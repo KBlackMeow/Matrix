@@ -5,6 +5,8 @@ class Webshell {
   final String name;
   final String url;
   final String? password;
+  /// Webshell 类型：php / jsp
+  final String type;
   /// 请求方法：GET / POST
   final String method;
   /// 1=在线, 0=离线
@@ -18,6 +20,7 @@ class Webshell {
     required this.name,
     required this.url,
     this.password,
+    this.type = 'php',
     this.method = 'POST',
     this.status = 1,
     required this.createdAt,
@@ -31,6 +34,7 @@ class Webshell {
       'name': name,
       'url': url,
       'password': password,
+      'type': type,
       'method': method,
       'status': status,
       'created_at': createdAt.millisecondsSinceEpoch,
@@ -45,6 +49,7 @@ class Webshell {
       name: map['name'] as String,
       url: map['url'] as String,
       password: map['password'] as String?,
+      type: (map['type'] as String?) ?? 'php',
       method: (map['method'] as String?) ?? 'POST',
       status: (map['status'] as int?) ?? 1,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
@@ -58,6 +63,7 @@ class Webshell {
     String? name,
     String? url,
     String? password,
+    String? type,
     String? method,
     int? status,
     DateTime? createdAt,
@@ -69,6 +75,7 @@ class Webshell {
       name: name ?? this.name,
       url: url ?? this.url,
       password: password ?? this.password,
+      type: type ?? this.type,
       method: method ?? this.method,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,

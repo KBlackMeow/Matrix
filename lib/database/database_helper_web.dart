@@ -59,6 +59,7 @@ class DatabaseHelperWeb {
     required String url,
     String? password,
     String method = 'POST',
+    String type = 'php',
   }) async {
     final now = DateTime.now();
     final ws = Webshell(
@@ -67,6 +68,7 @@ class DatabaseHelperWeb {
       name: name,
       url: url,
       password: password,
+      type: type,
       method: method,
       createdAt: now,
       updatedAt: now,

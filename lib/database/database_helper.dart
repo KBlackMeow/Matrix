@@ -37,8 +37,16 @@ class DatabaseHelper {
     required String url,
     String? password,
     String method = 'POST',
+    String type = 'php',
   }) async {
-    return impl.createWebshell(projectId, name: name, url: url, password: password, method: method);
+    return impl.createWebshell(
+      projectId,
+      name: name,
+      url: url,
+      password: password,
+      method: method,
+      type: type,
+    );
   }
 
   Future<List<Webshell>> getWebshellsByProject(int projectId) async {

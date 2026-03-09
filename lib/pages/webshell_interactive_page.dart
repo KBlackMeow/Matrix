@@ -498,9 +498,7 @@ class _TerminalTabState extends State<_TerminalTab>
       decoration: BoxDecoration(
         color: AppColors.bgElevated,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.45),
-        ),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.45)),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withValues(alpha: 0.12),
@@ -693,13 +691,13 @@ class _TerminalTabState extends State<_TerminalTab>
 
   Future<void> _doTabComplete() async {
     if (_executing) return;
-    final newText =
-        await _completer.onTab(_inputController.text, _currentDir);
+    final newText = await _completer.onTab(_inputController.text, _currentDir);
     if (newText != null && mounted) {
       _tabbing = true;
       _inputController.text = newText;
-      _inputController.selection =
-          TextSelection.collapsed(offset: newText.length);
+      _inputController.selection = TextSelection.collapsed(
+        offset: newText.length,
+      );
       _tabbing = false;
     }
   }
@@ -806,17 +804,97 @@ class _TabCompleter {
 
   // 内置命令列表（无需请求服务器）
   static const List<String> _builtins = [
-    'alias', 'apt', 'awk', 'base64', 'basename', 'bash', 'cat', 'cd',
-    'chmod', 'chown', 'chroot', 'clear', 'cp', 'crontab', 'curl', 'cut',
-    'date', 'dd', 'df', 'diff', 'dirname', 'du', 'echo', 'env', 'exit',
-    'export', 'find', 'grep', 'gunzip', 'gzip', 'head', 'hostname', 'id',
-    'ifconfig', 'ip', 'kill', 'killall', 'less', 'ln', 'ls', 'lsof',
-    'mkdir', 'more', 'mount', 'mv', 'nano', 'netstat', 'nohup', 'nslookup',
-    'passwd', 'perl', 'php', 'ping', 'printenv', 'ps', 'python', 'python3',
-    'pwd', 'rm', 'rmdir', 'rsync', 'scp', 'sed', 'sh', 'sleep', 'sort',
-    'ssh', 'stat', 'strings', 'su', 'sudo', 'tail', 'tar', 'tee', 'touch',
-    'tr', 'uname', 'uniq', 'unset', 'unzip', 'uptime', 'useradd', 'vi',
-    'vim', 'wc', 'wget', 'which', 'whoami', 'xargs', 'zip', 'zsh',
+    'alias',
+    'apt',
+    'awk',
+    'base64',
+    'basename',
+    'bash',
+    'cat',
+    'cd',
+    'chmod',
+    'chown',
+    'chroot',
+    'clear',
+    'cp',
+    'crontab',
+    'curl',
+    'cut',
+    'date',
+    'dd',
+    'df',
+    'diff',
+    'dirname',
+    'du',
+    'echo',
+    'env',
+    'exit',
+    'export',
+    'find',
+    'grep',
+    'gunzip',
+    'gzip',
+    'head',
+    'hostname',
+    'id',
+    'ifconfig',
+    'ip',
+    'kill',
+    'killall',
+    'less',
+    'ln',
+    'ls',
+    'lsof',
+    'mkdir',
+    'more',
+    'mount',
+    'mv',
+    'nano',
+    'netstat',
+    'nohup',
+    'nslookup',
+    'passwd',
+    'perl',
+    'php',
+    'ping',
+    'printenv',
+    'ps',
+    'python',
+    'python3',
+    'pwd',
+    'rm',
+    'rmdir',
+    'rsync',
+    'scp',
+    'sed',
+    'sh',
+    'sleep',
+    'sort',
+    'ssh',
+    'stat',
+    'strings',
+    'su',
+    'sudo',
+    'tail',
+    'tar',
+    'tee',
+    'touch',
+    'tr',
+    'uname',
+    'uniq',
+    'unset',
+    'unzip',
+    'uptime',
+    'useradd',
+    'vi',
+    'vim',
+    'wc',
+    'wget',
+    'which',
+    'whoami',
+    'xargs',
+    'zip',
+    'zsh',
   ];
 
   // 当前补全循环状态
@@ -971,7 +1049,9 @@ class _TabCompleter {
       final seen = <String>{};
       _matches = [
         for (final m in [...cmdM, ...fileM])
-          if (seen.add(m.endsWith('/') ? m.substring(0, m.length - 1) : m.trim()))
+          if (seen.add(
+            m.endsWith('/') ? m.substring(0, m.length - 1) : m.trim(),
+          ))
             m,
       ];
       _tokenPrefix = '';
@@ -1647,7 +1727,11 @@ class _FileViewDialogState extends State<_FileViewDialog> {
                         style: const TextStyle(
                           color: Color(0xFFB8C0CC),
                           fontFamily: 'Monaco',
-                          fontFamilyFallback: ['Courier New', 'Courier', 'monospace'],
+                          fontFamilyFallback: [
+                            'Courier New',
+                            'Courier',
+                            'monospace',
+                          ],
                           fontSize: 12,
                           height: 1.7,
                           letterSpacing: 0.2,
@@ -1913,7 +1997,7 @@ class _SystemInfoTabState extends State<_SystemInfoTab>
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '请检查 Webshell 是否可正常执行 PHP 代码',
+                        '请检查 Webshell 是否可正常执行远程代码/命令',
                         style: AppTextStyles.caption(
                           color: AppColors.textMuted,
                         ),

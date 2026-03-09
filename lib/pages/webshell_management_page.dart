@@ -55,6 +55,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
     final passwordController = TextEditingController();
     final nameController = TextEditingController();
     String selectedMethod = 'POST';
+    String selectedType = 'php';
     bool obscurePassword = true;
 
     final result = await showDialog<bool>(
@@ -87,7 +88,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                     fontFamily: 'monospace',
                   ),
                   decoration: InputDecoration(
-                    labelText: '密码（可选）',
+                    labelText: '密码 *',
                     labelStyle: const TextStyle(color: AppColors.textSecondary),
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(
@@ -119,6 +120,29 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                 Row(
                   children: [
                     Text(
+                      '类型：',
+                      style: AppTextStyles.body(color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(width: 12),
+                    ChoiceChip(
+                      label: const Text('PHP'),
+                      selected: selectedType == 'php',
+                      onSelected: (_) =>
+                          setDialogState(() => selectedType = 'php'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('JSP'),
+                      selected: selectedType == 'jsp',
+                      onSelected: (_) =>
+                          setDialogState(() => selectedType = 'jsp'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Text(
                       '请求方法：',
                       style: AppTextStyles.body(color: AppColors.textSecondary),
                     ),
@@ -140,7 +164,10 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
             ),
             FilledButton(
               onPressed: () {
-                if (urlController.text.trim().isEmpty) return;
+                if (urlController.text.trim().isEmpty ||
+                    passwordController.text.isEmpty) {
+                  return;
+                }
                 Navigator.pop(context, true);
               },
               style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
@@ -152,7 +179,9 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
       ),
     );
 
-    if (result == true && urlController.text.trim().isNotEmpty) {
+    if (result == true &&
+        urlController.text.trim().isNotEmpty &&
+        passwordController.text.isNotEmpty) {
       final url = urlController.text.trim();
       final name = nameController.text.trim().isEmpty
           ? _deriveNameFromUrl(url)
@@ -161,8 +190,9 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
         widget.project.id,
         name: name,
         url: url,
-        password: passwordController.text.isEmpty ? null : passwordController.text,
+        password: passwordController.text,
         method: selectedMethod,
+        type: selectedType,
       );
       _loadWebshells();
     }
@@ -173,6 +203,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
     final passwordController = TextEditingController(text: ws.password ?? '');
     final nameController = TextEditingController(text: ws.name);
     String selectedMethod = ws.method;
+    String selectedType = ws.type;
     bool obscurePassword = true;
 
     final result = await showDialog<bool>(
@@ -205,7 +236,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                     fontFamily: 'monospace',
                   ),
                   decoration: InputDecoration(
-                    labelText: '密码（可选）',
+                    labelText: '密码 *',
                     labelStyle: const TextStyle(color: AppColors.textSecondary),
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(
@@ -237,6 +268,29 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                 Row(
                   children: [
                     Text(
+                      '类型：',
+                      style: AppTextStyles.body(color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(width: 12),
+                    ChoiceChip(
+                      label: const Text('PHP'),
+                      selected: selectedType == 'php',
+                      onSelected: (_) =>
+                          setDialogState(() => selectedType = 'php'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('JSP'),
+                      selected: selectedType == 'jsp',
+                      onSelected: (_) =>
+                          setDialogState(() => selectedType = 'jsp'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Text(
                       '请求方法：',
                       style: AppTextStyles.body(color: AppColors.textSecondary),
                     ),
@@ -258,7 +312,10 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
             ),
             FilledButton(
               onPressed: () {
-                if (urlController.text.trim().isEmpty) return;
+                if (urlController.text.trim().isEmpty ||
+                    passwordController.text.isEmpty) {
+                  return;
+                }
                 Navigator.pop(context, true);
               },
               style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
@@ -270,7 +327,9 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
       ),
     );
 
-    if (result == true && urlController.text.trim().isNotEmpty) {
+    if (result == true &&
+        urlController.text.trim().isNotEmpty &&
+        passwordController.text.isNotEmpty) {
       final url = urlController.text.trim();
       final name = nameController.text.trim().isEmpty
           ? _deriveNameFromUrl(url)
@@ -278,7 +337,8 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
       await _db.updateWebshell(ws.copyWith(
         name: name,
         url: url,
-        password: passwordController.text.isEmpty ? null : passwordController.text,
+        password: passwordController.text,
+        type: selectedType,
         method: selectedMethod,
       ));
       _loadWebshells();
@@ -564,6 +624,13 @@ class _WebshellCard extends StatelessWidget {
                           size: 14, color: AppColors.textPrimary),
                     ),
                     const SizedBox(width: 8),
+                    _Tag(
+                      label: webshell.type.toUpperCase(),
+                      color: webshell.type == 'jsp'
+                          ? AppColors.amber
+                          : AppColors.cyan,
+                    ),
+                    const SizedBox(width: 6),
                     _Tag(
                       label: webshell.method,
                       color: webshell.method == 'POST'

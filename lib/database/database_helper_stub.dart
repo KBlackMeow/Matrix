@@ -21,7 +21,16 @@ Future<Webshell> createWebshell(
   required String url,
   String? password,
   String method = 'POST',
-}) => _web.createWebshell(projectId, name: name, url: url, password: password, method: method);
+  String type = 'php',
+}) =>
+    _web.createWebshell(
+      projectId,
+      name: name,
+      url: url,
+      password: password,
+      method: method,
+      type: type,
+    );
 
 Future<List<Webshell>> getWebshellsByProject(int projectId) =>
     _web.getWebshellsByProject(projectId);

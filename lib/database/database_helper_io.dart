@@ -26,7 +26,7 @@ class DatabaseHelperIo {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -64,6 +64,7 @@ class DatabaseHelperIo {
         name TEXT NOT NULL,
         url TEXT NOT NULL,
         password TEXT,
+        type TEXT NOT NULL DEFAULT 'php',
         method TEXT,
         status INTEGER DEFAULT 1,
         created_at INTEGER NOT NULL,
@@ -82,7 +83,12 @@ class DatabaseHelperIo {
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      await db.execute('ALTER TABLE projects ADD COLUMN domain TEXT NOT NULL DEFAULT ""');
+      await db.execute(
+          'ALTER TABLE projects ADD COLUMN domain TEXT NOT NULL DEFAULT ""');
+    }
+    if (oldVersion < 3) {
+      await db.execute(
+          "ALTER TABLE webshells ADD COLUMN type TEXT NOT NULL DEFAULT 'php'");
     }
   }
 
@@ -146,6 +152,7 @@ class DatabaseHelperIo {
     required String url,
     String? password,
     String method = 'POST',
+    String type = 'php',
   }) async {
     final db = await database;
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -154,6 +161,7 @@ class DatabaseHelperIo {
       'name': name,
       'url': url,
       'password': password,
+      'type': type,
       'method': method,
       'status': 1,
       'created_at': now,
@@ -165,6 +173,7 @@ class DatabaseHelperIo {
       name: name,
       url: url,
       password: password,
+      type: type,
       method: method,
       createdAt: DateTime.fromMillisecondsSinceEpoch(now),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
@@ -225,7 +234,16 @@ Future<Webshell> createWebshell(
   required String url,
   String? password,
   String method = 'POST',
-}) => _io.createWebshell(projectId, name: name, url: url, password: password, method: method);
+  String type = 'php',
+}) =>
+    _io.createWebshell(
+      projectId,
+      name: name,
+      url: url,
+      password: password,
+      method: method,
+      type: type,
+    );
 
 Future<List<Webshell>> getWebshellsByProject(int projectId) =>
     _io.getWebshellsByProject(projectId);
