@@ -199,6 +199,49 @@ foreach($info as $k=>$v){
     return result.trim() == '1';
   }
 
+  /// 轻量目录列举，仅返回 (name, isDir)，用于 Tab 补全缓存
+  Future<List<({String name, bool isDir})>> listNamesForCompletion(
+      String path) async {
+    final b64 = base64.encode(utf8.encode(path));
+    final code = "\$p=base64_decode('$b64');"
+        r"$d=@opendir($p);"
+        r"if($d===false){exit;}"
+        r"while(($f=readdir($d))!==false){"
+        r"if($f==='.'||$f==='..'){continue;}"
+        r"$t=is_dir($p.DIRECTORY_SEPARATOR.$f)?'d':'f';"
+        r"echo base64_encode($f).'|'.$t.chr(10);"
+        r"}closedir($d);";
+    final result = await _send(code);
+    if (result.isEmpty || result.startsWith('[')) return [];
+    final out = <({String name, bool isDir})>[];
+    for (final line in result.trim().split('\n')) {
+      final parts = line.trim().split('|');
+      if (parts.length < 2) continue;
+      try {
+        final name = utf8.decode(base64.decode(parts[0]));
+        out.add((name: name, isDir: parts[1] == 'd'));
+      } catch (_) {}
+    }
+    out.sort((a, b) => a.name.compareTo(b.name));
+    return out;
+  }
+
+  /// 返回用户 HOME 目录，用于 ~ 路径展开
+  Future<String> getHomeDir() async {
+    final result = await _send(r"echo getenv('HOME');");
+    return result.trim();
+  }
+
+  /// 返回环境变量名列表，用于 Tab 补全 $VAR
+  Future<List<String>> listEnvVarNames() async {
+    final result = await _send(
+      r"foreach(array_keys((array)getenv()) as $k){echo $k.chr(10);}",
+    );
+    if (result.isEmpty || result.startsWith('[')) return [];
+    return result.trim().split('\n').where((s) => s.isNotEmpty).toList()
+      ..sort();
+  }
+
   /// 写入/创建文件
   Future<bool> writeFile(String path, String content) async {
     final pathB64 = base64.encode(utf8.encode(path));
