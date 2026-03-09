@@ -306,13 +306,30 @@ class _TerminalTabState extends State<_TerminalTab>
     _inputController.clear();
     // 不立即跳转：entry 停在视口外下方，等输出返回后一起滑入
 
-    final output = await widget.service.executeCommand(cmd);
+    // cd 命令追加 marker+pwd，单次请求同时获取新目录，不再额外发网络请求
+    const _cwdMarker = '__MATRIX_CWD__';
+    final isCd = cmd == 'cd' || cmd.startsWith('cd ') || cmd.startsWith('cd\t');
+    final sendCmd =
+        isCd ? "$cmd 2>&1; echo '$_cwdMarker'; pwd" : cmd;
 
-    // 如果是 cd 命令，刷新当前目录并预热新目录的补全缓存
-    if (cmd.startsWith('cd ') || cmd == 'cd') {
-      final newDir = await widget.service.getCurrentDir();
-      if (mounted) setState(() => _currentDir = newDir);
-      _completer.warmDir(newDir);
+    final execResult = await widget.service.executeCommand(
+      sendCmd,
+      workingDir: _currentDir,
+    );
+
+    // 解析 cd 后的新目录
+    String output = execResult;
+    if (isCd) {
+      const sep = '$_cwdMarker\n';
+      final idx = execResult.lastIndexOf(sep);
+      if (idx >= 0) {
+        output = execResult.substring(0, idx).trim();
+        final newDir = execResult.substring(idx + sep.length).trim();
+        if (newDir.isNotEmpty && mounted) {
+          setState(() => _currentDir = newDir);
+          _completer.warmDir(newDir);
+        }
+      }
     }
 
     if (mounted) {
