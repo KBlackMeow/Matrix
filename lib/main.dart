@@ -2,16 +2,21 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import 'database/database_helper.dart';
 import 'database/database_init.dart';
 import 'models/project.dart';
 import 'pages/project_management_page.dart';
 import 'pages/project_scoped_page.dart';
 import 'pages/webshell_management_page.dart';
+import 'pages/payload_management_page.dart';
+import 'pages/dictionary_management_page.dart';
+import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   initDatabase(); // 初始化 SQLite（桌面端使用 FFI）
+  await SeedService.seed(DatabaseHelper()); // 首次启动种子化内置默认数据
   runApp(const MyApp());
 }
 
@@ -135,6 +140,12 @@ class _MainLayoutState extends State<MainLayout> {
         contentBuilder: (project, onSwitchProject) =>
             WebshellManagementPage(project: project, onSwitchProject: onSwitchProject),
       );
+    }
+    if (_selectedIndex == 4) {
+      return const PayloadManagementPage();
+    }
+    if (_selectedIndex == 5) {
+      return const DictionaryManagementPage();
     }
     return _WorkspaceContent(title: _menuItems[_selectedIndex].label);
   }

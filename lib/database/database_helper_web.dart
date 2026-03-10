@@ -1,13 +1,19 @@
 import '../models/project.dart';
 import '../models/webshell.dart';
+import '../models/payload.dart';
+import '../models/dictionary.dart';
 
 /// Web 平台内存存储（SQLite 不支持 Web，数据仅会话内有效）
 class DatabaseHelperWeb {
   static final DatabaseHelperWeb _instance = DatabaseHelperWeb._internal();
   final List<Project> _projects = [];
   final List<Webshell> _webshells = [];
+  final List<Payload> _payloads = [];
+  final List<Dictionary> _dictionaries = [];
   int _nextId = 1;
   int _nextWebshellId = 1;
+  int _nextPayloadId = 1;
+  int _nextDictId = 1;
 
   factory DatabaseHelperWeb() => _instance;
 
@@ -60,6 +66,7 @@ class DatabaseHelperWeb {
     String? password,
     String method = 'POST',
     String type = 'php',
+    String connectorType = 'php_eval',
   }) async {
     final now = DateTime.now();
     final ws = Webshell(
@@ -70,6 +77,7 @@ class DatabaseHelperWeb {
       password: password,
       type: type,
       method: method,
+      connectorType: connectorType,
       createdAt: now,
       updatedAt: now,
     );
@@ -95,5 +103,96 @@ class DatabaseHelperWeb {
     final len = _webshells.length;
     _webshells.removeWhere((w) => w.id == id);
     return len - _webshells.length;
+  }
+
+  // Payload 内存实现
+
+  Future<Payload> createPayload({
+    required String name,
+    required String type,
+    required String content,
+    bool isDefault = false,
+    String? description,
+    String? tags,
+  }) async {
+    final now = DateTime.now();
+    final payload = Payload(
+      id: _nextPayloadId++,
+      name: name,
+      type: type,
+      content: content,
+      filePath: '',
+      isDefault: isDefault,
+      description: description,
+      tags: tags,
+      createdAt: now,
+      updatedAt: now,
+    );
+    _payloads.insert(0, payload);
+    return payload;
+  }
+
+  Future<List<Payload>> getAllPayloads() async {
+    return List.from(_payloads)
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  Future<int> updatePayload(Payload payload) async {
+    final index = _payloads.indexWhere((p) => p.id == payload.id);
+    if (index < 0) return 0;
+    _payloads[index] = payload.copyWith(updatedAt: DateTime.now());
+    return 1;
+  }
+
+  Future<int> deletePayload(int id) async {
+    final len = _payloads.length;
+    _payloads.removeWhere((p) => p.id == id);
+    return len - _payloads.length;
+  }
+
+  // Dictionary 内存实现
+
+  Future<Dictionary> createDictionary({
+    required String name,
+    required String category,
+    required List<int> bytes,
+    bool isDefault = false,
+    String? description,
+    String? tags,
+  }) async {
+    final now = DateTime.now();
+    final lineCount =
+        bytes.where((b) => b == 10).length +
+        (bytes.isNotEmpty && bytes.last != 10 ? 1 : 0);
+    final dict = Dictionary(
+      id: _nextDictId++,
+      name: name,
+      category: category,
+      filePath: '',
+      lineCount: lineCount,
+      fileSize: bytes.length,
+      isDefault: isDefault,
+      description: description,
+      tags: tags,
+      createdAt: now,
+      updatedAt: now,
+    );
+    _dictionaries.insert(0, dict);
+    return dict;
+  }
+
+  Future<List<Dictionary>> getAllDictionaries() async {
+    return List.from(_dictionaries)
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  Future<String> readDictionaryPreview(String filePath,
+      {int maxLines = 300}) async =>
+      '// Web 模式：文件预览不可用';
+
+  Future<int> deleteDictionary(int id) async {
+    final len = _dictionaries.length;
+    _dictionaries.removeWhere((d) => d.id == id);
+    return len - _dictionaries.length;
   }
 }

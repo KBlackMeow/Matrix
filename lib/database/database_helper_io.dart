@@ -1,9 +1,16 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+// ConflictAlgorithm is exported by sqflite
 import 'package:path_provider/path_provider.dart';
 
 import '../models/project.dart';
 import '../models/webshell.dart';
+import '../models/payload.dart';
+import '../models/dictionary.dart';
 
 /// 桌面/移动端 SQLite 实现
 class DatabaseHelperIo {
@@ -26,7 +33,7 @@ class DatabaseHelperIo {
 
     return openDatabase(
       path,
-      version: 3,
+      version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -67,9 +74,47 @@ class DatabaseHelperIo {
         type TEXT NOT NULL DEFAULT 'php',
         method TEXT,
         status INTEGER DEFAULT 1,
+        connector_type TEXT NOT NULL DEFAULT 'php_eval',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         FOREIGN KEY (project_id) REFERENCES projects (id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE payloads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'php',
+        file_path TEXT NOT NULL DEFAULT '',
+        is_default INTEGER NOT NULL DEFAULT 0,
+        description TEXT,
+        tags TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE dictionaries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'custom',
+        file_path TEXT NOT NULL DEFAULT '',
+        line_count INTEGER NOT NULL DEFAULT 0,
+        file_size INTEGER NOT NULL DEFAULT 0,
+        is_default INTEGER NOT NULL DEFAULT 0,
+        description TEXT,
+        tags TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
       )
     ''');
 
@@ -89,6 +134,97 @@ class DatabaseHelperIo {
     if (oldVersion < 3) {
       await db.execute(
           "ALTER TABLE webshells ADD COLUMN type TEXT NOT NULL DEFAULT 'php'");
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS payloads (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT 'php',
+          content TEXT NOT NULL,
+          description TEXT,
+          tags TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 5) {
+      // 读取旧版所有 payload 的内容，迁移到本地文件
+      final rows = await db.rawQuery(
+          'SELECT id, name, type, content, description, tags, created_at, updated_at FROM payloads');
+
+      // 创建新表（用 file_path 替换 content）
+      await db.execute('''
+        CREATE TABLE payloads_v5 (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT 'php',
+          file_path TEXT NOT NULL DEFAULT '',
+          description TEXT,
+          tags TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+
+      final docsDir = await getApplicationDocumentsDirectory();
+      final payloadsDir = Directory('${docsDir.path}/mx_store');
+      if (!payloadsDir.existsSync()) await payloadsDir.create(recursive: true);
+
+      for (final row in rows) {
+        final id = row['id'] as int;
+        final name = row['name'] as String;
+        final content = (row['content'] as String?) ?? '';
+        final file = File(
+            '${payloadsDir.path}/${_hashedFileName(id, name)}');
+        await file.writeAsString(content);
+
+        await db.insert('payloads_v5', {
+          'id': id,
+          'name': name,
+          'type': (row['type'] as String?) ?? 'php',
+          'file_path': file.path,
+          'description': row['description'],
+          'tags': row['tags'],
+          'created_at': row['created_at'] as int,
+          'updated_at': row['updated_at'] as int,
+        });
+      }
+
+      await db.execute('DROP TABLE payloads');
+      await db.execute('ALTER TABLE payloads_v5 RENAME TO payloads');
+    }
+    if (oldVersion < 6) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS dictionaries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT 'custom',
+          file_path TEXT NOT NULL DEFAULT '',
+          line_count INTEGER NOT NULL DEFAULT 0,
+          file_size INTEGER NOT NULL DEFAULT 0,
+          description TEXT,
+          tags TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 7) {
+      await db.execute(
+          'CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+      await db.execute(
+          'ALTER TABLE payloads ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0');
+      await db.execute(
+          'ALTER TABLE dictionaries ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0');
+    }
+    if (oldVersion < 8) {
+      await db.execute(
+          "ALTER TABLE webshells ADD COLUMN connector_type TEXT NOT NULL DEFAULT 'php_eval'");
+      // 旧 JSP 类型自动映射到 jsp_classloader
+      await db.execute(
+          "UPDATE webshells SET connector_type = 'jsp_classloader' WHERE type = 'jsp'");
     }
   }
 
@@ -146,6 +282,272 @@ class DatabaseHelperIo {
     return db.delete('projects', where: 'id = ?', whereArgs: [id]);
   }
 
+  // ── Payload 文件目录 ────────────────────────────────────────────────────────
+
+  // 盐值：用于混淆文件名，不对外暴露
+  static const _kSalt = 'mx_payload_s3cr3t_2026';
+  static const _kDictSalt = 'mx_dict_s3cr3t_2026';
+
+  Future<Directory> _payloadsDir() async {
+    final docs = await getApplicationDocumentsDirectory();
+    final dir = Directory('${docs.path}/mx_store');
+    if (!dir.existsSync()) await dir.create(recursive: true);
+    return dir;
+  }
+
+  /// Payload 文件名：MD5(盐 + id + originalName)
+  static String _hashedFileName(int id, String name) {
+    final input = utf8.encode('$_kSalt$id$name');
+    return md5.convert(input).toString();
+  }
+
+  /// Dictionary 文件名：MD5(字典盐 + id + originalName)
+  static String _hashedDictFileName(int id, String name) {
+    final input = utf8.encode('$_kDictSalt$id$name');
+    return md5.convert(input).toString();
+  }
+
+  // ── Payload CRUD ────────────────────────────────────────────────────────────
+
+  // ── Meta 键值对 ─────────────────────────────────────────────────────────────
+
+  Future<String?> getMetaValue(String key) async {
+    final db = await database;
+    final rows =
+        await db.query('meta', where: 'key = ?', whereArgs: [key]);
+    if (rows.isEmpty) return null;
+    return rows.first['value'] as String?;
+  }
+
+  Future<void> setMetaValue(String key, String value) async {
+    final db = await database;
+    await db.insert('meta', {'key': key, 'value': value},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<Payload> createPayload({
+    required String name,
+    required String type,
+    required String content,
+    bool isDefault = false,
+    String? description,
+    String? tags,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    // 先插入行拿到自增 ID，file_path 暂时为空
+    final id = await db.insert('payloads', {
+      'name': name,
+      'type': type,
+      'file_path': '',
+      'is_default': isDefault ? 1 : 0,
+      'description': description,
+      'tags': tags,
+      'created_at': now,
+      'updated_at': now,
+    });
+
+    // 写入本地文件（MD5 混淆文件名）
+    final dir = await _payloadsDir();
+    final file = File('${dir.path}/${_hashedFileName(id, name)}');
+    await file.writeAsString(content);
+
+    // 更新 file_path
+    await db.update(
+      'payloads',
+      {'file_path': file.path},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    return Payload(
+      id: id,
+      name: name,
+      type: type,
+      content: content,
+      filePath: file.path,
+      isDefault: isDefault,
+      description: description,
+      tags: tags,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(now),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
+    );
+  }
+
+  Future<List<Payload>> getAllPayloads() async {
+    final db = await database;
+    // 默认项置顶，其余按更新时间倒序
+    final maps = await db.query('payloads',
+        orderBy: 'is_default DESC, updated_at DESC');
+    final result = <Payload>[];
+    for (final m in maps) {
+      final filePath = (m['file_path'] as String?) ?? '';
+      String content = '';
+      if (filePath.isNotEmpty) {
+        try {
+          content = await File(filePath).readAsString();
+        } catch (_) {
+          content = '// 文件丢失: $filePath';
+        }
+      }
+      result.add(Payload(
+        id: m['id'] as int,
+        name: m['name'] as String,
+        type: (m['type'] as String?) ?? 'php',
+        content: content,
+        filePath: filePath,
+        isDefault: (m['is_default'] as int? ?? 0) == 1,
+        description: m['description'] as String?,
+        tags: m['tags'] as String?,
+        createdAt:
+            DateTime.fromMillisecondsSinceEpoch(m['created_at'] as int),
+        updatedAt:
+            DateTime.fromMillisecondsSinceEpoch(m['updated_at'] as int),
+      ));
+    }
+    return result;
+  }
+
+  Future<int> updatePayload(Payload payload) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    // 同步更新文件内容
+    if (payload.filePath.isNotEmpty) {
+      try {
+        await File(payload.filePath).writeAsString(payload.content);
+      } catch (_) {}
+    }
+    return db.update(
+      'payloads',
+      {
+        'name': payload.name,
+        'type': payload.type,
+        'description': payload.description,
+        'tags': payload.tags,
+        'updated_at': now,
+      },
+      where: 'id = ?',
+      whereArgs: [payload.id],
+    );
+  }
+
+  Future<int> deletePayload(int id) async {
+    final db = await database;
+    // 先查询 file_path 再删文件
+    final rows = await db.query('payloads',
+        columns: ['file_path'], where: 'id = ?', whereArgs: [id]);
+    if (rows.isNotEmpty) {
+      final fp = rows.first['file_path'] as String? ?? '';
+      if (fp.isNotEmpty) {
+        try {
+          await File(fp).delete();
+        } catch (_) {}
+      }
+    }
+    return db.delete('payloads', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ── Dictionary CRUD ─────────────────────────────────────────────────────────
+
+  Future<Dictionary> createDictionary({
+    required String name,
+    required String category,
+    required List<int> bytes,
+    bool isDefault = false,
+    String? description,
+    String? tags,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    // 先插入占位行拿到自增 ID
+    final id = await db.insert('dictionaries', {
+      'name': name,
+      'category': category,
+      'file_path': '',
+      'line_count': 0,
+      'file_size': 0,
+      'is_default': isDefault ? 1 : 0,
+      'description': description,
+      'tags': tags,
+      'created_at': now,
+      'updated_at': now,
+    });
+
+    // 写入哈希文件
+    final dir = await _payloadsDir();
+    final file = File('${dir.path}/${_hashedDictFileName(id, name)}');
+    await file.writeAsBytes(bytes);
+
+    // 统计行数和大小
+    final lineCount = bytes.where((b) => b == 10).length +
+        (bytes.isNotEmpty && bytes.last != 10 ? 1 : 0);
+    final fileSize = bytes.length;
+
+    await db.update(
+      'dictionaries',
+      {'file_path': file.path, 'line_count': lineCount, 'file_size': fileSize},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    return Dictionary(
+      id: id,
+      name: name,
+      category: category,
+      filePath: file.path,
+      lineCount: lineCount,
+      fileSize: fileSize,
+      isDefault: isDefault,
+      description: description,
+      tags: tags,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(now),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
+    );
+  }
+
+  Future<List<Dictionary>> getAllDictionaries() async {
+    final db = await database;
+    // 默认项置顶
+    final maps = await db.query('dictionaries',
+        orderBy: 'is_default DESC, updated_at DESC');
+    return maps.map((m) => Dictionary.fromMap(m)).toList();
+  }
+
+  /// 读取字典前 [maxLines] 行作为预览
+  Future<String> readDictionaryPreview(String filePath,
+      {int maxLines = 300}) async {
+    if (filePath.isEmpty) return '';
+    try {
+      final lines = <String>[];
+      await File(filePath)
+          .openRead()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .take(maxLines)
+          .forEach(lines.add);
+      return lines.join('\n');
+    } catch (_) {
+      return '// 文件丢失: $filePath';
+    }
+  }
+
+  Future<int> deleteDictionary(int id) async {
+    final db = await database;
+    final rows = await db.query('dictionaries',
+        columns: ['file_path'], where: 'id = ?', whereArgs: [id]);
+    if (rows.isNotEmpty) {
+      final fp = rows.first['file_path'] as String? ?? '';
+      if (fp.isNotEmpty) {
+        try {
+          await File(fp).delete();
+        } catch (_) {}
+      }
+    }
+    return db.delete('dictionaries', where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<Webshell> createWebshell(
     int projectId, {
     required String name,
@@ -153,6 +555,7 @@ class DatabaseHelperIo {
     String? password,
     String method = 'POST',
     String type = 'php',
+    String connectorType = 'php_eval',
   }) async {
     final db = await database;
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -164,6 +567,7 @@ class DatabaseHelperIo {
       'type': type,
       'method': method,
       'status': 1,
+      'connector_type': connectorType,
       'created_at': now,
       'updated_at': now,
     });
@@ -175,6 +579,7 @@ class DatabaseHelperIo {
       password: password,
       type: type,
       method: method,
+      connectorType: connectorType,
       createdAt: DateTime.fromMillisecondsSinceEpoch(now),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
     );
@@ -200,8 +605,10 @@ class DatabaseHelperIo {
         'name': webshell.name,
         'url': webshell.url,
         'password': webshell.password,
+        'type': webshell.type,
         'method': webshell.method,
         'status': webshell.status,
+        'connector_type': webshell.connectorType,
         'updated_at': now,
       },
       where: 'id = ?',
@@ -235,6 +642,7 @@ Future<Webshell> createWebshell(
   String? password,
   String method = 'POST',
   String type = 'php',
+  String connectorType = 'php_eval',
 }) =>
     _io.createWebshell(
       projectId,
@@ -243,6 +651,7 @@ Future<Webshell> createWebshell(
       password: password,
       method: method,
       type: type,
+      connectorType: connectorType,
     );
 
 Future<List<Webshell>> getWebshellsByProject(int projectId) =>
@@ -251,3 +660,59 @@ Future<List<Webshell>> getWebshellsByProject(int projectId) =>
 Future<int> updateWebshell(Webshell webshell) => _io.updateWebshell(webshell);
 
 Future<int> deleteWebshell(int id) => _io.deleteWebshell(id);
+
+// Meta 顶层方法
+Future<String?> getMetaValue(String key) => _io.getMetaValue(key);
+Future<void> setMetaValue(String key, String value) =>
+    _io.setMetaValue(key, value);
+
+// Payload 相关顶层方法
+
+Future<Payload> createPayload({
+  required String name,
+  required String type,
+  required String content,
+  bool isDefault = false,
+  String? description,
+  String? tags,
+}) =>
+    _io.createPayload(
+      name: name,
+      type: type,
+      content: content,
+      isDefault: isDefault,
+      description: description,
+      tags: tags,
+    );
+
+Future<List<Payload>> getAllPayloads() => _io.getAllPayloads();
+
+Future<int> updatePayload(Payload payload) => _io.updatePayload(payload);
+
+Future<int> deletePayload(int id) => _io.deletePayload(id);
+
+// Dictionary 相关顶层方法
+
+Future<Dictionary> createDictionary({
+  required String name,
+  required String category,
+  required List<int> bytes,
+  bool isDefault = false,
+  String? description,
+  String? tags,
+}) =>
+    _io.createDictionary(
+      name: name,
+      category: category,
+      bytes: bytes,
+      isDefault: isDefault,
+      description: description,
+      tags: tags,
+    );
+
+Future<List<Dictionary>> getAllDictionaries() => _io.getAllDictionaries();
+
+Future<String> readDictionaryPreview(String filePath, {int maxLines = 300}) =>
+    _io.readDictionaryPreview(filePath, maxLines: maxLines);
+
+Future<int> deleteDictionary(int id) => _io.deleteDictionary(id);

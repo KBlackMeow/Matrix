@@ -148,24 +148,25 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                 color: AppColors.amber,
               ),
             ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           TextButton.icon(
             onPressed: _isChecking ? null : _checkConnection,
             icon: const Icon(Icons.wifi_tethering_rounded, size: 15),
             label: Text(
               _isChecking
-                  ? '检测中...'
+                  ? '检测中'
                   : _isConnected
                   ? '已连接'
-                  : '重新连接',
+                  : '重连',
             ),
             style: TextButton.styleFrom(
               foregroundColor: _isConnected
                   ? AppColors.primary
                   : AppColors.textSecondary,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           _methodBadge(widget.webshell.method),
           const SizedBox(width: 8),
         ],
@@ -200,6 +201,8 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       color: AppColors.bgElevated,
       child: TabBar(
         controller: _tabController,
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
         indicatorColor: AppColors.primary,
         indicatorWeight: 2,
         labelColor: AppColors.primary,
@@ -1388,25 +1391,30 @@ class _FileManagerTabState extends State<_FileManagerTab>
           ),
         ),
         // 列标题
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-          decoration: const BoxDecoration(
-            color: AppColors.bgCard,
-            border: Border(
-              bottom: BorderSide(color: AppColors.border),
-              top: BorderSide(color: AppColors.border),
-            ),
-          ),
-          child: Row(
-            children: [
-              const SizedBox(width: 28),
-              _colHeader('名称', flex: 5),
-              _colHeader('大小', width: 80),
-              _colHeader('权限', width: 60),
-              _colHeader('修改时间', width: 130),
-              const SizedBox(width: 90),
-            ],
-          ),
+        LayoutBuilder(
+          builder: (ctx, constraints) {
+            final w = constraints.maxWidth;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              decoration: const BoxDecoration(
+                color: AppColors.bgCard,
+                border: Border(
+                  bottom: BorderSide(color: AppColors.border),
+                  top: BorderSide(color: AppColors.border),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 28),
+                  _colHeader('名称', flex: 5),
+                  if (w > 480) _colHeader('大小', width: 80),
+                  if (w > 560) _colHeader('权限', width: 60),
+                  if (w > 640) _colHeader('修改时间', width: 130),
+                  SizedBox(width: w > 480 ? 90 : 72),
+                ],
+              ),
+            );
+          },
         ),
         // 文件列表
         Expanded(
@@ -1473,7 +1481,10 @@ class _FileRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUp = entry.name == '..';
-    return InkWell(
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final w = constraints.maxWidth;
+        return InkWell(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
@@ -1513,6 +1524,7 @@ class _FileRow extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (w > 480)
             SizedBox(
               width: 80,
               child: Text(
@@ -1523,6 +1535,7 @@ class _FileRow extends StatelessWidget {
                 ),
               ),
             ),
+            if (w > 560)
             SizedBox(
               width: 60,
               child: Text(
@@ -1533,6 +1546,7 @@ class _FileRow extends StatelessWidget {
                 ).copyWith(letterSpacing: 0.5),
               ),
             ),
+            if (w > 640)
             SizedBox(
               width: 130,
               child: Text(
@@ -1544,7 +1558,7 @@ class _FileRow extends StatelessWidget {
               ),
             ),
             SizedBox(
-              width: 90,
+              width: w > 480 ? 90 : 72,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -1575,6 +1589,8 @@ class _FileRow extends StatelessWidget {
           ],
         ),
       ),
+        );
+      },
     );
   }
 

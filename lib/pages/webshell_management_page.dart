@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../connectors/connector_factory.dart';
 import '../database/database_helper.dart';
 import '../models/project.dart';
 import '../models/webshell.dart';
@@ -55,127 +58,156 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
     final passwordController = TextEditingController();
     final nameController = TextEditingController();
     String selectedMethod = 'POST';
-    String selectedType = 'php';
+    String selectedConnectorType = 'php_eval';
     bool obscurePassword = true;
+    bool detecting = false;
+    List<_DetectResult>? detectResults;
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: AppColors.bgCard,
-          title: Text(
-            '添加 Webshell',
-            style: AppTextStyles.heading(color: AppColors.primary),
-          ),
-          content: SizedBox(
-            width: 440,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildField(
-                  controller: urlController,
-                  label: 'Webshell 地址 *',
-                  hint: 'http://example.com/shell.php',
-                  autofocus: true,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: passwordController,
-                  obscureText: obscurePassword,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontFamily: 'monospace',
-                  ),
-                  decoration: InputDecoration(
-                    labelText: '密码 *',
-                    labelStyle: const TextStyle(color: AppColors.textSecondary),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                          color: AppColors.primary.withValues(alpha: 0.5)),
+        builder: (context, setDialogState) {
+          Future<void> runDetect() async {
+            final url = urlController.text.trim();
+            final pass = passwordController.text;
+            if (url.isEmpty || pass.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('请先填写地址和密码'),
+                behavior: SnackBarBehavior.floating,
+                duration: Duration(seconds: 2),
+              ));
+              return;
+            }
+            setDialogState(() {
+              detecting = true;
+              detectResults = null;
+            });
+            final results = await _autoDetect(
+                url: url, password: pass, method: selectedMethod);
+            final first = results.firstWhere((r) => r.ok,
+                orElse: () => results.first);
+            setDialogState(() {
+              detecting = false;
+              detectResults = results;
+              if (first.ok) selectedConnectorType = first.type;
+            });
+          }
+
+          return AlertDialog(
+            backgroundColor: AppColors.bgCard,
+            title: Text(
+              '添加 Webshell',
+              style: AppTextStyles.heading(color: AppColors.primary),
+            ),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildField(
+                      controller: urlController,
+                      label: 'Webshell 地址 *',
+                      hint: 'http://example.com/shell.php',
+                      autofocus: true,
                     ),
-                    focusedBorder: const OutlineInputBorder(
-                      borderSide: BorderSide(color: AppColors.primary),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        color: AppColors.textSecondary,
-                        size: 20,
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: passwordController,
+                      obscureText: obscurePassword,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontFamily: 'monospace',
                       ),
-                      onPressed: () =>
-                          setDialogState(() => obscurePassword = !obscurePassword),
+                      decoration: InputDecoration(
+                        labelText: '密码 *',
+                        labelStyle:
+                            const TextStyle(color: AppColors.textSecondary),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                              color: AppColors.primary.withValues(alpha: 0.5)),
+                        ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderSide: BorderSide(color: AppColors.primary),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            color: AppColors.textSecondary,
+                            size: 20,
+                          ),
+                          onPressed: () => setDialogState(
+                              () => obscurePassword = !obscurePassword),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildField(
-                  controller: nameController,
-                  label: '备注名称（可选）',
-                  hint: '例如：后台管理 Shell',
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Text(
-                      '类型：',
-                      style: AppTextStyles.body(color: AppColors.textSecondary),
+                    const SizedBox(height: 16),
+                    _buildField(
+                      controller: nameController,
+                      label: '备注名称（可选）',
+                      hint: '例如：后台管理 Shell',
                     ),
-                    const SizedBox(width: 12),
-                    ChoiceChip(
-                      label: const Text('PHP'),
-                      selected: selectedType == 'php',
-                      onSelected: (_) =>
-                          setDialogState(() => selectedType = 'php'),
+                    const SizedBox(height: 16),
+                    _ConnectorRow(
+                      value: selectedConnectorType,
+                      detecting: detecting,
+                      onChanged: (v) => setDialogState(() {
+                        selectedConnectorType = v;
+                        final fixed = ConnectorFactory.fixedMethod(v);
+                        if (fixed != null) selectedMethod = fixed;
+                      }),
+                      onDetect: runDetect,
                     ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('JSP'),
-                      selected: selectedType == 'jsp',
-                      onSelected: (_) =>
-                          setDialogState(() => selectedType = 'jsp'),
+                    if (detectResults != null)
+                      _DetectResultPanel(results: detectResults!),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Text(
+                          '请求方法：',
+                          style:
+                              AppTextStyles.body(color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(width: 12),
+                        _MethodToggle(
+                          value: selectedMethod,
+                          lockedMethod: ConnectorFactory.fixedMethod(
+                              selectedConnectorType),
+                          onChanged: (v) =>
+                              setDialogState(() => selectedMethod = v),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Text(
-                      '请求方法：',
-                      style: AppTextStyles.body(color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(width: 12),
-                    _MethodToggle(
-                      value: selectedMethod,
-                      onChanged: (v) => setDialogState(() => selectedMethod = v),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text('取消',
-                  style: AppTextStyles.body(color: AppColors.textSecondary)),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (urlController.text.trim().isEmpty ||
-                    passwordController.text.isEmpty) {
-                  return;
-                }
-                Navigator.pop(context, true);
-              },
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-              child: Text('添加',
-                  style: AppTextStyles.body(color: AppColors.bgDark)),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text('取消',
+                    style:
+                        AppTextStyles.body(color: AppColors.textSecondary)),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (urlController.text.trim().isEmpty ||
+                      passwordController.text.isEmpty) {
+                    return;
+                  }
+                  Navigator.pop(context, true);
+                },
+                style:
+                    FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                child: Text('添加',
+                    style: AppTextStyles.body(color: AppColors.bgDark)),
+              ),
+            ],
+          );
+        },
       ),
     );
 
@@ -192,7 +224,8 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
         url: url,
         password: passwordController.text,
         method: selectedMethod,
-        type: selectedType,
+        type: ConnectorFactory.typeLabel(selectedConnectorType),
+        connectorType: selectedConnectorType,
       );
       _loadWebshells();
     }
@@ -203,127 +236,156 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
     final passwordController = TextEditingController(text: ws.password ?? '');
     final nameController = TextEditingController(text: ws.name);
     String selectedMethod = ws.method;
-    String selectedType = ws.type;
+    String selectedConnectorType = ws.connectorType;
     bool obscurePassword = true;
+    bool detecting = false;
+    List<_DetectResult>? detectResults;
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: AppColors.bgCard,
-          title: Text(
-            '编辑 Webshell',
-            style: AppTextStyles.heading(color: AppColors.primary),
-          ),
-          content: SizedBox(
-            width: 440,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildField(
-                  controller: urlController,
-                  label: 'Webshell 地址 *',
-                  hint: 'http://example.com/shell.php',
-                  autofocus: true,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: passwordController,
-                  obscureText: obscurePassword,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontFamily: 'monospace',
-                  ),
-                  decoration: InputDecoration(
-                    labelText: '密码 *',
-                    labelStyle: const TextStyle(color: AppColors.textSecondary),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                          color: AppColors.primary.withValues(alpha: 0.5)),
+        builder: (context, setDialogState) {
+          Future<void> runDetect() async {
+            final url = urlController.text.trim();
+            final pass = passwordController.text;
+            if (url.isEmpty || pass.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('请先填写地址和密码'),
+                behavior: SnackBarBehavior.floating,
+                duration: Duration(seconds: 2),
+              ));
+              return;
+            }
+            setDialogState(() {
+              detecting = true;
+              detectResults = null;
+            });
+            final results = await _autoDetect(
+                url: url, password: pass, method: selectedMethod);
+            final first = results.firstWhere((r) => r.ok,
+                orElse: () => results.first);
+            setDialogState(() {
+              detecting = false;
+              detectResults = results;
+              if (first.ok) selectedConnectorType = first.type;
+            });
+          }
+
+          return AlertDialog(
+            backgroundColor: AppColors.bgCard,
+            title: Text(
+              '编辑 Webshell',
+              style: AppTextStyles.heading(color: AppColors.primary),
+            ),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildField(
+                      controller: urlController,
+                      label: 'Webshell 地址 *',
+                      hint: 'http://example.com/shell.php',
+                      autofocus: true,
                     ),
-                    focusedBorder: const OutlineInputBorder(
-                      borderSide: BorderSide(color: AppColors.primary),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        color: AppColors.textSecondary,
-                        size: 20,
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: passwordController,
+                      obscureText: obscurePassword,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontFamily: 'monospace',
                       ),
-                      onPressed: () =>
-                          setDialogState(() => obscurePassword = !obscurePassword),
+                      decoration: InputDecoration(
+                        labelText: '密码 *',
+                        labelStyle:
+                            const TextStyle(color: AppColors.textSecondary),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                              color: AppColors.primary.withValues(alpha: 0.5)),
+                        ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderSide: BorderSide(color: AppColors.primary),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            color: AppColors.textSecondary,
+                            size: 20,
+                          ),
+                          onPressed: () => setDialogState(
+                              () => obscurePassword = !obscurePassword),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildField(
-                  controller: nameController,
-                  label: '备注名称（可选）',
-                  hint: '例如：后台管理 Shell',
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Text(
-                      '类型：',
-                      style: AppTextStyles.body(color: AppColors.textSecondary),
+                    const SizedBox(height: 16),
+                    _buildField(
+                      controller: nameController,
+                      label: '备注名称（可选）',
+                      hint: '例如：后台管理 Shell',
                     ),
-                    const SizedBox(width: 12),
-                    ChoiceChip(
-                      label: const Text('PHP'),
-                      selected: selectedType == 'php',
-                      onSelected: (_) =>
-                          setDialogState(() => selectedType = 'php'),
+                    const SizedBox(height: 16),
+                    _ConnectorRow(
+                      value: selectedConnectorType,
+                      detecting: detecting,
+                      onChanged: (v) => setDialogState(() {
+                        selectedConnectorType = v;
+                        final fixed = ConnectorFactory.fixedMethod(v);
+                        if (fixed != null) selectedMethod = fixed;
+                      }),
+                      onDetect: runDetect,
                     ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('JSP'),
-                      selected: selectedType == 'jsp',
-                      onSelected: (_) =>
-                          setDialogState(() => selectedType = 'jsp'),
+                    if (detectResults != null)
+                      _DetectResultPanel(results: detectResults!),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Text(
+                          '请求方法：',
+                          style:
+                              AppTextStyles.body(color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(width: 12),
+                        _MethodToggle(
+                          value: selectedMethod,
+                          lockedMethod: ConnectorFactory.fixedMethod(
+                              selectedConnectorType),
+                          onChanged: (v) =>
+                              setDialogState(() => selectedMethod = v),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Text(
-                      '请求方法：',
-                      style: AppTextStyles.body(color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(width: 12),
-                    _MethodToggle(
-                      value: selectedMethod,
-                      onChanged: (v) => setDialogState(() => selectedMethod = v),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text('取消',
-                  style: AppTextStyles.body(color: AppColors.textSecondary)),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (urlController.text.trim().isEmpty ||
-                    passwordController.text.isEmpty) {
-                  return;
-                }
-                Navigator.pop(context, true);
-              },
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-              child: Text('保存',
-                  style: AppTextStyles.body(color: AppColors.bgDark)),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text('取消',
+                    style:
+                        AppTextStyles.body(color: AppColors.textSecondary)),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (urlController.text.trim().isEmpty ||
+                      passwordController.text.isEmpty) {
+                    return;
+                  }
+                  Navigator.pop(context, true);
+                },
+                style:
+                    FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                child: Text('保存',
+                    style: AppTextStyles.body(color: AppColors.bgDark)),
+              ),
+            ],
+          );
+        },
       ),
     );
 
@@ -338,8 +400,9 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
         name: name,
         url: url,
         password: passwordController.text,
-        type: selectedType,
+        type: ConnectorFactory.typeLabel(selectedConnectorType),
         method: selectedMethod,
+        connectorType: selectedConnectorType,
       ));
       _loadWebshells();
     }
@@ -618,17 +681,22 @@ class _WebshellCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      webshell.name,
-                      style: AppTextStyles.body(
-                          size: 14, color: AppColors.textPrimary),
+                    Flexible(
+                      child: Text(
+                        webshell.name,
+                        style: AppTextStyles.body(
+                            size: 14, color: AppColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     _Tag(
-                      label: webshell.type.toUpperCase(),
-                      color: webshell.type == 'jsp'
+                      label: ConnectorFactory.shortLabel(webshell.connectorType),
+                      color: webshell.connectorType.startsWith('jsp')
                           ? AppColors.amber
-                          : AppColors.cyan,
+                          : webshell.connectorType.startsWith('asp')
+                              ? Colors.purple.shade300
+                              : AppColors.cyan,
                     ),
                     const SizedBox(width: 6),
                     _Tag(
@@ -682,38 +750,55 @@ class _WebshellCard extends StatelessWidget {
             ),
           ),
           // 操作按钮
-          Text(
-            _formatDate(webshell.createdAt),
-            style: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: onEnter,
-            icon: const Icon(Icons.terminal, size: 14),
-            label: const Text('进入'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-              foregroundColor: AppColors.primary,
-              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-              minimumSize: const Size(0, 32),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            color: AppColors.cyan,
-            tooltip: '编辑',
-            splashRadius: 18,
-          ),
-          IconButton(
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline, size: 18),
-            color: AppColors.red,
-            tooltip: '删除',
-            splashRadius: 18,
+          LayoutBuilder(
+            builder: (ctx, constraints) {
+              // constraints.maxWidth 在 Row 内恒为 0，用 MediaQuery 判断父级宽度
+              final screenW = MediaQuery.of(ctx).size.width;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (screenW > 680) ...[
+                    Text(
+                      _formatDate(webshell.createdAt),
+                      style: AppTextStyles.caption(
+                          size: 11, color: AppColors.textMuted),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  FilledButton.icon(
+                    onPressed: onEnter,
+                    icon: const Icon(Icons.terminal, size: 14),
+                    label: const Text('进入'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor:
+                          AppColors.primary.withValues(alpha: 0.15),
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(
+                          color: AppColors.primary.withValues(alpha: 0.5)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 0),
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    color: AppColors.cyan,
+                    tooltip: '编辑',
+                    splashRadius: 18,
+                  ),
+                  IconButton(
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    color: AppColors.red,
+                    tooltip: '删除',
+                    splashRadius: 18,
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -731,42 +816,74 @@ class _WebshellCard extends StatelessWidget {
 class _MethodToggle extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
+  /// 非 null 时表示该连接器固定使用此方法，切换按钮置灰并展示说明
+  final String? lockedMethod;
 
-  const _MethodToggle({required this.value, required this.onChanged});
+  const _MethodToggle({
+    required this.value,
+    required this.onChanged,
+    this.lockedMethod,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final locked = lockedMethod != null;
     return Row(
-      children: ['GET', 'POST'].map((method) {
-        final selected = value == method;
-        return GestureDetector(
-          onTap: () => onChanged(method),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            margin: const EdgeInsets.only(right: 8),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: selected
-                  ? AppColors.primary.withValues(alpha: 0.2)
-                  : AppColors.bgElevated,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: selected
-                    ? AppColors.primary
-                    : AppColors.border,
+      children: [
+        ...['GET', 'POST'].map((method) {
+          final selected = value == method;
+          return GestureDetector(
+            onTap: locked ? null : () => onChanged(method),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              margin: const EdgeInsets.only(right: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: locked
+                    ? (selected
+                        ? AppColors.textMuted.withValues(alpha: 0.15)
+                        : AppColors.bgElevated.withValues(alpha: 0.5))
+                    : (selected
+                        ? AppColors.primary.withValues(alpha: 0.2)
+                        : AppColors.bgElevated),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: locked
+                      ? AppColors.border.withValues(alpha: 0.5)
+                      : (selected ? AppColors.primary : AppColors.border),
+                ),
+              ),
+              child: Text(
+                method,
+                style: AppTextStyles.caption(
+                  size: 13,
+                  color: locked
+                      ? (selected
+                          ? AppColors.textSecondary
+                          : AppColors.textMuted.withValues(alpha: 0.5))
+                      : (selected
+                          ? AppColors.primary
+                          : AppColors.textSecondary),
+                ),
               ),
             ),
-            child: Text(
-              method,
-              style: AppTextStyles.caption(
-                size: 13,
-                color: selected ? AppColors.primary : AppColors.textSecondary,
+          );
+        }),
+        if (locked)
+          Row(
+            children: [
+              const Icon(Icons.lock_outline, size: 13,
+                  color: AppColors.textMuted),
+              const SizedBox(width: 4),
+              Text(
+                '由连接器固定',
+                style: AppTextStyles.caption(
+                    size: 11, color: AppColors.textMuted),
               ),
-            ),
+            ],
           ),
-        );
-      }).toList(),
+      ],
     );
   }
 }
@@ -791,6 +908,247 @@ class _Tag extends StatelessWidget {
       child: Text(
         label,
         style: AppTextStyles.caption(size: 11, color: color),
+      ),
+    );
+  }
+}
+
+// ─── Connector 类型下拉选择器 ────────────────────────────────────────────────
+
+class _ConnectorTypeDropdown extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _ConnectorTypeDropdown({
+    required this.value,
+    required this.onChanged,
+  });
+
+  static const _options = <(String, String)>[
+    ('php_eval',        'PHP Eval           —  php_eval_post.php'),
+    ('php_b64rot13',    'PHP B64+ROT13      —  php_b64rot13_post.php'),
+    ('php_passthru',    'PHP Passthru       —  php_passthru_req.php'),
+    ('php_probe',       'PHP Probe          —  php_probe_info.php'),
+    ('jsp_classloader', 'JSP ClassLoader    —  jsp_classloader_b64.jsp'),
+    ('jsp_runtime',     'JSP Runtime        —  jsp_runtime_get.jsp'),
+    ('asp_wscript',     'ASP WScript        —  asp_wscript_get.asp'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: InputDecoration(
+        labelText: '连接器类型',
+        labelStyle: AppTextStyles.caption(color: AppColors.textSecondary),
+        filled: true,
+        fillColor: AppColors.bgCard,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.border),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      ),
+      dropdownColor: AppColors.bgCard,
+      style: AppTextStyles.body(color: AppColors.textPrimary, size: 13),
+      items: _options.map((o) {
+        return DropdownMenuItem<String>(
+          value: o.$1,
+          child: Text(o.$2,
+              style: AppTextStyles.body(
+                  color: AppColors.textPrimary, size: 13)),
+        );
+      }).toList(),
+      onChanged: (v) {
+        if (v != null) onChanged(v);
+      },
+    );
+  }
+}
+
+// ─── 连接器行（下拉 + 自动检测按钮）────────────────────────────────────────────
+
+class _ConnectorRow extends StatelessWidget {
+  final String value;
+  final bool detecting;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onDetect;
+
+  const _ConnectorRow({
+    required this.value,
+    required this.detecting,
+    required this.onChanged,
+    required this.onDetect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _ConnectorTypeDropdown(
+            value: value,
+            onChanged: onChanged,
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton.icon(
+            onPressed: detecting ? null : onDetect,
+            icon: detecting
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  )
+                : const Icon(Icons.radar_rounded, size: 16),
+            label: Text(detecting ? '检测中' : '自动检测'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── 检测结果数据类 ───────────────────────────────────────────────────────────
+
+class _DetectResult {
+  final String type;
+  final bool ok;
+  final String msg;
+  const _DetectResult(this.type, this.ok, this.msg);
+}
+
+// ─── 检测逻辑（并发探测 7 种连接器）─────────────────────────────────────────────
+
+Future<List<_DetectResult>> _autoDetect({
+  required String url,
+  required String password,
+  required String method,
+}) async {
+  final futures = ConnectorFactory.allTypes.map((type) async {
+    try {
+      final ws = Webshell(
+        id: 0,
+        projectId: 0,
+        name: '_probe',
+        url: url,
+        password: password,
+        type: ConnectorFactory.typeLabel(type),
+        method: method,
+        connectorType: type,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      final ok = await ConnectorFactory.create(ws)
+          .ping()
+          .timeout(const Duration(seconds: 6));
+      return _DetectResult(type, ok, ok ? '有响应' : '无响应');
+    } on TimeoutException {
+      return _DetectResult(type, false, '超时');
+    } catch (_) {
+      return _DetectResult(type, false, '连接失败');
+    }
+  });
+  return Future.wait(futures);
+}
+
+// ─── 检测结果面板 ─────────────────────────────────────────────────────────────
+
+class _DetectResultPanel extends StatelessWidget {
+  final List<_DetectResult> results;
+
+  const _DetectResultPanel({required this.results});
+
+  @override
+  Widget build(BuildContext context) {
+    final working = results.where((r) => r.ok).length;
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      decoration: BoxDecoration(
+        color: AppColors.bgDark,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: working > 0
+              ? AppColors.primary.withValues(alpha: 0.4)
+              : AppColors.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                working > 0 ? Icons.check_circle_outline : Icons.info_outline,
+                size: 13,
+                color: working > 0 ? AppColors.primary : AppColors.textMuted,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                working > 0
+                    ? '检测完成，已自动选择第一个有响应的类型'
+                    : '未检测到有响应的连接器，请检查地址与密码',
+                style: AppTextStyles.caption(
+                  size: 11,
+                  color:
+                      working > 0 ? AppColors.primary : AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...results.map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 5),
+                child: Row(
+                  children: [
+                    Icon(
+                      r.ok
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked,
+                      size: 13,
+                      color: r.ok ? AppColors.primary : AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 96,
+                      child: Text(
+                        ConnectorFactory.shortLabel(r.type),
+                        style: AppTextStyles.caption(
+                          size: 12,
+                          color: r.ok
+                              ? AppColors.textPrimary
+                              : AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      r.msg,
+                      style: AppTextStyles.caption(
+                        size: 11,
+                        color: r.ok ? AppColors.primary : AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        ],
       ),
     );
   }
