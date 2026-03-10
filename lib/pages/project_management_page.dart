@@ -258,7 +258,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
           style: TextStyle(color: AppColors.red),
         ),
         content: Text(
-          '确定要删除项目「${project.name}」吗？此操作不可恢复。',
+          '确定要删除项目「${project.name}」吗？将同时删除该项目的 Webshell 及信息收集数据，此操作不可恢复。',
           style: const TextStyle(color: AppColors.textPrimary),
         ),
         actions: [

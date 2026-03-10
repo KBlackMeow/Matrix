@@ -7,6 +7,7 @@ import 'php_probe_connector.dart';
 import 'jsp_classloader_connector.dart';
 import 'jsp_runtime_connector.dart';
 import 'asp_wscript_connector.dart';
+import 'aspx_cmd_connector.dart';
 
 /// 根据 [Webshell.connectorType] 创建对应的连接器实例
 class ConnectorFactory {
@@ -21,13 +22,15 @@ class ConnectorFactory {
       'jsp_classloader' => JspClassloaderConnector(webshell),
       'jsp_runtime'     => JspRuntimeConnector(webshell),
       'asp_wscript'     => AspWscriptConnector(webshell),
+      'aspx_cmd'        => AspxCmdConnector(webshell),
       _                 => PhpEvalConnector(webshell), // fallback
     };
   }
 
-  /// 从 connectorType 推导显示用的 type 标签（php / jsp / asp）
+  /// 从 connectorType 推导显示用的 type 标签（php / jsp / asp / aspx）
   static String typeLabel(String connectorType) {
     if (connectorType.startsWith('jsp')) return 'jsp';
+    if (connectorType == 'aspx_cmd') return 'aspx';
     if (connectorType.startsWith('asp')) return 'asp';
     return 'php';
   }
@@ -41,6 +44,7 @@ class ConnectorFactory {
         'jsp_classloader' => 'JSP-CL',
         'jsp_runtime'     => 'JSP-CMD',
         'asp_wscript'     => 'ASP-CMD',
+        'aspx_cmd'        => 'ASPX-CMD',
         _                 => connectorType.toUpperCase(),
       };
 
@@ -53,7 +57,16 @@ class ConnectorFactory {
         'jsp_classloader' => 'jsp_classloader_b64.jsp',
         'jsp_runtime'     => 'jsp_runtime_get.jsp',
         'asp_wscript'     => 'asp_wscript_get.asp',
+        'aspx_cmd'        => 'aspx_cmd_post.aspx',
         _                 => '',
+      };
+
+  /// 返回该 connector 对应 payload 里使用的默认参数名。
+  /// 用于在 UI 的"密码"字段中显示提示，避免参数名混淆。
+  static String defaultParam(String connectorType) => switch (connectorType) {
+        'php_b64rot13' => 'x',   // $_POST['x']
+        'php_probe'    => '',    // 无参数
+        _              => 'cmd', // 其余均默认 cmd
       };
 
   /// 返回该连接器硬编码的请求方法（不受用户设置影响）。
@@ -73,5 +86,6 @@ class ConnectorFactory {
     'jsp_classloader',
     'jsp_runtime',
     'asp_wscript',
+    'aspx_cmd',
   ];
 }

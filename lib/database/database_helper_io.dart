@@ -279,6 +279,8 @@ class DatabaseHelperIo {
 
   Future<int> deleteProject(int id) async {
     final db = await database;
+    await db.delete('info_collection', where: 'project_id = ?', whereArgs: [id]);
+    await db.delete('webshells', where: 'project_id = ?', whereArgs: [id]);
     return db.delete('projects', where: 'id = ?', whereArgs: [id]);
   }
 

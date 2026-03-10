@@ -344,16 +344,6 @@ class _MainLayoutState extends State<MainLayout> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          IconButton(
-                            padding: EdgeInsets.zero,
-                            iconSize: 18,
-                            splashRadius: 18,
-                            onPressed: labelOpacity > 0.5
-                                ? () => setState(() => _sidebarHidden = true)
-                                : null,
-                            icon: const Icon(Icons.close, color: AppColors.textSecondary),
-                            tooltip: '隐藏菜单',
-                          ),
                         ],
                       ),
                     ),

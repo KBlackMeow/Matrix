@@ -113,36 +113,12 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                       autofocus: true,
                     ),
                     const SizedBox(height: 16),
-                    TextField(
+                    _PasswordParamField(
                       controller: passwordController,
                       obscureText: obscurePassword,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontFamily: 'monospace',
-                      ),
-                      decoration: InputDecoration(
-                        labelText: '密码 *',
-                        labelStyle:
-                            const TextStyle(color: AppColors.textSecondary),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: AppColors.primary.withValues(alpha: 0.5)),
-                        ),
-                        focusedBorder: const OutlineInputBorder(
-                          borderSide: BorderSide(color: AppColors.primary),
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: AppColors.textSecondary,
-                            size: 20,
-                          ),
-                          onPressed: () => setDialogState(
-                              () => obscurePassword = !obscurePassword),
-                        ),
-                      ),
+                      connectorType: selectedConnectorType,
+                      onToggleObscure: () => setDialogState(
+                          () => obscurePassword = !obscurePassword),
                     ),
                     const SizedBox(height: 16),
                     _buildField(
@@ -158,6 +134,11 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                         selectedConnectorType = v;
                         final fixed = ConnectorFactory.fixedMethod(v);
                         if (fixed != null) selectedMethod = fixed;
+                        // 切换类型时，若参数名为空则自动回填默认值
+                        if (passwordController.text.isEmpty) {
+                          final def = ConnectorFactory.defaultParam(v);
+                          if (def.isNotEmpty) passwordController.text = def;
+                        }
                       }),
                       onDetect: runDetect,
                     ),
@@ -291,36 +272,12 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                       autofocus: true,
                     ),
                     const SizedBox(height: 16),
-                    TextField(
+                    _PasswordParamField(
                       controller: passwordController,
                       obscureText: obscurePassword,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontFamily: 'monospace',
-                      ),
-                      decoration: InputDecoration(
-                        labelText: '密码 *',
-                        labelStyle:
-                            const TextStyle(color: AppColors.textSecondary),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: AppColors.primary.withValues(alpha: 0.5)),
-                        ),
-                        focusedBorder: const OutlineInputBorder(
-                          borderSide: BorderSide(color: AppColors.primary),
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: AppColors.textSecondary,
-                            size: 20,
-                          ),
-                          onPressed: () => setDialogState(
-                              () => obscurePassword = !obscurePassword),
-                        ),
-                      ),
+                      connectorType: selectedConnectorType,
+                      onToggleObscure: () => setDialogState(
+                          () => obscurePassword = !obscurePassword),
                     ),
                     const SizedBox(height: 16),
                     _buildField(
@@ -932,6 +889,7 @@ class _ConnectorTypeDropdown extends StatelessWidget {
     ('jsp_classloader', 'JSP ClassLoader    —  jsp_classloader_b64.jsp'),
     ('jsp_runtime',     'JSP Runtime        —  jsp_runtime_get.jsp'),
     ('asp_wscript',     'ASP WScript        —  asp_wscript_get.asp'),
+    ('aspx_cmd',        'ASPX .NET Process  —  aspx_cmd_post.aspx'),
   ];
 
   @override
@@ -967,6 +925,82 @@ class _ConnectorTypeDropdown extends StatelessWidget {
       onChanged: (v) {
         if (v != null) onChanged(v);
       },
+    );
+  }
+}
+
+// ─── 密码/参数名字段（根据 connector 显示上下文提示）────────────────────────────
+
+class _PasswordParamField extends StatelessWidget {
+  final TextEditingController controller;
+  final bool obscureText;
+  final String connectorType;
+  final VoidCallback onToggleObscure;
+
+  const _PasswordParamField({
+    required this.controller,
+    required this.obscureText,
+    required this.connectorType,
+    required this.onToggleObscure,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final defaultParam = ConnectorFactory.defaultParam(connectorType);
+    final isProbe = connectorType == 'php_probe';
+    final hint = isProbe
+        ? '探测模式，无需参数名'
+        : (defaultParam.isNotEmpty ? '参数名，默认: $defaultParam' : '');
+
+    return TextField(
+      controller: controller,
+      obscureText: obscureText && !isProbe,
+      enabled: !isProbe,
+      style: TextStyle(
+        color: isProbe ? AppColors.textMuted : AppColors.textPrimary,
+        fontFamily: 'monospace',
+      ),
+      decoration: InputDecoration(
+        labelText: isProbe ? '参数名（不适用）' : '参数名 *',
+        labelStyle: TextStyle(
+          color: isProbe ? AppColors.textMuted : AppColors.textSecondary,
+        ),
+        hintText: hint,
+        hintStyle: AppTextStyles.caption(
+            color: AppColors.textMuted, size: 12),
+        helperText: isProbe
+            ? null
+            : 'Payload 中接收命令的 HTTP 参数名（如 \$_POST["$defaultParam"]）',
+        helperStyle:
+            AppTextStyles.caption(color: AppColors.textMuted, size: 11),
+        helperMaxLines: 2,
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(
+            color: isProbe
+                ? AppColors.border.withValues(alpha: 0.4)
+                : AppColors.primary.withValues(alpha: 0.5),
+          ),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderSide:
+              BorderSide(color: AppColors.border.withValues(alpha: 0.3)),
+        ),
+        focusedBorder: const OutlineInputBorder(
+          borderSide: BorderSide(color: AppColors.primary),
+        ),
+        suffixIcon: isProbe
+            ? null
+            : IconButton(
+                icon: Icon(
+                  obscureText
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
+                onPressed: onToggleObscure,
+              ),
+      ),
     );
   }
 }

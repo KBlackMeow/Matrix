@@ -54,6 +54,7 @@ class DatabaseHelperWeb {
   }
 
   Future<int> deleteProject(int id) async {
+    _webshells.removeWhere((w) => w.projectId == id);
     final len = _projects.length;
     _projects.removeWhere((p) => p.id == id);
     return len - _projects.length;

