@@ -884,11 +884,11 @@ class _ConnectorTypeDropdown extends StatelessWidget {
   static const _options = <(String, String)>[
     ('php_eval',        'PHP Eval           —  php_eval_post.php'),
     ('php_b64rot13',    'PHP B64+ROT13      —  php_b64rot13_post.php'),
-    ('php_behinder',    'PHP 冰蝎           —  bing.php'),
+    ('php_behinder',    'PHP 冰蝎           —  php_behinder.php'),
     ('php_passthru',    'PHP Passthru       —  php_passthru_req.php'),
     ('php_probe',       'PHP Probe          —  php_probe_info.php'),
     ('jsp_classloader', 'JSP ClassLoader    —  jsp_classloader_b64.jsp'),
-    ('jsp_behinder',    'JSP 冰蝎           —  bing.jsp / jsp_behinder.jsp'),
+    ('jsp_behinder',    'JSP 冰蝎           —  jsp_behinder.jsp'),
     ('jsp_runtime',     'JSP Runtime        —  jsp_runtime_get.jsp'),
     ('asp_wscript',     'ASP WScript        —  asp_wscript_get.asp'),
     ('aspx_cmd',        'ASPX .NET Process  —  aspx_cmd_post.aspx'),

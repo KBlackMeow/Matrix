@@ -16,11 +16,15 @@ class JspClassloaderConnector extends ShellConnector {
   JspClassloaderConnector(super.webshell);
 
   late final String _execKey = _randomHex32();
+  String? _lastPingDiagnostic;
 
   static String _randomHex32() {
     final rng = math.Random.secure();
     return List.generate(32, (_) => rng.nextInt(16).toRadixString(16)).join();
   }
+
+  @override
+  String? get lastPingDiagnostic => _lastPingDiagnostic;
 
   @override
   Set<ConnectorCapability> get capabilities => const {
@@ -108,8 +112,10 @@ class JspClassloaderConnector extends ShellConnector {
   Future<bool> ping() async {
     try {
       final r = await _sendJsp('ping').timeout(const Duration(seconds: 8));
+      _lastPingDiagnostic = r.contains('MATRIX_JSP_PING') ? null : r;
       return r.contains('MATRIX_JSP_PING');
-    } catch (_) {
+    } catch (e) {
+      _lastPingDiagnostic = e.toString();
       return false;
     }
   }

@@ -84,16 +84,12 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
   }
 
   Future<void> _downloadToFile(Payload payload) async {
+    // 完全尊重 payload.name，不再自动补扩展名，让用户自行控制文件名
     final suggestedName =
         payload.name.isNotEmpty ? payload.name : 'payload_${payload.id}.txt';
+
     final location = await getSaveLocation(
       suggestedName: suggestedName,
-      acceptedTypeGroups: [
-        const XTypeGroup(
-          label: 'All',
-          extensions: ['php', 'jsp', 'asp', 'txt'],
-        ),
-      ],
     );
     if (location == null) return;
     try {

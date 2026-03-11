@@ -58,11 +58,11 @@ class ConnectorFactory {
   static String payloadHint(String connectorType) => switch (connectorType) {
         'php_eval'        => 'php_eval_post.php',
         'php_b64rot13'    => 'php_b64rot13_post.php',
-        'php_behinder'    => 'bing.php',
+        'php_behinder'    => 'php_behinder.php',
         'php_passthru'    => 'php_passthru_req.php',
         'php_probe'       => 'php_probe_info.php',
         'jsp_classloader' => 'jsp_classloader_b64.jsp',
-        'jsp_behinder'    => 'bing.jsp / jsp_behinder.jsp',
+        'jsp_behinder'    => 'jsp_behinder.jsp',
         'jsp_runtime'     => 'jsp_runtime_get.jsp',
         'asp_wscript'     => 'asp_wscript_get.asp',
         'aspx_cmd'        => 'aspx_cmd_post.aspx',
