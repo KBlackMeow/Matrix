@@ -90,12 +90,6 @@ class JspBehinderConnector extends ShellConnector {
     return Uint8List.fromList(base64.decode(b64));
   }
 
-  /// body 第二行：a=exec&_k=xxx&xxx=cmd，bing.jsp 用 getReader().readLine() 解析
-  String _buildParamLine(String action, Map<String, String> extraParams) {
-    final params = <String, String>{'a': action, ...extraParams};
-    return Uri(queryParameters: params).query;
-  }
-
   void _updateCookies(http.Response response) {
     final raw = response.headers['set-cookie'];
     if (raw == null) return;
