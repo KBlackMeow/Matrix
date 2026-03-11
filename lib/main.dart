@@ -8,6 +8,7 @@ import 'models/project.dart';
 import 'pages/project_management_page.dart';
 import 'pages/project_scoped_page.dart';
 import 'pages/webshell_management_page.dart';
+import 'pages/reverse_shell_dashboard_page.dart';
 import 'pages/payload_management_page.dart';
 import 'pages/dictionary_management_page.dart';
 import 'services/seed_service.dart';
@@ -66,6 +67,7 @@ class _MainLayoutState extends State<MainLayout> {
     MenuItem(icon: Icons.terminal_outlined, label: 'Webshell管理', selectedIcon: Icons.terminal),
     MenuItem(icon: Icons.code_outlined, label: 'Payload管理', selectedIcon: Icons.code),
     MenuItem(icon: Icons.menu_book_outlined, label: '字典管理', selectedIcon: Icons.menu_book),
+    MenuItem(icon: Icons.computer_outlined, label: '完整终端', selectedIcon: Icons.computer),
   ];
 
   void _handleMenuTap(int index) {
@@ -146,6 +148,9 @@ class _MainLayoutState extends State<MainLayout> {
     }
     if (_selectedIndex == 5) {
       return const DictionaryManagementPage();
+    }
+    if (_selectedIndex == 6) {
+      return const ReverseShellDashboardPage();
     }
     return _WorkspaceContent(title: _menuItems[_selectedIndex].label);
   }

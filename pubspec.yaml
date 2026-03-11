@@ -56,6 +56,9 @@ dependencies:
   # AES 加密（冰蝎协议）
   encrypt: ^5.0.3
 
+  # 终端模拟器控件（完整终端使用）
+  xterm: ^4.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

