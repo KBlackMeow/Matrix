@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/webshell.dart';
 import '../services/webshell_service.dart';
@@ -23,6 +24,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
   late final TabController _tabController;
   bool _isConnected = false;
   bool _isChecking = true;
+  String? _lastPingError;
 
   @override
   void initState() {
@@ -35,10 +37,17 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
   Future<void> _checkConnection() async {
     setState(() => _isChecking = true);
     final alive = await _service.ping();
+    if (!alive && _service.lastPingDiagnostic != null) {
+      // 在调试终端打印完整错误信息，UI 里只展示摘要
+      debugPrint(
+        '[Matrix][ping] ${_service.lastPingDiagnostic}',
+      );
+    }
     if (mounted) {
       setState(() {
         _isConnected = alive;
         _isChecking = false;
+        _lastPingError = alive ? null : _service.lastPingDiagnostic;
       });
     }
   }
@@ -58,33 +67,75 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
           _buildHeader(),
           _buildTabBar(),
           Expanded(
-            child: AnimatedBuilder(
-              animation: _tabController,
-              builder: (context, _) {
-                return TabBarView(
-                  controller: _tabController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    FocusScope(
-                      skipTraversal: _tabController.index != 0,
-                      child: _TerminalTab(service: _service),
+            child: _isChecking || !_isConnected
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isChecking)
+                          Text(
+                            '正在检测连接…',
+                            style: AppTextStyles.caption(color: AppColors.textMuted),
+                          )
+                        else
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '连接失败',
+                                style: AppTextStyles.caption(color: AppColors.red),
+                              ),
+                              if (_lastPingError != null &&
+                                  _lastPingError!.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                  ),
+                                  child: Text(
+                                    _lastPingError!.length > 200
+                                        ? '${_lastPingError!.substring(0, 200)}…'
+                                        : _lastPingError!,
+                                    style: AppTextStyles.caption(
+                                      color: AppColors.textMuted,
+                                      size: 11,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                      ],
                     ),
-                    FocusScope(
-                      skipTraversal: _tabController.index != 1,
-                      child: _FileManagerTab(service: _service),
-                    ),
-                    FocusScope(
-                      skipTraversal: _tabController.index != 2,
-                      child: _SystemInfoTab(service: _service),
-                    ),
-                    FocusScope(
-                      skipTraversal: _tabController.index != 3,
-                      child: _PrivEscTab(service: _service),
-                    ),
-                  ],
-                );
-              },
-            ),
+                  )
+                : AnimatedBuilder(
+                    animation: _tabController,
+                    builder: (context, _) {
+                      return TabBarView(
+                        controller: _tabController,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          FocusScope(
+                            skipTraversal: _tabController.index != 0,
+                            child: _TerminalTab(service: _service),
+                          ),
+                          FocusScope(
+                            skipTraversal: _tabController.index != 1,
+                            child: _FileManagerTab(service: _service),
+                          ),
+                          FocusScope(
+                            skipTraversal: _tabController.index != 2,
+                            child: _SystemInfoTab(service: _service),
+                          ),
+                          FocusScope(
+                            skipTraversal: _tabController.index != 3,
+                            child: _PrivEscTab(service: _service),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
           ),
         ],
       ),

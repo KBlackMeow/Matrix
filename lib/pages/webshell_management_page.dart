@@ -884,9 +884,11 @@ class _ConnectorTypeDropdown extends StatelessWidget {
   static const _options = <(String, String)>[
     ('php_eval',        'PHP Eval           —  php_eval_post.php'),
     ('php_b64rot13',    'PHP B64+ROT13      —  php_b64rot13_post.php'),
+    ('php_behinder',    'PHP 冰蝎           —  bing.php'),
     ('php_passthru',    'PHP Passthru       —  php_passthru_req.php'),
     ('php_probe',       'PHP Probe          —  php_probe_info.php'),
     ('jsp_classloader', 'JSP ClassLoader    —  jsp_classloader_b64.jsp'),
+    ('jsp_behinder',    'JSP 冰蝎           —  bing.jsp / jsp_behinder.jsp'),
     ('jsp_runtime',     'JSP Runtime        —  jsp_runtime_get.jsp'),
     ('asp_wscript',     'ASP WScript        —  asp_wscript_get.asp'),
     ('aspx_cmd',        'ASPX .NET Process  —  aspx_cmd_post.aspx'),
@@ -948,9 +950,23 @@ class _PasswordParamField extends StatelessWidget {
   Widget build(BuildContext context) {
     final defaultParam = ConnectorFactory.defaultParam(connectorType);
     final isProbe = connectorType == 'php_probe';
+    final isBehinder = connectorType == 'jsp_behinder' || connectorType == 'php_behinder';
     final hint = isProbe
         ? '探测模式，无需参数名'
-        : (defaultParam.isNotEmpty ? '参数名，默认: $defaultParam' : '');
+        : isBehinder
+            ? '默认 rebeyond，或 payload 中 k 的 16 位 hex'
+            : (defaultParam.isNotEmpty ? '参数名，默认: $defaultParam' : '');
+
+    final labelText = isProbe
+        ? '参数名（不适用）'
+        : isBehinder
+            ? '连接密码/密钥 *'
+            : '参数名 *';
+    final helperText = isProbe
+        ? null
+        : isBehinder
+            ? '连接密码（MD5 前 16 位为密钥）；或直接填 payload 中 String k="xxx" 的 hex 值'
+            : 'Payload 中接收命令的 HTTP 参数名（如 \$_POST["$defaultParam"]）';
 
     return TextField(
       controller: controller,
@@ -961,16 +977,14 @@ class _PasswordParamField extends StatelessWidget {
         fontFamily: 'monospace',
       ),
       decoration: InputDecoration(
-        labelText: isProbe ? '参数名（不适用）' : '参数名 *',
+        labelText: labelText,
         labelStyle: TextStyle(
           color: isProbe ? AppColors.textMuted : AppColors.textSecondary,
         ),
         hintText: hint,
         hintStyle: AppTextStyles.caption(
             color: AppColors.textMuted, size: 12),
-        helperText: isProbe
-            ? null
-            : 'Payload 中接收命令的 HTTP 参数名（如 \$_POST["$defaultParam"]）',
+        helperText: helperText,
         helperStyle:
             AppTextStyles.caption(color: AppColors.textMuted, size: 11),
         helperMaxLines: 2,

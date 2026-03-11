@@ -26,6 +26,10 @@ abstract class ShellConnector {
   bool get isProbeOnly       => capabilities.contains(ConnectorCapability.probeOnly);
 
   Future<bool> ping();
+
+  /// 连接失败时的诊断信息（如 HTTP 错误、MATRIX_ERR 等），供 UI 显示
+  String? get lastPingDiagnostic => null;
+
   Future<String> executeCommand(String cmd, {String workingDir = ''});
   Future<String> getCurrentDir();
   Future<List<FileEntry>> listDirectory(String path);

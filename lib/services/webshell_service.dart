@@ -30,6 +30,8 @@ class WebshellService {
 
   Future<bool> ping() => _connector.ping();
 
+  String? get lastPingDiagnostic => _connector.lastPingDiagnostic;
+
   Future<String> executeCommand(String cmd, {String workingDir = ''}) =>
       _connector.executeCommand(cmd, workingDir: workingDir);
 

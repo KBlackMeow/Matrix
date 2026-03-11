@@ -53,6 +53,9 @@ dependencies:
   # 哈希（MD5 用于混淆 payload 文件名）
   crypto: ^3.0.0
 
+  # AES 加密（冰蝎协议）
+  encrypt: ^5.0.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

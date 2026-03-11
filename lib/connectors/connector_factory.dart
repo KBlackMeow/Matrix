@@ -2,9 +2,11 @@ import '../models/webshell.dart';
 import 'shell_connector.dart';
 import 'php_eval_connector.dart';
 import 'php_b64rot13_connector.dart';
+import 'php_behinder_connector.dart';
 import 'php_passthru_connector.dart';
 import 'php_probe_connector.dart';
 import 'jsp_classloader_connector.dart';
+import 'jsp_behinder_connector.dart';
 import 'jsp_runtime_connector.dart';
 import 'asp_wscript_connector.dart';
 import 'aspx_cmd_connector.dart';
@@ -17,9 +19,11 @@ class ConnectorFactory {
     return switch (webshell.connectorType) {
       'php_eval'        => PhpEvalConnector(webshell),
       'php_b64rot13'    => PhpB64Rot13Connector(webshell),
+      'php_behinder'    => PhpBehinderConnector(webshell),
       'php_passthru'    => PhpPassthruConnector(webshell),
       'php_probe'       => PhpProbeConnector(webshell),
       'jsp_classloader' => JspClassloaderConnector(webshell),
+      'jsp_behinder'    => JspBehinderConnector(webshell),
       'jsp_runtime'     => JspRuntimeConnector(webshell),
       'asp_wscript'     => AspWscriptConnector(webshell),
       'aspx_cmd'        => AspxCmdConnector(webshell),
@@ -39,9 +43,11 @@ class ConnectorFactory {
   static String shortLabel(String connectorType) => switch (connectorType) {
         'php_eval'        => 'PHP-EVAL',
         'php_b64rot13'    => 'PHP-B64',
+        'php_behinder'    => 'PHP-BEHINDER',
         'php_passthru'    => 'PHP-CMD',
         'php_probe'       => 'PHP-PROBE',
         'jsp_classloader' => 'JSP-CL',
+        'jsp_behinder'    => 'JSP-BEHINDER',
         'jsp_runtime'     => 'JSP-CMD',
         'asp_wscript'     => 'ASP-CMD',
         'aspx_cmd'        => 'ASPX-CMD',
@@ -52,9 +58,11 @@ class ConnectorFactory {
   static String payloadHint(String connectorType) => switch (connectorType) {
         'php_eval'        => 'php_eval_post.php',
         'php_b64rot13'    => 'php_b64rot13_post.php',
+        'php_behinder'    => 'bing.php',
         'php_passthru'    => 'php_passthru_req.php',
         'php_probe'       => 'php_probe_info.php',
         'jsp_classloader' => 'jsp_classloader_b64.jsp',
+        'jsp_behinder'    => 'bing.jsp / jsp_behinder.jsp',
         'jsp_runtime'     => 'jsp_runtime_get.jsp',
         'asp_wscript'     => 'asp_wscript_get.asp',
         'aspx_cmd'        => 'aspx_cmd_post.aspx',
@@ -64,26 +72,31 @@ class ConnectorFactory {
   /// 返回该 connector 对应 payload 里使用的默认参数名。
   /// 用于在 UI 的"密码"字段中显示提示，避免参数名混淆。
   static String defaultParam(String connectorType) => switch (connectorType) {
-        'php_b64rot13' => 'x',   // $_POST['x']
-        'php_probe'    => '',    // 无参数
-        _              => 'cmd', // 其余均默认 cmd
+        'php_probe'    => '',        // 无参数
+        'php_behinder' => 'rebeyond', // 连接密码，或 16 位 hex 密钥
+        'jsp_behinder' => 'rebeyond', // 连接密码，或 16 位 hex 密钥
+        _              => 'cmd',     // 其余均默认 cmd
       };
 
   /// 返回该连接器硬编码的请求方法（不受用户设置影响）。
   /// 返回 null 表示连接器尊重用户选择。
   static String? fixedMethod(String connectorType) => switch (connectorType) {
-        'php_b64rot13'    => 'POST', // 只读 $_POST['x']
+        'php_b64rot13'    => 'POST', // 只读 $_POST['cmd']
         'php_probe'       => 'GET',  // 直接 GET，无参数
         'jsp_classloader' => 'POST', // agent body 过大，只走 POST
+        'php_behinder'    => 'POST', // AES 加密 body
+        'jsp_behinder'    => 'POST', // AES 加密 body
         _                 => null,
       };
 
   static const allTypes = [
     'php_eval',
     'php_b64rot13',
+    'php_behinder',
     'php_passthru',
     'php_probe',
     'jsp_classloader',
+    'jsp_behinder',
     'jsp_runtime',
     'asp_wscript',
     'aspx_cmd',

