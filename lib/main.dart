@@ -63,8 +63,8 @@ class _MainLayoutState extends State<MainLayout> {
   final List<MenuItem> _menuItems = [
     MenuItem(icon: Icons.folder_outlined, label: '项目管理', selectedIcon: Icons.folder),
     MenuItem(icon: Icons.search_outlined, label: '信息收集', selectedIcon: Icons.search),
-    MenuItem(icon: Icons.bug_report_outlined, label: 'EXP管理', selectedIcon: Icons.bug_report),
     MenuItem(icon: Icons.terminal_outlined, label: 'Webshell管理', selectedIcon: Icons.terminal),
+    MenuItem(icon: Icons.bug_report_outlined, label: 'EXP管理', selectedIcon: Icons.bug_report),
     MenuItem(icon: Icons.code_outlined, label: 'Payload管理', selectedIcon: Icons.code),
     MenuItem(icon: Icons.menu_book_outlined, label: '字典管理', selectedIcon: Icons.menu_book),
     MenuItem(icon: Icons.computer_outlined, label: '完整终端', selectedIcon: Icons.computer),
@@ -86,14 +86,13 @@ class _MainLayoutState extends State<MainLayout> {
         },
         onEnterExp: (project) {
           setState(() {
-            _selectedProject = project;
-            _selectedIndex = 2;
+            _selectedIndex = 3;
           });
         },
         onEnterWebshell: (project) {
           setState(() {
             _selectedProject = project;
-            _selectedIndex = 3;
+            _selectedIndex = 2;
           });
         },
       );
@@ -122,21 +121,6 @@ class _MainLayoutState extends State<MainLayout> {
           _selectedIndex = 0;
           _selectedProject = null;
         }),
-        title: 'EXP管理',
-        icon: Icons.bug_report,
-        contentBuilder: (project, onSwitchProject) =>
-            _ExpContent(project: project, onSwitchProject: onSwitchProject),
-      );
-    }
-    if (_selectedIndex == 3) {
-      return ProjectScopedPage(
-        selectedProject: _selectedProject,
-        onSelectProject: (p) => setState(() => _selectedProject = p),
-        onClearProject: () => setState(() => _selectedProject = null),
-        onNavigateToProjectManagement: () => setState(() {
-          _selectedIndex = 0;
-          _selectedProject = null;
-        }),
         title: 'Webshell管理',
         icon: Icons.terminal,
         contentBuilder: (project, onSwitchProject) =>
@@ -145,6 +129,9 @@ class _MainLayoutState extends State<MainLayout> {
     }
     if (_selectedIndex == 4) {
       return const PayloadManagementPage();
+    }
+    if (_selectedIndex == 3) {
+      return const _ExpContent();
     }
     if (_selectedIndex == 5) {
       return const DictionaryManagementPage();
@@ -485,13 +472,7 @@ class _InfoCollectionContent extends StatelessWidget {
 
 
 class _ExpContent extends StatelessWidget {
-  final Project project;
-  final VoidCallback onSwitchProject;
-
-  const _ExpContent({
-    required this.project,
-    required this.onSwitchProject,
-  });
+  const _ExpContent();
 
   @override
   Widget build(BuildContext context) {
@@ -514,20 +495,15 @@ class _ExpContent extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'EXP管理 · ${project.name}',
+                      'EXP管理',
                       style: AppTextStyles.heading(size: 18, color: AppColors.primary),
                     ),
                     Text(
-                      project.domain,
+                      'EXP 为全局管理，不再绑定具体项目',
                       style: AppTextStyles.caption(size: 14, color: AppColors.cyan),
                     ),
                   ],
                 ),
-              ),
-              TextButton.icon(
-                onPressed: onSwitchProject,
-                icon: const Icon(Icons.swap_horiz, size: 18, color: AppColors.textSecondary),
-                label: Text('切换项目', style: AppTextStyles.caption(color: AppColors.textSecondary)),
               ),
             ],
           ),
