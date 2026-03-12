@@ -62,6 +62,10 @@ class WebshellService {
   /// 默认依赖 [ShellConnector.startReverseShell] 的实现：
   /// - 仅当连接器具备 [ConnectorCapability.shellExec] 时可用。
   /// - 默认生成类 Unix 反弹命令，具体连接器可自行重写以支持更多平台。
-  Future<void> startReverseShell(String lhost, int lport) =>
-      _connector.startReverseShell(lhost, lport);
+  Future<void> startReverseShell(
+    String lhost,
+    int lport, {
+    bool preferScript = true,
+  }) =>
+      _connector.startReverseShell(lhost, lport, preferScript: preferScript);
 }

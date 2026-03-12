@@ -589,175 +589,180 @@ class _WebshellCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOnline = webshell.status == 1;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          // 状态指示点
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: isOnline ? AppColors.primary : AppColors.textMuted,
-              shape: BoxShape.circle,
-              boxShadow: isOnline
-                  ? [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.5),
-                        blurRadius: 6,
-                      )
-                    ]
-                  : null,
+    return InkWell(
+      onTap: onEnter,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            // 状态指示点
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: isOnline ? AppColors.primary : AppColors.textMuted,
+                shape: BoxShape.circle,
+                boxShadow: isOnline
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.5),
+                          blurRadius: 6,
+                        )
+                      ]
+                    : null,
+              ),
             ),
-          ),
-          const SizedBox(width: 14),
-          // 图标
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.3)),
-            ),
-            child:
-                const Icon(Icons.terminal, color: AppColors.primary, size: 20),
-          ),
-          const SizedBox(width: 14),
-          // 信息
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        webshell.name,
-                        style: AppTextStyles.body(
-                            size: 14, color: AppColors.textPrimary),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _Tag(
-                      label: ConnectorFactory.shortLabel(webshell.connectorType),
-                      color: webshell.connectorType.startsWith('jsp')
-                          ? AppColors.amber
-                          : webshell.connectorType.startsWith('asp')
-                              ? Colors.purple.shade300
-                              : AppColors.cyan,
-                    ),
-                    const SizedBox(width: 6),
-                    _Tag(
-                      label: webshell.method,
-                      color: webshell.method == 'POST'
-                          ? AppColors.cyan
-                          : AppColors.amber,
-                    ),
-                  ],
+            const SizedBox(width: 14),
+            // 图标
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.3),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        webshell.url,
-                        style: AppTextStyles.caption(
-                            size: 12, color: AppColors.primary),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    InkWell(
-                      onTap: () {
-                        Clipboard.setData(
-                            ClipboardData(text: webshell.url));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('已复制到剪贴板'),
-                            backgroundColor: AppColors.bgCard,
-                            behavior: SnackBarBehavior.floating,
-                            duration: const Duration(seconds: 1),
-                          ),
-                        );
-                      },
-                      child: const Icon(Icons.copy_outlined,
-                          size: 14, color: AppColors.textMuted),
-                    ),
-                  ],
-                ),
-                if (webshell.password != null &&
-                    webshell.password!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    '密码: ${'•' * webshell.password!.length.clamp(1, 12)}',
-                    style:
-                        AppTextStyles.caption(size: 11, color: AppColors.textMuted),
-                  ),
-                ],
-              ],
+              ),
+              child: const Icon(
+                Icons.terminal,
+                color: AppColors.primary,
+                size: 20,
+              ),
             ),
-          ),
-          // 操作按钮
-          LayoutBuilder(
-            builder: (ctx, constraints) {
-              // constraints.maxWidth 在 Row 内恒为 0，用 MediaQuery 判断父级宽度
-              final screenW = MediaQuery.of(ctx).size.width;
-              return Row(
-                mainAxisSize: MainAxisSize.min,
+            const SizedBox(width: 14),
+            // 信息
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (screenW > 680) ...[
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          webshell.name,
+                          style: AppTextStyles.body(
+                            size: 14,
+                            color: AppColors.textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _Tag(
+                        label:
+                            ConnectorFactory.shortLabel(webshell.connectorType),
+                        color: webshell.connectorType.startsWith('jsp')
+                            ? AppColors.amber
+                            : webshell.connectorType.startsWith('asp')
+                                ? Colors.purple.shade300
+                                : AppColors.cyan,
+                      ),
+                      const SizedBox(width: 6),
+                      _Tag(
+                        label: webshell.method,
+                        color: webshell.method == 'POST'
+                            ? AppColors.cyan
+                            : AppColors.amber,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          webshell.url,
+                          style: AppTextStyles.caption(
+                            size: 12,
+                            color: AppColors.primary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: () {
+                          Clipboard.setData(
+                            ClipboardData(text: webshell.url),
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('已复制到剪贴板'),
+                              backgroundColor: AppColors.bgCard,
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                        child: const Icon(
+                          Icons.copy_outlined,
+                          size: 14,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (webshell.password != null &&
+                      webshell.password!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
                     Text(
-                      _formatDate(webshell.createdAt),
+                      '密码: ${'•' * webshell.password!.length.clamp(1, 12)}',
                       style: AppTextStyles.caption(
-                          size: 11, color: AppColors.textMuted),
+                        size: 11,
+                        color: AppColors.textMuted,
+                      ),
                     ),
-                    const SizedBox(width: 8),
                   ],
-                  FilledButton.icon(
-                    onPressed: onEnter,
-                    icon: const Icon(Icons.terminal, size: 14),
-                    label: const Text('进入'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor:
-                          AppColors.primary.withValues(alpha: 0.15),
-                      foregroundColor: AppColors.primary,
-                      side: BorderSide(
-                          color: AppColors.primary.withValues(alpha: 0.5)),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 0),
-                      minimumSize: const Size(0, 32),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    color: AppColors.cyan,
-                    tooltip: '编辑',
-                    splashRadius: 18,
-                  ),
-                  IconButton(
-                    onPressed: onDelete,
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    color: AppColors.red,
-                    tooltip: '删除',
-                    splashRadius: 18,
-                  ),
                 ],
-              );
-            },
-          ),
-        ],
+              ),
+            ),
+            // 操作按钮
+            LayoutBuilder(
+              builder: (ctx, constraints) {
+                // constraints.maxWidth 在 Row 内恒为 0，用 MediaQuery 判断父级宽度
+                final screenW = MediaQuery.of(ctx).size.width;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (screenW > 680) ...[
+                      Text(
+                        _formatDate(webshell.createdAt),
+                        style: AppTextStyles.caption(
+                          size: 11,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    const SizedBox(width: 4),
+                    IconButton(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      color: AppColors.cyan,
+                      tooltip: '编辑',
+                      splashRadius: 18,
+                    ),
+                    IconButton(
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      color: AppColors.red,
+                      tooltip: '删除',
+                      splashRadius: 18,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

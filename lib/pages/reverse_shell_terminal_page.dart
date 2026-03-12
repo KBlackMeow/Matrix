@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +22,7 @@ class ReverseShellTerminalPage extends StatefulWidget {
 class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
   late final Terminal _terminal;
   late final TerminalController _terminalController;
+  late final FocusNode _focusNode;
   StreamSubscription<List<int>>? _rawSub;
 
   @override
@@ -36,14 +38,19 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
     );
 
     _terminalController = TerminalController();
+    _focusNode = FocusNode();
+
+    // 重新进入完整终端页面时，先回放该会话已有历史输出
+    for (final chunk in widget.session.historyRaw) {
+      if (chunk.isNotEmpty) {
+        _writeToTerminal(chunk);
+      }
+    }
 
     // 远端输出字节流 → 原样写入终端；会话结束时自动关闭页面
     _rawSub = widget.session.rawStream.listen(
       (data) {
-        // 不再改写 \r / \n，让 xterm 和远端程序按照各自协议原生处理：
-        // - 裸 \r 用于进度条/单行刷新
-        // - \n / \r\n 由终端自身决定如何渲染
-        _terminal.write(String.fromCharCodes(data));
+        _writeToTerminal(data);
       },
       onDone: () {
         // 远端主动 exit/断开时自动关闭完整终端页面
@@ -62,8 +69,23 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
   @override
   void dispose() {
     _rawSub?.cancel();
+    _focusNode.dispose();
     _terminalController.dispose();
     super.dispose();
+  }
+
+  /// 写入数据到终端控件，并处理“阶梯效应” (Staircase Effect)
+  ///
+  /// 在没有 PTY 的裸反弹 Shell 中，远端只发送 \n 而不包含 \r。
+  /// 此方法确保 \n 都会被解释为 \r\n，从而让光标回到行首。
+  void _writeToTerminal(List<int> data) {
+    // 使用 utf8 解码支持中文字符，allowMalformed 避免非法序列崩溃
+    final text = utf8.decode(data, allowMalformed: true);
+
+    // 算法：将所有 \n 替换为 \r\n，但要避免将原本就是 \r\n 的变成 \r\r\n
+    final fixedText = text.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n');
+
+    _terminal.write(fixedText);
   }
 
   @override
@@ -102,7 +124,9 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '完整终端 · ${widget.session.id}',
+                      widget.session.label != null && widget.session.label!.isNotEmpty
+                          ? '完整终端 · ${widget.session.label}'
+                          : '完整终端 · ${widget.session.id}',
                       style: AppTextStyles.heading(
                         size: 16,
                         color: AppColors.primary,
@@ -140,6 +164,8 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
           backgroundOpacity: 0,
           cursorType: TerminalCursorType.block,
           controller: _terminalController,
+          focusNode: _focusNode,
+          autofocus: true,
           // 保留默认快捷键：Ctrl/Cmd + C 复制、V 粘贴、A 全选，
           // 只额外增加右键菜单
           hardwareKeyboardOnly: true,

