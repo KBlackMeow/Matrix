@@ -11,7 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
-
+workstation/*
 # IntelliJ / Android Studio related
 *.iml
 *.ipr

@@ -234,7 +234,7 @@ class _ReverseShellDashboardPageState
                 )
               : ListView.separated(
                   itemCount: sessions.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (_, _) =>
                       const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final s = sessions[index];

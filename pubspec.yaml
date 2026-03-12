@@ -53,11 +53,15 @@ dependencies:
   # 哈希（MD5 用于混淆 payload 文件名）
   crypto: ^3.0.0
 
+  # GBK 解码（Webshell 文件管理中文支持）
+  gbk_codec: ^0.4.0
+
   # AES 加密（冰蝎协议）
   encrypt: ^5.0.3
 
   # 终端模拟器控件（完整终端使用）
   xterm: ^4.0.0
+  pointycastle: ^3.9.1
 
 dev_dependencies:
   flutter_test:
@@ -82,7 +86,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - data/jsp_agent_M.b64
+    - data/
     - assets/defaults/payloads/
     - assets/defaults/dicts/
 

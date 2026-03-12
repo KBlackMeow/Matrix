@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/file_entry.dart';
+import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
 import 'shell_exec_connector.dart';
 
@@ -48,7 +49,7 @@ class AspWscriptConnector extends ShellExecConnector {
       }
 
       if (response.statusCode != 200) return '[HTTP ${response.statusCode}]';
-      return _decode(response.body);
+      return _decode(decodeWithFallback(response.bodyBytes));
     } on TimeoutException {
       return '[Timeout]';
     } on http.ClientException catch (e) {
@@ -136,7 +137,7 @@ class AspWscriptConnector extends ShellExecConnector {
             !l.startsWith('CertUtil'))
         .join('');
     try {
-      return utf8.decode(base64.decode(b64));
+      return decodeWithFallback(base64.decode(b64));
     } catch (_) {
       return '[读取失败：编码错误]';
     }

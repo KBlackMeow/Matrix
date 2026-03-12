@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 
 import '../models/webshell.dart';
 import '../services/webshell_service.dart';
@@ -382,10 +381,10 @@ class _TerminalTabState extends State<_TerminalTab>
     // 不立即跳转：entry 停在视口外下方，等输出返回后一起滑入
 
     // cd 命令追加 marker+pwd，单次请求同时获取新目录，不再额外发网络请求
-    const _cwdMarker = '__MATRIX_CWD__';
+    const cwdMarker = '__MATRIX_CWD__';
     final isCd = cmd == 'cd' || cmd.startsWith('cd ') || cmd.startsWith('cd\t');
     final sendCmd =
-        isCd ? "$cmd 2>&1; echo '$_cwdMarker'; pwd" : cmd;
+        isCd ? "$cmd 2>&1; echo '$cwdMarker'; pwd" : cmd;
 
     final execResult = await widget.service.executeCommand(
       sendCmd,
@@ -395,7 +394,7 @@ class _TerminalTabState extends State<_TerminalTab>
     // 解析 cd 后的新目录
     String output = execResult;
     if (isCd) {
-      const sep = '$_cwdMarker\n';
+      const sep = '$cwdMarker\n';
       final idx = execResult.lastIndexOf(sep);
       if (idx >= 0) {
         output = execResult.substring(0, idx).trim();
@@ -1239,7 +1238,9 @@ class _TabCompleter {
     for (int i = 1; i < strs.length; i++) {
       final s = strs[i];
       int j = 0;
-      while (j < prefix.length && j < s.length && prefix[j] == s[j]) j++;
+      while (j < prefix.length && j < s.length && prefix[j] == s[j]) {
+        j++;
+      }
       prefix = prefix.substring(0, j);
       if (prefix.isEmpty) break;
     }
@@ -2913,8 +2914,7 @@ class _PrivEscTabState extends State<_PrivEscTab>
           reason: '内核 ${verMatch.group(1)} ($arch)，需在本地搜索对应 CVE',
           commands: [
             'searchsploit Linux Kernel ${verMatch.group(1)}',
-            '# https://www.exploit-db.com/search?q=' +
-                Uri.encodeComponent('Linux Kernel ${verMatch.group(1)}'),
+            '# https://www.exploit-db.com/search?q=${Uri.encodeComponent('Linux Kernel ${verMatch.group(1)}')}',
           ],
           verified: false,
         ));

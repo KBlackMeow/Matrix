@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../utils/encoding_utils.dart';
 import 'asp_wscript_connector.dart';
 import 'shell_connector.dart';
 
@@ -45,7 +46,7 @@ class AspxCmdConnector extends AspWscriptConnector {
 
       if (response.statusCode != 200) return '[HTTP ${response.statusCode}]';
       // .NET Process 输出为纯文本，直接返回，无需 HTML 解码
-      return response.body;
+      return decodeWithFallback(response.bodyBytes);
     } on TimeoutException {
       return '[Timeout]';
     } on http.ClientException catch (e) {
@@ -69,7 +70,7 @@ class AspxCmdConnector extends AspWscriptConnector {
         await sendRawCommand('powershell -NoProfile -Command "$ps"');
     if (raw.isEmpty || raw.startsWith('[')) return '[文件不存在或无权读取]';
     try {
-      return utf8.decode(base64.decode(raw.trim()));
+      return decodeWithFallback(base64.decode(raw.trim()));
     } catch (_) {
       return '[读取失败：编码错误]';
     }

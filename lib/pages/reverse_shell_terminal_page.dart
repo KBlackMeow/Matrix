@@ -58,7 +58,7 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
           Navigator.of(context).pop();
         }
       },
-      onError: (_, __) {
+      onError: (_, _) {
         if (mounted) {
           Navigator.of(context).pop();
         }

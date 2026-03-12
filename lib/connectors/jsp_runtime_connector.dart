@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import 'shell_connector.dart';
 import 'shell_exec_connector.dart';
+import '../utils/encoding_utils.dart';
 
 /// `jsp_runtime_get.jsp`：`Runtime.getRuntime().exec(cmd)`
 ///
@@ -45,7 +46,7 @@ class JspRuntimeConnector extends ShellExecConnector {
       }
 
       if (response.statusCode != 200) return '[HTTP ${response.statusCode}]';
-      return _stripPre(response.body);
+      return _stripPre(decodeWithFallback(response.bodyBytes));
     } on TimeoutException {
       return '[Timeout]';
     } on http.ClientException catch (e) {

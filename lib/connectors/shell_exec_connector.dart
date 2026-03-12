@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../models/file_entry.dart';
+import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
 
 /// 命令执行型连接器的抽象基类（passthru / runtime / wscript）
@@ -29,19 +30,23 @@ abstract class ShellExecConnector extends ShellConnector {
       final perms = parts[0];
       if (!perms.startsWith('-') &&
           !perms.startsWith('d') &&
-          !perms.startsWith('l')) continue;
+          !perms.startsWith('l')) {
+        continue;
+      }
       final size = int.tryParse(parts[4]) ?? 0;
       final dateStr = '${parts[5]} ${parts[6]} ${parts[7]}';
       final name = parts.sublist(8).join(' ');
       if (name == '.') continue;
       final isDir = perms.startsWith('d') || perms.startsWith('l');
-      entries.add(FileEntry(
-        name: name,
-        isDirectory: isDir,
-        size: size,
-        permissions: perms.length > 1 ? perms.substring(1) : perms,
-        modified: dateStr,
-      ));
+      entries.add(
+        FileEntry(
+          name: name,
+          isDirectory: isDir,
+          size: size,
+          permissions: perms.length > 1 ? perms.substring(1) : perms,
+          modified: dateStr,
+        ),
+      );
     }
     entries.sort((a, b) {
       if (a.name == '..') return -1;
@@ -54,7 +59,10 @@ abstract class ShellExecConnector extends ShellConnector {
 
   /// 解析以 `###KEY###` 分隔的批量命令输出
   static Map<String, String> parseSepOutput(
-      String raw, String sep, Map<String, String> keyMap) {
+    String raw,
+    String sep,
+    Map<String, String> keyMap,
+  ) {
     final result = <String, String>{};
     String? currentKey;
     final buffer = StringBuffer();
@@ -85,8 +93,9 @@ abstract class ShellExecConnector extends ShellConnector {
   @override
   Future<bool> ping() async {
     try {
-      final r = await sendRawCommand('echo MATRIX_PING')
-          .timeout(const Duration(seconds: 8));
+      final r = await sendRawCommand(
+        'echo MATRIX_PING',
+      ).timeout(const Duration(seconds: 8));
       return r.contains('MATRIX_PING');
     } catch (_) {
       return false;
@@ -118,10 +127,13 @@ abstract class ShellExecConnector extends ShellConnector {
   Future<String> readFile(String path) async {
     // base64 传输，避免特殊字符/二进制问题
     final raw = await sendRawCommand(
-        'cat ${sq(path)} 2>/dev/null | base64 -w0 2>/dev/null || cat ${sq(path)} 2>/dev/null | base64');
+      'cat ${sq(path)} 2>/dev/null | base64 -w0 2>/dev/null || cat ${sq(path)} 2>/dev/null | base64',
+    );
     if (raw.isEmpty || raw.startsWith('[')) return '[文件不存在或无权读取]';
     try {
-      return utf8.decode(base64.decode(raw.trim().replaceAll('\n', '').replaceAll('\r', '')));
+      return decodeWithFallback(
+        base64.decode(raw.trim().replaceAll('\n', '').replaceAll('\r', '')),
+      );
     } catch (_) {
       return '[读取失败：编码错误]';
     }
@@ -131,7 +143,8 @@ abstract class ShellExecConnector extends ShellConnector {
   Future<bool> writeFile(String path, String content) async {
     final b64 = base64.encode(utf8.encode(content));
     final r = await sendRawCommand(
-        'echo ${sq(b64)} | base64 -d > ${sq(path)} && echo 1 || echo 0');
+      'echo ${sq(b64)} | base64 -d > ${sq(path)} && echo 1 || echo 0',
+    );
     return r.trim() == '1';
   }
 
@@ -145,23 +158,34 @@ abstract class ShellExecConnector extends ShellConnector {
   Future<Map<String, String>> getSystemInfo() async {
     const sep = '###MATRIX_SEP###';
     final cmd = [
-      "echo '${sep}OS${sep}'",       'uname -a 2>/dev/null',
-      "echo '${sep}USER${sep}'",     'whoami 2>/dev/null',
-      "echo '${sep}PWD${sep}'",      'pwd 2>/dev/null',
-      "echo '${sep}HOST${sep}'",     'hostname 2>/dev/null',
-      "echo '${sep}ID${sep}'",       'id 2>/dev/null',
-      "echo '${sep}KERNEL${sep}'",   'uname -r 2>/dev/null',
+      "echo '${sep}OS${sep}'",
+      'uname -a 2>/dev/null',
+      "echo '${sep}USER${sep}'",
+      'whoami 2>/dev/null',
+      "echo '${sep}PWD${sep}'",
+      'pwd 2>/dev/null',
+      "echo '${sep}HOST${sep}'",
+      'hostname 2>/dev/null',
+      "echo '${sep}ID${sep}'",
+      'id 2>/dev/null',
+      "echo '${sep}KERNEL${sep}'",
+      'uname -r 2>/dev/null',
     ].join('; ');
     const keyMap = {
-      'OS': 'OS', 'USER': '运行用户', 'PWD': '当前目录',
-      'HOST': '主机名', 'ID': '用户ID', 'KERNEL': '内核版本',
+      'OS': 'OS',
+      'USER': '运行用户',
+      'PWD': '当前目录',
+      'HOST': '主机名',
+      'ID': '用户ID',
+      'KERNEL': '内核版本',
     };
     return parseSepOutput(await sendRawCommand(cmd), sep, keyMap);
   }
 
   @override
   Future<List<({String name, bool isDir})>> listNamesForCompletion(
-      String path) async {
+    String path,
+  ) async {
     final raw = await sendRawCommand('ls -1aF ${sq(path)} 2>/dev/null');
     if (raw.isEmpty || raw.startsWith('[')) return [];
     const classifiers = {42, 64, 124, 61, 62}; // * @ | = >

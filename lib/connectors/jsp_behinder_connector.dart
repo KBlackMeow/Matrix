@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart' as crypto;
 
 import '../models/file_entry.dart';
+import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
 
 /// `jsp_behinder.jsp` / `bing.jsp`：冰蝎 3.0 协议，AES 加密传输
@@ -174,10 +175,13 @@ class JspBehinderConnector extends ShellConnector {
           .timeout(const Duration(seconds: 15));
 
       _updateCookies(response);
-      if (response.statusCode == 200) return response.body;
-      final snippet = response.body.length > 4096
-          ? '${response.body.substring(0, 4096)}...'
-          : response.body;
+      if (response.statusCode == 200) {
+        return decodeWithFallback(response.bodyBytes);
+      }
+      final body = decodeWithFallback(response.bodyBytes);
+      final snippet = body.length > 4096
+          ? '${body.substring(0, 4096)}...'
+          : body;
       return '[HTTP ${response.statusCode}] 请求失败\n$snippet';
     } on TimeoutException {
       return '[Timeout] 连接超时';
@@ -239,7 +243,7 @@ class JspBehinderConnector extends ShellConnector {
           if (parts.length < 5) return null;
           String name;
           try {
-            name = utf8.decode(base64.decode(parts[0]));
+            name = decodeWithFallback(base64.decode(parts[0]));
           } catch (_) {
             name = parts[0];
           }
@@ -291,9 +295,9 @@ class JspBehinderConnector extends ShellConnector {
       if (idx > 0) {
         try {
           final key =
-              utf8.decode(base64.decode(line.substring(0, idx).trim()));
+              decodeWithFallback(base64.decode(line.substring(0, idx).trim()));
           final val =
-              utf8.decode(base64.decode(line.substring(idx + 1).trim()));
+              decodeWithFallback(base64.decode(line.substring(idx + 1).trim()));
           map[key] = val;
         } catch (_) {}
       }
@@ -311,7 +315,7 @@ class JspBehinderConnector extends ShellConnector {
       final parts = line.trim().split('|');
       if (parts.length < 2) continue;
       try {
-        final name = utf8.decode(base64.decode(parts[0]));
+        final name = decodeWithFallback(base64.decode(parts[0]));
         out.add((name: name, isDir: parts[1] == 'd'));
       } catch (_) {}
     }

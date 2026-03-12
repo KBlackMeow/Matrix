@@ -7,6 +7,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 
 import '../models/file_entry.dart';
+import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
 
 /// `jsp_classloader_b64.jsp`：ClassLoader 加载 M.class 内存马
@@ -92,10 +93,11 @@ class JspClassloaderConnector extends ShellConnector {
           )
           .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) return response.body;
-      final snippet = response.body.length > 4096
-          ? '${response.body.substring(0, 4096)}...'
-          : response.body;
+      if (response.statusCode == 200) {
+        return decodeWithFallback(response.bodyBytes);
+      }
+      final body = decodeWithFallback(response.bodyBytes);
+      final snippet = body.length > 4096 ? '${body.substring(0, 4096)}...' : body;
       return '[HTTP ${response.statusCode}] 请求失败\n$snippet';
     } on TimeoutException {
       return '[Timeout] 连接超时';
@@ -144,7 +146,9 @@ class JspClassloaderConnector extends ShellConnector {
     final result = await _sendJsp('ls', extraParams: {'path': path});
     if (result.isEmpty ||
         result.startsWith('ERR_OPEN') ||
-        result.startsWith('[')) return [];
+        result.startsWith('[')) {
+      return [];
+    }
 
     return result
         .trim()
@@ -155,7 +159,7 @@ class JspClassloaderConnector extends ShellConnector {
           if (parts.length < 5) return null;
           String name;
           try {
-            name = utf8.decode(base64.decode(parts[0]));
+            name = decodeWithFallback(base64.decode(parts[0]));
           } catch (_) {
             name = parts[0];
           }
@@ -207,9 +211,9 @@ class JspClassloaderConnector extends ShellConnector {
       if (idx > 0) {
         try {
           final key =
-              utf8.decode(base64.decode(line.substring(0, idx).trim()));
+              decodeWithFallback(base64.decode(line.substring(0, idx).trim()));
           final val =
-              utf8.decode(base64.decode(line.substring(idx + 1).trim()));
+              decodeWithFallback(base64.decode(line.substring(idx + 1).trim()));
           map[key] = val;
         } catch (_) {}
       }
@@ -227,7 +231,7 @@ class JspClassloaderConnector extends ShellConnector {
       final parts = line.trim().split('|');
       if (parts.length < 2) continue;
       try {
-        final name = utf8.decode(base64.decode(parts[0]));
+        final name = decodeWithFallback(base64.decode(parts[0]));
         out.add((name: name, isDir: parts[1] == 'd'));
       } catch (_) {}
     }
