@@ -68,6 +68,9 @@ class ReverseShellService {
   /// 新会话建立时的回调（例如用于在 UI 中自动打开终端标签页）
   void Function(ReverseShellSession session)? onSession;
 
+  /// 会话结束时的回调（例如用于刷新会话列表 UI）
+  void Function(ReverseShellSession session)? onSessionClosed;
+
   Map<String, ReverseShellSession> get sessions => Map.unmodifiable(_sessions);
 
   /// 启动监听。重复调用会先关闭旧监听再重新绑定。
@@ -96,7 +99,10 @@ class ReverseShellService {
     onSession?.call(session);
     // 任一输出流结束即认为会话结束
     await session.output.last.whenComplete(() {
-      _sessions.remove(id);
+      final removed = _sessions.remove(id);
+      if (removed != null) {
+        onSessionClosed?.call(removed);
+      }
     });
   }
 }

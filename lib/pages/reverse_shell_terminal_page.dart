@@ -22,7 +22,6 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
   late final Terminal _terminal;
   late final TerminalController _terminalController;
   StreamSubscription<List<int>>? _rawSub;
-  bool _lastCharWasCR = false;
 
   @override
   void initState() {
@@ -38,35 +37,26 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
 
     _terminalController = TerminalController();
 
-    // 远端输出字节流 → 写入终端
-    _rawSub = widget.session.rawStream.listen((data) {
-      // 智能规范换行：
-      // - 保留远端原始的 "\r\n"（CRLF）
-      // - 单独的 "\r" 原样保留（用于进度条覆盖当前行）
-      // - 单独的 "\n" 规范为 "\r\n"，修复 Bash 只下移不回行首的问题
-      final text = String.fromCharCodes(data);
-      final buf = StringBuffer();
-      for (var i = 0; i < text.length; i++) {
-        final ch = text[i];
-        if (ch == '\r') {
-          buf.write('\r');
-          _lastCharWasCR = true;
-        } else if (ch == '\n') {
-          if (_lastCharWasCR) {
-            // 这是 CRLF 中的 LF，直接写 LF 即可（前一个 CR 已写入）
-            buf.write('\n');
-          } else {
-            // 单独的 LF，转换为 CRLF
-            buf.write('\r\n');
-          }
-          _lastCharWasCR = false;
-        } else {
-          buf.write(ch);
-          _lastCharWasCR = false;
+    // 远端输出字节流 → 原样写入终端；会话结束时自动关闭页面
+    _rawSub = widget.session.rawStream.listen(
+      (data) {
+        // 不再改写 \r / \n，让 xterm 和远端程序按照各自协议原生处理：
+        // - 裸 \r 用于进度条/单行刷新
+        // - \n / \r\n 由终端自身决定如何渲染
+        _terminal.write(String.fromCharCodes(data));
+      },
+      onDone: () {
+        // 远端主动 exit/断开时自动关闭完整终端页面
+        if (mounted) {
+          Navigator.of(context).pop();
         }
-      }
-      _terminal.write(buf.toString());
-    });
+      },
+      onError: (_, __) {
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+    );
   }
 
   @override
@@ -186,7 +176,17 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
               final data = await Clipboard.getData(Clipboard.kTextPlain);
               final text = data?.text;
               if (text != null && text.isNotEmpty) {
-                _terminal.paste(text);
+                // 仅做最小化规范：
+                // - 将 CRLF 归一为 LF
+                // - 去掉残留的单独 CR（避免来自其他终端的回车控制符打乱行内顺序）
+                // - 去掉首部多余换行，避免光标直接跳到下一行
+                var t = text.replaceAll('\r\n', '\n').replaceAll('\r', '');
+                while (t.startsWith('\n')) {
+                  t = t.substring(1);
+                }
+                if (t.isNotEmpty) {
+                  _terminal.textInput(t);
+                }
               }
             }
           },

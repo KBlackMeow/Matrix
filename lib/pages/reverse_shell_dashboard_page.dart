@@ -20,14 +20,14 @@ class _ReverseShellDashboardPageState
   @override
   void initState() {
     super.initState();
-    // 新会话建立时自动打开终端页，并刷新列表
+    // 新会话建立 / 结束时刷新列表
     _service.onSession = (session) {
       setState(() {});
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ReverseShellTerminalPage(session: session),
-        ),
-      );
+    };
+    _service.onSessionClosed = (session) {
+      if (mounted) {
+        setState(() {});
+      }
     };
   }
 
