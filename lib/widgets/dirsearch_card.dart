@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import '../services/dirsearch_service.dart';
 import '../theme/app_theme.dart';
@@ -20,6 +21,7 @@ class _DirsearchCardState extends State<DirsearchCard> {
   final _timeoutController = TextEditingController();
   final _statusIncludeController = TextEditingController();
   final _maxRecurseDepthController = TextEditingController();
+  final _resultsScrollController = ScrollController();
 
   static const String _dictFile = 'dicc.txt';
   List<DirsearchResult> _results = [];
@@ -32,6 +34,10 @@ class _DirsearchCardState extends State<DirsearchCard> {
 
   /// 节流进度更新（毫秒时间戳），避免过于频繁的 setState
   int _lastProgressUpdateMs = 0;
+  /// 发现结果异步展示：累积后定时刷新（每 250ms 或满 15 条），降低 setState 频率避免主线程阻塞
+  static const int _resultFlushIntervalMs = 250;
+  static const int _resultFlushBatchSize = 15;
+  int _lastResultFlushMs = 0;
 
   @override
   void initState() {
@@ -47,6 +53,7 @@ class _DirsearchCardState extends State<DirsearchCard> {
     _timeoutController.dispose();
     _statusIncludeController.dispose();
     _maxRecurseDepthController.dispose();
+    _resultsScrollController.dispose();
     super.dispose();
   }
 
@@ -127,8 +134,8 @@ class _DirsearchCardState extends State<DirsearchCard> {
 
     try {
       final maxRecurseDepth =
-          (int.tryParse(_maxRecurseDepthController.text.trim()) ?? 2).clamp(
-            1,
+          (int.tryParse(_maxRecurseDepthController.text.trim()) ?? 0).clamp(
+            0,
             10,
           );
       final scannedPaths = <String>{};
@@ -151,11 +158,25 @@ class _DirsearchCardState extends State<DirsearchCard> {
           paths: toScan,
           onFound: (r) {
             foundBatch.add(r);
-            if (foundBatch.length >= 50 && mounted) {
+            if (!mounted) return;
+            final now = DateTime.now().millisecondsSinceEpoch;
+            final shouldFlush = foundBatch.isNotEmpty &&
+                (foundBatch.length >= _resultFlushBatchSize || now - _lastResultFlushMs >= _resultFlushIntervalMs);
+            if (shouldFlush) {
+              _lastResultFlushMs = now;
               setState(() {
                 _results = List.from(_results)..addAll(foundBatch);
               });
               foundBatch = [];
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (_resultsScrollController.hasClients) {
+                  _resultsScrollController.animateTo(
+                    _resultsScrollController.position.maxScrollExtent,
+                    duration: const Duration(milliseconds: 80),
+                    curve: Curves.easeOut,
+                  );
+                }
+              });
             }
           },
           onProgress: (cur, total) {
@@ -174,6 +195,15 @@ class _DirsearchCardState extends State<DirsearchCard> {
 
         if (foundBatch.isNotEmpty && mounted) {
           setState(() => _results = List.from(_results)..addAll(foundBatch));
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_resultsScrollController.hasClients) {
+              _resultsScrollController.animateTo(
+                _resultsScrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 80),
+                curve: Curves.easeOut,
+              );
+            }
+          });
         }
 
         if (!_recursiveScan || depth >= maxRecurseDepth) break;
@@ -223,6 +253,46 @@ class _DirsearchCardState extends State<DirsearchCard> {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
   }
 
+  InputDecoration _inputDecoration(String label, String hint) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+      floatingLabelBehavior: FloatingLabelBehavior.always,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 14,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(title, style: AppTextStyles.heading(size: 12, color: AppColors.textSecondary)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -243,435 +313,264 @@ class _DirsearchCardState extends State<DirsearchCard> {
                   color: AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(
-                  Icons.folder_open,
-                  color: AppColors.primary,
-                  size: 18,
-                ),
+                child: const Icon(Icons.folder_open, color: AppColors.primary, size: 18),
               ),
               const SizedBox(width: 10),
               Text(
                 'Web 路径扫描 (dirsearch)',
-                style: AppTextStyles.heading(
-                  size: 14,
-                  color: AppColors.textPrimary,
-                ),
+                style: AppTextStyles.heading(size: 14, color: AppColors.textPrimary),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          // 配置区（横向可滚动，避免越界）
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                SizedBox(
-                  width: 280,
-                  child: TextField(
-                    controller: _urlController,
-                    style: AppTextStyles.body(
-                      size: 12,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: '目标 URL',
-                      labelStyle: AppTextStyles.caption(size: 11),
-                      hintText: 'https://target.com',
-                      hintStyle: AppTextStyles.caption(
-                        size: 11,
-                        color: AppColors.textMuted,
-                      ),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(
-                          color: AppColors.primary.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 160,
-                  child: TextField(
-                    controller: _extensionsController,
-                    style: AppTextStyles.body(
-                      size: 12,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: '扩展名',
-                      labelStyle: AppTextStyles.caption(size: 11),
-                      hintText: 'php,html,js,txt,asp,aspx,jsp',
-                      hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(
-                          color: AppColors.primary.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 60,
-                  child: TextField(
-                    controller: _threadsController,
-                    keyboardType: TextInputType.number,
-                    style: AppTextStyles.body(
-                      size: 12,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: '线程',
-                      labelStyle: AppTextStyles.caption(size: 11),
-                      hintText: '5',
-                      hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 60,
-                  child: TextField(
-                    controller: _timeoutController,
-                    keyboardType: TextInputType.number,
-                    style: AppTextStyles.body(
-                      size: 12,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: '超时',
-                      labelStyle: AppTextStyles.caption(size: 11),
-                      hintText: '8',
-                      hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: _running ? null : _startScan,
-                  icon: const Icon(Icons.play_arrow, size: 18),
-                  label: const Text('开始'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    textStyle: const TextStyle(fontSize: 12, inherit: false),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: _running ? _stopScan : null,
-                  icon: const Icon(Icons.stop, size: 18),
-                  label: const Text('停止'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: BorderSide(
-                      color: AppColors.primary.withValues(alpha: 0.6),
-                    ),
-                    textStyle: const TextStyle(fontSize: 12, inherit: false),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              SizedBox(
-                width: 200,
-                child: TextField(
-                  controller: _statusIncludeController,
-                  style: AppTextStyles.body(
-                    size: 12,
-                    color: AppColors.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: '包含状态码',
-                    labelStyle: AppTextStyles.caption(size: 11),
-                    hintText: '200,201,301,302,401,403',
-                    hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              SizedBox(
-                height: 48,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: Checkbox(
-                        value: _recursiveScan,
-                        onChanged: _running
-                            ? null
-                            : (v) => setState(() => _recursiveScan = v ?? true),
-                        activeColor: AppColors.primary,
-                        fillColor: WidgetStateProperty.resolveWith(
-                          (_) => AppColors.primary.withValues(alpha: 0.3),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    GestureDetector(
-                      onTap: _running
-                          ? null
-                          : () => setState(
-                              () => _recursiveScan = !_recursiveScan,
-                            ),
-                      child: Text(
-                        '递归扫描 200 目录 深度',
-                        style: AppTextStyles.caption(
-                          size: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    SizedBox(
-                      width: 48,
-                      height: 36,
-                      child: TextField(
-                        controller: _maxRecurseDepthController,
-                        enabled: !_running,
-                        keyboardType: TextInputType.number,
-                        style: AppTextStyles.body(
-                          size: 12,
-                          color: AppColors.textPrimary,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: '2',
-                          hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 8,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(6),
-                            borderSide: const BorderSide(
-                              color: AppColors.border,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // 进度条
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.bgDark,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _progressTotal > 0
-                      ? '$_progressCurrent / $_progressTotal'
-                      : '等待扫描',
-                  style: AppTextStyles.caption(
-                    size: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: _progressTotal > 0
-                        ? _progressCurrent / _progressTotal
-                        : 0.0,
-                    minHeight: 8,
-                    backgroundColor: AppColors.border,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.primary,
-                    ),
-                  ),
-                ),
-                if (_statusMessage.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _statusMessage,
-                    style: AppTextStyles.caption(
-                      size: 11,
-                      color: AppColors.textMuted,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          // 结果区
-          Row(
-            children: [
-              Container(
-                width: 3,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: AppColors.cyan.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '发现 (${_results.length})',
-                style: AppTextStyles.heading(
-                  size: 12,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.bgDark,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: _results.isEmpty
-                  ? Center(
-                      child: Text(
-                        _running ? '扫描中...' : '结果将显示在此处',
-                        style: AppTextStyles.caption(
-                          size: 13,
-                          color: AppColors.textMuted,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Flexible(
+                  flex: 1,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _sectionTitle('目标配置'),
+                        TextField(
+                          controller: _urlController,
+                          style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
+                          decoration: _inputDecoration('目标 URL', 'https://target.com'),
                         ),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _results.length,
-                      itemBuilder: (context, i) {
-                        final r = _results[i];
-                        final color = r.statusCode == 200
-                            ? AppColors.cyan
-                            : r.statusCode >= 300 && r.statusCode < 400
-                            ? AppColors.primary
-                            : r.statusCode == 401
-                            ? Colors.orange
-                            : r.statusCode == 403
-                            ? Colors.amber
-                            : AppColors.textSecondary;
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 40,
-                                child: Text(
-                                  '${r.statusCode}',
-                                  style: AppTextStyles.body(
-                                    size: 12,
-                                    color: color,
-                                  ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _extensionsController,
+                                style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
+                                decoration: _inputDecoration('扩展名', 'php,html,js,txt,asp,aspx,jsp'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _threadsController,
+                                keyboardType: TextInputType.number,
+                                style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
+                                decoration: _inputDecoration('线程', '5'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _timeoutController,
+                                keyboardType: TextInputType.number,
+                                style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
+                                decoration: _inputDecoration('超时', '8'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _statusIncludeController,
+                          style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
+                          decoration: _inputDecoration('包含状态码', '200,201,301,302,401,403'),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _recursiveScan,
+                              onChanged: _running ? null : (v) => setState(() => _recursiveScan = v ?? true),
+                              activeColor: AppColors.primary,
+                              fillColor: WidgetStateProperty.resolveWith(
+                                (_) => AppColors.primary.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            Text('递归扫描 200 目录 深度', style: AppTextStyles.body(size: 12, color: AppColors.textPrimary)),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 56,
+                              child: TextField(
+                                controller: _maxRecurseDepthController,
+                                enabled: !_running,
+                                keyboardType: TextInputType.number,
+                                style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
+                                decoration: _inputDecoration('', '0'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _sectionTitle('操作'),
+                        Row(
+                          children: [
+                            SizedBox(
+                              height: 32,
+                              child: ElevatedButton.icon(
+                                onPressed: _running ? null : _startScan,
+                                icon: const Icon(Icons.play_arrow, size: 16),
+                                label: const Text('开始'),
+                                style: ElevatedButton.styleFrom(
+                                  textStyle: const TextStyle(fontSize: 11),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
                                 ),
                               ),
-                              SizedBox(
-                                width: 56,
-                                child: Text(
-                                  _fmtSize(r.contentLength),
-                                  style: AppTextStyles.caption(
-                                    size: 11,
-                                    color: AppColors.textMuted,
-                                  ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              height: 32,
+                              child: OutlinedButton.icon(
+                                onPressed: _running ? _stopScan : null,
+                                icon: const Icon(Icons.stop, size: 16),
+                                label: const Text('停止'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
+                                  textStyle: const TextStyle(fontSize: 11),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
                                 ),
                               ),
-                              Expanded(
-                                child: Text(
-                                  r.path,
-                                  style: AppTextStyles.terminal(
-                                    size: 12,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Flexible(
+                  flex: 1,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgDark,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              margin: const EdgeInsets.only(right: 6),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _running ? AppColors.primary : AppColors.textMuted,
+                              ),
+                            ),
+                            Text(
+                              _running ? '扫描中' : '空闲',
+                              style: AppTextStyles.caption(
+                                size: 11,
+                                color: _running ? AppColors.primary : AppColors.textSecondary,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              _progressTotal > 0 ? '$_progressCurrent / $_progressTotal' : '等待扫描',
+                              style: AppTextStyles.caption(size: 11, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 1, color: AppColors.border),
+                        const SizedBox(height: 4),
+                        if (_statusMessage.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: SelectableText(
+                              _statusMessage,
+                              style: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                              maxLines: 2,
+                            ),
+                          ),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: _progressTotal > 0 ? _progressCurrent / _progressTotal : 0.0,
+                            minHeight: 6,
+                            backgroundColor: AppColors.border,
+                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Container(
+                              width: 3,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: AppColors.cyan.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '发现 (${_results.length})',
+                              style: AppTextStyles.heading(size: 12, color: AppColors.textSecondary),
+                            ),
+                            const Spacer(),
+                            TextButton.icon(
+                              onPressed: _results.isEmpty
+                                  ? null
+                                  : () async {
+                                      final text = _results
+                                          .map((r) => '${r.statusCode}  ${_fmtSize(r.contentLength)}  ${r.path}')
+                                          .join('\n');
+                                      await Clipboard.setData(ClipboardData(text: text));
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
+                                        );
+                                      }
+                                    },
+                              icon: const Icon(Icons.copy, size: 14),
+                              label: const Text('复制'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.textSecondary,
+                                textStyle: const TextStyle(fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Expanded(
+                          child: _results.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    _running ? '扫描中...' : '结果将显示在此处',
+                                    style: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  controller: _resultsScrollController,
+                                  itemCount: _results.length,
+                                  itemBuilder: (context, i) {
+                                    final r = _results[i];
+                                    final color = r.statusCode == 200
+                                        ? AppColors.cyan
+                                        : r.statusCode >= 300 && r.statusCode < 400
+                                            ? AppColors.primary
+                                            : r.statusCode == 401
+                                                ? Colors.orange
+                                                : r.statusCode == 403
+                                                    ? Colors.amber
+                                                    : AppColors.textSecondary;
+                                    return SelectableText(
+                                      '${r.statusCode}  ${_fmtSize(r.contentLength).padRight(8)}  ${r.path}',
+                                      style: AppTextStyles.terminal(size: 12, color: color),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

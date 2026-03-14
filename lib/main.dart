@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import 'database/database_helper.dart';
 import 'database/database_init.dart';
@@ -15,11 +16,10 @@ import 'pages/webshell_management_page.dart';
 import 'pages/reverse_shell_dashboard_page.dart';
 import 'pages/payload_management_page.dart';
 import 'pages/dictionary_management_page.dart';
+import 'pages/info_collection_page.dart';
 import 'pages/thinkphp_exp_page.dart';
 import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
-import 'widgets/dirsearch_card.dart';
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   initDatabase(); // 初始化 SQLite（桌面端使用 FFI）
@@ -130,7 +130,7 @@ class _MainLayoutState extends State<MainLayout> {
         title: '信息收集',
         icon: Icons.search,
         contentBuilder: (project, onSwitchProject) =>
-            _InfoCollectionContent(project: project, onSwitchProject: onSwitchProject),
+            InfoCollectionLandingPage(project: project, onSwitchProject: onSwitchProject),
       );
     }
     if (_selectedIndex == 2) {
@@ -431,69 +431,6 @@ class _MainLayoutState extends State<MainLayout> {
   }
 }
 
-class _InfoCollectionContent extends StatelessWidget {
-  final Project project;
-  final VoidCallback onSwitchProject;
-
-  const _InfoCollectionContent({
-    required this.project,
-    required this.onSwitchProject,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
-            ),
-            child: Row(
-              children: [
-              const Icon(Icons.search, color: AppColors.primary, size: 32),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '信息收集 · ${project.name}',
-                      style: AppTextStyles.heading(size: 18, color: AppColors.primary),
-                    ),
-                    Text(
-                      project.domain,
-                      style: AppTextStyles.caption(size: 14, color: AppColors.cyan),
-                    ),
-                  ],
-                ),
-              ),
-              TextButton.icon(
-                onPressed: onSwitchProject,
-                icon: const Icon(Icons.swap_horiz, size: 18, color: AppColors.textSecondary),
-                label: const Text('切换项目'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        Expanded(
-          child: DirsearchCard(
-            initialUrl: project.domain.startsWith('http') ? project.domain : 'https://${project.domain}',
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-
 class _ExpContent extends StatelessWidget {
   const _ExpContent();
 
@@ -792,11 +729,15 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
 
   @override
   void dispose() {
+    _urlController.dispose();
+    _cookieNameController.dispose();
+    _timeoutController.dispose();
     _keyController.dispose();
     _payloadB64Controller.dispose();
     _logScrollController.dispose();
     super.dispose();
   }
+
   ShiroEncryptionMode _encryptionMode = ShiroEncryptionMode.cbc;
   String _log = '';
   bool _running = false;
@@ -807,10 +748,19 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
     setState(() {
       final existing = _log.isEmpty ? <String>[] : _log.split('\n');
       existing.add(line);
-      const maxLines = 400;
+      const maxLines = 500;
       final trimmed =
           existing.length > maxLines ? existing.sublist(existing.length - maxLines) : existing;
       _log = trimmed.join('\n');
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_logScrollController.hasClients) {
+        _logScrollController.animateTo(
+          _logScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -1033,411 +983,146 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.bgElevated,
+                  color: AppColors.cyan.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: AppColors.cyan.withValues(alpha: 0.5)),
                 ),
                 child: Text(
                   'Cookie: ${_cookieNameController.text.trim().isNotEmpty ? _cookieNameController.text.trim() : 'rememberMe'}',
-                  style: AppTextStyles.caption(
-                    size: 10,
-                    color: AppColors.textSecondary,
-                  ),
+                  style: AppTextStyles.caption(size: 10, color: AppColors.cyan),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Flexible(
+                  flex: 1,
                   child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 3,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '目标配置',
-                      style: AppTextStyles.heading(
-                        size: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                // URL 独占一行，避免挤在一起
-                TextField(
-                  controller: _urlController,
-                  style: AppTextStyles.body(
-                    size: 12,
-                    color: AppColors.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: '目标 URL',
-                    labelStyle: AppTextStyles.caption(size: 11),
-                    hintText: 'https://target.com/login',
-                    hintStyle: AppTextStyles.caption(
-                      size: 11,
-                      color: AppColors.textMuted,
-                    ),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _method,
-                        dropdownColor: AppColors.bgElevated,
-                        icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary, size: 22),
-                        style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
-                        items: const [
-                          DropdownMenuItem(value: 'GET', child: Text('GET')),
-                          DropdownMenuItem(value: 'POST', child: Text('POST')),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) setState(() => _method = v);
-                        },
-                        decoration: InputDecoration(
-                          labelText: '方法',
-                          labelStyle: AppTextStyles.caption(size: 11),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: AppColors.border),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
-                          ),
+                        _shiroSectionTitle('目标配置'),
+                        TextField(
+                          controller: _urlController,
+                          style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
+                          decoration: _shiroInputDecoration('目标 URL', 'https://target.com/login'),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<ShiroEncryptionMode>(
-                        value: _encryptionMode,
-                        dropdownColor: AppColors.bgElevated,
-                        icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary, size: 22),
-                        style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
-                        items: const [
-                          DropdownMenuItem(value: ShiroEncryptionMode.cbc, child: Text('AES-CBC')),
-                          DropdownMenuItem(value: ShiroEncryptionMode.gcm, child: Text('AES-GCM')),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) setState(() => _encryptionMode = v);
-                        },
-                        decoration: InputDecoration(
-                          labelText: '模式',
-                          labelStyle: AppTextStyles.caption(size: 11),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: AppColors.border),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: _method,
+                                dropdownColor: AppColors.bgElevated,
+                                icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary, size: 22),
+                                style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
+                                items: const [
+                                  DropdownMenuItem(value: 'GET', child: Text('GET')),
+                                  DropdownMenuItem(value: 'POST', child: Text('POST')),
+                                ],
+                                onChanged: (v) { if (v != null) setState(() => _method = v); },
+                                decoration: _shiroInputDecoration('方法', ''),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: DropdownButtonFormField<ShiroEncryptionMode>(
+                                value: _encryptionMode,
+                                dropdownColor: AppColors.bgElevated,
+                                icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary, size: 22),
+                                style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
+                                items: const [
+                                  DropdownMenuItem(value: ShiroEncryptionMode.cbc, child: Text('AES-CBC')),
+                                  DropdownMenuItem(value: ShiroEncryptionMode.gcm, child: Text('AES-GCM')),
+                                ],
+                                onChanged: (v) { if (v != null) setState(() => _encryptionMode = v); },
+                                decoration: _shiroInputDecoration('模式', ''),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _timeoutController,
+                                style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
+                                decoration: _shiroInputDecoration('超时(s)', '10'),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _cookieNameController,
+                          onChanged: (_) => setState(() {}),
+                          style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
+                          decoration: _shiroInputDecoration('Cookie 名', 'rememberMe'),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _verboseMode,
+                              onChanged: (v) { if (v != null) setState(() => _verboseMode = v); },
+                            ),
+                            Text('详细日志', style: AppTextStyles.caption(size: 11)),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _shiroSectionTitle('Key 与 Payload'),
+                        TextField(
+                          controller: _keyController,
+                          onChanged: (_) => setState(() {}),
+                          style: AppTextStyles.body(
+                            size: 12,
+                            color: _currentKey == null ? AppColors.textMuted : AppColors.cyan,
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
+                          decoration: _shiroInputDecoration('当前 Key', '爆破后自动填充').copyWith(
+                            suffixIcon: _currentKey == null
+                                ? const Icon(Icons.vpn_key_outlined, size: 16, color: AppColors.textSecondary)
+                                : const Icon(Icons.check_circle, size: 16, color: AppColors.cyan),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: 110,
-                      child: TextField(
-                        controller: _timeoutController,
-                        style: AppTextStyles.body(
-                          size: 12,
-                          color: AppColors.textPrimary,
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _payloadB64Controller,
+                          maxLines: 4,
+                          style: AppTextStyles.terminal(size: 11, color: AppColors.cyan),
+                          decoration: _shiroInputDecoration('Payload Base64', '粘贴 Base64 编码的序列化 Payload'),
                         ),
-                        decoration: InputDecoration(
-                          labelText: '超时 (s)',
-                          labelStyle: AppTextStyles.caption(size: 11),
-                          hintText: '10',
-                          hintStyle: AppTextStyles.caption(
-                            size: 11,
-                            color: AppColors.textMuted,
-                          ),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: AppColors.border),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
-                          ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _shiroActionBtn('检测 Shiro', _handleCheckShiro),
+                            const SizedBox(width: 8),
+                            _shiroActionBtn('爆破 Key', _handleBruteforce),
+                            const SizedBox(width: 8),
+                            _shiroActionBtn('验证 Key', _handleVerifyKey, enabled: _currentKey != null),
+                            const SizedBox(width: 8),
+                            _shiroActionBtn('发送 Payload', _handleSendPayload, enabled: _currentKey != null),
+                          ],
                         ),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _cookieNameController,
-                        onChanged: (_) => setState(() {}),
-                        style: AppTextStyles.body(
-                          size: 12,
-                          color: AppColors.textPrimary,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Cookie 名',
-                          labelStyle: AppTextStyles.caption(size: 11),
-                          hintText: 'rememberMe',
-                          hintStyle: AppTextStyles.caption(
-                            size: 11,
-                            color: AppColors.textMuted,
-                          ),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: AppColors.border),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _verboseMode,
-                          onChanged: (v) {
-                            if (v != null) setState(() => _verboseMode = v);
-                          },
-                        ),
-                        const Text('详细日志', style: TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _keyController,
-                  onChanged: (_) => setState(() {}),
-                  style: AppTextStyles.body(
-                    size: 12,
-                    color: _currentKey == null
-                        ? AppColors.textMuted
-                        : AppColors.cyan,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: '当前 Key',
-                    labelStyle: AppTextStyles.caption(size: 11),
-                    hintText: '爆破后自动填充，或手动粘贴',
-                    hintStyle: AppTextStyles.caption(
-                      size: 11,
-                      color: AppColors.textMuted,
-                    ),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
-                    ),
-                    suffixIcon: _currentKey == null
-                        ? const Icon(Icons.vpn_key_outlined,
-                            size: 16, color: AppColors.textSecondary)
-                        : const Icon(Icons.check_circle,
-                            size: 16, color: AppColors.cyan),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Container(
-                      width: 3,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: AppColors.cyan.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '发送 Payload',
-                      style: AppTextStyles.heading(
-                        size: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _payloadB64Controller,
-                        maxLines: 4,
-                        style: AppTextStyles.terminal(size: 11, color: AppColors.cyan),
-                        decoration: InputDecoration(
-                          labelText: 'Payload Base64',
-                          labelStyle: AppTextStyles.caption(size: 11),
-                          hintText: '粘贴 Base64 编码的序列化 Payload',
-                          hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: AppColors.border),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: AppColors.cyan.withValues(alpha: 0.6)),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    SizedBox(
-                      height: 34,
-                      child: ElevatedButton.icon(
-                        onPressed: _running ? null : _handleCheckShiro,
-                        icon: const Icon(Icons.search, size: 16),
-                        label: const Text('检测 Shiro'),
-                        style: ElevatedButton.styleFrom(
-                          textStyle: const TextStyle(fontSize: 12, inherit: false),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      height: 34,
-                      child: ElevatedButton.icon(
-                        onPressed: _running ? null : _handleBruteforce,
-                        icon: const Icon(Icons.lock_open, size: 16),
-                        label: const Text('爆破 Key'),
-                        style: ElevatedButton.styleFrom(
-                          textStyle: const TextStyle(fontSize: 12, inherit: false),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      height: 34,
-                      child: OutlinedButton.icon(
-                        onPressed: (_running || _currentKey == null) ? null : _handleVerifyKey,
-                        icon: const Icon(Icons.verified_user, size: 16),
-                        label: const Text('验证 Key'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
-                          textStyle: const TextStyle(fontSize: 12, inherit: false),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      height: 34,
-                      child: ElevatedButton.icon(
-                        onPressed: (_running || _currentKey == null) ? null : _handleSendPayload,
-                        icon: const Icon(Icons.send, size: 16),
-                        label: const Text('发送 Payload'),
-                        style: ElevatedButton.styleFrom(
-                          textStyle: const TextStyle(fontSize: 12, inherit: false),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Container(
-                      width: 3,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: AppColors.textSecondary.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '运行日志',
-                      style: AppTextStyles.heading(
-                        size: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
                       ],
                     ),
                   ),
                 ),
-                Expanded(
+                const SizedBox(width: 16),
+                Flexible(
+                  flex: 1,
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: AppColors.bgDark,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: AppColors.border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1450,73 +1135,52 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                               margin: const EdgeInsets.only(right: 6),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: _running
-                                    ? AppColors.primary
-                                    : AppColors.textMuted,
-                                boxShadow: _running
-                                    ? [
-                                        BoxShadow(
-                                          color: AppColors.primary.withValues(alpha: 0.5),
-                                          blurRadius: 4,
-                                        ),
-                                      ]
-                                    : null,
+                                color: _running ? AppColors.primary : AppColors.textMuted,
                               ),
                             ),
                             Text(
                               _running ? '运行中' : '空闲',
                               style: AppTextStyles.caption(
                                 size: 11,
-                                color: _running
-                                    ? AppColors.primary
-                                    : AppColors.textSecondary,
+                                color: _running ? AppColors.primary : AppColors.textSecondary,
                               ),
                             ),
                             const Spacer(),
                             TextButton.icon(
-                              onPressed: _log.isEmpty
-                                  ? null
-                                  : () {
-                                      setState(() {
-                                        _log = '';
-                                      });
-                                    },
+                              onPressed: _log.isEmpty ? null : () async {
+                                await Clipboard.setData(ClipboardData(text: _log));
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.copy, size: 14),
+                              label: const Text('复制'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.textSecondary,
+                                textStyle: const TextStyle(fontSize: 11),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _log.isEmpty ? null : () => setState(() => _log = ''),
                               icon: const Icon(Icons.clear_all, size: 14),
                               label: const Text('清空'),
                               style: TextButton.styleFrom(
                                 foregroundColor: AppColors.textSecondary,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                textStyle: const TextStyle(fontSize: 11, inherit: false),
+                                textStyle: const TextStyle(fontSize: 11),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
                         const Divider(height: 1, color: AppColors.border),
                         const SizedBox(height: 4),
                         Expanded(
-                          child: Scrollbar(
+                          child: SingleChildScrollView(
                             controller: _logScrollController,
-                            thumbVisibility: true,
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                return SingleChildScrollView(
-                                  controller: _logScrollController,
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      minWidth: constraints.maxWidth,
-                                      maxWidth: constraints.maxWidth,
-                                    ),
-                                    child: Text(
-                                      _log.isEmpty ? '> 等待操作' : _log,
-                                      style: AppTextStyles.terminal(
-                                        size: 12,
-                                        color: AppColors.textMuted,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
+                            child: SelectableText.rich(
+                              _shiroBuildLogRichText(_log),
+                              style: AppTextStyles.terminal(size: 12, color: AppColors.textMuted),
                             ),
                           ),
                         ),
@@ -1530,6 +1194,89 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
         ],
       ),
     );
+  }
+
+  Widget _shiroSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 14,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(title, style: AppTextStyles.heading(size: 12, color: AppColors.textSecondary)),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _shiroInputDecoration(String label, String hint) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+      floatingLabelBehavior: FloatingLabelBehavior.always,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
+      ),
+    );
+  }
+
+  Widget _shiroActionBtn(String label, VoidCallback onPressed, {bool enabled = true}) {
+    return SizedBox(
+      height: 32,
+      child: ElevatedButton(
+        onPressed: (_running || !enabled) ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          textStyle: const TextStyle(fontSize: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+
+  Color _shiroLogLineColor(String line) {
+    if (line.startsWith('[+]')) return AppColors.primary;
+    if (line.startsWith('[!]')) return AppColors.red;
+    if (line.startsWith('[-]')) return AppColors.textMuted;
+    if (line.startsWith('[*]')) return AppColors.cyan;
+    return AppColors.textSecondary;
+  }
+
+  TextSpan _shiroBuildLogRichText(String log) {
+    if (log.isEmpty) {
+      return TextSpan(text: '> 等待操作', style: TextStyle(color: AppColors.textMuted, fontFamily: 'Monaco'));
+    }
+    final lines = log.split('\n');
+    final spans = <TextSpan>[];
+    final baseStyle = AppTextStyles.terminal(size: 12, color: AppColors.textSecondary);
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final color = _shiroLogLineColor(line);
+      spans.add(TextSpan(
+        text: line + (i < lines.length - 1 ? '\n' : ''),
+        style: baseStyle.copyWith(
+          color: color,
+          fontWeight: line.startsWith('[+]') || line.startsWith('[!]') ? FontWeight.w600 : null,
+        ),
+      ));
+    }
+    return TextSpan(children: spans);
   }
 }
 

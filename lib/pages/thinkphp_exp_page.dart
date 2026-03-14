@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show rootBundle, Clipboard, ClipboardData;
 
+import '../database/database_helper.dart';
 import '../exp/thinkphp/thinkphp_exp_service.dart';
+import '../models/project.dart';
+import '../models/webshell.dart';
 import '../theme/app_theme.dart';
+import 'webshell_interactive_page.dart';
 
 /// ThinkPHP 漏洞利用页面（100% 复现 ThinkphpGUI）
 class ThinkphpExpPage extends StatelessWidget {
@@ -125,7 +129,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   List<ThinkphpVulnType> _detectedRceVulns = [];
   /// 当前选中的 RCE 漏洞（用于执行命令 / GetShell）
   ThinkphpVulnType? _selectedRceVuln;
-  ThinkphpVulnType _selectedCheckType = ThinkphpVulnType.tp5022_5129;
+  ThinkphpVulnType _selectedCheckType = ThinkphpVulnType.tp5023;
 
   void _appendLog(String line) {
     setState(() {
@@ -135,6 +139,15 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       final trimmed =
           existing.length > maxLines ? existing.sublist(existing.length - maxLines) : existing;
       _log = trimmed.join('\n');
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_logScrollController.hasClients) {
+        _logScrollController.animateTo(
+          _logScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -192,8 +205,14 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
         ThinkphpVulnType.tp5010,
         ThinkphpVulnType.tp5022_5129,
         ThinkphpVulnType.tp5023,
+        ThinkphpVulnType.tp5023Debug,
         ThinkphpVulnType.tp5024_5130,
+        ThinkphpVulnType.tp5ViewDisplay,
+        ThinkphpVulnType.tp5MethodFilter,
+        ThinkphpVulnType.tp5FileInclude,
         ThinkphpVulnType.tp3,
+        ThinkphpVulnType.tp3Module,
+        ThinkphpVulnType.tp3ModuleTypo,
         ThinkphpVulnType.tp3LogRce,
       ];
       final results = await svc.checkAllRce();
@@ -260,18 +279,21 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
 
   Future<void> _handleExeRce() async {
     final url = _urlController.text.trim();
-    final cmd = _cmdController.text.trim().isEmpty ? 'id' : _cmdController.text.trim();
+    final vuln = _selectedRceVuln;
     if (url.isEmpty) {
       _appendLog('[!] 请输入目标 URL');
       return;
     }
-    final vuln = _selectedRceVuln;
     if (vuln == null) {
       _appendLog('[!] 请先检测并选择要利用的 RCE 漏洞');
       return;
     }
+    final defaultInput = vuln == ThinkphpVulnType.tp5FileInclude ? '/etc/passwd' : 'id';
+    final cmd = _cmdController.text.trim().isEmpty ? defaultInput : _cmdController.text.trim();
     setState(() => _running = true);
-    _appendLog('[*] 执行命令 ($vuln.label): $cmd');
+    _appendLog(vuln == ThinkphpVulnType.tp5FileInclude
+        ? '[*] 读取文件 ($vuln.label): $cmd'
+        : '[*] 执行命令 ($vuln.label): $cmd');
     try {
       final svc = ThinkphpExpService(
         url: url,
@@ -279,9 +301,9 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       );
       final out = await svc.exeRce(vuln, cmd);
       if (out != null && out.isNotEmpty) {
-        _appendLog('[+] 输出:\n$out');
+        _appendLog(vuln == ThinkphpVulnType.tp5FileInclude ? '[+] 文件内容:\n$out' : '[+] 输出:\n$out');
       } else {
-        _appendLog('[-] 无输出或执行失败');
+        _appendLog(vuln == ThinkphpVulnType.tp5FileInclude ? '[-] 读取失败或文件不存在' : '[-] 无输出或执行失败');
       }
     } catch (e) {
       _appendLog('[!] 异常: $e');
@@ -312,6 +334,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       final shellUrl = await svc.getShell(vuln, shellContent);
       if (shellUrl != null) {
         _appendLog('[+] GetShell 成功: $shellUrl');
+        if (mounted) _openWebshellFromResult(context, shellUrl);
       } else {
         _appendLog('[-] GetShell 失败');
       }
@@ -320,6 +343,150 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     } finally {
       if (mounted) setState(() => _running = false);
     }
+  }
+
+  /// 解析 GetShell 结果并跳转到 Webshell 交互页
+  Future<void> _openWebshellFromResult(BuildContext context, String shellUrl) async {
+    String url = shellUrl;
+    String password = 'rebeyond';
+    final passIdx = shellUrl.indexOf(' Pass:');
+    if (passIdx > 0) {
+      url = shellUrl.substring(0, passIdx).trim();
+      password = shellUrl.substring(passIdx + 6).trim();
+    }
+    final now = DateTime.now();
+    Webshell ws = Webshell(
+      id: 0,
+      projectId: 0,
+      name: 'ThinkPHP GetShell',
+      url: url,
+      password: password,
+      type: 'php',
+      method: 'POST',
+      status: 1,
+      connectorType: 'php_behinder',
+      createdAt: now,
+      updatedAt: now,
+    );
+    try {
+      final db = DatabaseHelper();
+      Project? project = await _showProjectPicker(context, db);
+      if (project != null) {
+        ws = await db.createWebshell(
+          project.id,
+          name: 'ThinkPHP GetShell',
+          url: url,
+          password: password,
+          method: 'POST',
+          type: 'php',
+          connectorType: 'php_behinder',
+        );
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WebshellInteractivePage(webshell: ws),
+      ),
+    );
+  }
+
+  /// 弹出项目选择器；无项目时弹出创建对话框
+  Future<Project?> _showProjectPicker(BuildContext context, DatabaseHelper db) async {
+    final projects = await db.getAllProjects();
+    if (projects.isEmpty) {
+      return _showCreateProjectDialog(context, db);
+    }
+    return showDialog<Project>(
+      context: context,
+      builder: (ctx) => _ProjectPickerDialog(projects: projects),
+    );
+  }
+
+  /// 创建项目对话框
+  Future<Project?> _showCreateProjectDialog(BuildContext context, DatabaseHelper db) async {
+    final nameController = TextEditingController();
+    final domainController = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: Text('暂无项目', style: AppTextStyles.heading(color: AppColors.primary)),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '请先创建一个项目以保存 Webshell',
+                style: AppTextStyles.caption(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                  labelText: '项目名称',
+                  hintText: '例如：目标站点',
+                  hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                  labelStyle: const TextStyle(color: AppColors.textSecondary),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                  ),
+                  focusedBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.primary),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: domainController,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                  labelText: '域名或ID *',
+                  hintText: '例如：example.com',
+                  hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                  labelStyle: const TextStyle(color: AppColors.textSecondary),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                  ),
+                  focusedBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.primary),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('取消', style: AppTextStyles.body(color: AppColors.textSecondary)),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (nameController.text.trim().isEmpty || domainController.text.trim().isEmpty) return;
+              Navigator.pop(ctx, true);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            child: Text('创建', style: AppTextStyles.body(color: AppColors.bgDark)),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true &&
+        nameController.text.trim().isNotEmpty &&
+        domainController.text.trim().isNotEmpty) {
+      return db.createProject(
+        nameController.text.trim(),
+        domain: domainController.text.trim(),
+      );
+    }
+    return null;
   }
 
   @override
@@ -465,13 +632,16 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                         TextField(
                           controller: _cmdController,
                           style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
-                          decoration: _inputDecoration('命令', 'id'),
+                          decoration: _inputDecoration(
+                            _selectedRceVuln == ThinkphpVulnType.tp5FileInclude ? '文件路径' : '命令',
+                            _selectedRceVuln == ThinkphpVulnType.tp5FileInclude ? '/etc/passwd' : 'id',
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
                             _actionBtn(
-                              '执行命令',
+                              _selectedRceVuln == ThinkphpVulnType.tp5FileInclude ? '读取文件' : '执行命令',
                               _handleExeRce,
                               enabled: _selectedRceVuln != null,
                             ),
@@ -479,7 +649,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                             _actionBtn(
                               'GetShell',
                               _handleGetShell,
-                              enabled: _selectedRceVuln != null,
+                              enabled: _selectedRceVuln != null && _selectedRceVuln!.supportsGetShell,
                             ),
                           ],
                         ),
@@ -520,6 +690,22 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                             ),
                             const Spacer(),
                             TextButton.icon(
+                              onPressed: _log.isEmpty ? null : () async {
+                                await Clipboard.setData(ClipboardData(text: _log));
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.copy, size: 14),
+                              label: const Text('复制'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.textSecondary,
+                                textStyle: const TextStyle(fontSize: 11),
+                              ),
+                            ),
+                            TextButton.icon(
                               onPressed: _log.isEmpty ? null : () => setState(() => _log = ''),
                               icon: const Icon(Icons.clear_all, size: 14),
                               label: const Text('清空'),
@@ -535,8 +721,8 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                         Expanded(
                           child: SingleChildScrollView(
                             controller: _logScrollController,
-                            child: Text(
-                              _log.isEmpty ? '> 等待操作' : _log,
+                            child: SelectableText.rich(
+                              _buildLogRichText(_log),
                               style: AppTextStyles.terminal(size: 12, color: AppColors.textMuted),
                             ),
                           ),
@@ -578,6 +764,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       labelText: label,
       hintText: hint,
       hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+      floatingLabelBehavior: FloatingLabelBehavior.always,
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -603,6 +790,71 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
         ),
         child: Text(label),
       ),
+    );
+  }
+
+  /// 根据日志前缀返回颜色，凸显关键信息
+  Color _logLineColor(String line) {
+    if (line.startsWith('[+]')) return AppColors.primary; // 成功 - 高亮绿
+    if (line.startsWith('[!]')) return AppColors.red;     // 错误/警告 - 红色
+    if (line.startsWith('[-]')) return AppColors.textMuted; // 失败 - 灰色
+    if (line.startsWith('[*]')) return AppColors.cyan;    // 进行中 - 青色
+    if (line.startsWith('[i]')) return AppColors.cyan.withValues(alpha: 0.9); // 信息 - 浅青
+    return AppColors.textSecondary;
+  }
+
+  TextSpan _buildLogRichText(String log) {
+    if (log.isEmpty) {
+      return TextSpan(text: '> 等待操作', style: TextStyle(color: AppColors.textMuted, fontFamily: 'Monaco'));
+    }
+    final lines = log.split('\n');
+    final spans = <TextSpan>[];
+    final baseStyle = AppTextStyles.terminal(size: 12, color: AppColors.textSecondary);
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final color = _logLineColor(line);
+      spans.add(TextSpan(
+        text: line + (i < lines.length - 1 ? '\n' : ''),
+        style: baseStyle.copyWith(color: color, fontWeight: line.startsWith('[+]') || line.startsWith('[!]') ? FontWeight.w600 : null),
+      ));
+    }
+    return TextSpan(children: spans);
+  }
+}
+
+/// 项目选择器对话框
+class _ProjectPickerDialog extends StatelessWidget {
+  final List<Project> projects;
+
+  const _ProjectPickerDialog({required this.projects});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.bgCard,
+      title: Text('选择项目', style: AppTextStyles.heading(color: AppColors.primary)),
+      content: SizedBox(
+        width: 360,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: projects.length,
+          itemBuilder: (ctx, i) {
+            final p = projects[i];
+            return ListTile(
+              leading: const Icon(Icons.folder_outlined, color: AppColors.primary, size: 20),
+              title: Text(p.name, style: AppTextStyles.body(size: 13, color: AppColors.textPrimary)),
+              subtitle: Text(p.domain, style: AppTextStyles.caption(size: 11, color: AppColors.textMuted)),
+              onTap: () => Navigator.pop(context, p),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('取消', style: AppTextStyles.body(color: AppColors.textSecondary)),
+        ),
+      ],
     );
   }
 }
