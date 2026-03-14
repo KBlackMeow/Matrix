@@ -15,6 +15,7 @@ import 'pages/webshell_management_page.dart';
 import 'pages/reverse_shell_dashboard_page.dart';
 import 'pages/payload_management_page.dart';
 import 'pages/dictionary_management_page.dart';
+import 'pages/thinkphp_exp_page.dart';
 import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/dirsearch_card.dart';
@@ -552,12 +553,18 @@ class _ExpContent extends StatelessWidget {
                   },
                 );
               }
-              return const _ExpEntryCard(
-                icon: Icons.http,
-                title: '占位 · 即将上线',
-                subtitle: '更多漏洞利用模块开发中',
-                tag: 'Coming soon',
-                onTap: null,
+              return _ExpEntryCard(
+                icon: Icons.php,
+                title: 'ThinkPHP 漏洞利用',
+                subtitle: '3.x/5.x/6.x 漏洞检测、RCE、GetShell',
+                tag: 'PHP · 通用',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ThinkphpExpPage(),
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -771,7 +778,7 @@ class _ShiroExpCard extends StatefulWidget {
 
 class _ShiroExpCardState extends State<_ShiroExpCard> {
   final _urlController = TextEditingController();
-  final _cookieNameController = TextEditingController(text: 'rememberMe');
+  final _cookieNameController = TextEditingController();
   final _timeoutController = TextEditingController();
   final _keyController = TextEditingController();
   final _payloadB64Controller = TextEditingController();

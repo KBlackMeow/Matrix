@@ -15,15 +15,11 @@ class DirsearchCard extends StatefulWidget {
 
 class _DirsearchCardState extends State<DirsearchCard> {
   final _urlController = TextEditingController();
-  final _extensionsController = TextEditingController(
-    text: 'php,html,js,txt,asp,aspx,jsp',
-  );
-  final _threadsController = TextEditingController(text: '5');
-  final _timeoutController = TextEditingController(text: '8');
-  final _statusIncludeController = TextEditingController(
-    text: '200,201,301,302,401,403',
-  );
-  final _maxRecurseDepthController = TextEditingController(text: '2');
+  final _extensionsController = TextEditingController();
+  final _threadsController = TextEditingController();
+  final _timeoutController = TextEditingController();
+  final _statusIncludeController = TextEditingController();
+  final _maxRecurseDepthController = TextEditingController();
 
   static const String _dictFile = 'dicc.txt';
   List<DirsearchResult> _results = [];
@@ -91,8 +87,9 @@ class _DirsearchCardState extends State<DirsearchCard> {
 
     _setStatus('加载字典...');
     final extStr = _extensionsController.text.trim();
+    final defaultExt = 'php,html,js,txt,asp,aspx,jsp';
     final extensions = extStr.isEmpty
-        ? <String>[]
+        ? defaultExt.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
         : extStr
               .split(',')
               .map((e) => e.trim())
@@ -108,11 +105,12 @@ class _DirsearchCardState extends State<DirsearchCard> {
     }
     setState(() => _progressTotal = paths.length);
 
-    final threads = int.tryParse(_threadsController.text.trim()) ?? 10;
+    final threads = int.tryParse(_threadsController.text.trim()) ?? 5;
     final timeoutSec = int.tryParse(_timeoutController.text.trim()) ?? 8;
     final statusStr = _statusIncludeController.text.trim();
+    final defaultStatus = '200,201,301,302,401,403';
     final statusCodes = statusStr.isEmpty
-        ? {200, 201, 301, 302, 401, 403}
+        ? defaultStatus.split(',').map((e) => int.tryParse(e.trim())).whereType<int>().toSet()
         : statusStr
               .split(',')
               .map((e) => int.tryParse(e.trim()))
@@ -318,6 +316,7 @@ class _DirsearchCardState extends State<DirsearchCard> {
                       labelText: '扩展名',
                       labelStyle: AppTextStyles.caption(size: 11),
                       hintText: 'php,html,js,txt,asp,aspx,jsp',
+                      hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -352,6 +351,8 @@ class _DirsearchCardState extends State<DirsearchCard> {
                     decoration: InputDecoration(
                       labelText: '线程',
                       labelStyle: AppTextStyles.caption(size: 11),
+                      hintText: '5',
+                      hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -380,6 +381,8 @@ class _DirsearchCardState extends State<DirsearchCard> {
                     decoration: InputDecoration(
                       labelText: '超时',
                       labelStyle: AppTextStyles.caption(size: 11),
+                      hintText: '8',
+                      hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -436,7 +439,8 @@ class _DirsearchCardState extends State<DirsearchCard> {
                   decoration: InputDecoration(
                     labelText: '包含状态码',
                     labelStyle: AppTextStyles.caption(size: 11),
-                    hintText: '200,301,302,401,403',
+                    hintText: '200,201,301,302,401,403',
+                    hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -500,6 +504,8 @@ class _DirsearchCardState extends State<DirsearchCard> {
                           color: AppColors.textPrimary,
                         ),
                         decoration: InputDecoration(
+                          hintText: '2',
+                          hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8,
