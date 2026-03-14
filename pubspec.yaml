@@ -59,6 +59,9 @@ dependencies:
   # AES 加密（冰蝎协议）
   encrypt: ^5.0.3
 
+  # MySQL 爆破（fscan 复刻）
+  mysql1: ^0.20.0
+
   # 终端模拟器控件（完整终端使用）
   xterm: ^4.0.0
   pointycastle: ^3.9.1

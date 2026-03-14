@@ -139,4 +139,27 @@ class DatabaseHelper {
   Future<int> deleteDictionary(int id) async {
     return impl.deleteDictionary(id);
   }
+
+  // Scan Sessions（扫描会话持久化）
+  Future<int> createScanSession({
+    required int projectId,
+    required String scanType,
+    required String target,
+    String? configJson,
+  }) async {
+    return impl.createScanSession(
+      projectId: projectId,
+      scanType: scanType,
+      target: target,
+      configJson: configJson,
+    );
+  }
+
+  Future<Map<String, dynamic>?> getLatestScanSession(int projectId, String scanType) =>
+      impl.getLatestScanSession(projectId, scanType);
+
+  Future<void> updateScanSession(int id, {String? logText, String? status}) =>
+      impl.updateScanSession(id, logText: logText, status: status);
+
+  Future<void> appendScanLog(int id, String line) => impl.appendScanLog(id, line);
 }

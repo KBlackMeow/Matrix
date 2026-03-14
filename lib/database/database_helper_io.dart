@@ -33,7 +33,7 @@ class DatabaseHelperIo {
 
     return openDatabase(
       path,
-      version: 8,
+      version: 9,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -123,6 +123,24 @@ class DatabaseHelperIo {
     );
     await db.execute(
       'CREATE INDEX idx_webshell_project ON webshells(project_id)',
+    );
+
+    await db.execute('''
+      CREATE TABLE scan_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER,
+        scan_type TEXT NOT NULL,
+        target TEXT NOT NULL,
+        config_json TEXT,
+        log_text TEXT,
+        status TEXT NOT NULL DEFAULT 'running',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects (id)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_scan_sessions_project_type ON scan_sessions(project_id, scan_type)',
     );
   }
 
@@ -226,6 +244,25 @@ class DatabaseHelperIo {
       await db.execute(
           "UPDATE webshells SET connector_type = 'jsp_classloader' WHERE type = 'jsp'");
     }
+    if (oldVersion < 9) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS scan_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_id INTEGER,
+          scan_type TEXT NOT NULL,
+          target TEXT NOT NULL,
+          config_json TEXT,
+          log_text TEXT,
+          status TEXT NOT NULL DEFAULT 'running',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects (id)
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_scan_sessions_project_type ON scan_sessions(project_id, scan_type)',
+      );
+    }
   }
 
   Future<Project> createProject(String name, {required String domain, String? description}) async {
@@ -281,7 +318,66 @@ class DatabaseHelperIo {
     final db = await database;
     await db.delete('info_collection', where: 'project_id = ?', whereArgs: [id]);
     await db.delete('webshells', where: 'project_id = ?', whereArgs: [id]);
+    await db.delete('scan_sessions', where: 'project_id = ?', whereArgs: [id]);
     return db.delete('projects', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ── Scan Sessions（扫描会话持久化）────────────────────────────────────────────
+
+  Future<int> createScanSession({
+    required int projectId,
+    required String scanType,
+    required String target,
+    String? configJson,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return db.insert('scan_sessions', {
+      'project_id': projectId,
+      'scan_type': scanType,
+      'target': target,
+      'config_json': configJson,
+      'log_text': '',
+      'status': 'running',
+      'created_at': now,
+      'updated_at': now,
+    });
+  }
+
+  Future<Map<String, dynamic>?> getLatestScanSession(int projectId, String scanType) async {
+    final db = await database;
+    final rows = await db.query(
+      'scan_sessions',
+      where: 'project_id = ? AND scan_type = ?',
+      whereArgs: [projectId, scanType],
+      orderBy: 'updated_at DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first.map((k, v) => MapEntry(k.toString(), v));
+  }
+
+  Future<void> updateScanSession(int id, {String? logText, String? status}) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final updates = <String, dynamic>{'updated_at': now};
+    if (logText != null) updates['log_text'] = logText;
+    if (status != null) updates['status'] = status;
+    await db.update('scan_sessions', updates, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> appendScanLog(int id, String text) async {
+    final db = await database;
+    final rows = await db.query('scan_sessions', where: 'id = ?', whereArgs: [id]);
+    if (rows.isEmpty) return;
+    final current = rows.first['log_text'] as String? ?? '';
+    final updated = current.isEmpty ? text : '$current\n$text';
+    await db.update(
+      'scan_sessions',
+      {'log_text': updated, 'updated_at': DateTime.now().millisecondsSinceEpoch},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   // ── Payload 文件目录 ────────────────────────────────────────────────────────
@@ -742,3 +838,25 @@ Future<String> readDictionaryPreview(String filePath, {int maxLines = 300}) =>
     _io.readDictionaryPreview(filePath, maxLines: maxLines);
 
 Future<int> deleteDictionary(int id) => _io.deleteDictionary(id);
+
+// Scan Sessions 顶层方法
+Future<int> createScanSession({
+  required int projectId,
+  required String scanType,
+  required String target,
+  String? configJson,
+}) =>
+    _io.createScanSession(
+      projectId: projectId,
+      scanType: scanType,
+      target: target,
+      configJson: configJson,
+    );
+
+Future<Map<String, dynamic>?> getLatestScanSession(int projectId, String scanType) =>
+    _io.getLatestScanSession(projectId, scanType);
+
+Future<void> updateScanSession(int id, {String? logText, String? status}) =>
+    _io.updateScanSession(id, logText: logText, status: status);
+
+Future<void> appendScanLog(int id, String line) => _io.appendScanLog(id, line);

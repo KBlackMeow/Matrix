@@ -36,6 +36,22 @@ class ThinkphpExpService {
     return result;
   }
 
+  /// 预检：目标是否为 ThinkPHP（避免非 ThinkPHP 站点误报）
+  Future<bool> isThinkPHP() async {
+    try {
+      final res = await http.get(baseUri).timeout(timeout);
+      final body = res.body.toLowerCase();
+      final combined = '$body ${res.headers.toString().toLowerCase()}';
+      if (RegExp(r'thinkphp|think-php|runtime|\[ info \]|\[ error \]').hasMatch(combined)) {
+        return true;
+      }
+      if (body.contains('php version') || body.contains('<?php')) return true;
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// 检测可用模块（index/manage/admin/api）
   Future<String> _getModule() async {
     final client = http.Client();
@@ -151,6 +167,11 @@ class ThinkphpExpService {
     return ThinkphpResult(false, 'ThinkPHP 5.0.24-5.1.30 RCE', '');
   }
 
+  static final _falsePositivePatterns = RegExp(
+    r'^(forbidden|403|404|not found|error|denied|unauthorized|access denied|bad request|invalid|<!doctype|<\?xml)\s*$',
+    caseSensitive: false,
+  );
+
   /// 6. ThinkPHP 5.x 数据库信息泄露
   Future<ThinkphpResult> checkTp5Db() async {
     final mod = await _getModule();
@@ -162,14 +183,17 @@ class ThinkphpExpService {
     ];
     try {
       String? username, hostname, password, database;
+      String? _valid(String? s) =>
+          (s != null && s.isNotEmpty && !_falsePositivePatterns.hasMatch(s.trim())) ? s.trim() : null;
+
       final r0 = await http.get(Uri.parse(urls[0])).timeout(timeout);
-      username = r0.body.length < 20 ? r0.body.trim() : null;
+      username = r0.body.length < 20 ? _valid(r0.body.trim()) : null;
       final r1 = await http.get(Uri.parse(urls[1])).timeout(timeout);
-      hostname = r1.body.length < 20 ? r1.body.trim() : null;
+      hostname = r1.body.length < 20 ? _valid(r1.body.trim()) : null;
       final r2 = await http.get(Uri.parse(urls[2])).timeout(timeout);
-      password = r2.body.length < 40 ? r2.body.trim() : null;
+      password = r2.body.length < 40 ? _valid(r2.body.trim()) : null;
       final r3 = await http.get(Uri.parse(urls[3])).timeout(timeout);
-      database = r3.body.length < 20 ? r3.body.trim() : null;
+      database = r3.body.length < 20 ? _valid(r3.body.trim()) : null;
       if (username != null || hostname != null || password != null || database != null) {
         return ThinkphpResult(
           true,
@@ -380,7 +404,8 @@ class ThinkphpExpService {
           final res = await http.get(Uri.parse(u)).timeout(timeout);
           if (res.statusCode == 200 && res.body.isNotEmpty && res.body.length < 500 && !res.body.contains('<!DOCTYPE')) {
             final val = res.body.trim();
-            if (val.isNotEmpty && !val.startsWith('{') && !val.contains('<html')) {
+            if (val.isNotEmpty && !val.startsWith('{') && !val.contains('<html') &&
+                !_falsePositivePatterns.hasMatch(val)) {
               return ThinkphpResult(true, 'ThinkPHP 5.0.22 config 泄露', '$name=$val');
             }
           }

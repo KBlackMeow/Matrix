@@ -1,14 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import '../services/dirsearch_service.dart';
+import '../services/dirscan_background_service.dart';
+import '../services/scan_session_service.dart';
 import '../theme/app_theme.dart';
 
 /// 复刻 [dirsearch](https://github.com/maurosoria/dirsearch) 的路径爆破 UI
+/// 支持后台运行、结果自动保存、退出再进入恢复状态
 class DirsearchCard extends StatefulWidget {
+  final int? projectId;
   final String? initialUrl;
 
-  const DirsearchCard({super.key, this.initialUrl});
+  const DirsearchCard({super.key, this.projectId, this.initialUrl});
 
   @override
   State<DirsearchCard> createState() => _DirsearchCardState();
@@ -23,30 +29,129 @@ class _DirsearchCardState extends State<DirsearchCard> {
   final _maxRecurseDepthController = TextEditingController();
   final _resultsScrollController = ScrollController();
 
-  static const String _dictFile = 'dicc.txt';
   List<DirsearchResult> _results = [];
   String _statusMessage = '';
   int _progressCurrent = 0;
   int _progressTotal = 0;
   bool _running = false;
-  bool _cancelled = false;
   bool _recursiveScan = true;
 
-  /// 节流进度更新（毫秒时间戳），避免过于频繁的 setState
-  int _lastProgressUpdateMs = 0;
-  /// 发现结果异步展示：累积后定时刷新（每 250ms 或满 15 条），降低 setState 频率避免主线程阻塞
-  static const int _resultFlushIntervalMs = 250;
-  static const int _resultFlushBatchSize = 15;
-  int _lastResultFlushMs = 0;
+  int? _sessionId;
+  StreamSubscription<DirscanProgress>? _progressSubscription;
+  Timer? _pollTimer;
+  final _scanSession = ScanSessionService();
+  final _bgService = DirscanBackgroundService();
 
   @override
   void initState() {
     super.initState();
     if (widget.initialUrl != null) _urlController.text = widget.initialUrl!;
+    _loadSession();
+  }
+
+  Future<void> _loadSession() async {
+    if (widget.projectId == null) return;
+    final meta = await _scanSession.loadSessionWithMeta(widget.projectId!, 'dir_scan');
+    if (meta != null && mounted) {
+      setState(() {
+        if (meta.target != null) _urlController.text = meta.target!;
+        if (meta.log.isNotEmpty) {
+          _results = meta.log
+              .split('\n')
+              .where((l) => l.contains('|'))
+              .map((l) {
+            final p = l.split('|');
+            if (p.length >= 3) {
+              return DirsearchResult(
+                path: p[0],
+                statusCode: int.tryParse(p[1]) ?? 0,
+                contentLength: int.tryParse(p[2]) ?? 0,
+              );
+            }
+            return null;
+          }).whereType<DirsearchResult>().toList();
+        }
+        if (meta.status == 'running') {
+          _running = true;
+          _sessionId = meta.id;
+          _startPolling();
+          _subscribeProgress();
+        }
+      });
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _refreshFromDb());
+  }
+
+  void _subscribeProgress() {
+    _progressSubscription?.cancel();
+    final sid = _sessionId;
+    if (sid == null) return;
+    _progressSubscription = _bgService.progress.listen((p) {
+      if (!mounted || p.sessionId != sid) return;
+      setState(() {
+        _progressCurrent = p.current;
+        _progressTotal = p.total;
+        if (p.status == 'completed' || p.status == 'cancelled') {
+          _running = false;
+          _stopPolling();
+          _setStatus(p.status == 'cancelled'
+              ? '已取消'
+              : '扫描完成，发现 ${p.resultsCount} 个有效路径');
+        } else if (p.status == 'error') {
+          _running = false;
+          _stopPolling();
+          _setStatus('[!] ${p.message ?? "异常"}');
+        } else if (p.status == 'empty_dict') {
+          _running = false;
+          _stopPolling();
+          _setStatus('[!] 字典为空或加载失败');
+        }
+      });
+      if (p.status == 'completed' || p.status == 'cancelled') {
+        _refreshFromDb();
+      }
+    });
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  Future<void> _refreshFromDb() async {
+    if (widget.projectId == null || !mounted) return;
+    final meta = await _scanSession.loadSessionWithMeta(widget.projectId!, 'dir_scan');
+    if (meta == null || !mounted) return;
+    setState(() {
+      _results = meta.log
+          .split('\n')
+          .where((l) => l.contains('|'))
+          .map((l) {
+        final p = l.split('|');
+        if (p.length >= 3) {
+          return DirsearchResult(
+            path: p[0],
+            statusCode: int.tryParse(p[1]) ?? 0,
+            contentLength: int.tryParse(p[2]) ?? 0,
+          );
+        }
+        return null;
+      }).whereType<DirsearchResult>().toList();
+      if (meta.status != 'running') {
+        _running = false;
+        _stopPolling();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _progressSubscription?.cancel();
+    _stopPolling();
     _urlController.dispose();
     _extensionsController.dispose();
     _threadsController.dispose();
@@ -82,15 +187,10 @@ class _DirsearchCardState extends State<DirsearchCard> {
       return;
     }
 
-    setState(() {
-      _running = true;
-      _cancelled = false;
-      _results = [];
-      _statusMessage = '';
-      _progressCurrent = 0;
-      _progressTotal = 0;
-      _lastProgressUpdateMs = 0;
-    });
+    if (widget.projectId == null) {
+      _setStatus('[!] 需要项目上下文以支持后台扫描');
+      return;
+    }
 
     _setStatus('加载字典...');
     final extStr = _extensionsController.text.trim();
@@ -102,15 +202,6 @@ class _DirsearchCardState extends State<DirsearchCard> {
               .map((e) => e.trim())
               .where((e) => e.isNotEmpty)
               .toList();
-
-    final (:basePaths, :paths) =
-        await DirsearchService.loadAndExpandWordlistAsync(_dictFile, extensions);
-    if (paths.isEmpty) {
-      _setStatus('[!] 字典为空或加载失败');
-      setState(() => _running = false);
-      return;
-    }
-    setState(() => _progressTotal = paths.length);
 
     final threads = int.tryParse(_threadsController.text.trim()) ?? 5;
     final timeoutSec = int.tryParse(_timeoutController.text.trim()) ?? 8;
@@ -125,126 +216,40 @@ class _DirsearchCardState extends State<DirsearchCard> {
               .toSet();
     if (statusCodes.isEmpty) statusCodes.addAll([200, 301, 302, 401, 403]);
 
-    final svc = DirsearchService(
-      baseUrl: baseUrl,
-      threads: threads.clamp(1, 50),
-      timeout: Duration(seconds: timeoutSec.clamp(1, 60)),
-      includeStatus: statusCodes,
-    );
+    final maxRecurseDepth =
+        (int.tryParse(_maxRecurseDepthController.text.trim()) ?? 0).clamp(0, 10);
 
     try {
-      final maxRecurseDepth =
-          (int.tryParse(_maxRecurseDepthController.text.trim()) ?? 0).clamp(
-            0,
-            10,
-          );
-      final scannedPaths = <String>{};
-      var totalCompletedBefore = 0;
-      var totalPlanned = paths.length;
-      var roundPaths = paths;
-      var depth = 0;
-
-      while (roundPaths.isNotEmpty && !_cancelled) {
-        final toScan = roundPaths
-            .where((p) => !scannedPaths.contains(p))
-            .toList();
-        scannedPaths.addAll(toScan);
-        if (toScan.isEmpty) break;
-
-        if (mounted) setState(() => _progressTotal = totalPlanned);
-
-        var foundBatch = <DirsearchResult>[];
-        final found = await svc.scan(
-          paths: toScan,
-          onFound: (r) {
-            foundBatch.add(r);
-            if (!mounted) return;
-            final now = DateTime.now().millisecondsSinceEpoch;
-            final shouldFlush = foundBatch.isNotEmpty &&
-                (foundBatch.length >= _resultFlushBatchSize || now - _lastResultFlushMs >= _resultFlushIntervalMs);
-            if (shouldFlush) {
-              _lastResultFlushMs = now;
-              setState(() {
-                _results = List.from(_results)..addAll(foundBatch);
-              });
-              foundBatch = [];
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (_resultsScrollController.hasClients) {
-                  _resultsScrollController.animateTo(
-                    _resultsScrollController.position.maxScrollExtent,
-                    duration: const Duration(milliseconds: 80),
-                    curve: Curves.easeOut,
-                  );
-                }
-              });
-            }
-          },
-          onProgress: (cur, total) {
-            if (!mounted) return;
-            final now = DateTime.now().millisecondsSinceEpoch;
-            final isLast = cur == total;
-            if (isLast || now - _lastProgressUpdateMs >= 200) {
-              _lastProgressUpdateMs = now;
-              setState(() => _progressCurrent = totalCompletedBefore + cur);
-            }
-          },
-          isCancelled: () => _cancelled,
-        );
-
-        totalCompletedBefore += toScan.length;
-
-        if (foundBatch.isNotEmpty && mounted) {
-          setState(() => _results = List.from(_results)..addAll(foundBatch));
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_resultsScrollController.hasClients) {
-              _resultsScrollController.animateTo(
-                _resultsScrollController.position.maxScrollExtent,
-                duration: const Duration(milliseconds: 80),
-                curve: Curves.easeOut,
-              );
-            }
-          });
-        }
-
-        if (!_recursiveScan || depth >= maxRecurseDepth) break;
-
-        final dirs200 = found
-            .where(
-              (r) =>
-                  r.statusCode == 200 &&
-                  DirsearchService.looksLikeDirectory(r.path),
-            )
-            .map((r) => r.path)
-            .toList();
-
-        roundPaths = await DirsearchService.computeNextRoundPaths(
-          dirs200: dirs200,
-          basePaths: basePaths,
-          extensions: extensions,
-          scannedPaths: scannedPaths,
-          maxPathsPerRound: 50000,
-        );
-        totalPlanned += roundPaths.length;
-        depth++;
-        if (roundPaths.isNotEmpty && mounted) {
-          _setStatus('递归深度 $depth，下一轮 ${roundPaths.length} 个路径');
-        }
-      }
-
-      if (mounted) {
-        _setStatus('扫描完成，发现 ${_results.length} 个有效路径');
-        setState(() => _running = false);
-      }
+      _sessionId = await _bgService.startScan(
+        projectId: widget.projectId!,
+        baseUrl: baseUrl,
+        extensions: extensions,
+        threads: threads,
+        timeoutSec: timeoutSec,
+        statusCodes: statusCodes,
+        recursiveScan: _recursiveScan,
+        maxRecurseDepth: maxRecurseDepth,
+      );
     } catch (e) {
-      if (mounted) {
-        _setStatus('[!] 异常: $e');
-        setState(() => _running = false);
-      }
+      _setStatus('[!] 启动失败: $e');
+      return;
     }
+
+    setState(() {
+      _running = true;
+      _results = [];
+      _statusMessage = '后台扫描已启动，离开页面后继续运行';
+      _progressCurrent = 0;
+      _progressTotal = 0;
+    });
+    _startPolling();
+    _subscribeProgress();
   }
 
   void _stopScan() {
-    setState(() => _cancelled = true);
+    if (_sessionId != null) {
+      _bgService.cancelSession(_sessionId!);
+    }
   }
 
   String _fmtSize(int bytes) {
@@ -520,9 +525,10 @@ class _DirsearchCardState extends State<DirsearchCard> {
                                       final text = _results
                                           .map((r) => '${r.statusCode}  ${_fmtSize(r.contentLength)}  ${r.path}')
                                           .join('\n');
+                                      final messenger = ScaffoldMessenger.of(context);
                                       await Clipboard.setData(ClipboardData(text: text));
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        messenger.showSnackBar(
                                           const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
                                         );
                                       }
