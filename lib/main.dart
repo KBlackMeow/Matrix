@@ -17,6 +17,7 @@ import 'pages/payload_management_page.dart';
 import 'pages/dictionary_management_page.dart';
 import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
+import 'widgets/dirsearch_card.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -481,10 +482,9 @@ class _InfoCollectionContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        Center(
-          child: Text(
-            '> 信息收集功能开发中...',
-            style: AppTextStyles.terminal(size: 14, color: AppColors.textMuted),
+        Expanded(
+          child: DirsearchCard(
+            initialUrl: project.domain.startsWith('http') ? project.domain : 'https://${project.domain}',
           ),
         ),
       ],
@@ -532,34 +532,34 @@ class _ExpContent extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         Expanded(
-          child: GridView.count(
-            crossAxisCount: 2,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 3,
-            children: [
-              _ExpEntryCard(
-                icon: Icons.cookie,
-                title: 'Apache Shiro 反序列化',
-                subtitle: 'rememberMe Key 爆破 / Payload 注入',
-                tag: 'Java · 通用',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ShiroExpPage(),
-                    ),
-                  );
-                },
-              ),
-              // 预留未来的 EXP 模块
-              const _ExpEntryCard(
+          child: ListView.separated(
+            padding: const EdgeInsets.only(bottom: 16),
+            itemCount: 2,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _ExpEntryCard(
+                  icon: Icons.cookie,
+                  title: 'Apache Shiro 反序列化',
+                  subtitle: 'rememberMe Key 爆破 / Payload 注入',
+                  tag: 'Java · 通用',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ShiroExpPage(),
+                      ),
+                    );
+                  },
+                );
+              }
+              return const _ExpEntryCard(
                 icon: Icons.http,
                 title: '占位 · 即将上线',
                 subtitle: '更多漏洞利用模块开发中',
                 tag: 'Coming soon',
                 onTap: null,
-              ),
-            ],
+              );
+            },
           ),
         ),
       ],
@@ -687,28 +687,30 @@ class _ExpEntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final enabled = onTap != null;
     return Material(
-      color: enabled ? AppColors.bgCard : AppColors.bgCard.withValues(alpha: 0.7),
-      borderRadius: BorderRadius.circular(12),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            color: enabled ? AppColors.bgCard : AppColors.bgCard.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
           child: Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.5),
-                  ),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
                 ),
-                child: Icon(icon, color: AppColors.primary, size: 22),
+                child: Icon(icon, color: AppColors.primary, size: 24),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -718,36 +720,36 @@ class _ExpEntryCard extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.body(
-                        size: 14,
+                      style: AppTextStyles.heading(
+                        size: 15,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
                       subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.caption(
-                        size: 12,
+                        size: 13,
                         color: AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.bgElevated,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: AppColors.border),
                 ),
                 child: Text(
                   tag,
                   style: AppTextStyles.caption(
-                    size: 11,
+                    size: 12,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -1046,7 +1048,14 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                 Row(
                   children: [
                     Container(
@@ -1404,6 +1413,10 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                   ],
                 ),
                 const SizedBox(height: 6),
+                      ],
+                    ),
+                  ),
+                ),
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(12),

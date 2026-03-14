@@ -93,6 +93,9 @@ Future<Dictionary> createDictionary({
 
 Future<List<Dictionary>> getAllDictionaries() => _web.getAllDictionaries();
 
+Future<void> updateDictionaryContent(Dictionary dict, List<int> bytes) =>
+    _web.updateDictionaryContent(dict, bytes);
+
 Future<String> readDictionaryPreview(String filePath, {int maxLines = 300}) =>
     _web.readDictionaryPreview(filePath, maxLines: maxLines);
 

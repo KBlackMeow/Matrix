@@ -2,6 +2,15 @@ import 'package:flutter/services.dart';
 
 import '../database/database_helper.dart';
 
+/// 根据文件名推断字典分类
+String _inferDictCategory(String name) {
+  final lower = name.toLowerCase();
+  if (lower.contains('password') || lower.contains('pass') || lower.contains('top100') || lower.contains('top200') || lower.contains('top1000')) return 'passwords';
+  if (lower.contains('username') || lower.contains('user')) return 'usernames';
+  if (lower.contains('subdomain')) return 'subdomains';
+  return 'paths';
+}
+
 /// 内置默认数据种子化服务
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
@@ -159,6 +168,8 @@ class SeedService {
   static Future<void> seed(DatabaseHelper db) async {
     // Patch 检查每次启动都运行（与版本号无关），内容不一致时直接覆盖
     await _applyPatches(db);
+    // 字典同步：每次启动检测 assets/defaults/dicts 变化，自动更新或新增
+    await _syncDefaultDicts(db);
 
     final stored = await db.getMetaValue(_kMetaKey);
     final storedVersion = int.tryParse(stored ?? '0') ?? 0;
@@ -251,6 +262,66 @@ class SeedService {
         ));
       } catch (_) {}
     }
+  }
+
+  /// 每次启动同步 assets/defaults/dicts 下的字典：检测文件变化并更新，新增的自动导入
+  static Future<void> _syncDefaultDicts(DatabaseHelper db) async {
+    try {
+      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+      final dictAssets = manifest
+          .listAssets()
+          .where((k) => k.startsWith('assets/defaults/dicts/'))
+          .toList();
+
+      final existingDicts = await db.getAllDictionaries();
+      final dictByName = {for (final d in existingDicts) d.name: d};
+
+      for (final assetPath in dictAssets) {
+        final name = assetPath.split('/').last;
+        if (name.isEmpty) continue;
+        try {
+          final data = await rootBundle.load(assetPath);
+          final bytes = data.buffer.asUint8List();
+          final fileSize = bytes.length;
+
+          final existing = dictByName[name];
+          if (existing != null) {
+            if (existing.isDefault && existing.fileSize != fileSize) {
+              await db.updateDictionaryContent(existing, bytes);
+            }
+          } else {
+            final category = _dictDefCategory(name) ?? _inferDictCategory(name);
+            final def = _findDictDef(name);
+            await db.createDictionary(
+              name: name,
+              category: category,
+              bytes: bytes,
+              isDefault: true,
+              description: def?.description,
+              tags: def?.tags,
+            );
+          }
+        } catch (_) {
+          // asset 加载失败时跳过
+        }
+      }
+    } catch (_) {
+      // AssetManifest 不可用时静默跳过（如部分测试环境）
+    }
+  }
+
+  static String? _dictDefCategory(String name) {
+    for (final d in _defaultDicts) {
+      if (d.name == name) return d.category;
+    }
+    return null;
+  }
+
+  static _DictDef? _findDictDef(String name) {
+    for (final d in _defaultDicts) {
+      if (d.name == name) return d;
+    }
+    return null;
   }
 }
 

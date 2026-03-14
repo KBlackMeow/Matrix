@@ -187,6 +187,20 @@ class DatabaseHelperWeb {
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
+  Future<void> updateDictionaryContent(Dictionary dict, List<int> bytes) async {
+    final lineCount = bytes.where((b) => b == 10).length +
+        (bytes.isNotEmpty && bytes.last != 10 ? 1 : 0);
+    final fileSize = bytes.length;
+    final index = _dictionaries.indexWhere((d) => d.id == dict.id);
+    if (index >= 0) {
+      _dictionaries[index] = dict.copyWith(
+        lineCount: lineCount,
+        fileSize: fileSize,
+        updatedAt: DateTime.now(),
+      );
+    }
+  }
+
   Future<String> readDictionaryPreview(String filePath,
       {int maxLines = 300}) async =>
       '// Web 模式：文件预览不可用';

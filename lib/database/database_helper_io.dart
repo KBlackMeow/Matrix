@@ -517,6 +517,27 @@ class DatabaseHelperIo {
     return maps.map((m) => Dictionary.fromMap(m)).toList();
   }
 
+  /// 更新字典内容（用于内置字典与 asset 同步）
+  Future<void> updateDictionaryContent(Dictionary dict, List<int> bytes) async {
+    if (dict.filePath.isEmpty) return;
+    final file = File(dict.filePath);
+    await file.writeAsBytes(bytes);
+    final lineCount = bytes.where((b) => b == 10).length +
+        (bytes.isNotEmpty && bytes.last != 10 ? 1 : 0);
+    final fileSize = bytes.length;
+    final db = await database;
+    await db.update(
+      'dictionaries',
+      {
+        'line_count': lineCount,
+        'file_size': fileSize,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [dict.id],
+    );
+  }
+
   /// 读取字典前 [maxLines] 行作为预览
   Future<String> readDictionaryPreview(String filePath,
       {int maxLines = 300}) async {
@@ -713,6 +734,9 @@ Future<Dictionary> createDictionary({
     );
 
 Future<List<Dictionary>> getAllDictionaries() => _io.getAllDictionaries();
+
+Future<void> updateDictionaryContent(Dictionary dict, List<int> bytes) =>
+    _io.updateDictionaryContent(dict, bytes);
 
 Future<String> readDictionaryPreview(String filePath, {int maxLines = 300}) =>
     _io.readDictionaryPreview(filePath, maxLines: maxLines);

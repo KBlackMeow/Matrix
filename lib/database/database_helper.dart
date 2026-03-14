@@ -127,6 +127,10 @@ class DatabaseHelper {
     return impl.getAllDictionaries();
   }
 
+  Future<void> updateDictionaryContent(Dictionary dict, List<int> bytes) async {
+    return impl.updateDictionaryContent(dict, bytes);
+  }
+
   Future<String> readDictionaryPreview(String filePath,
       {int maxLines = 300}) async {
     return impl.readDictionaryPreview(filePath, maxLines: maxLines);
