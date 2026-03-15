@@ -65,7 +65,7 @@ class SeedService {
       asset: 'assets/defaults/payloads/php_behinder.php',
       name: 'php_behinder.php',
       type: 'php',
-      description: 'PHP 冰蝎 3.0（Behinder），AES 加密，func|params 格式，默认密码 rebeyond',
+      description: 'PHP 冰蝎 3.0（Behinder），AES 加密，func|params 格式，默认密码 mAtrix_911',
       tags: 'php,behinder,aes,encrypt,冰蝎',
       sinceVersion: 6,
     ),

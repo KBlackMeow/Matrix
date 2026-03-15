@@ -73,8 +73,8 @@ class ConnectorFactory {
   /// 用于在 UI 的"密码"字段中显示提示，避免参数名混淆。
   static String defaultParam(String connectorType) => switch (connectorType) {
         'php_probe'    => '',        // 无参数
-        'php_behinder' => 'rebeyond', // 连接密码，或 16 位 hex 密钥
-        'jsp_behinder' => 'rebeyond', // 连接密码，或 16 位 hex 密钥
+        'php_behinder' => 'mAtrix_911', // 连接密码，或 16 位 hex 密钥
+        'jsp_behinder' => 'mAtrix_911', // 连接密码，或 16 位 hex 密钥
         _              => 'cmd',     // 其余均默认 cmd
       };
 

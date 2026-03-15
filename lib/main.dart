@@ -899,25 +899,9 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
       _appendLog('[!] 请先爆破出 Key 或输入 Key');
       return;
     }
-    var b64 = _payloadB64Controller.text.trim().replaceAll(RegExp(r'\s+'), '');
-    if (b64.isEmpty) {
-      _appendLog('[!] 请输入 Payload Base64');
-      return;
-    }
-    if (b64.contains('%')) {
-      b64 = Uri.decodeComponent(b64);
-    }
-
-    List<int> payload;
-    try {
-      payload = base64.decode(b64);
-    } catch (e) {
-      _appendLog('[!] Base64 解码失败: $e');
-      return;
-    }
 
     setState(() => _running = true);
-    _appendLog('[*] 发送 Payload，使用 Key：$key');
+
     try {
       final timeout = int.tryParse(_timeoutController.text.trim()) ?? 10;
       final svc = ShiroExpService(
@@ -928,26 +912,41 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
             : 'rememberMe',
         timeout: Duration(seconds: timeout),
       );
-      final res = await svc.sendExploitOnce(
+
+      // 仅保留“自定义 Payload”模式
+      var b64 = _payloadB64Controller.text.trim().replaceAll(RegExp(r'\s+'), '');
+      if (b64.isEmpty) {
+        _appendLog('[!] 请输入 Payload Base64');
+        return;
+      }
+      if (b64.contains('%')) {
+        b64 = Uri.decodeComponent(b64);
+      }
+
+      List<int> payload;
+      try {
+        payload = base64.decode(b64);
+      } catch (e) {
+        _appendLog('[!] Base64 解码失败: $e');
+        return;
+      }
+
+      _appendLog('[*] 发送自定义 Payload，使用 Key：$key');
+      final result = await svc.sendExploitOnce(
         keyBase64: key,
         serializedPayload: payload,
         mode: _encryptionMode,
         onProgress: _appendLog,
       );
+      final res = result.response;
       final code = res.statusCode;
-      if (code >= 200 && code < 300) {
-        _appendLog('[+] 发送完成，HTTP: $code');
-      } else if (code == 400) {
-        _appendLog('[+] 发送完成，HTTP: 400（payload 可能已执行，请尝试访问注入的 URL 验证）');
-      } else {
-        _appendLog('[+] 发送完成，HTTP: $code');
-      }
+      _appendLog('[+] 发送完成，HTTP: $code');
       if (res.body.trim().isNotEmpty) {
         final snippet = res.body.length > 500 ? '${res.body.substring(0, 500)}...' : res.body;
         _appendLog('[i] 响应体: $snippet');
       }
     } catch (e) {
-      _appendLog('[!] 发送异常: $e');
+      _appendLog('[!] 利用异常: $e');
     } finally {
       if (mounted) setState(() => _running = false);
     }
@@ -1005,10 +1004,12 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
               children: [
                 Flexible(
                   flex: 1,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 0, minWidth: 0),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                       children: [
                         _shiroSectionTitle('目标配置'),
                         TextField(
@@ -1023,7 +1024,7 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                               child: DropdownButtonFormField<String>(
                                 value: _method,
                                 dropdownColor: AppColors.bgElevated,
-                                icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary, size: 22),
+                                icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary, size: 22),
                                 style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
                                 items: const [
                                   DropdownMenuItem(value: 'GET', child: Text('GET')),
@@ -1038,7 +1039,7 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                               child: DropdownButtonFormField<ShiroEncryptionMode>(
                                 value: _encryptionMode,
                                 dropdownColor: AppColors.bgElevated,
-                                icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary, size: 22),
+                                icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary, size: 22),
                                 style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
                                 items: const [
                                   DropdownMenuItem(value: ShiroEncryptionMode.cbc, child: Text('AES-CBC')),
@@ -1055,6 +1056,20 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                                 style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
                                 decoration: _shiroInputDecoration('超时(s)', '10'),
                                 keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '模式: 自定义 Payload（仅发送下方 Base64）',
+                                style: AppTextStyles.caption(
+                                  size: 11,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
                             ),
                           ],
@@ -1099,14 +1114,13 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                           decoration: _shiroInputDecoration('Payload Base64', '粘贴 Base64 编码的序列化 Payload'),
                         ),
                         const SizedBox(height: 8),
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
                             _shiroActionBtn('检测 Shiro', _handleCheckShiro),
-                            const SizedBox(width: 8),
                             _shiroActionBtn('爆破 Key', _handleBruteforce),
-                            const SizedBox(width: 8),
                             _shiroActionBtn('验证 Key', _handleVerifyKey, enabled: _currentKey != null),
-                            const SizedBox(width: 8),
                             _shiroActionBtn('发送 Payload', _handleSendPayload, enabled: _currentKey != null),
                           ],
                         ),
@@ -1114,32 +1128,35 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                     ),
                   ),
                 ),
+                ),
                 const SizedBox(width: 16),
                 Flexible(
                   flex: 1,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgDark,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              margin: const EdgeInsets.only(right: 6),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _running ? AppColors.primary : AppColors.textMuted,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 0, minWidth: 0),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgDark,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                margin: const EdgeInsets.only(right: 6),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _running ? AppColors.primary : AppColors.textMuted,
+                                ),
                               ),
-                            ),
-                            Text(
-                              _running ? '运行中' : '空闲',
+                              Text(
+                                _running ? '运行中' : '空闲',
                               style: AppTextStyles.caption(
                                 size: 11,
                                 color: _running ? AppColors.primary : AppColors.textSecondary,
@@ -1187,6 +1204,7 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                       ],
                     ),
                   ),
+                ),
                 ),
               ],
             ),

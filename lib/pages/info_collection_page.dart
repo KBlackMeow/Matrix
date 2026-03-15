@@ -87,41 +87,51 @@ class InfoCollectionLandingPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 4.0,
-              children: [
-                _ScanTypeCard(
-                  icon: Icons.network_check,
-                  title: '端口扫描',
-                  subtitle: 'TCP/UDP 端口探测，识别开放服务',
-                  tag: 'Nmap',
-                  onTap: () => _navigateTo(context, _PortScanPage(project: project)),
-                ),
-                _ScanTypeCard(
-                  icon: Icons.folder_open,
-                  title: '目录扫描',
-                  subtitle: 'Web 路径爆破，发现隐藏目录与文件',
-                  tag: 'dirsearch',
-                  onTap: () => _navigateTo(context, _DirectoryScanPage(project: project)),
-                ),
-                _ScanTypeCard(
-                  icon: Icons.fingerprint,
-                  title: '指纹信息扫描',
-                  subtitle: '识别 CMS、框架、中间件等组件',
-                  tag: 'Wappalyzer',
-                  onTap: () => _navigateTo(context, _FingerprintScanPage(project: project)),
-                ),
-                _ScanTypeCard(
-                  icon: Icons.bug_report,
-                  title: '漏洞扫描',
-                  subtitle: '自动化漏洞检测与 PoC 验证',
-                  tag: 'POC',
-                  onTap: () => _navigateTo(context, _VulnerabilityScanPage(project: project)),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final bool singleColumn = constraints.maxWidth < 720;
+                final crossAxisCount = singleColumn ? 1 : 2;
+                return GridView.count(
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 4.0,
+                  children: [
+                    _ScanTypeCard(
+                      icon: Icons.network_check,
+                      title: '端口扫描',
+                      subtitle: 'TCP/UDP 端口探测，识别开放服务',
+                      tag: 'fscan',
+                      onTap: () =>
+                          _navigateTo(context, _PortScanPage(project: project)),
+                    ),
+                    _ScanTypeCard(
+                      icon: Icons.folder_open,
+                      title: '目录扫描',
+                      subtitle: 'Web 路径爆破，发现隐藏目录与文件',
+                      tag: 'dirsearch',
+                      onTap: () =>
+                          _navigateTo(context, _DirectoryScanPage(project: project)),
+                    ),
+                    _ScanTypeCard(
+                      icon: Icons.fingerprint,
+                      title: '指纹信息扫描',
+                      subtitle: '识别 CMS、框架、中间件等组件',
+                      tag: 'Wappalyzer',
+                      onTap: () => _navigateTo(
+                          context, _FingerprintScanPage(project: project)),
+                    ),
+                    _ScanTypeCard(
+                      icon: Icons.bug_report,
+                      title: '漏洞扫描',
+                      subtitle: '自动化漏洞检测与 PoC 验证',
+                      tag: 'POC',
+                      onTap: () => _navigateTo(
+                          context, _VulnerabilityScanPage(project: project)),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -197,18 +207,21 @@ class _ScanTypeCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       title,
                       style: AppTextStyles.heading(size: 13, color: AppColors.textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
                       style: AppTextStyles.caption(size: 11, color: AppColors.textSecondary),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],

@@ -901,8 +901,26 @@ class _ConnectorTypeDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool hasValue = _options.any((o) => o.$1 == value);
+    final List<DropdownMenuItem<String>> items = _options.map((o) {
+      return DropdownMenuItem<String>(
+        value: o.$1,
+        child: Text(o.$2,
+            style: AppTextStyles.body(
+                color: AppColors.textPrimary, size: 13)),
+      );
+    }).toList();
+
+    if (!hasValue && value.isNotEmpty) {
+      items.add(DropdownMenuItem<String>(
+        value: value,
+        child: Text('未知: $value',
+            style: AppTextStyles.body(color: AppColors.red, size: 13)),
+      ));
+    }
+
     return DropdownButtonFormField<String>(
-      initialValue: value,
+      value: value,
       decoration: InputDecoration(
         labelText: '连接器类型',
         labelStyle: AppTextStyles.caption(color: AppColors.textSecondary),
@@ -959,7 +977,7 @@ class _PasswordParamField extends StatelessWidget {
     final hint = isProbe
         ? '探测模式，无需参数名'
         : isBehinder
-            ? '默认 rebeyond，或 payload 中 k 的 16 位 hex'
+            ? '默认 mAtrix_911，或 payload 中 k 的 16 位 hex'
             : (defaultParam.isNotEmpty ? '参数名，默认: $defaultParam' : '');
 
     final labelText = isProbe

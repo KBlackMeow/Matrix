@@ -11,9 +11,9 @@ import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
 
-/// `bing.php`：冰蝎 3.0 PHP 协议，AES 加密传输
+  /// `bing.php`：冰蝎 3.0 PHP 协议，AES 加密传输
 ///
-/// 密钥 = MD5(连接密码)[0:16]，默认密码 rebeyond → e45e329feb5d925b
+  /// 密钥 = MD5(连接密码)[0:16]，默认密码 mAtrix_911 → 42b842fc69195c9d
 /// POST body = base64(AES_encrypt("C|php_code"))，解密后 explode('|') 取 params，eval 执行
 class PhpBehinderConnector extends ShellConnector {
   PhpBehinderConnector(super.webshell);
@@ -24,7 +24,7 @@ class PhpBehinderConnector extends ShellConnector {
   String get _aesKey {
     final pass = webshell.password?.trim().isNotEmpty == true
         ? webshell.password!.trim()
-        : 'rebeyond';
+        : 'mAtrix_911';
     if (pass.length == 16 && _isHex16(pass)) {
       return pass.toLowerCase();
     }

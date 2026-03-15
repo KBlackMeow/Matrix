@@ -348,7 +348,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   /// 解析 GetShell 结果并跳转到 Webshell 交互页
   Future<void> _openWebshellFromResult(BuildContext context, String shellUrl) async {
     String url = shellUrl;
-    String password = 'rebeyond';
+    String password = 'mAtrix_911';
     final passIdx = shellUrl.indexOf(' Pass:');
     if (passIdx > 0) {
       url = shellUrl.substring(0, passIdx).trim();

