@@ -14,6 +14,9 @@ class DirscanBackgroundService {
   /// 当前运行中的 sessionId -> 取消标记
   final _cancelFlags = <int, bool>{};
 
+  /// 当前运行中的 sessionId -> DirsearchService 实例（用于立即中止 HTTP 请求）
+  final _activeSvcs = <int, DirsearchService>{};
+
   /// 进度流：供 UI 订阅（可选，UI 销毁后不再监听，扫描照常进行）
   final _progressController = StreamController<DirscanProgress>.broadcast();
   Stream<DirscanProgress> get progress => _progressController.stream;
@@ -88,6 +91,7 @@ class DirscanBackgroundService {
         timeout: Duration(seconds: timeoutSec.clamp(1, 60)),
         includeStatus: statusCodes,
       );
+      _activeSvcs[sessionId] = svc;
 
       final scannedPaths = <String>{};
       var totalCompletedBefore = 0;
@@ -152,6 +156,7 @@ class DirscanBackgroundService {
     } finally {
       final cancelled = _cancelFlags[sessionId] == true;
       _cancelFlags.remove(sessionId);
+      _activeSvcs.remove(sessionId);
       await _scanSession.finishSession(
         sessionId,
         status: cancelled ? 'cancelled' : 'completed',
@@ -161,6 +166,7 @@ class DirscanBackgroundService {
 
   void cancelSession(int sessionId) {
     _cancelFlags[sessionId] = true;
+    _activeSvcs[sessionId]?.cancel();
   }
 
   void dispose() {

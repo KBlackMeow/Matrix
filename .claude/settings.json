@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/illya/test/BOOT-INF/classes -name *.class -exec strings {})",
+      "Bash(2)",
+      "Bash(grep -E \"[A-Za-z0-9+/]{20,}={0,2}\")",
+      "Bash(grep -r \"getDirectoryPath\\\\|getSaveLocation\\\\|openFile\\\\|XTypeGroup\" ~/.pub-cache/hosted/pub.dev/file_selector*/lib/*.dart)"
+    ]
+  }
+}

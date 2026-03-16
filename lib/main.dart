@@ -21,11 +21,13 @@ import 'pages/payload_management_page.dart';
 import 'pages/dictionary_management_page.dart';
 import 'pages/info_collection_page.dart';
 import 'pages/thinkphp_exp_page.dart';
+import 'services/scan_session_service.dart';
 import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   initDatabase(); // 初始化 SQLite（桌面端使用 FFI）
+  await ScanSessionService().resetStaleSessions(); // 清理上次异常退出遗留的 running 会话
   await SeedService.seed(DatabaseHelper()); // 首次启动种子化内置默认数据
   runApp(const MyApp());
 }

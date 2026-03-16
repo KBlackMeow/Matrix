@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -147,6 +148,26 @@ class AspWscriptConnector extends ShellExecConnector {
   Future<bool> writeFile(String path, String content) async {
     final b64 = base64.encode(utf8.encode(content));
     // 写临时 base64 文件再 certutil 解码
+    final r = await sendRawCommand(
+        'echo $b64 > "%TEMP%\\__mx_dec.tmp" && certutil -decode "%TEMP%\\__mx_dec.tmp" "$path" && del "%TEMP%\\__mx_dec.tmp" && echo 1');
+    return r.trim().contains('1');
+  }
+
+  @override
+  Future<Uint8List> readFileBinary(String path) async {
+    final raw = await sendRawCommand(
+        'certutil -encode "$path" "%TEMP%\\__mx_enc.tmp" && type "%TEMP%\\__mx_enc.tmp" && del "%TEMP%\\__mx_enc.tmp"');
+    if (raw.isEmpty || raw.startsWith('[')) throw Exception('无法读取文件: $raw');
+    final b64 = raw.split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty && !l.startsWith('-----') && !l.startsWith('CertUtil'))
+        .join('');
+    return base64.decode(b64);
+  }
+
+  @override
+  Future<bool> writeFileBinary(String path, Uint8List bytes) async {
+    final b64 = base64.encode(bytes);
     final r = await sendRawCommand(
         'echo $b64 > "%TEMP%\\__mx_dec.tmp" && certutil -decode "%TEMP%\\__mx_dec.tmp" "$path" && del "%TEMP%\\__mx_dec.tmp" && echo 1');
     return r.trim().contains('1');

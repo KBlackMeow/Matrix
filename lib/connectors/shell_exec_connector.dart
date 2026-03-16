@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
@@ -146,6 +147,56 @@ abstract class ShellExecConnector extends ShellConnector {
       'echo ${sq(b64)} | base64 -d > ${sq(path)} && echo 1 || echo 0',
     );
     return r.trim() == '1';
+  }
+
+  @override
+  Future<Uint8List> readFileBinary(String path) async {
+    final raw = await sendRawCommand(
+      'cat ${sq(path)} 2>/dev/null | base64 -w0 2>/dev/null || cat ${sq(path)} 2>/dev/null | base64',
+    );
+    if (raw.isEmpty || raw.startsWith('[')) throw Exception('无法读取文件: $raw');
+    final b64 = raw.trim().replaceAll(RegExp(r'\s'), '');
+    return base64.decode(b64);
+  }
+
+  @override
+  Future<bool> writeFileBinary(String path, Uint8List bytes) async {
+    // 保留单次写入实现，供不关心进度的场景使用
+    final b64 = base64.encode(bytes);
+    final r = await sendRawCommand(
+      'echo ${sq(b64)} | base64 -d > ${sq(path)} && echo 1 || echo 0',
+    );
+    return r.trim() == '1';
+  }
+
+  static const _kChunkSize = 128 * 1024; // 128 KB per chunk
+
+  @override
+  Future<bool> writeFileBinaryWithProgress(
+    String path,
+    Uint8List bytes,
+    void Function(int sent, int total) onProgress,
+  ) async {
+    final total = bytes.length;
+    onProgress(0, total);
+
+    // 通过多次 base64 分块写入，避免超长命令，同时便于进度反馈。
+    int offset = 0;
+    bool first = true;
+    while (offset < total) {
+      final end = (offset + _kChunkSize).clamp(0, total);
+      final chunk = bytes.sublist(offset, end);
+      final b64 = base64.encode(chunk);
+      final redirect = first ? '>' : '>>';
+      final r = await sendRawCommand(
+        'echo ${sq(b64)} | base64 -d $redirect ${sq(path)} && echo 1 || echo 0',
+      );
+      if (r.trim() != '1') return false;
+      offset = end;
+      first = false;
+      onProgress(offset, total);
+    }
+    return true;
   }
 
   @override

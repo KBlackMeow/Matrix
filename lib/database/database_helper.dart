@@ -162,4 +162,7 @@ class DatabaseHelper {
       impl.updateScanSession(id, logText: logText, status: status);
 
   Future<void> appendScanLog(int id, String line) => impl.appendScanLog(id, line);
+
+  /// 启动时将所有遗留的 running 会话重置为 interrupted
+  Future<void> resetStaleRunningSessions() => impl.resetStaleRunningSessions();
 }

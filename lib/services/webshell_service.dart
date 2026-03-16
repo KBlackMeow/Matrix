@@ -1,5 +1,7 @@
 export '../models/file_entry.dart';
 
+import 'dart:typed_data';
+
 import '../connectors/connector_factory.dart';
 import '../connectors/shell_connector.dart';
 import '../models/file_entry.dart';
@@ -46,6 +48,18 @@ class WebshellService {
       _connector.writeFile(path, content);
 
   Future<bool> deleteFile(String path) => _connector.deleteFile(path);
+
+  Future<Uint8List> readFileBinary(String path) =>
+      _connector.readFileBinary(path);
+
+  Future<bool> writeFileBinary(String path, Uint8List bytes) =>
+      _connector.writeFileBinary(path, bytes);
+
+  Future<bool> writeFileBinaryWithProgress(
+    String path,
+    Uint8List bytes,
+    void Function(int sent, int total) onProgress,
+  ) => _connector.writeFileBinaryWithProgress(path, bytes, onProgress);
 
   Future<Map<String, String>> getSystemInfo() => _connector.getSystemInfo();
 

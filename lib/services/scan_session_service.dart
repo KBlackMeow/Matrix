@@ -11,6 +11,9 @@ class ScanSessionService {
 
   final _db = DatabaseHelper();
 
+  /// 应用启动时调用：将所有未正常结束的 running 会话标记为 interrupted
+  Future<void> resetStaleSessions() => _db.resetStaleRunningSessions();
+
   /// 创建新会话（开始新扫描时调用）
   Future<int> createSession({
     required int projectId,

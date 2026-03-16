@@ -366,6 +366,17 @@ class DatabaseHelperIo {
     await db.update('scan_sessions', updates, where: 'id = ?', whereArgs: [id]);
   }
 
+  /// 启动时清理遗留的 running 会话（强制退出时未能更新状态）
+  Future<void> resetStaleRunningSessions() async {
+    final db = await database;
+    await db.update(
+      'scan_sessions',
+      {'status': 'interrupted', 'updated_at': DateTime.now().millisecondsSinceEpoch},
+      where: 'status = ?',
+      whereArgs: ['running'],
+    );
+  }
+
   Future<void> appendScanLog(int id, String text) async {
     final db = await database;
     final rows = await db.query('scan_sessions', where: 'id = ?', whereArgs: [id]);
@@ -860,3 +871,5 @@ Future<void> updateScanSession(int id, {String? logText, String? status}) =>
     _io.updateScanSession(id, logText: logText, status: status);
 
 Future<void> appendScanLog(int id, String line) => _io.appendScanLog(id, line);
+
+Future<void> resetStaleRunningSessions() => _io.resetStaleRunningSessions();

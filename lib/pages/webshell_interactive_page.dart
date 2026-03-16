@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'dart:convert';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -619,16 +623,23 @@ class _TerminalTabState extends State<_TerminalTab>
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text(
-                '已发送反弹 Shell 命令（模式：${mode == 'script' ? 'script 优先' : 'bash 优先'}），等待连接 ${rs.lhost}:${rs.lport} ...'),
+              '已发送反弹 Shell 命令，等待连接 ...',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Color(0xFF064D2E), // 暗绿色背景
+            behavior: SnackBarBehavior.floating,
           ),
         );
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('启动失败：$e'),
+            content: Text('启动失败：$e',
+                style: const TextStyle(color: Colors.white)),
+            backgroundColor: AppColors.red,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -643,7 +654,10 @@ class _TerminalTabState extends State<_TerminalTab>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('启动监听失败：$e'),
+            content: Text('启动监听失败：$e',
+                style: const TextStyle(color: Colors.white)),
+            backgroundColor: AppColors.red,
+            behavior: SnackBarBehavior.floating,
           ),
         );
         return;
@@ -1479,7 +1493,12 @@ class _FileManagerTabState extends State<_FileManagerTab>
   String _currentPath = '/';
   List<FileEntry> _files = [];
   bool _loading = true;
+  bool _uploading = false;
+  bool _downloading = false;
+  String? _downloadDir;
   String? _errorMsg;
+  bool _uploadCancelled = false;
+  bool _downloadCancelled = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -1554,6 +1573,212 @@ class _FileManagerTabState extends State<_FileManagerTab>
     );
   }
 
+  Future<void> _uploadFile() async {
+    if (!widget.service.supportsFileWrite) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('当前连接器不支持文件写入'),
+        backgroundColor: AppColors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    final file = await openFile(acceptedTypeGroups: const [XTypeGroup(label: '所有文件')]);
+    if (file == null || !mounted) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    final remotePath = _join(_currentPath, file.name);
+    final transferred = ValueNotifier<int>(0);
+    _uploadCancelled = false;
+    bool ok = false;
+    bool usedBinaryPath = false;
+    try {
+      // 若检测为文本文件，则优先走已有的文本写入逻辑（你已验证可用），
+      // 避免部分环境下二进制上传因 base64/命令兼容性问题导致失败。
+      final looksBinary = _isBinary(bytes);
+      if (!looksBinary) {
+        setState(() => _uploading = true);
+        final content = utf8.decode(bytes);
+        ok = await widget.service.writeFile(remotePath, content);
+      } else {
+        usedBinaryPath = true;
+        setState(() => _uploading = true);
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => _TransferProgressDialog(
+            fileName: file.name,
+            fileSize: bytes.length,
+            transferred: transferred,
+            isUpload: true,
+            onCancel: () {
+              _uploadCancelled = true;
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
+            },
+          ),
+        );
+        ok = await widget.service.writeFileBinaryWithProgress(
+          remotePath,
+          bytes,
+          (sent, _) {
+              if (!mounted) return;
+              if (_uploadCancelled) {
+                throw _TransferCancelled();
+              }
+              transferred.value = sent;
+          },
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      // 不再主动关闭当前页面，仅结束上传状态和进度
+      setState(() => _uploading = false);
+      transferred.dispose();
+      if (e is _TransferCancelled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '上传已取消',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Color(0xFF064D2E), // 暗绿色背景
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text('上传失败: $e', style: const TextStyle(color: Colors.white)),
+          backgroundColor: AppColors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      return;
+    }
+    // 若二进制路径失败且是“看起来像文本”的文件，尝试自动回退到文本写入。
+    if (!ok && !usedBinaryPath) {
+      try {
+        final content = utf8.decode(bytes);
+        ok = await widget.service.writeFile(remotePath, content);
+      } catch (_) {
+        // ignore, 保持原有失败提示
+      }
+    }
+
+    if (!mounted) {
+      transferred.dispose();
+      return;
+    }
+    // 保持当前页面与对话框，由用户自行关闭
+    setState(() => _uploading = false);
+    transferred.dispose();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? '已上传 ${file.name}' : '上传失败',
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor:
+            ok ? const Color(0xFF064D2E) : AppColors.red, // 成功用暗绿，失败用红
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    if (ok) _loadDirectory(_currentPath);
+  }
+
+  /// 粗略判断文件是否为二进制：
+  /// - 采样前若干字节，如存在 NUL 字节则视为二进制；
+  /// - 否则尝试按 UTF-8 解码，失败则视为二进制。
+  bool _isBinary(List<int> bytes) {
+    if (bytes.isEmpty) return false;
+    final sampleLen = bytes.length > 4096 ? 4096 : bytes.length;
+    for (var i = 0; i < sampleLen; i++) {
+      if (bytes[i] == 0) return true;
+    }
+    try {
+      utf8.decode(bytes, allowMalformed: false);
+      return false;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> _downloadFile(FileEntry entry) async {
+    if (_downloading) return;
+    if (_downloadDir == null) {
+      final dir = await getDirectoryPath(confirmButtonText: '选择下载目录');
+      if (dir == null || !mounted) return;
+      setState(() => _downloadDir = dir);
+    }
+    setState(() {
+      _downloading = true;
+      _downloadCancelled = false;
+    });
+    final remotePath = _join(_currentPath, entry.name);
+    final localPath = '${_downloadDir!}${Platform.pathSeparator}${entry.name}';
+    // download is a single HTTP round-trip, so use indeterminate indicator
+    final transferred = ValueNotifier<int>(0);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _TransferProgressDialog(
+        fileName: entry.name,
+        fileSize: entry.size,
+        transferred: transferred,
+        isUpload: false,
+        onCancel: () {
+          _downloadCancelled = true;
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        },
+      ),
+    );
+    try {
+      final bytes = await widget.service.readFileBinary(remotePath);
+      if (!mounted) {
+        transferred.dispose();
+        return;
+      }
+      if (_downloadCancelled) {
+        // 已被用户取消，丢弃结果
+        setState(() => _downloading = false);
+        transferred.dispose();
+        return;
+      }
+      await File(localPath).writeAsBytes(bytes, flush: true);
+      if (!mounted) {
+        transferred.dispose();
+        return;
+      }
+      // 保持当前页面与对话框，由用户自行关闭
+      setState(() => _downloading = false);
+      transferred.dispose();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '已保存至 $localPath',
+            style: const TextStyle(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF064D2E), // 暗绿色背景
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) { transferred.dispose(); return; }
+      Navigator.of(context).pop();
+      setState(() => _downloading = false);
+      transferred.dispose();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content:
+            Text('下载失败: $e', style: const TextStyle(color: Colors.white)),
+        backgroundColor: AppColors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
   Future<void> _deleteFile(FileEntry entry) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -1585,8 +1810,13 @@ class _FileManagerTabState extends State<_FileManagerTab>
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? '已删除 ${entry.name}' : '删除失败'),
-        backgroundColor: ok ? AppColors.bgCard : AppColors.red,
+        content: Text(
+          ok ? '已删除 ${entry.name}' : '删除失败',
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: ok
+            ? const Color(0xFF064D2E) // 删除成功用暗绿色
+            : AppColors.red, // 失败仍用红色
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -1635,6 +1865,13 @@ class _FileManagerTabState extends State<_FileManagerTab>
                   ),
                 ),
               ),
+              if (widget.service.supportsFileWrite)
+                IconButton(
+                  onPressed: _loading || _uploading || _downloading ? null : _uploadFile,
+                  icon: const Icon(Icons.upload_file, size: 16),
+                  color: AppColors.primary,
+                  tooltip: '上传文件',
+                ),
               IconButton(
                 onPressed: _loading ? null : () => _loadDirectory(_currentPath),
                 icon: const Icon(Icons.refresh, size: 16),
@@ -1664,7 +1901,7 @@ class _FileManagerTabState extends State<_FileManagerTab>
                   if (w > 480) _colHeader('大小', width: 80),
                   if (w > 560) _colHeader('权限', width: 60),
                   if (w > 640) _colHeader('修改时间', width: 130),
-                  SizedBox(width: w > 480 ? 90 : 72),
+                  SizedBox(width: w > 480 ? 120 : 100),
                 ],
               ),
             );
@@ -1698,6 +1935,11 @@ class _FileManagerTabState extends State<_FileManagerTab>
                       onEdit: f.isDirectory || f.name == '..'
                           ? null
                           : () => _showEditDialog(f),
+                      onDownload: f.isDirectory || f.name == '..' || _downloading
+                          ? null
+                          : widget.service.supportsFileRead
+                              ? () => _downloadFile(f)
+                              : null,
                       onDelete: f.name == '..' ? null : () => _deleteFile(f),
                     );
                   },
@@ -1722,6 +1964,7 @@ class _FileRow extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onView;
   final VoidCallback? onEdit;
+  final VoidCallback? onDownload;
   final VoidCallback? onDelete;
 
   const _FileRow({
@@ -1729,6 +1972,7 @@ class _FileRow extends StatelessWidget {
     this.onTap,
     this.onView,
     this.onEdit,
+    this.onDownload,
     this.onDelete,
   });
 
@@ -1812,7 +2056,7 @@ class _FileRow extends StatelessWidget {
               ),
             ),
             SizedBox(
-              width: w > 480 ? 90 : 72,
+              width: w > 480 ? 120 : 100,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -1829,6 +2073,13 @@ class _FileRow extends StatelessWidget {
                       AppColors.primary,
                       '编辑',
                       onEdit!,
+                    ),
+                  if (onDownload != null)
+                    _iconBtn(
+                      Icons.download_outlined,
+                      AppColors.primaryDim,
+                      '下载',
+                      onDownload!,
                     ),
                   if (onDelete != null)
                     _iconBtn(
@@ -1908,6 +2159,137 @@ class _FileRow extends StatelessWidget {
     }
   }
 }
+
+// ─── 传输进度对话框 ─────────────────────────────────────────────────────────────
+
+class _TransferProgressDialog extends StatelessWidget {
+  final String fileName;
+  final int fileSize;
+  final ValueNotifier<int> transferred;
+  final bool isUpload;
+  final VoidCallback onCancel;
+
+  const _TransferProgressDialog({
+    required this.fileName,
+    required this.fileSize,
+    required this.transferred,
+    required this.isUpload,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: SizedBox(
+          width: 360,
+          child: ValueListenableBuilder<int>(
+            valueListenable: transferred,
+            builder: (_, sent, _) {
+              // Upload: deterministic progress; download: always indeterminate
+              final double? progress = isUpload && fileSize > 0
+                  ? (sent / fileSize).clamp(0.0, 1.0)
+                  : null;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        isUpload ? Icons.upload_file : Icons.download_outlined,
+                        color: AppColors.primary,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isUpload ? '上传中' : '下载中',
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: onCancel,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          minimumSize: const Size(0, 0),
+                        ),
+                        child: Text(
+                          '取消',
+                          style: AppTextStyles.caption(
+                            color: AppColors.textSecondary,
+                            size: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    fileName,
+                    style: AppTextStyles.terminal(size: 12, color: AppColors.cyan),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: AppColors.bgDark,
+                      valueColor:
+                          const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (progress != null)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${_fmtSize(sent)} / ${_fmtSize(fileSize)}',
+                          style: AppTextStyles.caption(
+                              color: AppColors.textSecondary, size: 11),
+                        ),
+                        Text(
+                          '${(progress * 100).round()}%',
+                          style: AppTextStyles.caption(
+                              color: AppColors.primary, size: 11),
+                        ),
+                      ],
+                    )
+                  else
+                    Text(
+                      isUpload ? '正在上传...' : '正在接收数据，请稍候...',
+                      style: AppTextStyles.caption(
+                          color: AppColors.textSecondary, size: 11),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _fmtSize(int bytes) {
+    if (bytes <= 0) return '—';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+  }
+}
+
+class _TransferCancelled implements Exception {}
 
 // ─── 文件查看对话框 ─────────────────────────────────────────────────────────────
 

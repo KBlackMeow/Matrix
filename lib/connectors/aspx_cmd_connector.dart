@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -80,6 +81,24 @@ class AspxCmdConnector extends AspWscriptConnector {
   Future<bool> writeFile(String path, String content) async {
     final b64 = base64.encode(utf8.encode(content));
     // PowerShell: Base64 → 写入文件
+    final ps =
+        '[IO.File]::WriteAllBytes(\'$path\', [Convert]::FromBase64String(\'$b64\'))';
+    final r = await sendRawCommand(
+        'powershell -NoProfile -Command "$ps" && echo 1');
+    return r.trim().contains('1');
+  }
+
+  @override
+  Future<Uint8List> readFileBinary(String path) async {
+    final ps = '[Convert]::ToBase64String([IO.File]::ReadAllBytes(\'$path\'))';
+    final raw = await sendRawCommand('powershell -NoProfile -Command "$ps"');
+    if (raw.isEmpty || raw.startsWith('[')) throw Exception('无法读取文件: $raw');
+    return base64.decode(raw.trim());
+  }
+
+  @override
+  Future<bool> writeFileBinary(String path, Uint8List bytes) async {
+    final b64 = base64.encode(bytes);
     final ps =
         '[IO.File]::WriteAllBytes(\'$path\', [Convert]::FromBase64String(\'$b64\'))';
     final r = await sendRawCommand(

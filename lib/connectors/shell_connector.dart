@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../models/webshell.dart';
 import '../models/file_entry.dart';
 
@@ -36,6 +38,27 @@ abstract class ShellConnector {
   Future<String> readFile(String path);
   Future<bool> writeFile(String path, String content);
   Future<bool> deleteFile(String path);
+
+  /// 以二进制方式读取远端文件，返回原始字节（用于下载）
+  Future<Uint8List> readFileBinary(String path) async =>
+      throw UnsupportedError('当前连接器不支持二进制文件下载');
+
+  /// 以二进制方式写入远端文件（用于上传任意格式文件）
+  Future<bool> writeFileBinary(String path, Uint8List bytes) async =>
+      throw UnsupportedError('当前连接器不支持二进制文件上传');
+
+  /// 带进度回调的二进制上传；[onProgress] 参数为 (已传字节, 总字节)。
+  /// 默认实现为单次上传，子类可覆盖以实现分块进度。
+  Future<bool> writeFileBinaryWithProgress(
+    String path,
+    Uint8List bytes,
+    void Function(int sent, int total) onProgress,
+  ) async {
+    onProgress(0, bytes.length);
+    final ok = await writeFileBinary(path, bytes);
+    onProgress(bytes.length, bytes.length);
+    return ok;
+  }
   Future<Map<String, String>> getSystemInfo();
   Future<List<({String name, bool isDir})>> listNamesForCompletion(String path);
   Future<String> getHomeDir();

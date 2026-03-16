@@ -122,3 +122,6 @@ Future<void> updateScanSession(int id, {String? logText, String? status}) =>
     _web.updateScanSession(id, logText: logText, status: status);
 
 Future<void> appendScanLog(int id, String line) => _web.appendScanLog(id, line);
+
+// Web 内存存储，重启即清空，无需重置
+Future<void> resetStaleRunningSessions() async {}

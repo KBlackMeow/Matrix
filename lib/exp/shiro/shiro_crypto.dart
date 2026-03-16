@@ -15,7 +15,10 @@ class ShiroCrypto {
     required Uint8List serializedPayload,
     ShiroEncryptionMode mode = ShiroEncryptionMode.cbc,
   }) async {
-    final keyBytes = enc.Key.fromBase64(keyBase64);
+    // 补全 Base64 padding，避免 key 末尾缺 '=' 导致 FormatException
+    final rem = keyBase64.length % 4;
+    final paddedKey = rem == 0 ? keyBase64 : keyBase64 + '=' * (4 - rem);
+    final keyBytes = enc.Key.fromBase64(paddedKey);
 
     if (mode == ShiroEncryptionMode.cbc) {
       // 终极修复：完全对齐 shiro_check (Go) 的逻辑
@@ -42,11 +45,13 @@ class ShiroCrypto {
     } else {
       // Shiro 1.4.2+ GCM 模式：使用标准 AES-GCM（PointyCastle），输出 Nonce(16) + Ciphertext + Tag(16)
       final ivBytes = Uint8List(16);
-      final rnd = pc.SecureRandom('Fortuna')
-        ..seed(pc.KeyParameter(Uint8List.fromList(DateTime.now()
-            .microsecondsSinceEpoch
-            .toRadixString(16)
-            .codeUnits)));
+      // Fortuna 要求恰好 32 字节（256-bit）种子
+      final seedRaw = DateTime.now().microsecondsSinceEpoch;
+      final seed = Uint8List(32);
+      for (var i = 0; i < 8; i++) {
+        seed[i] = (seedRaw >> (i * 8)) & 0xff;
+      }
+      final rnd = pc.SecureRandom('Fortuna')..seed(pc.KeyParameter(seed));
       for (var i = 0; i < ivBytes.length; i++) {
         ivBytes[i] = rnd.nextUint8();
       }

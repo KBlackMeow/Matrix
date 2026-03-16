@@ -1,4 +1,6 @@
 import 'dart:async' show unawaited;
+import 'dart:convert' show utf8;
+import 'dart:math' show Random;
 
 import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/services.dart' show rootBundle;
@@ -221,8 +223,77 @@ class DirsearchService {
   final Set<int> excludeStatus;
   final String userAgent;
 
+  final _activeClients = <http.Client>[];
+
+  /// 软404指纹：移植自 dirsearch 的 DynamicContentParser
+  _ContentFingerprint? _wildcardFingerprint;
+
+  static String _randomHex(int len) {
+    final r = Random.secure();
+    return List.generate(len, (_) => r.nextInt(16).toRadixString(16)).join();
+  }
+
+  /// GET 随机路径并返回响应 body 文本；非200或异常返回 null
+  Future<String?> _fetchWildcardBody(http.Client client, Uri uri) async {
+    try {
+      final req = http.Request('GET', uri)
+        ..headers['User-Agent'] = userAgent
+        ..followRedirects = false;
+      final res = await client.send(req).timeout(timeout);
+      if (res.statusCode != 200) {
+        unawaited(res.stream.listen(null).cancel());
+        return null;
+      }
+      final bytes = await res.stream.toBytes();
+      return utf8.decode(bytes, allowMalformed: true);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 扫描前建立软404指纹：两次随机路径均返回200才认定为软404站点
+  Future<void> _initWildcard(http.Client client) async {
+    final base = baseUrl.endsWith('/') ? baseUrl : '$baseUrl/';
+    final c1 = await _fetchWildcardBody(client, Uri.parse('$base${_randomHex(16)}notexist'));
+    if (c1 == null) return;
+    final c2 = await _fetchWildcardBody(client, Uri.parse('$base${_randomHex(16)}notexist'));
+    if (c2 == null) return;
+    _wildcardFingerprint = _ContentFingerprint.from(c1, c2);
+  }
+
+  /// 下载 GET body 用于与软404指纹比对；失败或非200返回 null
+  Future<String?> _fetchBodyForCheck(http.Client client, Uri url) async {
+    try {
+      final req = http.Request('GET', url)
+        ..headers['User-Agent'] = userAgent
+        ..followRedirects = false;
+      final res = await client.send(req).timeout(timeout);
+      if (res.statusCode != 200) {
+        unawaited(res.stream.listen(null).cancel());
+        return null;
+      }
+      final bytes = await res.stream.toBytes();
+      return utf8.decode(bytes, allowMalformed: true);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 判断是否为软404：使用内容指纹而非大小比较
+  bool _isSoft404(String? body) {
+    if (_wildcardFingerprint == null || body == null || body.isEmpty) return false;
+    return _wildcardFingerprint!.matches(body);
+  }
+
+  /// 立即中止所有进行中的 HTTP 请求
+  void cancel() {
+    for (final c in List.of(_activeClients)) {
+      c.close();
+    }
+  }
+
   /// 探测路径：先 HEAD，失败或 405 时回退到 GET（GET 仅读 header，不下载 body）
-  Future<({int? code, int? contentLength})> _probePath({
+  Future<({int? code, int? contentLength, String? location})> _probePath({
     required http.Client client,
     required Uri url,
     required Duration timeout,
@@ -241,7 +312,8 @@ class DirsearchService {
       }
       final contentLength =
           int.tryParse(headRes.headers['content-length'] ?? '0') ?? 0;
-      return (code: headRes.statusCode, contentLength: contentLength);
+      final location = headRes.headers['location'];
+      return (code: headRes.statusCode, contentLength: contentLength, location: location);
     } catch (_) {
       return _probePathWithGet(
         client: client,
@@ -251,7 +323,7 @@ class DirsearchService {
     }
   }
 
-  Future<({int? code, int? contentLength})> _probePathWithGet({
+  Future<({int? code, int? contentLength, String? location})> _probePathWithGet({
     required http.Client client,
     required Uri url,
     required Duration timeout,
@@ -263,10 +335,11 @@ class DirsearchService {
       final getRes = await client.send(getReq).timeout(timeout);
       final contentLength =
           int.tryParse(getRes.headers['content-length'] ?? '0') ?? 0;
+      final location = getRes.headers['location'];
       unawaited(getRes.stream.listen(null).cancel());
-      return (code: getRes.statusCode, contentLength: contentLength);
+      return (code: getRes.statusCode, contentLength: contentLength, location: location);
     } catch (_) {
-      return (code: null, contentLength: null);
+      return (code: null, contentLength: null, location: null);
     }
   }
 
@@ -292,6 +365,16 @@ class DirsearchService {
     var completed = 0;
     final total = paths.length;
 
+    // 软404基线探测：扫描前请求随机不存在路径，检测服务器是否对所有路径返回200
+    final wildcardClient = http.Client();
+    _activeClients.add(wildcardClient);
+    try {
+      await _initWildcard(wildcardClient);
+    } finally {
+      _activeClients.remove(wildcardClient);
+      wildcardClient.close();
+    }
+
     final chunkSize = (paths.length / threads).ceil().clamp(1, paths.length);
     final chunks = <List<String>>[];
     for (var i = 0; i < paths.length; i += chunkSize) {
@@ -301,11 +384,12 @@ class DirsearchService {
     final chunkResults = await Future.wait(chunks.map((chunk) async {
       final chunkFound = <DirsearchResult>[];
       final client = http.Client();
+      _activeClients.add(client);
       try {
         for (final path in chunk) {
           if (isCancelled()) break;
           final fullUrl = Uri.parse('$base${path.startsWith('/') ? path.substring(1) : path}');
-          final (:code, :contentLength) = await _probePath(
+          final (:code, :contentLength, :location) = await _probePath(
             client: client,
             url: fullUrl,
             timeout: timeout,
@@ -313,7 +397,22 @@ class DirsearchService {
           if (code != null) {
             final allowed = includeStatus.isEmpty || includeStatus.contains(code);
             final excluded = excludeStatus.contains(code);
-            if (allowed && !excluded) {
+            // 排除重定向到主页的误报：301/302 且 Location 指向根路径
+            final isHomepageRedirect = (code == 301 || code == 302) &&
+                location != null &&
+                (() {
+                  final loc = Uri.tryParse(location);
+                  if (loc == null) return false;
+                  final locPath = loc.path.isEmpty ? '/' : loc.path;
+                  return locPath == '/' || locPath == Uri.parse(base).path;
+                })();
+            // 软404检测：仅在有基线且响应为200时下载body比对内容
+            bool isSoft404 = false;
+            if (code == 200 && _wildcardFingerprint != null) {
+              final body = await _fetchBodyForCheck(client, fullUrl);
+              isSoft404 = _isSoft404(body);
+            }
+            if (allowed && !excluded && !isHomepageRedirect && !isSoft404) {
               final r = DirsearchResult(
                 path: path,
                 statusCode: code,
@@ -329,6 +428,7 @@ class DirsearchService {
           }
         }
       } finally {
+        _activeClients.remove(client);
         client.close();
       }
       return chunkFound;
@@ -338,5 +438,72 @@ class DirsearchService {
       results.addAll(list);
     }
     return results;
+  }
+}
+
+/// 移植自 dirsearch 的 DynamicContentParser：
+/// 通过比较两次随机路径响应的稳定词 token，判断新响应是否与软404基线相似。
+class _ContentFingerprint {
+  final bool _isStatic;
+  final String _baseContent;
+  final List<String> _staticPatterns;
+
+  _ContentFingerprint._(this._isStatic, this._baseContent, this._staticPatterns);
+
+  factory _ContentFingerprint.from(String content1, String content2) {
+    if (content1 == content2) {
+      return _ContentFingerprint._(true, content1, const []);
+    }
+    // 提取两次响应中均稳定出现的词 token（有序）
+    final words2 = content2.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toSet();
+    final stable = content1
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty && words2.contains(w))
+        .toList();
+    return _ContentFingerprint._(false, content1, stable);
+  }
+
+  /// 返回 true 表示 content 与软404基线相似（应过滤）
+  bool matches(String content) {
+    if (_isStatic) return content == _baseContent;
+
+    final words = content.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    var cursor = 0;
+    var misses = 0;
+
+    for (final pattern in _staticPatterns) {
+      final idx = _indexFrom(words, pattern, cursor);
+      if (idx == -1) {
+        // dirsearch 允许 20 个以上的模式里漏掉一个
+        if (misses > 0 || _staticPatterns.length < 20) return false;
+        misses++;
+      } else {
+        cursor = idx + 1;
+      }
+    }
+
+    // 模式数少时用相似率兜底（对应 dirsearch 的 SequenceMatcher > 0.75）
+    final baseWordCount = _baseContent.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+    if (words.length > baseWordCount && _staticPatterns.length < 20) {
+      return _jaccardSimilarity(_baseContent, content) > 0.75;
+    }
+
+    return true;
+  }
+
+  static int _indexFrom(List<String> list, String item, int start) {
+    for (var i = start; i < list.length; i++) {
+      if (list[i] == item) return i;
+    }
+    return -1;
+  }
+
+  /// Jaccard 相似度：交集词数 / 并集词数
+  static double _jaccardSimilarity(String a, String b) {
+    final setA = a.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toSet();
+    final setB = b.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toSet();
+    if (setA.isEmpty && setB.isEmpty) return 1.0;
+    if (setA.isEmpty || setB.isEmpty) return 0.0;
+    return setA.intersection(setB).length / setA.union(setB).length;
   }
 }

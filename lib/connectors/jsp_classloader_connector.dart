@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
@@ -199,6 +200,65 @@ class JspClassloaderConnector extends ShellConnector {
   Future<bool> deleteFile(String path) async {
     final r = await _sendJsp('rm', extraParams: {'path': path});
     return r.trim() == '1';
+  }
+
+  @override
+  Future<Uint8List> readFileBinary(String path) async {
+    // 通过 shell base64 命令编码，避免二进制数据经 PrintWriter 损坏
+    final cmd =
+        'cat ${_sq(path)} 2>/dev/null | base64 -w0 2>/dev/null'
+        " || cat ${_sq(path)} 2>/dev/null | base64";
+    final result = await _sendJsp('exec',
+        extraParams: {'_k': _execKey, _execKey: cmd});
+    final b64 = result.trim().replaceAll(RegExp(r'\s'), '');
+    if (b64.isEmpty || b64.startsWith('[')) {
+      throw Exception('无法读取文件: $b64');
+    }
+    return base64.decode(b64);
+  }
+
+  /// 上传场景下的实际写入路径：统一直接使用调用方传入的路径（当前浏览目录）。
+  static String _uploadPathFor(String path) => path;
+
+  @override
+  Future<bool> writeFileBinary(String path, Uint8List bytes) async {
+    // 为了避免单次 POST 体超过 Tomcat maxPostSize，这里使用分块协议：
+    // 多次 exec 调用，按小块 base64 + shell 重定向写入目标文件。
+    return writeFileBinaryWithProgress(path, bytes, (_, __) {});
+  }
+
+  // 分块大小：与 JSP 冰蝎保持一致，使用较小块减少单次命令长度。
+  static const _kChunkSize = 1 * 1024;
+
+  @override
+  Future<bool> writeFileBinaryWithProgress(
+    String path,
+    Uint8List bytes,
+    void Function(int sent, int total) onProgress,
+  ) async {
+    final total = bytes.length;
+    final target = _uploadPathFor(path);
+    onProgress(0, total);
+
+    int offset = 0;
+    bool first = true;
+    while (offset < total) {
+      final end = (offset + _kChunkSize).clamp(0, total);
+      final chunk = bytes.sublist(offset, end);
+      final b64 = base64.encode(chunk);
+      final redirect = first ? '>' : '>>';
+      final cmd =
+          "echo ${_sq(b64)} | base64 -d $redirect ${_sq(target)} && echo 1 || echo 0";
+      final r = await _sendJsp(
+        'exec',
+        extraParams: {'_k': _execKey, _execKey: cmd},
+      );
+      if (!r.trim().endsWith('1')) return false;
+      offset = end;
+      first = false;
+      onProgress(offset, total);
+    }
+    return true;
   }
 
   @override
