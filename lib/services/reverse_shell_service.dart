@@ -19,12 +19,14 @@ class ReverseShellSession {
         _controller.add(utf8.decode(data, allowMalformed: true));
       },
       onError: (e, st) {
-        _controller.addError(e, st);
-        _bytesController.addError(e, st);
+        _alive = false;
+        if (!_controller.isClosed) _controller.addError(e, st);
+        if (!_bytesController.isClosed) _bytesController.addError(e, st);
       },
       onDone: () {
-        _controller.close();
-        _bytesController.close();
+        _alive = false;
+        if (!_controller.isClosed) _controller.close();
+        if (!_bytesController.isClosed) _bytesController.close();
       },
       cancelOnError: true,
     );
@@ -35,6 +37,11 @@ class ReverseShellSession {
 
   /// 可选的来源标签，例如 Webshell 名称，便于在 UI 中展示
   String? label;
+
+  bool _alive = true;
+
+  /// Socket 是否仍然存活（远端未断开）
+  bool get isAlive => _alive;
 
   final _controller = StreamController<String>.broadcast();
   late final StreamController<List<int>> _bytesController;
@@ -61,10 +68,11 @@ class ReverseShellSession {
   }
 
   Future<void> close() async {
+    _alive = false;
     await _subscription.cancel();
     await _socket.close();
-    await _controller.close();
-    await _bytesController.close();
+    if (!_controller.isClosed) await _controller.close();
+    if (!_bytesController.isClosed) await _bytesController.close();
   }
 }
 
@@ -166,13 +174,17 @@ class ReverseShellService {
     final session = ReverseShellSession(id, socket);
     _sessions[id] = session;
     onSession?.call(session);
-    // 任一输出流结束即认为会话结束
-    await session.output.last.whenComplete(() {
+    // 等待会话结束（含无数据即断开的情况）
+    try {
+      await session.output.last;
+    } catch (_) {
+      // 连接未发送任何数据即关闭时属于正常情况，忽略 StateError
+    } finally {
       final removed = _sessions.remove(id);
       if (removed != null) {
         onSessionClosed?.call(removed);
       }
-    });
+    }
   }
 }
 

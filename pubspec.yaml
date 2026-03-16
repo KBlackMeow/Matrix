@@ -90,6 +90,7 @@ flutter:
 
   assets:
     - data/
+    - data/mem_shell/
     - assets/defaults/payloads/
     - assets/defaults/dicts/
     - data/shiro_keys.txt

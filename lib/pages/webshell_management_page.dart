@@ -920,6 +920,7 @@ class _ConnectorTypeDropdown extends StatelessWidget {
     }
 
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       value: value,
       decoration: InputDecoration(
         labelText: '连接器类型',

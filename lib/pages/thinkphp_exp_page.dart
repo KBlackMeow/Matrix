@@ -590,10 +590,14 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                               child: DropdownButtonFormField<ThinkphpVulnType>(
                                 key: ValueKey(_selectedCheckType),
                                 initialValue: _selectedCheckType,
+                                isExpanded: true,
                                 dropdownColor: AppColors.bgElevated,
                                 style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
                                 items: ThinkphpVulnType.values
-                                    .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
+                                    .map((t) => DropdownMenuItem(
+                                          value: t,
+                                          child: Text(t.label, overflow: TextOverflow.ellipsis),
+                                        ))
                                     .toList(),
                                 onChanged: _running ? null : (t) => t != null ? setState(() => _selectedCheckType = t) : null,
                                 decoration: _inputDecoration('', ''),
@@ -614,10 +618,14 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                                 child: DropdownButtonFormField<ThinkphpVulnType>(
                                   key: ValueKey('rce_${_selectedRceVuln?.name ?? "none"}'),
                                   initialValue: _selectedRceVuln,
+                                  isExpanded: true,
                                   dropdownColor: AppColors.bgElevated,
                                   style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
                                   items: _detectedRceVulns
-                                      .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
+                                      .map((t) => DropdownMenuItem(
+                                            value: t,
+                                            child: Text(t.label, overflow: TextOverflow.ellipsis),
+                                          ))
                                       .toList(),
                                   onChanged: _running
                                       ? null

