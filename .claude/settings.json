@@ -4,7 +4,23 @@
       "Bash(find /Users/illya/test/BOOT-INF/classes -name *.class -exec strings {})",
       "Bash(2)",
       "Bash(grep -E \"[A-Za-z0-9+/]{20,}={0,2}\")",
-      "Bash(grep -r \"getDirectoryPath\\\\|getSaveLocation\\\\|openFile\\\\|XTypeGroup\" ~/.pub-cache/hosted/pub.dev/file_selector*/lib/*.dart)"
+      "Bash(grep -r \"getDirectoryPath\\\\|getSaveLocation\\\\|openFile\\\\|XTypeGroup\" ~/.pub-cache/hosted/pub.dev/file_selector*/lib/*.dart)",
+      "Bash(find /Users/illya/Projects/matrix -type f -name *.class)",
+      "Bash(find /Users/illya/Projects/matrix -type f -name README*)",
+      "Bash(find /Users/illya/Projects/matrix -type f -name *compile* -o -name *build*)",
+      "Bash(grep -r \"base64\\\\|b64\\\\|encode\" /Users/illya/Projects/matrix --include=*.sh --include=*.gradle --include=*.kts)",
+      "Bash(git -C /Users/illya/Projects/matrix log --all --oneline -- *jsp_agent* *M.b64*)",
+      "Bash(git -C /Users/illya/Projects/matrix show 39112dc)",
+      "Bash(git -C /Users/illya/Projects/matrix log --all --oneline --follow -- \"data/jsp_agent_M.b64\")",
+      "Bash(git -C /Users/illya/Projects/matrix log -p --follow -- data/jsp_agent_M.b64)",
+      "Bash(find /Users/illya/Projects/matrix -type f \\\\\\(-name *.py -o -name compile* \\\\\\))",
+      "Bash(grep -r \"javac\\\\|java.*class\\\\|M.b64\\\\|base64.*encode\" /Users/illya/Projects/matrix --include=*.py --include=*.sh --include=*.dart)",
+      "Bash(find /Users/illya/Projects/matrix -type f \\\\\\(-name *.sh -o -name Makefile \\\\\\))",
+      "Bash(xargs ls:*)",
+      "Bash(git -C /Users/illya/Projects/matrix show db69a46:data/jsp_agent_M.b64)",
+      "Bash(git -C /Users/illya/Projects/matrix log --all --oneline -- \"tools/jsp_agent/M.java\")",
+      "Bash(git -C /Users/illya/Projects/matrix show 1b99419 --name-only)",
+      "Bash(git -C /Users/illya/Projects/matrix show 39112dc --name-only)"
     ]
   }
 }

