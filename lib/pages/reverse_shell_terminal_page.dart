@@ -24,6 +24,7 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
   late final TerminalController _terminalController;
   late final FocusNode _focusNode;
   StreamSubscription<List<int>>? _rawSub;
+  bool _closedManually = false;
 
   @override
   void initState() {
@@ -47,19 +48,19 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
       }
     }
 
-    // 远端输出字节流 → 原样写入终端；会话结束时自动关闭页面
+    // 远端输出字节流 → 原样写入终端；会话结束时自动关闭页面（若未手动关闭）
     _rawSub = widget.session.rawStream.listen(
       (data) {
         _writeToTerminal(data);
       },
       onDone: () {
-        // 远端主动 exit/断开时自动关闭完整终端页面
-        if (mounted) {
+        // 远端主动 exit/断开时自动关闭完整终端页面（手动关闭时不再二次 pop）
+        if (mounted && !_closedManually) {
           Navigator.of(context).pop();
         }
       },
       onError: (_, _) {
-        if (mounted) {
+        if (mounted && !_closedManually) {
           Navigator.of(context).pop();
         }
       },
@@ -132,6 +133,23 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                         color: AppColors.primary,
                       ),
                       overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: () async {
+                      _closedManually = true;
+                      await widget.session.close();
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                      }
+                    },
+                    icon: const Icon(Icons.power_settings_new,
+                        size: 16, color: AppColors.red),
+                    label: Text(
+                      '主动断开',
+                      style: AppTextStyles.caption(
+                          size: 11, color: AppColors.red),
                     ),
                   ),
                 ],

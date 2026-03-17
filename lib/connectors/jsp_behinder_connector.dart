@@ -149,7 +149,7 @@ class JspBehinderConnector extends ShellConnector {
     if (_sessionEstablished) return;
     try {
       final uri = Uri.parse(webshell.url);
-      final r = await _client.get(uri).timeout(const Duration(seconds: 5));
+      final r = await _client.get(uri).timeout(const Duration(seconds: 10));
       _updateCookies(r);
       _sessionEstablished = true;
     } catch (_) {
@@ -183,7 +183,7 @@ class JspBehinderConnector extends ShellConnector {
 
       final response = await _client
           .post(uri, headers: headers, body: bodyBytes)
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 25));
 
       _updateCookies(response);
       if (response.statusCode == 200) {
@@ -221,7 +221,7 @@ class JspBehinderConnector extends ShellConnector {
   @override
   Future<bool> ping() async {
     try {
-      final r = await _sendBehinder('ping').timeout(const Duration(seconds: 8));
+      final r = await _sendBehinder('ping').timeout(const Duration(seconds: 15));
       _lastPingDiagnostic = r.contains('MATRIX_JSP_PING') ? null : r;
       return r.contains('MATRIX_JSP_PING');
     } catch (e) {

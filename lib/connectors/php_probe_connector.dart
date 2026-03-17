@@ -21,7 +21,7 @@ class PhpProbeConnector extends ShellConnector {
     try {
       final uri = Uri.parse(webshell.url);
       final response =
-          await http.get(uri).timeout(const Duration(seconds: 10));
+          await http.get(uri).timeout(const Duration(seconds: 20));
       if (response.statusCode == 200) {
         return decodeWithFallback(response.bodyBytes);
       }

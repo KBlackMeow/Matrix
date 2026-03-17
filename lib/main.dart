@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:crypto/crypto.dart' as crypto;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
@@ -21,6 +19,9 @@ import 'pages/payload_management_page.dart';
 import 'pages/dictionary_management_page.dart';
 import 'pages/info_collection_page.dart';
 import 'pages/thinkphp_exp_page.dart';
+import 'pages/zentao_exp_page.dart';
+import 'models/webshell.dart';
+import 'pages/webshell_interactive_page.dart';
 import 'services/scan_session_service.dart';
 import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
@@ -560,7 +561,7 @@ class _ExpContent extends StatelessWidget {
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.only(bottom: 16),
-            itemCount: 2,
+            itemCount: 3,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               if (index == 0) {
@@ -578,15 +579,30 @@ class _ExpContent extends StatelessWidget {
                   },
                 );
               }
+              if (index == 1) {
+                return _ExpEntryCard(
+                  icon: Icons.php,
+                  title: 'ThinkPHP 漏洞利用',
+                  subtitle: '3.x/5.x/6.x 漏洞检测、RCE、GetShell',
+                  tag: 'PHP · 通用',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ThinkphpExpPage(),
+                      ),
+                    );
+                  },
+                );
+              }
               return _ExpEntryCard(
-                icon: Icons.php,
-                title: 'ThinkPHP 漏洞利用',
-                subtitle: '3.x/5.x/6.x 漏洞检测、RCE、GetShell',
-                tag: 'PHP · 通用',
+                icon: Icons.storage,
+                title: 'Zentao 仓库 RCE',
+                subtitle: '绕过登录 · Repo 配置写入冰蝎 WebShell',
+                tag: 'PHP · 禅道',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const ThinkphpExpPage(),
+                      builder: (_) => const ZentaoExpPage(),
                     ),
                   );
                 },
@@ -1091,14 +1107,87 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
         onProgress: _appendLog,
       );
 
-      final baseUrl = Uri.parse(url).replace(path: '').toString();
-      // BehinderFilter 存储 md5(p_header)[0:16] 作为 AES 密钥
-      // Behinder 客户端连接时填该值
-      final digest = crypto.md5.convert(utf8.encode(password));
-      final bigInt = digest.bytes.fold<BigInt>(
-          BigInt.zero, (acc, b) => (acc << 8) | BigInt.from(b));
-      final behinderKey = bigInt.toRadixString(16).substring(0, 16);
-      _appendLog('[i] 注入完成。请用冰蝎连接 $baseUrl$path（密码: $behinderKey）');
+      final base = Uri.parse(url);
+      final baseUrl = base.replace(path: path, query: null).toString();
+      final behinderPass = password;
+      _appendLog('[i] 注入完成，内存 WebShell: $baseUrl  密码: $behinderPass');
+      // 持久化到数据库并跳转到 Webshell 交互页
+      if (mounted) {
+        final now = DateTime.now();
+        Webshell ws = Webshell(
+          id: 0,
+          projectId: 0,
+          name: 'Shiro 内存马',
+          url: baseUrl,
+          password: behinderPass,
+          type: 'jsp',
+          method: 'POST',
+          status: 1,
+          connectorType: 'jsp_behinder',
+          createdAt: now,
+          updatedAt: now,
+        );
+        try {
+          final db = DatabaseHelper();
+          final projects = await db.getAllProjects();
+          Project? project;
+          if (projects.isNotEmpty) {
+            project = await showDialog<Project>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: AppColors.bgCard,
+                title: Text('选择项目', style: AppTextStyles.heading(color: AppColors.primary)),
+                content: SizedBox(
+                  width: 360,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: projects.length,
+                    itemBuilder: (ctx, i) {
+                      final p = projects[i];
+                      return ListTile(
+                        leading: const Icon(Icons.folder_outlined,
+                            color: AppColors.primary, size: 20),
+                        title: Text(p.name,
+                            style: AppTextStyles.body(
+                                size: 13, color: AppColors.textPrimary)),
+                        subtitle: Text(p.domain,
+                            style: AppTextStyles.caption(
+                                size: 11, color: AppColors.textMuted)),
+                        onTap: () => Navigator.pop(ctx, p),
+                      );
+                    },
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text('取消',
+                        style: AppTextStyles.body(
+                            color: AppColors.textSecondary)),
+                  ),
+                ],
+              ),
+            );
+          }
+          if (project != null) {
+            ws = await db.createWebshell(
+              project.id,
+              name: 'Shiro 内存马',
+              url: baseUrl,
+              password: behinderPass,
+              method: 'POST',
+              type: 'jsp',
+              connectorType: 'jsp_behinder',
+            );
+          }
+        } catch (_) {}
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => WebshellInteractivePage(webshell: ws),
+          ),
+        );
+      }
     } catch (e) {
       _appendLog('[!] 注入异常: $e');
     } finally {

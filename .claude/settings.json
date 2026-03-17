@@ -20,7 +20,9 @@
       "Bash(git -C /Users/illya/Projects/matrix show db69a46:data/jsp_agent_M.b64)",
       "Bash(git -C /Users/illya/Projects/matrix log --all --oneline -- \"tools/jsp_agent/M.java\")",
       "Bash(git -C /Users/illya/Projects/matrix show 1b99419 --name-only)",
-      "Bash(git -C /Users/illya/Projects/matrix show 39112dc --name-only)"
+      "Bash(git -C /Users/illya/Projects/matrix show 39112dc --name-only)",
+      "Bash(curl -s -I --connect-timeout 5 http://172.21.11.5/)",
+      "Bash(curl -sv --connect-timeout 5 http://172.21.11.5/)"
     ]
   }
 }

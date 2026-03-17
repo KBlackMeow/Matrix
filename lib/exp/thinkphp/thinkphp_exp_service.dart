@@ -828,7 +828,8 @@ extension ThinkphpVulnTypeExt on ThinkphpVulnType {
       case ThinkphpVulnType.tp5FileInclude:
         return 'ThinkPHP 5.x Lang/load 文件包含';
       case ThinkphpVulnType.tp5ConfigGet:
-        return 'ThinkPHP 5.0.22 config 泄露';
+        // 部分 Zentao 18.x 复用该配置接口，结果常出现在禅道环境中
+        return 'ThinkPHP 5.0.22 config 泄露（Zentao 18.x 组件常见）';
       case ThinkphpVulnType.tp5Db:
         return 'ThinkPHP 5.x 数据库信息泄露';
       case ThinkphpVulnType.tp5Log:

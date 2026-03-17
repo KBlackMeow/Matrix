@@ -36,7 +36,7 @@ class PhpEvalConnector extends ShellConnector {
         params[pass] = phpCode;
         response = await http
             .get(uri.replace(queryParameters: params))
-            .timeout(const Duration(seconds: 15));
+            .timeout(const Duration(seconds: 25));
       } else {
         response = await http
             .post(
@@ -44,7 +44,7 @@ class PhpEvalConnector extends ShellConnector {
               headers: {'Content-Type': 'application/x-www-form-urlencoded'},
               body: {pass: phpCode},
             )
-            .timeout(const Duration(seconds: 15));
+            .timeout(const Duration(seconds: 25));
       }
 
       if (response.statusCode == 200) {
@@ -69,7 +69,7 @@ class PhpEvalConnector extends ShellConnector {
     try {
       final token = base64.encode(utf8.encode('MATRIX_PING'));
       final r = await sendPhpCode("echo base64_decode('$token');")
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 15));
       return r.contains('MATRIX_PING');
     } catch (_) {
       return false;

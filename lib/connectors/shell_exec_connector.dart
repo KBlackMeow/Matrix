@@ -96,7 +96,7 @@ abstract class ShellExecConnector extends ShellConnector {
     try {
       final r = await sendRawCommand(
         'echo MATRIX_PING',
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 15));
       return r.contains('MATRIX_PING');
     } catch (_) {
       return false;

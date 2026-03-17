@@ -124,7 +124,8 @@ class ServiceProbeService {
 
   Future<ServiceProbeResult> _probeHttp(String host, int port) async {
     final scheme = port == 443 ? 'https' : 'http';
-    final uri = Uri.parse('$scheme://$host:$port/');
+    final base = '$scheme://$host:$port';
+    final uri = Uri.parse('$base/');
     HttpClient? client;
     try {
       client = HttpClient()
@@ -139,11 +140,41 @@ class ServiceProbeService {
       final titleMatch = RegExp(r'<title[^>]*>([^<]*)</title>', caseSensitive: false).firstMatch(body);
       final title = titleMatch?.group(1)?.trim().replaceAll(RegExp(r'\s+'), ' ').substring(0, 50) ?? '';
 
-      final cms = _detectCms(body, res.headers, uri.toString());
+      // 使用最终落地 URL（跟随重定向后）进行 CMS 识别，避免根路径无特征的问题
+      final finalUrl = res.redirects.isNotEmpty
+          ? res.redirects.last.location.toString()
+          : uri.toString();
+      String? cms = _detectCms(body, res.headers, finalUrl);
+
+      // 根路径未识别出 CMS 时，探测常见子路径（如禅道安装在 /zentaopms/www/）
+      String? zentaoBase;
+      if (cms == null) {
+        const zentaoPaths = [
+          '/zentaopms/www',
+          '/zentao',
+          '/zentaopms',
+        ];
+        for (final p in zentaoPaths) {
+          try {
+            final subUri = Uri.parse('$base$p/index.php?m=user&f=login');
+            final req2 = await client.getUrl(subUri);
+            req2.headers.set('User-Agent', 'Mozilla/5.0 (compatible; MatrixScanner/1.0)');
+            final res2 = await req2.close().timeout(timeout);
+            final body2 = await res2.transform(utf8.decoder).join();
+            if (_detectCms(body2, res2.headers, subUri.toString()) == 'Zentao') {
+              cms = 'Zentao';
+              zentaoBase = '$base$p';
+              break;
+            }
+          } catch (_) {}
+        }
+      }
+
       final parts = <String>[];
       if (server.isNotEmpty) parts.add('Server: $server');
       if (poweredBy.isNotEmpty) parts.add('X-Powered-By: $poweredBy');
       if (cms != null) parts.add('CMS: $cms');
+      if (zentaoBase != null) parts.add('ZentaoBase: $zentaoBase');
       if (title.isNotEmpty) parts.add('Title: $title');
       parts.add('Status: ${res.statusCode}');
 
@@ -172,7 +203,16 @@ class ServiceProbeService {
     final combined = '$lower $headerStr $url';
 
     final fingerprints = [
-      _Fp('ThinkPHP', RegExp(r'thinkphp|think-php|/index\.php')),
+      // ThinkPHP：匹配明显的框架特征，避免单纯因 /index.php 误报
+      _Fp('ThinkPHP', RegExp(
+        r'thinkphp|think-php|tp3\.0|tp5\.0|tp6\.0|/thinkphp|index\.php\?s=/',
+        caseSensitive: false,
+      )),
+      // Zentao：多维度识别（中文名、路径、Cookie、JS 变量）
+      _Fp('Zentao', RegExp(
+        r'zentaosid=|zentaopms|禅道|window\.zentao|/zentao/',
+        caseSensitive: false,
+      )),
       _Fp('Drupal', RegExp(r'drupal|sites/all|sites/default')),
       _Fp('WordPress', RegExp(r'wp-content|wp-includes|wordpress')),
       _Fp('Joomla', RegExp(r'joomla|/media/jui/')),

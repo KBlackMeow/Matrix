@@ -106,7 +106,7 @@ class PhpBehinderConnector extends ShellConnector {
       // 勿用 application/x-www-form-urlencoded：base64 含 + 会被解码为空格导致损坏
       final response = await _client
           .post(Uri.parse(webshell.url), headers: _requestHeaders(), body: body)
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 25));
 
       _updateCookies(response);
       if (response.statusCode == 200) {
@@ -132,7 +132,7 @@ class PhpBehinderConnector extends ShellConnector {
       _useCbc = false;
       var r = await _sendPhp(
         "echo 'MATRIX_PHP_PING';",
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 15));
       if (r.contains('MATRIX_PHP_PING')) {
         _lastPingDiagnostic = null;
         return true;
@@ -140,7 +140,7 @@ class PhpBehinderConnector extends ShellConnector {
       _useCbc = true;
       r = await _sendPhp(
         "echo 'MATRIX_PHP_PING';",
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 15));
       _lastPingDiagnostic = r.contains('MATRIX_PHP_PING') ? null : r;
       return r.contains('MATRIX_PHP_PING');
     } catch (e) {

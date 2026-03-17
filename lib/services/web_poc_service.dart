@@ -2,6 +2,7 @@ import '../exp/shiro/shiro_crypto.dart';
 import '../exp/shiro/shiro_exp_service.dart';
 import '../exp/shiro/shiro_payload_repo.dart';
 import '../exp/thinkphp/thinkphp_exp_service.dart';
+import '../exp/zentao/zentao_exp_service.dart';
 
 /// Web POC 漏洞扫描（webpoc）：ThinkPHP RCE、Shiro Key 等
 /// 输出格式对齐 fscan
@@ -86,6 +87,23 @@ class WebPocService {
             }
           }
         }
+      }
+    } catch (_) {}
+
+    // 3. 禅道 Repo RCE 检测
+    try {
+      final zentaoBase = await ZentaoExpService.detectZentaoBase(
+        baseUri,
+        timeout: timeout,
+      );
+      if (zentaoBase != null) {
+        results.add(WebPocResult(
+          target: baseUri,
+          pocType: 'poc-yaml-zentao-repo-rce',
+          pocName: '禅道 Repo 配置 RCE (CVE-2022-40978)',
+          detail: '',
+          params: {'zentaoBase': zentaoBase},
+        ));
       }
     } catch (_) {}
 

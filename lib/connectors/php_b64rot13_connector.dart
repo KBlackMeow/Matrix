@@ -29,7 +29,7 @@ class PhpB64Rot13Connector extends PhpEvalConnector {
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: {param: encoded},
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 25));
 
       if (response.statusCode == 200) {
         return decodeWithFallback(response.bodyBytes);

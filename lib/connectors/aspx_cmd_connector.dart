@@ -36,13 +36,13 @@ class AspxCmdConnector extends AspWscriptConnector {
               headers: {'Content-Type': 'application/x-www-form-urlencoded'},
               body: {_param: cmd},
             )
-            .timeout(const Duration(seconds: 20));
+            .timeout(const Duration(seconds: 30));
       } else {
         final params = Map<String, String>.from(uri.queryParameters);
         params[_param] = cmd;
         response = await http
             .get(uri.replace(queryParameters: params))
-            .timeout(const Duration(seconds: 20));
+            .timeout(const Duration(seconds: 30));
       }
 
       if (response.statusCode != 200) return '[HTTP ${response.statusCode}]';

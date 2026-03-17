@@ -325,6 +325,7 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
   late final TextEditingController _urlController;
   bool _running = false;
   final List<_FoundVuln> _foundVulns = [];
+  final List<String> _scanLogs = [];
   int? _sessionId;
   StreamSubscription<VulnScanEvent>? _vulnSubscription;
   Timer? _pollTimer;
@@ -348,15 +349,16 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
         if (meta.target != null) _urlController.text = meta.target!;
         if (meta.log.isNotEmpty) {
           _foundVulns.clear();
+          _scanLogs.clear();
           for (final line in meta.log.split('\n')) {
             if (line.contains('\t')) {
               final p = line.split('\t');
               if (p.length >= 3) {
-                _foundVulns.add(_FoundVuln(
-                  type: p[0],
-                  name: p[1],
-                  detail: p.sublist(2).join('\t'),
-                ));
+                if (p[0] == 'Zentao-LOG') {
+                  _scanLogs.add(p[1]);
+                } else {
+                  _foundVulns.add(_FoundVuln(type: p[0], name: p[1], detail: p.sublist(2).join('\t')));
+                }
               }
             }
           }
@@ -387,15 +389,16 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
     if (meta == null || !mounted) return;
     setState(() {
       _foundVulns.clear();
+      _scanLogs.clear();
       for (final line in meta.log.split('\n')) {
         if (line.contains('\t')) {
           final p = line.split('\t');
           if (p.length >= 3) {
-            _foundVulns.add(_FoundVuln(
-              type: p[0],
-              name: p[1],
-              detail: p.sublist(2).join('\t'),
-            ));
+            if (p[0] == 'Zentao-LOG') {
+              _scanLogs.add(p[1]);
+            } else {
+              _foundVulns.add(_FoundVuln(type: p[0], name: p[1], detail: p.sublist(2).join('\t')));
+            }
           }
         }
       }
@@ -412,11 +415,13 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
     if (sid == null) return;
     _vulnSubscription = _bgService.vulnEvents.listen((event) {
       if (!mounted || event.sessionId != sid) return;
-      setState(() => _foundVulns.add(_FoundVuln(
-        type: event.type,
-        name: event.name,
-        detail: event.detail,
-      )));
+      setState(() {
+        if (event.type == 'Zentao-LOG') {
+          _scanLogs.add(event.name);
+        } else {
+          _foundVulns.add(_FoundVuln(type: event.type, name: event.name, detail: event.detail));
+        }
+      });
     });
   }
 
@@ -454,6 +459,7 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
     setState(() {
       _running = true;
       _foundVulns.clear();
+      _scanLogs.clear();
     });
     _startPolling();
     _subscribeVulns();
@@ -662,6 +668,43 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
                         },
                       ),
                     ),
+                  // 扫描日志区域（仅在有日志时显示）
+                  if (_scanLogs.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Container(
+                          width: 3,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: AppColors.textMuted.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '检测日志',
+                          style: AppTextStyles.heading(size: 11, color: AppColors.textMuted),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 160),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgDark,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: SingleChildScrollView(
+                        child: SelectableText(
+                          _scanLogs.join('\n'),
+                          style: AppTextStyles.terminal(size: 11, color: AppColors.textMuted),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

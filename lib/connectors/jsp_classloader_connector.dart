@@ -93,7 +93,7 @@ class JspClassloaderConnector extends ShellConnector {
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: bodyParts.join('&'),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 25));
 
       if (response.statusCode == 200) {
         return decodeWithFallback(response.bodyBytes);
@@ -117,7 +117,7 @@ class JspClassloaderConnector extends ShellConnector {
   @override
   Future<bool> ping() async {
     try {
-      final r = await _sendJsp('ping').timeout(const Duration(seconds: 8));
+      final r = await _sendJsp('ping').timeout(const Duration(seconds: 15));
       _lastPingDiagnostic = r.contains('MATRIX_JSP_PING') ? null : r;
       return r.contains('MATRIX_JSP_PING');
     } catch (e) {
