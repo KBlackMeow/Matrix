@@ -285,6 +285,13 @@ class _PortScanCardState extends State<PortScanCard> {
     );
   }
 
+  Future<void> _clearLog() async {
+    setState(() => _log = '');
+    if (_sessionId != null) {
+      await _scanSession.clearSessionLog(_sessionId!);
+    }
+  }
+
   Future<void> _saveResult() async {
     if (_log.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -489,6 +496,15 @@ class _PortScanCardState extends State<PortScanCard> {
                               ),
                             ),
                             const Spacer(),
+                            TextButton.icon(
+                              onPressed: (_running || _log.isEmpty) ? null : _clearLog,
+                              icon: const Icon(Icons.delete_outline, size: 14),
+                              label: const Text('清空'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.red,
+                                textStyle: const TextStyle(fontSize: 11),
+                              ),
+                            ),
                             TextButton.icon(
                               onPressed: _log.isEmpty ? null : _saveResult,
                               icon: const Icon(Icons.save, size: 14),

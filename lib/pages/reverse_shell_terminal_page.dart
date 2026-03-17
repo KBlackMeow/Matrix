@@ -26,6 +26,12 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
   StreamSubscription<List<int>>? _rawSub;
   bool _closedManually = false;
 
+  // 当前终端列数/行数，初始值与 xterm 默认值一致
+  int _termCols = 80;
+  int _termRows = 24;
+  // 防抖定时器：窗口拖拽时不向远端频繁发 stty
+  Timer? _resizeDebounce;
+
   @override
   void initState() {
     super.initState();
@@ -73,6 +79,27 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
     _focusNode.dispose();
     _terminalController.dispose();
     super.dispose();
+  }
+
+  /// TerminalView 渲染后读取其实际 cols/rows，同步通知远端 shell。
+  /// 由 LayoutBuilder 的 postFrameCallback 调用：此时 TerminalView
+  /// 已按真实字体尺寸完成 terminal.resize()，viewWidth/viewHeight 是精确值，
+  /// 不再需要手动用字符宽度估算（避免右侧留白）。
+  void _resizeIfNeeded(Size size) {
+    if (size.isEmpty) return;
+    // 读取 TerminalView 已设置好的实际列/行数
+    final cols = _terminal.viewWidth;
+    final rows = _terminal.viewHeight;
+    if (cols == _termCols && rows == _termRows) return;
+    _termCols = cols;
+    _termRows = rows;
+    // 防抖 300ms：拖拽窗口过程中不向远端频繁发 stty
+    _resizeDebounce?.cancel();
+    _resizeDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        widget.session.send('stty cols $cols rows $rows\n');
+      }
+    });
   }
 
   /// 写入数据到终端控件，并处理“阶梯效应” (Staircase Effect)
@@ -139,10 +166,10 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                   TextButton.icon(
                     onPressed: () async {
                       _closedManually = true;
+                      final nav = Navigator.of(context);
                       await widget.session.close();
-                      if (mounted) {
-                        Navigator.of(context).pop();
-                      }
+                      if (!mounted) return;
+                      nav.pop();
                     },
                     icon: const Icon(Icons.power_settings_new,
                         size: 16, color: AppColors.red),
@@ -173,69 +200,75 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
     );
   }
 
-  /// 终端 + 右键菜单（复制选中内容）
+  /// 终端 + 右键菜单；外层 LayoutBuilder 负责动态检测并同步终端尺寸
   Widget _buildTerminalWithContextMenu() {
-    return Stack(
-      children: [
-        TerminalView(
-          _terminal,
-          backgroundOpacity: 0,
-          cursorType: TerminalCursorType.block,
-          controller: _terminalController,
-          focusNode: _focusNode,
-          autofocus: true,
-          // 保留默认快捷键：Ctrl/Cmd + C 复制、V 粘贴、A 全选，
-          // 只额外增加右键菜单
-          hardwareKeyboardOnly: true,
-          onSecondaryTapUp: (details, cell) async {
-            final selection = _terminalController.selection;
-            final selectedText = selection != null
-                ? _terminal.buffer.getText(selection)
-                : null;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 在下一帧更新，避免在 build 阶段直接修改状态
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _resizeIfNeeded(constraints.biggest);
+        });
+        return Stack(
+          children: [
+            TerminalView(
+              _terminal,
+              backgroundOpacity: 0,
+              cursorType: TerminalCursorType.block,
+              controller: _terminalController,
+              focusNode: _focusNode,
+              autofocus: true,
+              hardwareKeyboardOnly: true,
+              onSecondaryTapUp: (details, cell) async {
+                final selection = _terminalController.selection;
+                final selectedText = selection != null
+                    ? _terminal.buffer.getText(selection)
+                    : null;
 
-            final choice = await showMenu<String>(
-              context: context,
-              position: RelativeRect.fromLTRB(
-                details.globalPosition.dx,
-                details.globalPosition.dy,
-                details.globalPosition.dx,
-                details.globalPosition.dy,
-              ),
-              items: [
-                if (selectedText != null)
-                  const PopupMenuItem(
-                    value: 'copy',
-                    child: Text('复制'),
+                final ctx = context;
+                if (!ctx.mounted) return;
+                final choice = await showMenu<String>(
+                  context: ctx,
+                  position: RelativeRect.fromLTRB(
+                    details.globalPosition.dx,
+                    details.globalPosition.dy,
+                    details.globalPosition.dx,
+                    details.globalPosition.dy,
                   ),
-                const PopupMenuItem(
-                  value: 'paste',
-                  child: Text('粘贴'),
-                ),
-              ],
-            );
+                  items: [
+                    if (selectedText != null)
+                      const PopupMenuItem(
+                        value: 'copy',
+                        child: Text('复制'),
+                      ),
+                    const PopupMenuItem(
+                      value: 'paste',
+                      child: Text('粘贴'),
+                    ),
+                  ],
+                );
 
-            if (choice == 'copy' && selectedText != null) {
-              await Clipboard.setData(ClipboardData(text: selectedText));
-            } else if (choice == 'paste') {
-              final data = await Clipboard.getData(Clipboard.kTextPlain);
-              final text = data?.text;
-              if (text != null && text.isNotEmpty) {
-                // 仅做最小化规范：
-                // - 将 CRLF 归一为 LF
-                // - 去掉残留的单独 CR（避免来自其他终端的回车控制符打乱行内顺序）
-                // - 去掉首部多余换行，避免光标直接跳到下一行
-                var t = text.replaceAll('\r\n', '\n').replaceAll('\r', '');
-                while (t.startsWith('\n')) {
-                  t = t.substring(1);
+                if (choice == 'copy' && selectedText != null) {
+                  await Clipboard.setData(ClipboardData(text: selectedText));
+                } else if (choice == 'paste') {
+                  final data = await Clipboard.getData(Clipboard.kTextPlain);
+                  final text = data?.text;
+                  if (text != null && text.isNotEmpty) {
+                    var t = text.replaceAll('\r\n', '\n').replaceAll('\r', '');
+                    while (t.startsWith('\n')) {
+                      t = t.substring(1);
+                    }
+                    if (t.isNotEmpty) {
+                      // Bracketed Paste Mode：告知远端 bash 这是粘贴而非逐键输入，
+                      // 避免大量内容被 readline 逐字符处理导致缓冲区溢出、从头覆盖
+                      widget.session.send('\x1b[200~$t\x1b[201~');
+                    }
+                  }
                 }
-                if (t.isNotEmpty) {
-                  _terminal.textInput(t);
-                }
-              }
-            }
-          },
-        ),
-      ],
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

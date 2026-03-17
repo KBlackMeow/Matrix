@@ -97,6 +97,10 @@ class ScanSessionService {
     );
   }
 
+  /// 清空指定会话的日志（清空日志按钮调用）
+  Future<void> clearSessionLog(int sessionId) =>
+      _db.updateScanSession(sessionId, logText: '');
+
   /// 加载最新会话（含 id、status，用于后台扫描恢复）
   Future<({int id, String log, String? target, String? config, String status})?> loadSessionWithMeta(
     int projectId,

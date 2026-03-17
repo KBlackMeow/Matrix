@@ -433,6 +433,16 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
     super.dispose();
   }
 
+  Future<void> _clearVulns() async {
+    setState(() {
+      _foundVulns.clear();
+      _scanLogs.clear();
+    });
+    if (_sessionId != null) {
+      await _scanSession.clearSessionLog(_sessionId!);
+    }
+  }
+
   Future<void> _startScan() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) return;
@@ -579,6 +589,18 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
                       Text(
                         '发现的漏洞 (${_foundVulns.length})',
                         style: AppTextStyles.heading(size: 12, color: AppColors.textSecondary),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: (_running || (_foundVulns.isEmpty && _scanLogs.isEmpty))
+                            ? null
+                            : _clearVulns,
+                        icon: const Icon(Icons.delete_outline, size: 14),
+                        label: const Text('清空'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.red,
+                          textStyle: const TextStyle(fontSize: 11),
+                        ),
                       ),
                     ],
                   ),

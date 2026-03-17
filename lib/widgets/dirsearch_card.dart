@@ -162,6 +162,18 @@ class _DirsearchCardState extends State<DirsearchCard> {
     super.dispose();
   }
 
+  Future<void> _clearResults() async {
+    setState(() {
+      _results = [];
+      _statusMessage = '';
+      _progressCurrent = 0;
+      _progressTotal = 0;
+    });
+    if (_sessionId != null) {
+      await _scanSession.clearSessionLog(_sessionId!);
+    }
+  }
+
   void _setStatus(String msg) {
     if (mounted) setState(() => _statusMessage = msg);
   }
@@ -518,6 +530,15 @@ class _DirsearchCardState extends State<DirsearchCard> {
                               style: AppTextStyles.heading(size: 12, color: AppColors.textSecondary),
                             ),
                             const Spacer(),
+                            TextButton.icon(
+                              onPressed: (_running || _results.isEmpty) ? null : _clearResults,
+                              icon: const Icon(Icons.delete_outline, size: 14),
+                              label: const Text('清空'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.red,
+                                textStyle: const TextStyle(fontSize: 11),
+                              ),
+                            ),
                             TextButton.icon(
                               onPressed: _results.isEmpty
                                   ? null
