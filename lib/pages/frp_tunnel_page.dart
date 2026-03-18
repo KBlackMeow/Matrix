@@ -229,14 +229,55 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
     final isActive = status == FrpTunnelStatus.running ||
         status == FrpTunnelStatus.connecting;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Flexible(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useHorizontal = constraints.maxWidth >= 720;
+        if (useHorizontal) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 1,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: 280),
+                    child: _buildConfigColumn(status, isActive),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 1,
+                child: _buildLogSection(),
+              ),
+            ],
+          );
+        } else {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: _buildConfigColumn(status, isActive),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(child: _buildLogSection()),
+            ],
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildConfigColumn(FrpTunnelStatus status, bool isActive) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
         // ---- 头部信息卡 ----
         Container(
           padding: const EdgeInsets.all(20),
@@ -326,16 +367,20 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(p.name,
                                   style: AppTextStyles.terminal(
                                       size: 12,
-                                      color: AppColors.textPrimary)),
+                                      color: AppColors.textPrimary),
+                                  overflow: TextOverflow.ellipsis),
                               Text(
                                 '${p.serverAddr}:${p.serverPort}  →  ${p.localAddr}:${p.localPort}',
                                 style: AppTextStyles.caption(
                                     size: 11,
                                     color: AppColors.textMuted),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
                             ],
                           ),
@@ -491,6 +536,8 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                           'TCPMux（yamux 多路复用，frp 默认开启，关闭则退回直连模式）',
                           style: AppTextStyles.caption(
                               size: 12, color: AppColors.textSecondary),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
                         ),
                       ),
                     ],
@@ -556,15 +603,13 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
             ],
           ),
         ),
-              ],
-            ),
-          ),
-        ), // end Flexible/SingleChildScrollView
-        const SizedBox(height: 16),
+      ],
+    ),
+    );
+  }
 
-        // ---- 日志输出 ----
-        Expanded(
-          child: Container(
+  Widget _buildLogSection() {
+    return Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: const Color(0xFF0D1117),
@@ -588,14 +633,13 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                         onTap: () async {
                           final text = _frpService.logs.join('\n');
                           await Clipboard.setData(ClipboardData(text: text));
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('日志已复制到剪贴板'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          }
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('日志已复制到剪贴板'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
                         },
                         child: Text('复制',
                             style: AppTextStyles.caption(
@@ -647,10 +691,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                 ),
               ],
             ),
-          ),
-        ),
-      ],
-    );
+          );
   }
 
   /// Token 专用输入框：明文显示 + 禁用自动更正/智能标点，避免 macOS IME 替换字符

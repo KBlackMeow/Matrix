@@ -108,6 +108,13 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
     _showSnack('已复制到剪贴板');
   }
 
+  Future<void> _copyAsBase64(Payload payload) async {
+    final b64 = base64Encode(utf8.encode(payload.content));
+    await Clipboard.setData(ClipboardData(text: b64));
+    if (!mounted) return;
+    _showSnack('已复制为 Base64');
+  }
+
   Future<void> _delete(Payload payload) async {
     if (payload.isDefault) return;
     final confirmed = await showDialog<bool>(
@@ -126,6 +133,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
       builder: (_) => _PayloadDetailDialog(
         payload: payload,
         onCopy: () => _copyToClipboard(payload),
+        onCopyBase64: () => _copyAsBase64(payload),
         onDownload: () => _downloadToFile(payload),
         onDelete: () async {
           Navigator.pop(context);
@@ -547,12 +555,14 @@ class _ConfirmDeleteDialog extends StatelessWidget {
 class _PayloadDetailDialog extends StatefulWidget {
   final Payload payload;
   final VoidCallback onCopy;
+  final VoidCallback onCopyBase64;
   final VoidCallback onDownload;
   final VoidCallback onDelete;
 
   const _PayloadDetailDialog({
     required this.payload,
     required this.onCopy,
+    required this.onCopyBase64,
     required this.onDownload,
     required this.onDelete,
   });
@@ -632,6 +642,11 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                       icon: Icons.copy_outlined,
                       label: '复制',
                       onPressed: widget.onCopy),
+                  const SizedBox(width: 6),
+                  _DialogBtn(
+                      icon: Icons.code,
+                      label: '复制为Base64',
+                      onPressed: widget.onCopyBase64),
                   const SizedBox(width: 6),
                   _DialogBtn(
                       icon: Icons.download_outlined,
