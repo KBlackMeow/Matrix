@@ -46,12 +46,19 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
     _terminalController = TerminalController();
     _focusNode = FocusNode();
 
-    // 重新进入完整终端页面时，先回放该会话已有历史输出
-    for (final chunk in widget.session.historyRaw) {
-      if (chunk.isNotEmpty) {
-        _writeToTerminal(chunk);
+    // 重新进入完整终端页面时，延后到首帧渲染后再回放历史，确保 Terminal 已 resize 到实际尺寸，
+    // 避免在默认 80x24 下写入后 reflow 导致换行异常
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.session.historyRaw.isEmpty) return;
+      final combined = <int>[];
+      for (final chunk in widget.session.historyRaw) {
+        combined.addAll(chunk);
       }
-    }
+      if (combined.isNotEmpty) {
+        _writeToTerminal(combined);
+      }
+    });
 
     // 远端输出字节流 → 原样写入终端；连接断开时仅标记状态，不自动关闭（由用户手动关闭）
     _rawSub = widget.session.rawStream.listen(
