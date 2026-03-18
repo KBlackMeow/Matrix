@@ -38,6 +38,10 @@ class ReverseShellSession {
   /// 可选的来源标签，例如 Webshell 名称，便于在 UI 中展示
   String? label;
 
+  /// 上次发送给远端的 stty cols/rows，用于避免重复进入终端页面时重复发送
+  int? lastSttyCols;
+  int? lastSttyRows;
+
   bool _alive = true;
 
   /// Socket 是否仍然存活（远端未断开）

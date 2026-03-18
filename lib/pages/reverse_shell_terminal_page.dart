@@ -28,9 +28,6 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
   StreamSubscription<List<int>>? _rawSub;
   bool _closedManually = false;
 
-  // 当前终端列数/行数，初始值与 xterm 默认值一致
-  int _termCols = 80;
-  int _termRows = 24;
   // 防抖定时器：窗口拖拽时不向远端频繁发 stty
   Timer? _resizeDebounce;
   // 文件传输状态
@@ -81,27 +78,25 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
   @override
   void dispose() {
     _rawSub?.cancel();
+    _resizeDebounce?.cancel();
     _focusNode.dispose();
     _terminalController.dispose();
     super.dispose();
   }
 
   /// TerminalView 渲染后读取其实际 cols/rows，同步通知远端 shell。
-  /// 由 LayoutBuilder 的 postFrameCallback 调用：此时 TerminalView
-  /// 已按真实字体尺寸完成 terminal.resize()，viewWidth/viewHeight 是精确值，
-  /// 不再需要手动用字符宽度估算（避免右侧留白）。
+  /// 仅在创建时和窗口尺寸变化时发送，避免每次进入页面都重复发送。
   void _resizeIfNeeded(Size size) {
     if (size.isEmpty) return;
-    // 读取 TerminalView 已设置好的实际列/行数
     final cols = _terminal.viewWidth;
     final rows = _terminal.viewHeight;
-    if (cols == _termCols && rows == _termRows) return;
-    _termCols = cols;
-    _termRows = rows;
-    // 防抖 300ms：拖拽窗口过程中不向远端频繁发 stty
+    // 尺寸未变则跳过（含重入页面时 session 已记录上次发送值的情况）
+    if (cols == widget.session.lastSttyCols && rows == widget.session.lastSttyRows) return;
     _resizeDebounce?.cancel();
     _resizeDebounce = Timer(const Duration(milliseconds: 300), () {
       if (mounted) {
+        widget.session.lastSttyCols = cols;
+        widget.session.lastSttyRows = rows;
         widget.session.send('stty cols $cols rows $rows\n');
       }
     });
