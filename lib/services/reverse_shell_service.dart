@@ -65,10 +65,26 @@ class ReverseShellSession {
 
   /// 发送原始命令/按键数据到远端（不会自动追加换行，请在调用方自行控制）
   Future<void> send(String data) async {
-    // 终端控件 (xterm) 已经按协议输出了正确的控制序列，这里必须原样转发，
-    // 否则会导致回车/换行组合被多次处理，出现光标逐行右移等异常。
-    _socket.add(utf8.encode(data));
-    await _socket.flush();
+    if (!_alive) throw StateError('连接已断开');
+    try {
+      _socket.add(utf8.encode(data));
+      await _socket.flush();
+    } catch (e) {
+      _alive = false;
+      rethrow;
+    }
+  }
+
+  /// 发送原始字节（用于大块数据传输，避免中间字符串拼接）
+  Future<void> sendBytes(List<int> data) async {
+    if (!_alive) throw StateError('连接已断开');
+    try {
+      _socket.add(data);
+      await _socket.flush();
+    } catch (e) {
+      _alive = false;
+      rethrow;
+    }
   }
 
   Future<void> close() async {

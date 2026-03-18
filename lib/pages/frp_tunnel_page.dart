@@ -545,6 +545,26 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
+                      Switch(
+                        value: _frpService.autoReconnect,
+                        onChanged: (v) =>
+                            setState(() => _frpService.autoReconnect = v),
+                        activeThumbColor: AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '断开后自动重连（5 秒后重试）',
+                          style: AppTextStyles.caption(
+                              size: 12, color: AppColors.textSecondary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
                       Text('认证算法：',
                           style: AppTextStyles.caption(
                               size: 12, color: AppColors.textSecondary)),

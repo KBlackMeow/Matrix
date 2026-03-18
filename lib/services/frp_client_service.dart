@@ -219,6 +219,12 @@ class FrpClientService {
   List<String> get logs => List.unmodifiable(_logs);
   void Function()? onChanged;
 
+  // ---- 断开后自动重连 ----
+  bool _autoReconnect = false;
+  bool get autoReconnect => _autoReconnect;
+  set autoReconnect(bool v) => _autoReconnect = v;
+  Timer? _reconnectTimer;
+
   // --------------------------------------------------------------------------
   // 公开 API
   // --------------------------------------------------------------------------
@@ -272,7 +278,15 @@ class FrpClientService {
             _log('  提示：若服务端配置了 tcpMux=false，请关闭「TCPMux」选项重试');
           }
           _setStatus(FrpTunnelStatus.error);
+          final cfg = currentConfig;
           _teardown();
+          if (_autoReconnect && cfg != null) {
+            _log('5 秒后自动重连...');
+            _reconnectTimer = Timer(const Duration(seconds: 5), () {
+              _reconnectTimer = null;
+              start(cfg);
+            });
+          }
         }
       },
     );
@@ -866,6 +880,8 @@ class FrpClientService {
   // --------------------------------------------------------------------------
 
   void _teardown() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _tcpActive = false;
     _pingTimer?.cancel();
     _pingTimer = null;
