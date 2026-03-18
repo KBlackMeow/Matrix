@@ -85,9 +85,9 @@ abstract class ShellConnector {
     if (preferScript) {
       // 使用多级回退的一键反弹命令，并显式设置 TERM：
       // 1. 先导出 TERM=xterm-256color，避免 clear 等命令报 “TERM not set”
-      // 2. 优先使用 script 分配伪终端 + bash
+      // 2. 优先使用 script 分配伪终端 + bash（script 先运行，bash 作为子进程获得 PTY）
       // 3. 其次使用 bash -i
-      // 4. 否则      → /bin/sh -i
+      // 4. 否则 → /bin/sh -i
       cmd =
           "bash -c 'export TERM=xterm-256color; "
           "if command -v script >/dev/null 2>&1; then "

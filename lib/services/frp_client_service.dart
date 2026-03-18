@@ -709,13 +709,13 @@ class FrpClientService {
 
   Future<void> _openWorkConn(FrpTunnelConfig cfg) async {
     Socket? local;
+    StreamSubscription<List<int>>? workSub;
+    void Function()? closeWork;
     try {
       final workFrpBuf = <int>[];
       final ready = Completer<void>();
       List<int> postHandshakeBuf = [];
-      StreamSubscription<List<int>>? workSub;
       late void Function(List<int>) sendToWork;
-      late void Function() closeWork;
 
       if (_useTcpMux) {
         final workStream = _muxOpenStream();
@@ -761,7 +761,12 @@ class FrpClientService {
           _muxSendData(workStream.id, d);
           _tcpFlush();
         };
-        closeWork = () => workStream.close();
+        closeWork = () {
+          _muxSendFrame(_mxWindowUpdate, _mxFin, workStream.id, 0);
+          _tcpFlush();
+          workStream.close();
+          _muxStreams.remove(workStream.id);
+        };
       } else {
         // ---- 非 tcpMux 模式：新 TCP 连接 ----
         final workSocket =
@@ -808,8 +813,8 @@ class FrpClientService {
         closeWork = workSocket.destroy;
       }
 
-      await ready.future.timeout(const Duration(seconds: 25),
-          onTimeout: () => throw TimeoutException('等待 StartWorkConn 超时（25s）'));
+      await ready.future.timeout(const Duration(hours: 24),
+          onTimeout: () => throw TimeoutException('等待 StartWorkConn 超时（24h）'));
 
       local = await Socket.connect(cfg.localAddr, cfg.localPort);
       _log('桥接成功：frps ↔ ${cfg.localAddr}:${cfg.localPort}');
@@ -822,13 +827,15 @@ class FrpClientService {
 
       local.listen(
         sendToWork,
-        onDone: closeWork,
-        onError: (_) => closeWork(),
+        onDone: closeWork!,
+        onError: (_) => closeWork!(),
         cancelOnError: true,
       );
     } catch (e) {
       _log('工作连接失败：$e');
       local?.destroy();
+      await workSub?.cancel();
+      closeWork?.call(); // 发送 yamux FIN、关闭流并从 _muxStreams 移除，避免影响后续连接
     }
   }
 

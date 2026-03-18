@@ -232,6 +232,11 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Flexible(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
         // ---- 头部信息卡 ----
         Container(
           padding: const EdgeInsets.all(20),
@@ -551,6 +556,10 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
             ],
           ),
         ),
+              ],
+            ),
+          ),
+        ), // end Flexible/SingleChildScrollView
         const SizedBox(height: 16),
 
         // ---- 日志输出 ----
