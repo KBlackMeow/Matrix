@@ -15,6 +15,7 @@ import 'pages/project_management_page.dart';
 import 'pages/project_scoped_page.dart';
 import 'pages/webshell_management_page.dart';
 import 'pages/reverse_shell_dashboard_page.dart';
+import 'pages/frp_tunnel_page.dart';
 import 'pages/payload_management_page.dart';
 import 'pages/dictionary_management_page.dart';
 import 'pages/info_collection_page.dart';
@@ -97,6 +98,7 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
     MenuItem(icon: Icons.code_outlined, label: 'Payload管理', selectedIcon: Icons.code),
     MenuItem(icon: Icons.menu_book_outlined, label: '字典管理', selectedIcon: Icons.menu_book),
     MenuItem(icon: Icons.computer_outlined, label: '完整终端', selectedIcon: Icons.computer),
+    MenuItem(icon: Icons.alt_route_outlined, label: 'FRP隧道', selectedIcon: Icons.alt_route),
   ];
 
   @override
@@ -183,6 +185,9 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
     }
     if (_selectedIndex == 6) {
       return const ReverseShellDashboardPage();
+    }
+    if (_selectedIndex == 7) {
+      return const FrpTunnelPage();
     }
     return _WorkspaceContent(title: _menuItems[_selectedIndex].label);
   }

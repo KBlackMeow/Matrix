@@ -11,6 +11,8 @@ import '../models/project.dart';
 import '../models/webshell.dart';
 import '../models/payload.dart';
 import '../models/dictionary.dart';
+import '../models/frp_profile.dart';
+import '../services/frp_client_service.dart';
 
 /// 桌面/移动端 SQLite 实现
 class DatabaseHelperIo {
@@ -33,7 +35,7 @@ class DatabaseHelperIo {
 
     return openDatabase(
       path,
-      version: 9,
+      version: 10,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -142,6 +144,25 @@ class DatabaseHelperIo {
     await db.execute(
       'CREATE INDEX idx_scan_sessions_project_type ON scan_sessions(project_id, scan_type)',
     );
+
+    await db.execute('''
+      CREATE TABLE frp_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        server_addr TEXT NOT NULL,
+        server_port INTEGER NOT NULL DEFAULT 7000,
+        token TEXT NOT NULL DEFAULT '',
+        proxy_name TEXT NOT NULL DEFAULT 'shell',
+        remote_port INTEGER NOT NULL DEFAULT 6000,
+        local_addr TEXT NOT NULL DEFAULT '127.0.0.1',
+        local_port INTEGER NOT NULL DEFAULT 4444,
+        version TEXT NOT NULL DEFAULT '',
+        use_tcp_mux INTEGER NOT NULL DEFAULT 1,
+        auth_mode TEXT NOT NULL DEFAULT 'md5',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -262,6 +283,26 @@ class DatabaseHelperIo {
       await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_scan_sessions_project_type ON scan_sessions(project_id, scan_type)',
       );
+    }
+    if (oldVersion < 10) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS frp_profiles (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          server_addr TEXT NOT NULL,
+          server_port INTEGER NOT NULL DEFAULT 7000,
+          token TEXT NOT NULL DEFAULT '',
+          proxy_name TEXT NOT NULL DEFAULT 'shell',
+          remote_port INTEGER NOT NULL DEFAULT 6000,
+          local_addr TEXT NOT NULL DEFAULT '127.0.0.1',
+          local_port INTEGER NOT NULL DEFAULT 4444,
+          version TEXT NOT NULL DEFAULT '',
+          use_tcp_mux INTEGER NOT NULL DEFAULT 1,
+          auth_mode TEXT NOT NULL DEFAULT 'md5',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
     }
   }
 
@@ -750,6 +791,67 @@ class DatabaseHelperIo {
     final db = await database;
     return db.delete('webshells', where: 'id = ?', whereArgs: [id]);
   }
+
+  // ── FRP Profiles ─────────────────────────────────────────────────────────────
+
+  Future<FrpProfile> createFrpProfile({
+    required String name,
+    required String serverAddr,
+    required int serverPort,
+    required String token,
+    required String proxyName,
+    required int remotePort,
+    required String localAddr,
+    required int localPort,
+    required String version,
+    required bool useTcpMux,
+    required FrpAuthMode authMode,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final id = await db.insert('frp_profiles', {
+      'name': name,
+      'server_addr': serverAddr,
+      'server_port': serverPort,
+      'token': token,
+      'proxy_name': proxyName,
+      'remote_port': remotePort,
+      'local_addr': localAddr,
+      'local_port': localPort,
+      'version': version,
+      'use_tcp_mux': useTcpMux ? 1 : 0,
+      'auth_mode': authMode.name,
+      'created_at': now,
+      'updated_at': now,
+    });
+    return FrpProfile(
+      id: id,
+      name: name,
+      serverAddr: serverAddr,
+      serverPort: serverPort,
+      token: token,
+      proxyName: proxyName,
+      remotePort: remotePort,
+      localAddr: localAddr,
+      localPort: localPort,
+      version: version,
+      useTcpMux: useTcpMux,
+      authMode: authMode,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(now),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
+    );
+  }
+
+  Future<List<FrpProfile>> getAllFrpProfiles() async {
+    final db = await database;
+    final maps = await db.query('frp_profiles', orderBy: 'updated_at DESC');
+    return maps.map((m) => FrpProfile.fromMap(m.map((k, v) => MapEntry(k, v)))).toList();
+  }
+
+  Future<int> deleteFrpProfile(int id) async {
+    final db = await database;
+    return db.delete('frp_profiles', where: 'id = ?', whereArgs: [id]);
+  }
 }
 
 final _io = DatabaseHelperIo();
@@ -873,3 +975,35 @@ Future<void> updateScanSession(int id, {String? logText, String? status}) =>
 Future<void> appendScanLog(int id, String line) => _io.appendScanLog(id, line);
 
 Future<void> resetStaleRunningSessions() => _io.resetStaleRunningSessions();
+
+// FRP Profiles 顶层方法
+Future<FrpProfile> createFrpProfile({
+  required String name,
+  required String serverAddr,
+  required int serverPort,
+  required String token,
+  required String proxyName,
+  required int remotePort,
+  required String localAddr,
+  required int localPort,
+  required String version,
+  required bool useTcpMux,
+  required FrpAuthMode authMode,
+}) =>
+    _io.createFrpProfile(
+      name: name,
+      serverAddr: serverAddr,
+      serverPort: serverPort,
+      token: token,
+      proxyName: proxyName,
+      remotePort: remotePort,
+      localAddr: localAddr,
+      localPort: localPort,
+      version: version,
+      useTcpMux: useTcpMux,
+      authMode: authMode,
+    );
+
+Future<List<FrpProfile>> getAllFrpProfiles() => _io.getAllFrpProfiles();
+
+Future<int> deleteFrpProfile(int id) => _io.deleteFrpProfile(id);

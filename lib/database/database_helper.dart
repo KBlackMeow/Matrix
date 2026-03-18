@@ -2,6 +2,8 @@ import '../models/project.dart';
 import '../models/webshell.dart';
 import '../models/payload.dart';
 import '../models/dictionary.dart';
+import '../models/frp_profile.dart';
+import '../services/frp_client_service.dart';
 import 'database_helper_stub.dart'
     if (dart.library.io) 'database_helper_io.dart' as impl;
 
@@ -165,4 +167,37 @@ class DatabaseHelper {
 
   /// 启动时将所有遗留的 running 会话重置为 interrupted
   Future<void> resetStaleRunningSessions() => impl.resetStaleRunningSessions();
+
+  // FRP Profiles
+
+  Future<FrpProfile> createFrpProfile({
+    required String name,
+    required String serverAddr,
+    required int serverPort,
+    required String token,
+    required String proxyName,
+    required int remotePort,
+    required String localAddr,
+    required int localPort,
+    required String version,
+    required bool useTcpMux,
+    required FrpAuthMode authMode,
+  }) =>
+      impl.createFrpProfile(
+        name: name,
+        serverAddr: serverAddr,
+        serverPort: serverPort,
+        token: token,
+        proxyName: proxyName,
+        remotePort: remotePort,
+        localAddr: localAddr,
+        localPort: localPort,
+        version: version,
+        useTcpMux: useTcpMux,
+        authMode: authMode,
+      );
+
+  Future<List<FrpProfile>> getAllFrpProfiles() => impl.getAllFrpProfiles();
+
+  Future<int> deleteFrpProfile(int id) => impl.deleteFrpProfile(id);
 }

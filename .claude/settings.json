@@ -22,7 +22,17 @@
       "Bash(git -C /Users/illya/Projects/matrix show 1b99419 --name-only)",
       "Bash(git -C /Users/illya/Projects/matrix show 39112dc --name-only)",
       "Bash(curl -s -I --connect-timeout 5 http://172.21.11.5/)",
-      "Bash(curl -sv --connect-timeout 5 http://172.21.11.5/)"
+      "Bash(curl -sv --connect-timeout 5 http://172.21.11.5/)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "Bash(curl -s https://raw.githubusercontent.com/fatedier/frp/v0.67.0/server/service.go)",
+      "Bash(curl -s https://raw.githubusercontent.com/fatedier/frp/v0.67.0/server/control.go)",
+      "Bash(curl -s https://raw.githubusercontent.com/fatedier/frp/v0.67.0/pkg/msg/dispatcher.go)",
+      "Bash(curl -I https://raw.githubusercontent.com/fatedier/frp/v0.67.0/pkg/msg/dispatcher.go)",
+      "Bash(curl -s https://raw.githubusercontent.com/fatedier/frp/v0.67.0/pkg/transport/message.go)",
+      "Bash(curl -s \"https://api.github.com/repos/fatedier/frp/contents/pkg/msg?ref=v0.67.0\")"
     ]
   }
 }

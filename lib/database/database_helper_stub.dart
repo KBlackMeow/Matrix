@@ -2,6 +2,8 @@ import '../models/project.dart';
 import '../models/webshell.dart';
 import '../models/payload.dart';
 import '../models/dictionary.dart';
+import '../models/frp_profile.dart';
+import '../services/frp_client_service.dart';
 import 'database_helper_web.dart';
 
 final _web = DatabaseHelperWeb();
@@ -125,3 +127,50 @@ Future<void> appendScanLog(int id, String line) => _web.appendScanLog(id, line);
 
 // Web 内存存储，重启即清空，无需重置
 Future<void> resetStaleRunningSessions() async {}
+
+// FRP Profiles（Web 无持久化，仅会话内有效）
+final _frpProfiles = <FrpProfile>[];
+int _frpProfileIdSeq = 1;
+
+Future<FrpProfile> createFrpProfile({
+  required String name,
+  required String serverAddr,
+  required int serverPort,
+  required String token,
+  required String proxyName,
+  required int remotePort,
+  required String localAddr,
+  required int localPort,
+  required String version,
+  required bool useTcpMux,
+  required FrpAuthMode authMode,
+}) async {
+  final now = DateTime.now();
+  final profile = FrpProfile(
+    id: _frpProfileIdSeq++,
+    name: name,
+    serverAddr: serverAddr,
+    serverPort: serverPort,
+    token: token,
+    proxyName: proxyName,
+    remotePort: remotePort,
+    localAddr: localAddr,
+    localPort: localPort,
+    version: version,
+    useTcpMux: useTcpMux,
+    authMode: authMode,
+    createdAt: now,
+    updatedAt: now,
+  );
+  _frpProfiles.add(profile);
+  return profile;
+}
+
+Future<List<FrpProfile>> getAllFrpProfiles() async =>
+    List.unmodifiable(_frpProfiles.reversed.toList());
+
+Future<int> deleteFrpProfile(int id) async {
+  final before = _frpProfiles.length;
+  _frpProfiles.removeWhere((p) => p.id == id);
+  return before - _frpProfiles.length;
+}
