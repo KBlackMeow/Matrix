@@ -27,6 +27,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     with SingleTickerProviderStateMixin {
   late final WebshellService _service;
   late final TabController _tabController;
+  late final _TabCompleter _completer;
   bool _isConnected = false;
   bool _isChecking = true;
   String? _lastPingError;
@@ -36,6 +37,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     super.initState();
     _service = WebshellService(widget.webshell);
     _tabController = TabController(length: 4, vsync: this);
+    _completer = _TabCompleter(_service);
     _checkConnection();
   }
 
@@ -123,11 +125,14 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                         children: [
                           FocusScope(
                             skipTraversal: _tabController.index != 0,
-                            child: _TerminalTab(service: _service),
+                            child: _TerminalTab(service: _service, completer: _completer),
                           ),
                           FocusScope(
                             skipTraversal: _tabController.index != 1,
-                            child: _FileManagerTab(service: _service),
+                            child: _FileManagerTab(
+                              service: _service,
+                              onInvalidateCompleterDir: _completer.invalidateDir,
+                            ),
                           ),
                           FocusScope(
                             skipTraversal: _tabController.index != 2,
@@ -310,8 +315,9 @@ class _TerminalEntry {
 
 class _TerminalTab extends StatefulWidget {
   final WebshellService service;
+  final _TabCompleter completer;
 
-  const _TerminalTab({required this.service});
+  const _TerminalTab({required this.service, required this.completer});
 
   @override
   State<_TerminalTab> createState() => _TerminalTabState();
@@ -342,7 +348,7 @@ class _TerminalTabState extends State<_TerminalTab>
   @override
   void initState() {
     super.initState();
-    _completer = _TabCompleter(widget.service);
+    _completer = widget.completer;
     _initDir();
   }
 
@@ -415,6 +421,8 @@ class _TerminalTabState extends State<_TerminalTab>
         entry.output = output.isEmpty ? '(无输出)' : output;
         _executing = false;
       });
+      // 命令执行后使当前目录缓存失效，以便 touch/echo 等创建的文件能被 Tab 补全
+      _completer.invalidateDir(_currentDir);
       _scrollToBottom(animated: true); // 平滑滚动到最新输出
       // 执行完毕后恢复焦点
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1216,6 +1224,11 @@ class _TabCompleter {
     } catch (_) {}
   }
 
+  /// 使指定目录的缓存失效，写入新文件后调用以便 Tab 补全能识别新文件
+  void invalidateDir(String dir) {
+    _cache.remove(dir);
+  }
+
   Future<void> fetchEnvVars() async {
     try {
       _envVars = await service.listEnvVarNames();
@@ -1485,8 +1498,12 @@ class _EntryBlock extends StatelessWidget {
 
 class _FileManagerTab extends StatefulWidget {
   final WebshellService service;
+  final void Function(String dir) onInvalidateCompleterDir;
 
-  const _FileManagerTab({required this.service});
+  const _FileManagerTab({
+    required this.service,
+    required this.onInvalidateCompleterDir,
+  });
 
   @override
   State<_FileManagerTab> createState() => _FileManagerTabState();
@@ -1572,7 +1589,10 @@ class _FileManagerTabState extends State<_FileManagerTab>
         path: path,
         name: entry.name,
         initialContent: content,
-        onSaved: () => _loadDirectory(_currentPath),
+        onSaved: () {
+          _loadDirectory(_currentPath);
+          widget.onInvalidateCompleterDir(_parent(path));
+        },
       ),
     );
   }
@@ -1596,15 +1616,15 @@ class _FileManagerTabState extends State<_FileManagerTab>
     bool ok = false;
     bool usedBinaryPath = false;
     try {
-      // 若检测为文本文件，则优先走已有的文本写入逻辑（你已验证可用），
-      // 避免部分环境下二进制上传因 base64/命令兼容性问题导致失败。
+      // 若检测为文本文件且体积较小，则走文本写入；大文件一律走分块上传，避免单次请求超限。
       final looksBinary = _isBinary(bytes);
-      if (!looksBinary) {
+      final useBinaryPath = looksBinary || bytes.length > 100 * 1024;
+      if (!useBinaryPath) {
         setState(() => _uploading = true);
         final content = utf8.decode(bytes);
         ok = await widget.service.writeFile(remotePath, content);
       } else {
-        usedBinaryPath = true;
+        usedBinaryPath = true; // 二进制文件或大文件（>100KB）走分块
         setState(() => _uploading = true);
         showDialog(
           context: context,
@@ -1651,6 +1671,9 @@ class _FileManagerTabState extends State<_FileManagerTab>
           ),
         );
       } else {
+        debugPrint(
+          '[Matrix][上传] 异常 file=${file.name} path=$remotePath size=${bytes.length} error=$e',
+        );
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content:
               Text('上传失败: $e', style: const TextStyle(color: Colors.white)),
@@ -1677,6 +1700,12 @@ class _FileManagerTabState extends State<_FileManagerTab>
     // 保持当前页面与对话框，由用户自行关闭
     setState(() => _uploading = false);
     transferred.dispose();
+    if (!ok) {
+      debugPrint(
+        '[Matrix][上传] 失败 file=${file.name} path=$remotePath size=${bytes.length} '
+        'usedBinaryPath=$usedBinaryPath',
+      );
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -1688,7 +1717,10 @@ class _FileManagerTabState extends State<_FileManagerTab>
         behavior: SnackBarBehavior.floating,
       ),
     );
-    if (ok) _loadDirectory(_currentPath);
+    if (ok) {
+      _loadDirectory(_currentPath);
+      widget.onInvalidateCompleterDir(_parent(remotePath));
+    }
   }
 
   /// 粗略判断文件是否为二进制：
@@ -1810,7 +1842,8 @@ class _FileManagerTabState extends State<_FileManagerTab>
       ),
     );
     if (confirm != true) return;
-    final ok = await widget.service.deleteFile(_join(_currentPath, entry.name));
+    final deletedPath = _join(_currentPath, entry.name);
+    final ok = await widget.service.deleteFile(deletedPath);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1824,7 +1857,10 @@ class _FileManagerTabState extends State<_FileManagerTab>
         behavior: SnackBarBehavior.floating,
       ),
     );
-    if (ok) _loadDirectory(_currentPath);
+    if (ok) {
+      _loadDirectory(_currentPath);
+      widget.onInvalidateCompleterDir(_parent(deletedPath));
+    }
   }
 
   @override

@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:encrypt/encrypt.dart' as enc;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 
@@ -221,7 +222,9 @@ class JspBehinderConnector extends ShellConnector {
   @override
   Future<bool> ping() async {
     try {
-      final r = await _sendBehinder('ping').timeout(const Duration(seconds: 15));
+      final r = await _sendBehinder(
+        'ping',
+      ).timeout(const Duration(seconds: 15));
       _lastPingDiagnostic = r.contains('MATRIX_JSP_PING') ? null : r;
       return r.contains('MATRIX_JSP_PING');
     } catch (e) {
@@ -340,7 +343,7 @@ class JspBehinderConnector extends ShellConnector {
     return writeFileBinaryWithProgress(path, bytes, (_, _) {});
   }
 
-  // 分块大小：4 KB → base64 后约 5.5 KB，安全低于 Tomcat 默认 maxHttpHeaderSize (8 KB)
+  // 分块大小：3 KB → base64 约 4 KB，确保 X-V header 不超 Tomcat maxHttpHeaderSize (8 KB)
   static const _kChunkSize = 4 * 1024;
 
   @override
@@ -366,7 +369,14 @@ class JspBehinderConnector extends ShellConnector {
         'exec',
         extraParams: {'_k': _execKey, _execKey: cmd},
       );
-      if (!r.trim().endsWith('1')) return false;
+      if (!r.trim().endsWith('1')) {
+        final snippet = r.length > 500 ? '${r.substring(0, 500)}...' : r;
+        debugPrint(
+          '[Matrix][jsp_behinder] 上传分块失败 path=$target offset=$offset total=$total '
+          'response=${snippet.replaceAll('\n', ' ')}',
+        );
+        return false;
+      }
       offset = end;
       first = false;
       onProgress(offset, total);

@@ -4,6 +4,7 @@ import 'dart:io' as io;
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 
@@ -234,7 +235,7 @@ class JspClassloaderConnector extends ShellConnector {
     return writeFileBinaryWithProgress(path, bytes, (_, __) {});
   }
 
-  // 分块大小：与 JSP 冰蝎保持一致，使用较小块减少单次命令长度。
+  // 分块大小：64 KB → base64 约 86 KB
   static const _kChunkSize = 64 * 1024;
 
   @override
@@ -260,7 +261,14 @@ class JspClassloaderConnector extends ShellConnector {
         'exec',
         extraParams: {'_k': _execKey, _execKey: cmd},
       );
-      if (!r.trim().endsWith('1')) return false;
+      if (!r.trim().endsWith('1')) {
+        final snippet = r.length > 500 ? '${r.substring(0, 500)}...' : r;
+        debugPrint(
+          '[Matrix][jsp_classloader] 上传分块失败 path=$target offset=$offset total=$total '
+          'response=${snippet.replaceAll('\n', ' ')}',
+        );
+        return false;
+      }
       offset = end;
       first = false;
       onProgress(offset, total);
