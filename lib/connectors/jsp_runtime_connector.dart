@@ -39,7 +39,10 @@ class JspRuntimeConnector extends ShellExecConnector {
         response = await http
             .post(
               uri,
-              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+              headers: {
+                'Content-Type':
+                    'application/x-www-form-urlencoded; charset=UTF-8',
+              },
               body: {_param: cmd},
             )
             .timeout(const Duration(seconds: 30));

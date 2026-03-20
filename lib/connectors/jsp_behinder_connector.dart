@@ -235,11 +235,21 @@ class JspBehinderConnector extends ShellConnector {
 
   static String _sq(String s) => "'${s.replaceAll("'", "'\\''")}'";
 
+  static bool _hasNonAscii(String s) => s.codeUnits.any((c) => c > 127);
+
   @override
   Future<String> executeCommand(String cmd, {String workingDir = ''}) async {
-    final cd = (workingDir.isNotEmpty && workingDir.startsWith('/'))
-        ? 'cd ${_sq(workingDir)} && '
-        : '';
+    final String cd;
+    if (workingDir.isNotEmpty && workingDir.startsWith('/')) {
+      if (_hasNonAscii(workingDir)) {
+        final b64Wd = base64.encode(utf8.encode(workingDir));
+        cd = "_wd=\$(echo ${_sq(b64Wd)}|base64 -d) && cd \"\$_wd\" && ";
+      } else {
+        cd = 'cd ${_sq(workingDir)} && ';
+      }
+    } else {
+      cd = '';
+    }
     final r = await _sendBehinder(
       'exec',
       extraParams: {'_k': _execKey, _execKey: '$cd$cmd'},
@@ -254,15 +264,26 @@ class JspBehinderConnector extends ShellConnector {
     return currentDir;
   }
 
-  @override
-  Future<List<FileEntry>> listDirectory(String path) async {
-    final result = await _sendBehinder('ls', extraParams: {'path': path});
-    if (result.isEmpty ||
-        result.startsWith('ERR_OPEN') ||
-        result.startsWith('[')) {
-      return [];
-    }
+  /// Shell command that lists [path] in the same pipe-delimited format the
+  /// behinder `ls` action uses: `base64(name)|d_or_f|size|perms|mtime\n`.
+  /// The path is base64-encoded so the exec header stays pure ASCII.
+  String _execLsCmd(String path) {
+    final b64Path = base64.encode(utf8.encode(path));
+    // Linux stat uses -c, macOS stat uses -f — try both with ||.
+    return "_p=\$(echo ${_sq(b64Path)}|base64 -d);"
+        "{ echo '..';ls -a \"\$_p\" 2>/dev/null|grep -vE '^\\.\\.?\$'; }"
+        "|while IFS= read -r n;do"
+        " f=\"\$_p/\$n\";[ -e \"\$f\" ]||continue;"
+        "[ -d \"\$f\" ]&&t=d||t=f;"
+        "s=\$(stat -c%s \"\$f\" 2>/dev/null||stat -f%z \"\$f\" 2>/dev/null||echo 0);"
+        "p=\$(stat -c%A \"\$f\" 2>/dev/null||stat -f%Sp \"\$f\" 2>/dev/null||echo -);"
+        "m=\$(stat -c%y \"\$f\" 2>/dev/null||stat -f%Sm \"\$f\" 2>/dev/null||echo -);"
+        "nb=\$(printf '%s' \"\$n\"|base64|tr -d '\\n');"
+        "printf '%s|%s|%s|%s|%s\\n' \"\$nb\" \"\$t\" \"\$s\" \"\$p\" \"\$m\";"
+        "done";
+  }
 
+  List<FileEntry> _parseLsOutput(String result) {
     return result
         .trim()
         .split('\n')
@@ -296,30 +317,64 @@ class JspBehinderConnector extends ShellConnector {
   }
 
   @override
-  Future<String> readFile(String path) async =>
-      _sendBehinder('cat', extraParams: {'path': path});
-
-  @override
-  Future<bool> writeFile(String path, String content) async {
-    final r = await _sendBehinder(
-      'write',
-      extraParams: {'path': path, 'data': base64.encode(utf8.encode(content))},
-    );
-    return r.trim() == '1';
+  Future<List<FileEntry>> listDirectory(String path) async {
+    final String result;
+    if (_hasNonAscii(path)) {
+      result = await _sendBehinder(
+        'exec',
+        extraParams: {'_k': _execKey, _execKey: _execLsCmd(path)},
+      );
+    } else {
+      result = await _sendBehinder('ls', extraParams: {'path': path});
+    }
+    if (result.isEmpty ||
+        result.startsWith('ERR_OPEN') ||
+        result.startsWith('[')) {
+      return [];
+    }
+    return _parseLsOutput(result);
   }
 
   @override
+  Future<String> readFile(String path) async {
+    try {
+      return decodeWithFallback(await readFileBinary(path));
+    } catch (_) {
+      return '[文件不存在或无权读取]';
+    }
+  }
+
+  @override
+  Future<bool> writeFile(String path, String content) =>
+      writeFileBinaryWithProgress(
+        path,
+        Uint8List.fromList(utf8.encode(content)),
+        (_, _) {},
+      );
+
+  @override
   Future<bool> deleteFile(String path) async {
-    final r = await _sendBehinder('rm', extraParams: {'path': path});
-    return r.trim() == '1';
+    // base64-encode the path so non-ASCII names (e.g. Chinese) are safe in the
+    // HTTP header value sent to the behinder agent.
+    final b64Path = base64.encode(utf8.encode(path));
+    final cmd =
+        "_p=\$(echo ${_sq(b64Path)} | base64 -d) && rm \"\$_p\" && echo 1 || echo 0";
+    final r = await _sendBehinder(
+      'exec',
+      extraParams: {'_k': _execKey, _execKey: cmd},
+    );
+    return r.trim().contains('1');
   }
 
   @override
   Future<Uint8List> readFileBinary(String path) async {
-    // 通过 shell base64 命令编码，避免二进制数据经 PrintWriter 损坏
+    // base64-encode the path so non-ASCII names (e.g. Chinese) are safe in the
+    // HTTP header value sent to the behinder agent.
+    final b64Path = base64.encode(utf8.encode(path));
     final cmd =
-        'cat ${_sq(path)} 2>/dev/null | base64 -w0 2>/dev/null'
-        " || cat ${_sq(path)} 2>/dev/null | base64";
+        "_p=\$(echo ${_sq(b64Path)} | base64 -d)"
+        " && cat \"\$_p\" 2>/dev/null | base64 -w0 2>/dev/null"
+        " || cat \"\$_p\" 2>/dev/null | base64";
     final result = await _sendBehinder(
       'exec',
       extraParams: {'_k': _execKey, _execKey: cmd},
@@ -360,6 +415,16 @@ class JspBehinderConnector extends ShellConnector {
     // non-ASCII file names (e.g. Chinese) would otherwise be rejected by
     // Dart's HTTP client as an invalid header field value.
     final b64Target = base64.encode(utf8.encode(target));
+
+    if (total == 0) {
+      final cmd =
+          "_p=\$(echo ${_sq(b64Target)} | base64 -d) && : > \"\$_p\" && echo 1 || echo 0";
+      final r = await _sendBehinder(
+        'exec',
+        extraParams: {'_k': _execKey, _execKey: cmd},
+      );
+      return r.trim().endsWith('1');
+    }
 
     int offset = 0;
     bool first = true;
@@ -415,7 +480,15 @@ class JspBehinderConnector extends ShellConnector {
   Future<List<({String name, bool isDir})>> listNamesForCompletion(
     String path,
   ) async {
-    final result = await _sendBehinder('ls', extraParams: {'path': path});
+    final String result;
+    if (_hasNonAscii(path)) {
+      result = await _sendBehinder(
+        'exec',
+        extraParams: {'_k': _execKey, _execKey: _execLsCmd(path)},
+      );
+    } else {
+      result = await _sendBehinder('ls', extraParams: {'path': path});
+    }
     if (result.isEmpty || result.startsWith('[')) return [];
     final out = <({String name, bool isDir})>[];
     for (final line in result.trim().split('\n')) {

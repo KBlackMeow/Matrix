@@ -37,20 +37,20 @@ class JspClassloaderConnector extends ShellConnector {
     ConnectorCapability.fileWrite,
   };
 
-  /// 严格 percent-encode（防止 Tomcat 将 `+` 解码为空格破坏 Base64）
+  /// UTF-8 字节级 percent-encode（与 charset=UTF-8 一致；按 codeUnit 编码会破坏中文）
   static String _formEncode(String s) {
     final buf = StringBuffer();
-    for (final cu in s.codeUnits) {
-      if ((cu >= 0x41 && cu <= 0x5A) ||
-          (cu >= 0x61 && cu <= 0x7A) ||
-          (cu >= 0x30 && cu <= 0x39) ||
-          cu == 0x2D ||
-          cu == 0x5F ||
-          cu == 0x2E ||
-          cu == 0x7E) {
-        buf.writeCharCode(cu);
+    for (final b in utf8.encode(s)) {
+      if ((b >= 0x41 && b <= 0x5A) ||
+          (b >= 0x61 && b <= 0x7A) ||
+          (b >= 0x30 && b <= 0x39) ||
+          b == 0x2D ||
+          b == 0x5F ||
+          b == 0x2E ||
+          b == 0x7E) {
+        buf.writeCharCode(b);
       } else {
-        buf.write('%${cu.toRadixString(16).padLeft(2, '0').toUpperCase()}');
+        buf.write('%${b.toRadixString(16).padLeft(2, '0').toUpperCase()}');
       }
     }
     return buf.toString();
@@ -91,7 +91,10 @@ class JspClassloaderConnector extends ShellConnector {
       final response = await http
           .post(
             uri,
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            headers: {
+              'Content-Type':
+                  'application/x-www-form-urlencoded; charset=UTF-8',
+            },
             body: bodyParts.join('&'),
           )
           .timeout(const Duration(seconds: 25));
@@ -129,11 +132,21 @@ class JspClassloaderConnector extends ShellConnector {
 
   static String _sq(String s) => "'${s.replaceAll("'", "'\\''")}'";
 
+  static bool _hasNonAscii(String s) => s.codeUnits.any((c) => c > 127);
+
   @override
   Future<String> executeCommand(String cmd, {String workingDir = ''}) async {
-    final cd = (workingDir.isNotEmpty && workingDir.startsWith('/'))
-        ? 'cd ${_sq(workingDir)} && '
-        : '';
+    final String cd;
+    if (workingDir.isNotEmpty && workingDir.startsWith('/')) {
+      if (_hasNonAscii(workingDir)) {
+        final b64Wd = base64.encode(utf8.encode(workingDir));
+        cd = "_wd=\$(echo ${_sq(b64Wd)}|base64 -d) && cd \"\$_wd\" && ";
+      } else {
+        cd = 'cd ${_sq(workingDir)} && ';
+      }
+    } else {
+      cd = '';
+    }
     final r = await _sendJsp(
       'exec',
       extraParams: {'_k': _execKey, _execKey: '$cd$cmd'},
@@ -141,22 +154,23 @@ class JspClassloaderConnector extends ShellConnector {
     return r.trim();
   }
 
-  @override
-  Future<String> getCurrentDir() async {
-    final r = (await _sendJsp('pwd')).trim();
-    if (r.isNotEmpty && !r.startsWith('[')) currentDir = r;
-    return currentDir;
+  /// 与 jsp_behinder 一致：路径 base64 后走 exec，避免表单/Shell 编码损坏中文路径
+  String _execLsCmd(String path) {
+    final b64Path = base64.encode(utf8.encode(path));
+    return "_p=\$(echo ${_sq(b64Path)}|base64 -d);"
+        "{ echo '..';ls -a \"\$_p\" 2>/dev/null|grep -vE '^\\.\\.?\$'; }"
+        "|while IFS= read -r n;do"
+        " f=\"\$_p/\$n\";[ -e \"\$f\" ]||continue;"
+        "[ -d \"\$f\" ]&&t=d||t=f;"
+        "s=\$(stat -c%s \"\$f\" 2>/dev/null||stat -f%z \"\$f\" 2>/dev/null||echo 0);"
+        "p=\$(stat -c%A \"\$f\" 2>/dev/null||stat -f%Sp \"\$f\" 2>/dev/null||echo -);"
+        "m=\$(stat -c%y \"\$f\" 2>/dev/null||stat -f%Sm \"\$f\" 2>/dev/null||echo -);"
+        "nb=\$(printf '%s' \"\$n\"|base64|tr -d '\\n');"
+        "printf '%s|%s|%s|%s|%s\\n' \"\$nb\" \"\$t\" \"\$s\" \"\$p\" \"\$m\";"
+        "done";
   }
 
-  @override
-  Future<List<FileEntry>> listDirectory(String path) async {
-    final result = await _sendJsp('ls', extraParams: {'path': path});
-    if (result.isEmpty ||
-        result.startsWith('ERR_OPEN') ||
-        result.startsWith('[')) {
-      return [];
-    }
-
+  List<FileEntry> _parseLsOutput(String result) {
     return result
         .trim()
         .split('\n')
@@ -190,11 +204,52 @@ class JspClassloaderConnector extends ShellConnector {
   }
 
   @override
-  Future<String> readFile(String path) async =>
-      _sendJsp('cat', extraParams: {'path': path});
+  Future<String> getCurrentDir() async {
+    final r = (await _sendJsp('pwd')).trim();
+    if (r.isNotEmpty && !r.startsWith('[')) currentDir = r;
+    return currentDir;
+  }
+
+  @override
+  Future<List<FileEntry>> listDirectory(String path) async {
+    final String result;
+    if (_hasNonAscii(path)) {
+      result = await _sendJsp(
+        'exec',
+        extraParams: {'_k': _execKey, _execKey: _execLsCmd(path)},
+      );
+    } else {
+      result = await _sendJsp('ls', extraParams: {'path': path});
+    }
+    if (result.isEmpty ||
+        result.startsWith('ERR_OPEN') ||
+        result.startsWith('[')) {
+      return [];
+    }
+    return _parseLsOutput(result);
+  }
+
+  @override
+  Future<String> readFile(String path) async {
+    if (_hasNonAscii(path)) {
+      try {
+        return decodeWithFallback(await readFileBinary(path));
+      } catch (_) {
+        return '[文件不存在或无权读取]';
+      }
+    }
+    return _sendJsp('cat', extraParams: {'path': path});
+  }
 
   @override
   Future<bool> writeFile(String path, String content) async {
+    if (_hasNonAscii(path)) {
+      return writeFileBinaryWithProgress(
+        path,
+        Uint8List.fromList(utf8.encode(content)),
+        (_, __) {},
+      );
+    }
     final r = await _sendJsp(
       'write',
       extraParams: {'path': path, 'data': base64.encode(utf8.encode(content))},
@@ -204,16 +259,34 @@ class JspClassloaderConnector extends ShellConnector {
 
   @override
   Future<bool> deleteFile(String path) async {
+    if (_hasNonAscii(path)) {
+      final b64Path = base64.encode(utf8.encode(path));
+      final cmd =
+          "_p=\$(echo ${_sq(b64Path)} | base64 -d) && rm \"\$_p\" && echo 1 || echo 0";
+      final r = await _sendJsp(
+        'exec',
+        extraParams: {'_k': _execKey, _execKey: cmd},
+      );
+      return r.trim().contains('1');
+    }
     final r = await _sendJsp('rm', extraParams: {'path': path});
     return r.trim() == '1';
   }
 
   @override
   Future<Uint8List> readFileBinary(String path) async {
-    // 通过 shell base64 命令编码，避免二进制数据经 PrintWriter 损坏
-    final cmd =
-        'cat ${_sq(path)} 2>/dev/null | base64 -w0 2>/dev/null'
-        " || cat ${_sq(path)} 2>/dev/null | base64";
+    final String cmd;
+    if (_hasNonAscii(path)) {
+      final b64Path = base64.encode(utf8.encode(path));
+      cmd =
+          "_p=\$(echo ${_sq(b64Path)} | base64 -d)"
+          " && cat \"\$_p\" 2>/dev/null | base64 -w0 2>/dev/null"
+          " || cat \"\$_p\" 2>/dev/null | base64";
+    } else {
+      cmd =
+          'cat ${_sq(path)} 2>/dev/null | base64 -w0 2>/dev/null'
+          " || cat ${_sq(path)} 2>/dev/null | base64";
+    }
     final result = await _sendJsp(
       'exec',
       extraParams: {'_k': _execKey, _execKey: cmd},
@@ -248,6 +321,19 @@ class JspClassloaderConnector extends ShellConnector {
     final target = _uploadPathFor(path);
     onProgress(0, total);
 
+    // 目标路径 base64 后仅含 ASCII，避免 UTF-8 在表单/Shell 中被错误解码
+    final b64Target = base64.encode(utf8.encode(target));
+
+    if (total == 0) {
+      final cmd =
+          "_p=\$(echo ${_sq(b64Target)} | base64 -d) && : > \"\$_p\" && echo 1 || echo 0";
+      final r = await _sendJsp(
+        'exec',
+        extraParams: {'_k': _execKey, _execKey: cmd},
+      );
+      return r.trim().endsWith('1');
+    }
+
     int offset = 0;
     bool first = true;
     while (offset < total) {
@@ -256,7 +342,7 @@ class JspClassloaderConnector extends ShellConnector {
       final b64 = base64.encode(chunk);
       final redirect = first ? '>' : '>>';
       final cmd =
-          "echo ${_sq(b64)} | base64 -d $redirect ${_sq(target)} && echo 1 || echo 0";
+          "_p=\$(echo ${_sq(b64Target)} | base64 -d) && echo ${_sq(b64)} | base64 -d $redirect \"\$_p\" && echo 1 || echo 0";
       final r = await _sendJsp(
         'exec',
         extraParams: {'_k': _execKey, _execKey: cmd},
@@ -302,7 +388,15 @@ class JspClassloaderConnector extends ShellConnector {
   Future<List<({String name, bool isDir})>> listNamesForCompletion(
     String path,
   ) async {
-    final result = await _sendJsp('ls', extraParams: {'path': path});
+    final String result;
+    if (_hasNonAscii(path)) {
+      result = await _sendJsp(
+        'exec',
+        extraParams: {'_k': _execKey, _execKey: _execLsCmd(path)},
+      );
+    } else {
+      result = await _sendJsp('ls', extraParams: {'path': path});
+    }
     if (result.isEmpty || result.startsWith('[')) return [];
     final out = <({String name, bool isDir})>[];
     for (final line in result.trim().split('\n')) {
