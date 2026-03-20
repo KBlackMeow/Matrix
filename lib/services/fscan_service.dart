@@ -60,7 +60,8 @@ class FscanService {
         onProbe(host, port, probeResult);
         if (probeResult is ServiceProbeResult &&
             (probeResult.service == 'HTTP' || probeResult.service == 'HTTPS')) {
-          final scheme = port == 443 ? 'https' : 'http';
+          const httpsPorts = {443, 8443, 9443};
+          final scheme = httpsPorts.contains(port) ? 'https' : 'http';
           webUrls.add('$scheme://$host:$port');
         }
       };

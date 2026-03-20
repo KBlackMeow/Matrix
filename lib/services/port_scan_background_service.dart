@@ -228,7 +228,12 @@ class PortScanBackgroundService {
           if (result is ServiceProbeResult) {
             final r = result;
             final svcTag = _serviceTag(r.service);
-            log('${_ts()} [SUCCESS] 服务识别 $host:$port => $svcTag');
+            // Include fingerprint detail (version, title, etc.) if available
+            final fp = r.fingerprint;
+            final fpSuffix = fp.isNotEmpty && !fp.startsWith('(')
+                ? ' | $fp'
+                : '';
+            log('${_ts()} [SUCCESS] 服务识别 $host:$port => $svcTag$fpSuffix');
             for (final v in r.vulnerabilities) {
               log('${_ts()} [!] [$host:$port] $v');
             }

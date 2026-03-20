@@ -40,6 +40,7 @@ class ServiceProbeService {
       53: 'DNS',
       80: 'HTTP',
       81: 'HTTP',
+      88: 'Kerberos',
       110: 'POP3',
       135: 'MSRPC',
       139: 'NetBIOS',
@@ -69,9 +70,13 @@ class ServiceProbeService {
       8086: 'HTTP',
       8087: 'HTTP',
       8088: 'HTTP',
+      888: 'HTTP',
       8089: 'Splunk',
+      8090: 'HTTP',
       8443: 'HTTPS',
-      9000: 'PHP-FPM',
+      8888: 'HTTP',
+      9000: 'HTTP',
+      9443: 'HTTPS',
       9090: 'Prometheus',
       9100: 'Prometheus',
       9200: 'Elasticsearch',
@@ -87,11 +92,11 @@ class ServiceProbeService {
 
     try {
       // HTTP/HTTPS（常见 Web 端口）
-      if (port == 80 || port == 81 || port == 443 || port == 3000 || port == 4000 ||
+      if (port == 80 || port == 81 || port == 443 || port == 888 || port == 3000 || port == 4000 ||
           port == 5000 || port == 7000 || port == 8000 || port == 8080 || port == 8081 ||
           port == 8082 || port == 8083 || port == 8084 || port == 8085 || port == 8086 ||
-          port == 8087 || port == 8088 || port == 8089 || port == 8443 || port == 9000 ||
-          port == 9090 || port == 9100) {
+          port == 8087 || port == 8088 || port == 8089 || port == 8090 || port == 8443 ||
+          port == 8888 || port == 9000 || port == 9090 || port == 9100 || port == 9443) {
         return await _probeHttp(host, port);
       }
       // Redis
@@ -124,8 +129,11 @@ class ServiceProbeService {
     }
   }
 
+  // HTTPS 端口集合（非 80 的 TLS 端口）
+  static const _httpsPorts = {443, 8443, 9443};
+
   Future<ServiceProbeResult> _probeHttp(String host, int port) async {
-    final scheme = port == 443 ? 'https' : 'http';
+    final scheme = _httpsPorts.contains(port) ? 'https' : 'http';
     final base = '$scheme://$host:$port';
     final uri = Uri.parse('$base/');
     HttpClient? client;
@@ -481,17 +489,51 @@ class ServiceProbeService {
   }
 
   Future<ServiceProbeResult> _probePostgres(String host, int port) async {
+    // PostgreSQL startup message: length(4) + protocol(4=196608) + "user\0postgres\0database\0postgres\0\0"
+    // Server responds with 'R'=auth required or 'E'=error
+    final user = 'postgres';
+    final userBytes = [...user.codeUnits, 0];
+    final db = 'postgres';
+    final dbBytes = [...db.codeUnits, 0];
+    final payload = <int>[
+      0x00, 0x03, 0x00, 0x00, // protocol 3.0
+      ...utf8.encode('user'), 0x00, ...userBytes,
+      ...utf8.encode('database'), 0x00, ...dbBytes,
+      0x00, // terminator
+    ];
+    final len = payload.length + 4;
+    final startup = <int>[
+      (len >> 24) & 0xFF, (len >> 16) & 0xFF,
+      (len >> 8) & 0xFF, len & 0xFF,
+      ...payload,
+    ];
     try {
       final socket = await Socket.connect(host, port, timeout: timeout);
-      final _ = await socket.first;
+      socket.add(startup);
+      await socket.flush();
+      List<int> bytes = [];
+      try {
+        bytes = await socket.first.timeout(const Duration(milliseconds: 1500)) as List<int>;
+      } catch (_) {}
       await socket.close();
 
-      // PostgreSQL startup: length(4) + 196608 + "user\0" + "username\0" ...
-      // Server responds with 'R' (auth) or error
+      // Response: 'R'=AuthRequest (any auth type = confirmed PostgreSQL)
+      //           'E'=Error (also confirmed)
+      //           'N'=NoData
+      if (bytes.isNotEmpty) {
+        final first = bytes[0];
+        if (first == 0x52 /* 'R' */ || first == 0x45 /* 'E' */ || first == 0x4E /* 'N' */) {
+          return ServiceProbeResult(
+            service: 'PostgreSQL',
+            fingerprint: 'PostgreSQL',
+            vulnerabilities: [],
+          );
+        }
+      }
       return ServiceProbeResult(
         service: 'PostgreSQL',
-        fingerprint: 'PostgreSQL',
-        vulnerabilities: [], // 仅爆破成功时报告
+        fingerprint: bytes.isNotEmpty ? 'PostgreSQL' : 'PostgreSQL (仅端口开放)',
+        vulnerabilities: [],
       );
     } catch (_) {
       return ServiceProbeResult(service: 'PostgreSQL', fingerprint: '(探测失败)', vulnerabilities: []);
@@ -499,27 +541,63 @@ class ServiceProbeService {
   }
 
   Future<ServiceProbeResult> _probeMssql(String host, int port) async {
+    // TDS 7.0 PRELOGIN 包：触发 SQL Server 响应版本信息
+    // header: type=0x12(prelogin) status=0x01 length=0x002F call_id=0x0000 window=0x0000
+    // options: VERSION(0) ENCRYPTION(1) INSTOPT(2) THREADID(3) MARS(4) TERMINATOR
+    final prelogin = <int>[
+      0x12, 0x01, 0x00, 0x2F, 0x00, 0x00, 0x01, 0x00, // TDS header
+      0x00, 0x00, 0x1A, 0x00, 0x06, // VERSION offset=0x001A, len=6
+      0x01, 0x00, 0x20, 0x00, 0x01, // ENCRYPTION offset=0x0020, len=1
+      0x02, 0x00, 0x21, 0x00, 0x01, // INSTOPT offset=0x0021, len=1
+      0x03, 0x00, 0x22, 0x00, 0x04, // THREADID offset=0x0022, len=4
+      0x04, 0x00, 0x26, 0x00, 0x01, // MARS offset=0x0026, len=1
+      0xFF,                          // TERMINATOR
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // VERSION (0.0.0.0 sub=0)
+      0x02,                          // ENCRYPTION = NOT_SUP
+      0x00,                          // INSTOPT = empty
+      0x00, 0x00, 0x00, 0x00,        // THREADID
+      0x00,                          // MARS = OFF
+    ];
     try {
       final socket = await Socket.connect(host, port, timeout: timeout);
+      socket.add(prelogin);
+      await socket.flush();
       List<int> bytes = [];
       try {
         bytes = await socket.first.timeout(const Duration(milliseconds: 1500)) as List<int>;
-      } catch (_) {
-        // MSSQL 可能需客户端先发 prelogin，服务端才响应
-      }
+      } catch (_) {}
       await socket.close();
 
-      // TDS 协议：尝试从响应中提取可读字符串（若有）
-      final str = bytes.isNotEmpty
-          ? String.fromCharCodes(bytes.where((b) => b >= 32 && b < 127))
-          : '';
-      final versionMatch = RegExp(r'[\d.]+').firstMatch(str);
-      final version = versionMatch?.group(0);
+      // TDS prelogin response: header 8 bytes, then version at offset indicated by option
+      // Simple approach: scan for version-like byte sequence (major.minor.build.sub)
+      String? version;
+      if (bytes.length >= 14) {
+        // Skip 8-byte TDS header; look for 6-byte VERSION field in prelogin response
+        // Response options list has same structure; version is first option value
+        // Simpler: just scan for 4-byte version block (major, minor, build-hi, build-lo)
+        for (var i = 8; i + 5 < bytes.length; i++) {
+          final major = bytes[i];
+          final minor = bytes[i + 1];
+          final buildHi = bytes[i + 2];
+          final buildLo = bytes[i + 3];
+          if (major >= 9 && major <= 16 && minor == 0) {
+            final build = (buildHi << 8) | buildLo;
+            version = '$major.$minor.$build';
+            break;
+          }
+        }
+      }
+      // Fallback: printable string scan
+      if (version == null && bytes.isNotEmpty) {
+        final str = String.fromCharCodes(bytes.where((b) => b >= 32 && b < 127));
+        final m = RegExp(r'Microsoft SQL Server').firstMatch(str);
+        if (m != null) version = 'MSSQL';
+      }
       return ServiceProbeResult(
         service: 'MSSQL',
         version: version,
         fingerprint: version != null ? 'MSSQL $version' : (bytes.isNotEmpty ? 'MSSQL' : 'MSSQL (仅端口开放)'),
-        vulnerabilities: [], // 仅爆破成功时报告
+        vulnerabilities: [],
       );
     } catch (_) {
       return ServiceProbeResult(service: 'MSSQL', fingerprint: '(探测失败)', vulnerabilities: []);
