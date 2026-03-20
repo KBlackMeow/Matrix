@@ -127,9 +127,15 @@ class FscanService {
         if (isCancelled()) break;
         try {
           final ms = Ms17010Service(timeout: timeout);
-          if (await ms.check(h)) {
-            onLog?.call('[!] MS17-010 可能存在: $h:445');
+          final r = await ms.check(h);
+          if (r.isVulnerable) {
+            final msg = r.hasDoublePulsar
+                ? '[!] MS17-010+DOUBLEPULSAR: $h${r.os != null ? " [${r.os}]" : ""}'
+                : '[!] MS17-010: $h${r.os != null ? " [${r.os}]" : ""}';
+            onLog?.call(msg);
             result.ms17010.add('$h:445');
+          } else if (r.os != null) {
+            onLog?.call('[*] SMB 系统信息: $h [${r.os}]');
           }
         } catch (_) {}
       }

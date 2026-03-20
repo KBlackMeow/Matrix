@@ -131,13 +131,18 @@ class PortScanService {
   }
 
   /// 检查端口是否开放
+  /// 注意：必须在 connect 成功后立即返回 true，不等 close()；
+  /// 某些 Web 服务器在 TCP 握手完成后立即发 RST（无 HTTP 请求时），
+  /// 若等 close() 再判断会因 RST 异常误报端口关闭。
   Future<bool> _isPortOpen(String host, int port) async {
+    Socket? socket;
     try {
-      final socket = await Socket.connect(host, port, timeout: timeout);
-      await socket.close();
-      return true;
+      socket = await Socket.connect(host, port, timeout: timeout);
+      return true; // TCP 三次握手成功 = 端口开放
     } catch (_) {
       return false;
+    } finally {
+      try { socket?.destroy(); } catch (_) {}
     }
   }
 
@@ -162,20 +167,25 @@ class PortScanService {
         futures.add((() async {
           if (isCancelled()) return;
           await semaphore.acquire();
+          bool open = false;
           try {
             if (isCancelled()) return;
-            final open = await _isPortOpen(h, p);
+            open = await _isPortOpen(h, p);
             if (open && !isCancelled()) {
               onOpen?.call(h, p);
               onLog?.call('[SUCCESS] 端口开放 $h:$p');
-              if (onProbe != null && enableServiceProbe) {
-                final probe = ServiceProbeService(timeout: Duration(seconds: timeout.inSeconds.clamp(2, 10)));
-                final r = await probe.probe(h, p);
-                if (!isCancelled()) onProbe(h, p, r);
-              }
             }
           } finally {
-            semaphore.release();
+            semaphore.release(); // 先释放信号量，再做耗时的服务探测
+          }
+          // 服务探测在信号量外执行，不占用端口扫描并发槽
+          // HTTP 探测最长可达 12s（Zentao 路径 × 3），若在信号量内会严重拖慢扫描
+          if (open && !isCancelled() && onProbe != null && enableServiceProbe) {
+            try {
+              final probe = ServiceProbeService(timeout: Duration(seconds: timeout.inSeconds.clamp(2, 10)));
+              final r = await probe.probe(h, p);
+              if (!isCancelled()) onProbe(h, p, r);
+            } catch (_) {}
           }
         })());
       }

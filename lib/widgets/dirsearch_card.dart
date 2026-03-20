@@ -35,6 +35,8 @@ class _DirsearchCardState extends State<DirsearchCard> {
   int _progressTotal = 0;
   bool _running = false;
   bool _recursiveScan = true;
+  // 递归模式：'standard' | 'deep' | 'force'
+  String _recursiveMode = 'standard';
 
   int? _sessionId;
   StreamSubscription<DirscanProgress>? _progressSubscription;
@@ -240,7 +242,10 @@ class _DirsearchCardState extends State<DirsearchCard> {
         timeoutSec: timeoutSec,
         statusCodes: statusCodes,
         recursiveScan: _recursiveScan,
+        deepRecursive: _recursiveMode == 'deep',
+        forceRecursive: _recursiveMode == 'force',
         maxRecurseDepth: maxRecurseDepth,
+        recursionStatusCodes: const {200, 301, 302},
       );
     } catch (e) {
       _setStatus('[!] 启动失败: $e');
@@ -394,23 +399,27 @@ class _DirsearchCardState extends State<DirsearchCard> {
                           decoration: _inputDecoration('包含状态码', '200,201,301,302,401,403'),
                         ),
                         const SizedBox(height: 8),
+                        // ── 递归开关 + 深度 ────────────────────────────────
                         Row(
                           children: [
                             Checkbox(
                               value: _recursiveScan,
-                              onChanged: _running ? null : (v) => setState(() => _recursiveScan = v ?? true),
+                              onChanged: _running
+                                  ? null
+                                  : (v) => setState(() => _recursiveScan = v ?? true),
                               activeColor: AppColors.primary,
                               fillColor: WidgetStateProperty.resolveWith(
                                 (_) => AppColors.primary.withValues(alpha: 0.3),
                               ),
                             ),
-                            Text('递归扫描 200 目录 深度', style: AppTextStyles.body(size: 12, color: AppColors.textPrimary)),
-                            const SizedBox(width: 8),
+                            Text('递归扫描  深度',
+                                style: AppTextStyles.body(size: 12, color: AppColors.textPrimary)),
+                            const SizedBox(width: 6),
                             SizedBox(
-                              width: 56,
+                              width: 48,
                               child: TextField(
                                 controller: _maxRecurseDepthController,
-                                enabled: !_running,
+                                enabled: !_running && _recursiveScan,
                                 keyboardType: TextInputType.number,
                                 style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
                                 decoration: _inputDecoration('', '0'),
@@ -418,6 +427,36 @@ class _DirsearchCardState extends State<DirsearchCard> {
                             ),
                           ],
                         ),
+                        // ── 递归模式选择（仅递归开启时可用）─────────────────
+                        if (_recursiveScan) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const SizedBox(width: 4),
+                              Text('模式：',
+                                  style: AppTextStyles.caption(
+                                      size: 11, color: AppColors.textSecondary)),
+                              const SizedBox(width: 6),
+                              SegmentedButton<String>(
+                                segments: const [
+                                  ButtonSegment(value: 'standard', label: Text('标准')),
+                                  ButtonSegment(value: 'deep',     label: Text('深度')),
+                                  ButtonSegment(value: 'force',    label: Text('强制')),
+                                ],
+                                selected: {_recursiveMode},
+                                onSelectionChanged: _running
+                                    ? null
+                                    : (v) => setState(
+                                        () => _recursiveMode = v.first),
+                                style: ButtonStyle(
+                                  textStyle: WidgetStateProperty.all(
+                                      const TextStyle(fontSize: 11)),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         _sectionTitle('操作'),
                         Row(
