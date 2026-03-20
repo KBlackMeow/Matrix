@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
@@ -7,9 +9,67 @@ import '../services/frp_client_service.dart';
 import '../services/reverse_shell_service.dart';
 import '../theme/app_theme.dart';
 
+// ---------------------------------------------------------------------------
+// 复制配置：frps 上 proxy 名称唯一，同一远端端口通常也只能被一个 TCP 代理占用
+// ---------------------------------------------------------------------------
+
+bool _frpSameServer(FrpProfile a, FrpProfile b) =>
+    a.serverAddr == b.serverAddr && a.serverPort == b.serverPort;
+
+bool _proxyNameTakenOnServer(String proxyName, FrpProfile serverRef, List<FrpProfile> all) =>
+    all.any((x) => _frpSameServer(x, serverRef) && x.proxyName == proxyName);
+
+bool _remotePortTakenOnServer(int port, FrpProfile serverRef, List<FrpProfile> all) =>
+    all.any((x) => _frpSameServer(x, serverRef) && x.remotePort == port);
+
+String _uniqueDuplicateDisplayName(String baseName, List<FrpProfile> all) {
+  var name = '$baseName 副本';
+  if (!all.any((x) => x.name == name)) return name;
+  for (var i = 2;; i++) {
+    name = '$baseName 副本 ($i)';
+    if (!all.any((x) => x.name == name)) return name;
+  }
+}
+
+/// 与同一 frps 上已有配置不冲突的代理名
+String _uniqueDuplicateProxyName(FrpProfile source, List<FrpProfile> all) {
+  final first = '${source.proxyName}_副本';
+  if (!_proxyNameTakenOnServer(first, source, all)) return first;
+  for (var i = 2;; i++) {
+    final c = '${source.proxyName}_副本$i';
+    if (!_proxyNameTakenOnServer(c, source, all)) return c;
+  }
+}
+
+/// 同一 frps 上尚未占用的远端端口（从原端口 +1 起找）
+int _nextFreeRemotePortOnServer(FrpProfile source, List<FrpProfile> all) {
+  bool taken(int port) => _remotePortTakenOnServer(port, source, all);
+  for (var port = source.remotePort + 1; port <= 65535; port++) {
+    if (!taken(port)) return port;
+  }
+  for (var port = 1024; port < source.remotePort; port++) {
+    if (!taken(port)) return port;
+  }
+  return source.remotePort + 1;
+}
+
+/// 与 [FrpProfile.toConfig] 一致，用于把运行中的单例连接对应回某条已保存配置
+bool _frpTunnelConfigMatchesProfile(FrpTunnelConfig c, FrpProfile p) {
+  return c.serverAddr == p.serverAddr &&
+      c.serverPort == p.serverPort &&
+      c.token == p.token &&
+      c.proxyName == p.proxyName &&
+      c.remotePort == p.remotePort &&
+      c.localAddr == p.localAddr &&
+      c.localPort == p.localPort &&
+      c.version == p.version &&
+      c.useTcpMux == p.useTcpMux &&
+      c.authMode == p.authMode;
+}
+
 /// FRP 客户端隧道页面
 ///
-/// 填写服务端参数后，点击「启动隧道」即可将远端端口转发到本地的反弹 Shell 监听端口。
+/// 每条配置独立卡片：启动 / 编辑 / 复制 / 删除；编辑在弹窗中打开，修改自动保存。
 class FrpTunnelPage extends StatefulWidget {
   const FrpTunnelPage({super.key});
 
@@ -20,92 +80,142 @@ class FrpTunnelPage extends StatefulWidget {
 class _FrpTunnelPageState extends State<FrpTunnelPage> {
   final _frpService = FrpClientService();
   final _shellService = ReverseShellService();
-
-  // 表单控制器
-  late final TextEditingController _serverAddrCtrl;
-  late final TextEditingController _serverPortCtrl;
-  late final TextEditingController _tokenCtrl;
-  late final TextEditingController _proxyNameCtrl;
-  late final TextEditingController _remotePortCtrl;
-  late final TextEditingController _localAddrCtrl;
-  late final TextEditingController _localPortCtrl;
-  late final TextEditingController _versionCtrl;
-
-  bool _useTcpMux = true;
-  FrpAuthMode _authMode = FrpAuthMode.md5;
-
   final _db = DatabaseHelper();
   List<FrpProfile> _profiles = [];
-
+  int? _activeProfileId;
   final ScrollController _logScroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _serverAddrCtrl = TextEditingController();
-    _serverPortCtrl = TextEditingController(text: '7000');
-    _tokenCtrl = TextEditingController();
-    _proxyNameCtrl = TextEditingController(text: 'shell');
-    _remotePortCtrl = TextEditingController(text: '6000');
-    _localAddrCtrl = TextEditingController(text: '127.0.0.1');
-    // 默认本地端口跟随反弹 Shell 监听配置
-    _shellService.loadConfig().then((_) {
-      if (mounted) {
-        _localPortCtrl.text = _shellService.lport.toString();
-      }
-    });
-    _localPortCtrl = TextEditingController(text: _shellService.lport.toString());
-    _versionCtrl = TextEditingController();
-
     _frpService.onChanged = () {
-      if (mounted) {
-        setState(() {});
-        _scrollLogsToBottom();
-      }
+      if (!mounted) return;
+      setState(() {
+        _activeProfileId = _resolveActiveProfileId();
+      });
+      _scrollLogsToBottom();
     };
-
     _loadProfiles();
+  }
+
+  /// [FrpClientService] 为全局单例，离开页面再进入时须根据 currentConfig 恢复「当前是哪条配置」
+  int? _resolveActiveProfileId() {
+    final cfg = _frpService.currentConfig;
+    final s = _frpService.status;
+    if (cfg == null || (s != FrpTunnelStatus.running && s != FrpTunnelStatus.connecting)) {
+      return null;
+    }
+    for (final p in _profiles) {
+      if (_frpTunnelConfigMatchesProfile(cfg, p)) return p.id;
+    }
+    return null;
   }
 
   Future<void> _loadProfiles() async {
     final list = await _db.getAllFrpProfiles();
-    if (mounted) setState(() => _profiles = list);
-  }
-
-  void _applyProfile(FrpProfile p) {
+    if (!mounted) return;
     setState(() {
-      _serverAddrCtrl.text = p.serverAddr;
-      _serverPortCtrl.text = p.serverPort.toString();
-      _tokenCtrl.text = p.token;
-      _proxyNameCtrl.text = p.proxyName;
-      _remotePortCtrl.text = p.remotePort.toString();
-      _localAddrCtrl.text = p.localAddr;
-      _localPortCtrl.text = p.localPort.toString();
-      _versionCtrl.text = p.version;
-      _useTcpMux = p.useTcpMux;
-      _authMode = p.authMode;
+      _profiles = list;
+      _activeProfileId = _resolveActiveProfileId();
     });
   }
 
-  Future<void> _promptSaveProfile() async {
-    final nameCtrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
+  Future<void> _openEditorDialog({FrpProfile? profile}) async {
+    await _shellService.loadConfig();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => _FrpProfileEditorDialog(
+        profile: profile,
+        defaultLocalPort: _shellService.lport,
+        frpService: _frpService,
+        activeProfileId: _activeProfileId,
+        onSaved: _loadProfiles,
+      ),
+    );
+    await _loadProfiles();
+  }
+
+  Future<void> _duplicateProfile(FrpProfile p) async {
+    try {
+      final all = await _db.getAllFrpProfiles();
+      final name = _uniqueDuplicateDisplayName(p.name, all);
+      final proxyName = _uniqueDuplicateProxyName(p, all);
+      final remotePort = _nextFreeRemotePortOnServer(p, all);
+
+      await _db.createFrpProfile(
+        name: name,
+        serverAddr: p.serverAddr,
+        serverPort: p.serverPort,
+        token: p.token,
+        proxyName: proxyName,
+        remotePort: remotePort,
+        localAddr: p.localAddr,
+        localPort: p.localPort,
+        version: p.version,
+        useTcpMux: p.useTcpMux,
+        authMode: p.authMode,
+      );
+      await _loadProfiles();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '已复制「$name」\n代理名 $proxyName · 远端端口 $remotePort（已与原版区分，可按需再改）',
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('复制失败：$e'), duration: const Duration(seconds: 3)),
+        );
+      }
+    }
+  }
+
+  bool _isRunningProfile(FrpProfile p) {
+    final s = _frpService.status;
+    return (s == FrpTunnelStatus.running || s == FrpTunnelStatus.connecting) &&
+        _activeProfileId == p.id;
+  }
+
+  Future<void> _startOrStopProfile(FrpProfile p) async {
+    if (_isRunningProfile(p)) {
+      await _frpService.stop();
+      if (mounted) setState(() => _activeProfileId = null);
+      return;
+    }
+
+    if (p.serverAddr.isEmpty || p.proxyName.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('该配置缺少服务器地址或代理名称，请先编辑保存')),
+      );
+      return;
+    }
+
+    if (_frpService.status == FrpTunnelStatus.running ||
+        _frpService.status == FrpTunnelStatus.connecting) {
+      await _frpService.stop();
+    }
+
+    await _frpService.start(p.toConfig());
+    if (mounted) setState(() => _activeProfileId = p.id);
+  }
+
+  Future<void> _confirmDelete(FrpProfile p) async {
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgCard,
-        title: Text('保存配置', style: AppTextStyles.heading(size: 16)),
-        content: TextField(
-          controller: nameCtrl,
-          autofocus: true,
-          style: AppTextStyles.terminal(size: 13, color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            hintText: '配置名称',
-            hintStyle: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-          onSubmitted: (_) => Navigator.pop(ctx, true),
+        title: Text('删除配置', style: AppTextStyles.heading(size: 16)),
+        content: Text(
+          '确定删除「${p.name}」？此操作不可恢复。',
+          style: AppTextStyles.caption(size: 13, color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
@@ -114,57 +224,28 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('保存', style: AppTextStyles.caption(size: 13, color: AppColors.primary)),
+            child: Text('删除', style: AppTextStyles.caption(size: 13, color: AppColors.red)),
           ),
         ],
       ),
     );
-    nameCtrl.dispose();
-    if (confirmed != true) return;
+    if (ok != true || !mounted) return;
 
-    final name = nameCtrl.text.trim();
-    if (name.isEmpty) return;
-
-    final serverPort = int.tryParse(_serverPortCtrl.text.trim()) ?? 7000;
-    final remotePort = int.tryParse(_remotePortCtrl.text.trim()) ?? 6000;
-    final localPort = int.tryParse(_localPortCtrl.text.trim()) ?? 4444;
-
-    await _db.createFrpProfile(
-      name: name,
-      serverAddr: _serverAddrCtrl.text.trim(),
-      serverPort: serverPort,
-      token: _tokenCtrl.text.trim(),
-      proxyName: _proxyNameCtrl.text.trim(),
-      remotePort: remotePort,
-      localAddr: _localAddrCtrl.text.trim().isEmpty ? '127.0.0.1' : _localAddrCtrl.text.trim(),
-      localPort: localPort,
-      version: _versionCtrl.text.trim(),
-      useTcpMux: _useTcpMux,
-      authMode: _authMode,
-    );
+    if (_isRunningProfile(p)) {
+      await _frpService.stop();
+      _activeProfileId = null;
+    }
+    await _db.deleteFrpProfile(p.id);
     await _loadProfiles();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已保存「$name」'), duration: const Duration(seconds: 2)),
+        SnackBar(content: Text('已删除「${p.name}」'), duration: const Duration(seconds: 2)),
       );
     }
   }
 
-  Future<void> _deleteProfile(FrpProfile p) async {
-    await _db.deleteFrpProfile(p.id);
-    await _loadProfiles();
-  }
-
   @override
   void dispose() {
-    _serverAddrCtrl.dispose();
-    _serverPortCtrl.dispose();
-    _tokenCtrl.dispose();
-    _proxyNameCtrl.dispose();
-    _remotePortCtrl.dispose();
-    _localAddrCtrl.dispose();
-    _localPortCtrl.dispose();
-    _versionCtrl.dispose();
     _logScroll.dispose();
     _frpService.onChanged = null;
     super.dispose();
@@ -182,52 +263,19 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
     });
   }
 
-  Future<void> _toggleTunnel() async {
-    if (_frpService.status == FrpTunnelStatus.running ||
-        _frpService.status == FrpTunnelStatus.connecting) {
-      await _frpService.stop();
-      return;
+  String? _activeProfileName() {
+    if (_activeProfileId == null) return null;
+    try {
+      return _profiles.firstWhere((e) => e.id == _activeProfileId).name;
+    } catch (_) {
+      return null;
     }
-
-    final serverAddr = _serverAddrCtrl.text.trim();
-    final serverPort = int.tryParse(_serverPortCtrl.text.trim());
-    final remotePort = int.tryParse(_remotePortCtrl.text.trim());
-    final localPort = int.tryParse(_localPortCtrl.text.trim());
-    final proxyName = _proxyNameCtrl.text.trim();
-    final localAddr = _localAddrCtrl.text.trim();
-
-    if (serverAddr.isEmpty ||
-        serverPort == null ||
-        remotePort == null ||
-        localPort == null ||
-        proxyName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请填写完整参数')),
-      );
-      return;
-    }
-
-    final config = FrpTunnelConfig(
-      serverAddr: serverAddr,
-      serverPort: serverPort,
-      token: _tokenCtrl.text.trim(),
-      proxyName: proxyName,
-      remotePort: remotePort,
-      localAddr: localAddr.isEmpty ? '127.0.0.1' : localAddr,
-      localPort: localPort,
-      version: _versionCtrl.text.trim(),
-      useTcpMux: _useTcpMux,
-      authMode: _authMode,
-    );
-
-    await _frpService.start(config);
   }
 
   @override
   Widget build(BuildContext context) {
     final status = _frpService.status;
-    final isActive = status == FrpTunnelStatus.running ||
-        status == FrpTunnelStatus.connecting;
+    final isActive = status == FrpTunnelStatus.running || status == FrpTunnelStatus.connecting;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -241,7 +289,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.only(right: 8),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: 280),
+                    constraints: const BoxConstraints(minWidth: 280),
                     child: _buildConfigColumn(status, isActive),
                   ),
                 ),
@@ -272,519 +320,312 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
   }
 
   Widget _buildConfigColumn(FrpTunnelStatus status, bool isActive) {
+    final activeName = _activeProfileName();
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-        // ---- 头部信息卡 ----
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _statusColor(status).withValues(alpha: 0.6),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.bgCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _statusColor(status).withValues(alpha: 0.6),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.alt_route, color: _statusColor(status), size: 32),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'FRP 隧道客户端',
+                        style: AppTextStyles.heading(size: 18, color: _statusColor(status)),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        activeName != null && isActive
+                            ? '${_statusLabel(status)} · $activeName'
+                            : _statusLabel(status),
+                        style: AppTextStyles.caption(size: 13, color: AppColors.textSecondary),
+                      ),
+                      if (isActive && activeName == null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '连接仍在，但与已保存配置不一致（例如切页后未恢复对应项）。可点右侧「停止连接」',
+                          style: AppTextStyles.caption(size: 11, color: Colors.orange),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (isActive && activeName == null)
+                  TextButton(
+                    onPressed: () async {
+                      await _frpService.stop();
+                      if (mounted) {
+                        setState(() => _activeProfileId = null);
+                      }
+                    },
+                    child: Text(
+                      '停止连接',
+                      style: AppTextStyles.caption(size: 12, color: AppColors.red),
+                    ),
+                  ),
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _statusColor(status),
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: _statusColor(status).withValues(alpha: 0.6),
+                              blurRadius: 8,
+                            )
+                          ]
+                        : null,
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Row(
+          const SizedBox(height: 16),
+
+          Text('已保存配置',
+              style: AppTextStyles.caption(size: 12, color: AppColors.textMuted)),
+          const SizedBox(height: 8),
+
+          if (_profiles.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              decoration: BoxDecoration(
+                color: AppColors.bgCard,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.bgCard),
+              ),
+              child: Text(
+                '暂无配置，点击底部「新建配置」添加。',
+                style: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
+              ),
+            )
+          else
+            ..._profiles.map((p) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _buildProfileCard(p, status),
+                )),
+
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () => _openEditorDialog(profile: null),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('新建配置'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileCard(FrpProfile p, FrpTunnelStatus status) {
+    final running = _isRunningProfile(p);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: running
+              ? AppColors.primary.withValues(alpha: 0.45)
+              : AppColors.bgCard.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.alt_route, color: _statusColor(status), size: 32),
-              const SizedBox(width: 16),
+              Icon(
+                running ? Icons.play_circle_outline : Icons.bookmark_outline,
+                size: 18,
+                color: running ? AppColors.primary : AppColors.textMuted,
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'FRP 隧道客户端',
-                      style: AppTextStyles.heading(
-                          size: 18, color: _statusColor(status)),
+                      p.name,
+                      style: AppTextStyles.terminal(size: 13, color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _statusLabel(status),
-                      style: AppTextStyles.caption(
-                          size: 13, color: AppColors.textSecondary),
+                      '映射 远端端口 ${p.remotePort} → 本地 ${p.localAddr}:${p.localPort}',
+                      style: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'frp 服务器 ${p.serverAddr}:${p.serverPort}',
+                      style: AppTextStyles.caption(size: 10, color: AppColors.textMuted),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              // 保存配置按钮
-              IconButton(
-                tooltip: '保存当前配置',
-                icon: const Icon(Icons.bookmark_add_outlined, size: 20),
-                color: AppColors.textMuted,
-                onPressed: isActive ? null : _promptSaveProfile,
-              ),
-              const SizedBox(width: 4),
-              // 状态指示灯
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _statusColor(status),
-                  boxShadow: isActive
-                      ? [
-                          BoxShadow(
-                            color: _statusColor(status).withValues(alpha: 0.6),
-                            blurRadius: 8,
-                          )
-                        ]
-                      : null,
-                ),
-              ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-
-        // ---- 已保存配置 ----
-        if (_profiles.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('已保存配置',
-                    style: AppTextStyles.caption(
-                        size: 12, color: AppColors.textMuted)),
-                const SizedBox(height: 8),
-                ...List.generate(_profiles.length, (i) {
-                  final p = _profiles[i];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.bookmark_outline,
-                            size: 14, color: AppColors.textMuted),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(p.name,
-                                  style: AppTextStyles.terminal(
-                                      size: 12,
-                                      color: AppColors.textPrimary),
-                                  overflow: TextOverflow.ellipsis),
-                              Text(
-                                '${p.serverAddr}:${p.serverPort}  →  ${p.localAddr}:${p.localPort}',
-                                style: AppTextStyles.caption(
-                                    size: 11,
-                                    color: AppColors.textMuted),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ],
-                          ),
-                        ),
-                        TextButton(
-                          style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(40, 28),
-                              tapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap),
-                          onPressed:
-                              isActive ? null : () => _applyProfile(p),
-                          child: Text('加载',
-                              style: AppTextStyles.caption(
-                                  size: 11, color: AppColors.primary)),
-                        ),
-                        const SizedBox(width: 4),
-                        GestureDetector(
-                          onTap: () => _deleteProfile(p),
-                          child: const Icon(Icons.close,
-                              size: 14, color: AppColors.textMuted),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-
-        if (_profiles.isNotEmpty) const SizedBox(height: 16),
-
-        // ---- 参数表单 ----
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            alignment: WrapAlignment.start,
             children: [
-              Text('服务端配置',
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: status == FrpTunnelStatus.connecting && !running
+                    ? null
+                    : () => _startOrStopProfile(p),
+                child: Text(
+                  running ? '停止' : '启动',
                   style: AppTextStyles.caption(
-                      size: 12, color: AppColors.textMuted)),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: _field(
-                      controller: _serverAddrCtrl,
-                      label: 'frp 服务器地址',
-                      hint: '例如 1.2.3.4',
-                      enabled: !isActive,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _field(
-                      controller: _serverPortCtrl,
-                      label: '端口',
-                      hint: '7000',
-                      enabled: !isActive,
-                      numeric: true,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _tokenField(enabled: !isActive),
-              const SizedBox(height: 16),
-              Text('代理配置',
-                  style: AppTextStyles.caption(
-                      size: 12, color: AppColors.textMuted)),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _field(
-                      controller: _proxyNameCtrl,
-                      label: '代理名称',
-                      hint: 'shell',
-                      enabled: !isActive,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _field(
-                      controller: _remotePortCtrl,
-                      label: '远端端口',
-                      hint: '6000',
-                      enabled: !isActive,
-                      numeric: true,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: _field(
-                      controller: _localAddrCtrl,
-                      label: '本地地址',
-                      hint: '127.0.0.1',
-                      enabled: !isActive,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _field(
-                      controller: _localPortCtrl,
-                      label: '本地端口',
-                      hint: '4444',
-                      enabled: !isActive,
-                      numeric: true,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              // 高级选项
-              ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: EdgeInsets.zero,
-                dense: true,
-                title: Text('高级选项',
-                    style: AppTextStyles.caption(
-                        size: 12, color: AppColors.textMuted)),
-                children: [
-                  const SizedBox(height: 6),
-                  _field(
-                    controller: _versionCtrl,
-                    label: '客户端版本号（留空则不携带）',
-                    hint: '例如 0.51.3 / 0.61.1',
-                    enabled: !isActive,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Switch(
-                        value: _useTcpMux,
-                        onChanged: isActive
-                            ? null
-                            : (v) => setState(() => _useTcpMux = v),
-                        activeThumbColor: AppColors.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'TCPMux（yamux 多路复用，frp 默认开启，关闭则退回直连模式）',
-                          style: AppTextStyles.caption(
-                              size: 12, color: AppColors.textSecondary),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 2,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Switch(
-                        value: _frpService.autoReconnect,
-                        onChanged: (v) =>
-                            setState(() => _frpService.autoReconnect = v),
-                        activeThumbColor: AppColors.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '断开后自动重连（5 秒后重试）',
-                          style: AppTextStyles.caption(
-                              size: 12, color: AppColors.textSecondary),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text('认证算法：',
-                          style: AppTextStyles.caption(
-                              size: 12, color: AppColors.textSecondary)),
-                      const SizedBox(width: 8),
-                      DropdownButton<FrpAuthMode>(
-                        value: _authMode,
-                        isDense: true,
-                        dropdownColor: AppColors.bgCard,
-                        style: AppTextStyles.terminal(
-                            size: 12, color: AppColors.textPrimary),
-                        onChanged: isActive
-                            ? null
-                            : (v) {
-                                if (v != null) setState(() => _authMode = v);
-                              },
-                        items: const [
-                          DropdownMenuItem(
-                              value: FrpAuthMode.md5,
-                              child: Text('MD5 (官方默认)')),
-                          DropdownMenuItem(
-                              value: FrpAuthMode.hmacSha1,
-                              child: Text('HMAC-SHA1')),
-                          DropdownMenuItem(
-                              value: FrpAuthMode.hmacSha256,
-                              child: Text('HMAC-SHA256')),
-                          DropdownMenuItem(
-                              value: FrpAuthMode.rawToken,
-                              child: Text('Raw Token')),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // 启动/停止按钮
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: status == FrpTunnelStatus.connecting
-                      ? null
-                      : _toggleTunnel,
-                  icon: Icon(
-                    isActive ? Icons.stop : Icons.play_arrow,
-                    size: 18,
-                  ),
-                  label: Text(_buttonLabel(status)),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: isActive
-                        ? AppColors.red.withValues(alpha: 0.8)
-                        : AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    size: 12,
+                    color: running ? AppColors.red : AppColors.primary,
                   ),
                 ),
               ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => _openEditorDialog(profile: p),
+                child: Text('编辑', style: AppTextStyles.caption(size: 12, color: AppColors.primary)),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => _duplicateProfile(p),
+                child: Text('复制', style: AppTextStyles.caption(size: 12, color: AppColors.textSecondary)),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => _confirmDelete(p),
+                child: Text('删除', style: AppTextStyles.caption(size: 12, color: AppColors.textMuted)),
+              ),
             ],
           ),
-        ),
-      ],
-    ),
+        ],
+      ),
     );
   }
 
   Widget _buildLogSection() {
     return Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0D1117),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.bgCard),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.terminal,
-                        size: 14, color: AppColors.textMuted),
-                    const SizedBox(width: 6),
-                    Text('运行日志',
-                        style: AppTextStyles.caption(
-                            size: 12, color: AppColors.textMuted)),
-                    const Spacer(),
-                    if (_frpService.logs.isNotEmpty) ...[
-                      GestureDetector(
-                        onTap: () async {
-                          final text = _frpService.logs.join('\n');
-                          await Clipboard.setData(ClipboardData(text: text));
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('日志已复制到剪贴板'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
-                        child: Text('复制',
-                            style: AppTextStyles.caption(
-                                size: 11, color: AppColors.primary)),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1117),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.bgCard),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.terminal, size: 14, color: AppColors.textMuted),
+              const SizedBox(width: 6),
+              Text('运行日志',
+                  style: AppTextStyles.caption(size: 12, color: AppColors.textMuted)),
+              const Spacer(),
+              if (_frpService.logs.isNotEmpty) ...[
+                GestureDetector(
+                  onTap: () async {
+                    final text = _frpService.logs.join('\n');
+                    await Clipboard.setData(ClipboardData(text: text));
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('日志已复制到剪贴板'),
+                        duration: Duration(seconds: 2),
                       ),
-                      const SizedBox(width: 12),
-                      GestureDetector(
-                        onTap: () => setState(() => _frpService.logs),
-                        child: Text('清空',
-                            style: AppTextStyles.caption(
-                                size: 11, color: AppColors.textMuted)),
-                      ),
-                    ],
-                  ],
+                    );
+                  },
+                  child: Text('复制',
+                      style: AppTextStyles.caption(size: 11, color: AppColors.primary)),
                 ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: _frpService.logs.isEmpty
-                      ? Center(
-                          child: Text(
-                            '> 尚无日志',
-                            style: AppTextStyles.terminal(
-                                size: 13, color: AppColors.textMuted),
-                          ),
-                        )
-                      : ListView.builder(
-                          controller: _logScroll,
-                          itemCount: _frpService.logs.length,
-                          itemBuilder: (context, i) {
-                            final line = _frpService.logs[i];
-                            final isError = line.contains('失败') ||
-                                line.contains('错误') ||
-                                line.contains('断开');
-                            final isOk = line.contains('成功') ||
-                                line.contains('就绪') ||
-                                line.contains('桥接');
-                            final color = isError
-                                ? AppColors.red
-                                : isOk
-                                    ? AppColors.primary
-                                    : AppColors.textSecondary;
-                            return Text(
-                              line,
-                              style: AppTextStyles.terminal(
-                                  size: 12, color: color),
-                            );
-                          },
-                        ),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: () {
+                    _frpService.clearLogs();
+                    setState(() {});
+                  },
+                  child: Text('清空',
+                      style: AppTextStyles.caption(size: 11, color: AppColors.textMuted)),
                 ),
               ],
-            ),
-          );
-  }
-
-  /// Token 专用输入框：明文显示 + 禁用自动更正/智能标点，避免 macOS IME 替换字符
-  Widget _tokenField({bool enabled = true}) {
-    return TextField(
-      controller: _tokenCtrl,
-      enabled: enabled,
-      autocorrect: false,
-      enableSuggestions: false,
-      style: AppTextStyles.terminal(size: 13, color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        labelText: 'Token（可留空）',
-        labelStyle: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.bgCard),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide:
-              BorderSide(color: AppColors.primary.withValues(alpha: 0.25)),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide:
-              BorderSide(color: AppColors.bgCard.withValues(alpha: 0.5)),
-        ),
-        filled: true,
-        fillColor: AppColors.bgDark,
-      ),
-    );
-  }
-
-  Widget _field({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    bool enabled = true,
-    bool numeric = false,
-    bool obscure = false,
-  }) {
-    return TextField(
-      controller: controller,
-      enabled: enabled,
-      obscureText: obscure,
-      keyboardType: numeric ? TextInputType.number : TextInputType.text,
-      style: AppTextStyles.terminal(size: 13, color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        labelStyle: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
-        hintStyle: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.bgCard),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-              color: AppColors.primary.withValues(alpha: 0.25)),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.bgCard.withValues(alpha: 0.5)),
-        ),
-        filled: true,
-        fillColor: AppColors.bgDark,
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _frpService.logs.isEmpty
+                ? Center(
+                    child: Text(
+                      '> 尚无日志',
+                      style: AppTextStyles.terminal(size: 13, color: AppColors.textMuted),
+                    ),
+                  )
+                : ListView.builder(
+                    controller: _logScroll,
+                    itemCount: _frpService.logs.length,
+                    itemBuilder: (context, i) {
+                      final line = _frpService.logs[i];
+                      final isError =
+                          line.contains('失败') || line.contains('错误') || line.contains('断开');
+                      final isOk =
+                          line.contains('成功') || line.contains('就绪') || line.contains('桥接');
+                      final color = isError
+                          ? AppColors.red
+                          : isOk
+                              ? AppColors.primary
+                              : AppColors.textSecondary;
+                      return Text(
+                        line,
+                        style: AppTextStyles.terminal(size: 12, color: color),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }
@@ -811,19 +652,516 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
       case FrpTunnelStatus.error:
         return '连接出错，请检查参数或日志';
       case FrpTunnelStatus.idle:
-        return '就绪 · 填写参数后启动隧道';
+        return '就绪 · 在列表中点击「启动」连接隧道';
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 编辑 / 新建 — 独立弹窗
+// ---------------------------------------------------------------------------
+
+class _FrpProfileEditorDialog extends StatefulWidget {
+  const _FrpProfileEditorDialog({
+    required this.profile,
+    required this.defaultLocalPort,
+    required this.frpService,
+    required this.activeProfileId,
+    required this.onSaved,
+  });
+
+  /// null 表示新建
+  final FrpProfile? profile;
+  final int defaultLocalPort;
+  final FrpClientService frpService;
+
+  /// 当前隧道对应的配置 id；仅当编辑这条且隧道在跑时锁定表单
+  final int? activeProfileId;
+  final Future<void> Function() onSaved;
+
+  @override
+  State<_FrpProfileEditorDialog> createState() => _FrpProfileEditorDialogState();
+}
+
+class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
+  final _db = DatabaseHelper();
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _serverAddrCtrl;
+  late final TextEditingController _serverPortCtrl;
+  late final TextEditingController _tokenCtrl;
+  late final TextEditingController _proxyNameCtrl;
+  late final TextEditingController _remotePortCtrl;
+  late final TextEditingController _localAddrCtrl;
+  late final TextEditingController _localPortCtrl;
+  late final TextEditingController _versionCtrl;
+
+  bool _useTcpMux = true;
+  FrpAuthMode _authMode = FrpAuthMode.md5;
+  int? _editingId;
+  Timer? _saveDebounce;
+  bool _suspendAutosave = false;
+
+  bool get _isNew => _editingId == null;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.profile;
+    _editingId = p?.id;
+    _nameCtrl = TextEditingController(text: p?.name ?? '');
+    _serverAddrCtrl = TextEditingController(text: p?.serverAddr ?? '');
+    _serverPortCtrl = TextEditingController(text: (p?.serverPort ?? 7000).toString());
+    _tokenCtrl = TextEditingController(text: p?.token ?? '');
+    _proxyNameCtrl = TextEditingController(text: p?.proxyName ?? 'shell');
+    _remotePortCtrl = TextEditingController(text: (p?.remotePort ?? 6000).toString());
+    _localAddrCtrl = TextEditingController(text: p?.localAddr ?? '127.0.0.1');
+    _localPortCtrl = TextEditingController(
+      text: (p?.localPort ?? widget.defaultLocalPort).toString(),
+    );
+    _versionCtrl = TextEditingController(text: p?.version ?? '');
+    if (p != null) {
+      _useTcpMux = p.useTcpMux;
+      _authMode = p.authMode;
+    }
+
+    if (_isNew) {
+      scheduleMicrotask(() {
+        _suspendAutosave = false;
+        _schedulePersist();
+      });
     }
   }
 
-  String _buttonLabel(FrpTunnelStatus s) {
-    switch (s) {
-      case FrpTunnelStatus.running:
-        return '停止隧道';
-      case FrpTunnelStatus.connecting:
-        return '连接中...';
-      case FrpTunnelStatus.error:
-      case FrpTunnelStatus.idle:
-        return '启动隧道';
+  @override
+  void dispose() {
+    _saveDebounce?.cancel();
+    _nameCtrl.dispose();
+    _serverAddrCtrl.dispose();
+    _serverPortCtrl.dispose();
+    _tokenCtrl.dispose();
+    _proxyNameCtrl.dispose();
+    _remotePortCtrl.dispose();
+    _localAddrCtrl.dispose();
+    _localPortCtrl.dispose();
+    _versionCtrl.dispose();
+    super.dispose();
+  }
+
+  void _maybePersist() {
+    if (_suspendAutosave) return;
+    _schedulePersist();
+  }
+
+  void _schedulePersist() {
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(milliseconds: 450), _persistDraft);
+  }
+
+  Map<String, dynamic> _readFormForDb() {
+    final serverPort = int.tryParse(_serverPortCtrl.text.trim()) ?? 7000;
+    final remotePort = int.tryParse(_remotePortCtrl.text.trim()) ?? 6000;
+    final localPort = int.tryParse(_localPortCtrl.text.trim()) ?? 4444;
+    var name = _nameCtrl.text.trim();
+    if (name.isEmpty) name = '未命名配置';
+    return {
+      'name': name,
+      'serverAddr': _serverAddrCtrl.text.trim(),
+      'serverPort': serverPort,
+      'token': _tokenCtrl.text.trim(),
+      'proxyName': _proxyNameCtrl.text.trim().isEmpty ? 'shell' : _proxyNameCtrl.text.trim(),
+      'remotePort': remotePort,
+      'localAddr': _localAddrCtrl.text.trim().isEmpty ? '127.0.0.1' : _localAddrCtrl.text.trim(),
+      'localPort': localPort,
+      'version': _versionCtrl.text.trim(),
+      'useTcpMux': _useTcpMux,
+      'authMode': _authMode,
+    };
+  }
+
+  Future<void> _persistDraft() async {
+    if (!mounted || _suspendAutosave) return;
+
+    final m = _readFormForDb();
+    final name = m['name'] as String;
+    final serverAddr = m['serverAddr'] as String;
+    final serverPort = m['serverPort'] as int;
+    final token = m['token'] as String;
+    final proxyName = m['proxyName'] as String;
+    final remotePort = m['remotePort'] as int;
+    final localAddr = m['localAddr'] as String;
+    final localPort = m['localPort'] as int;
+    final version = m['version'] as String;
+    final useTcpMux = m['useTcpMux'] as bool;
+    final authMode = m['authMode'] as FrpAuthMode;
+
+    try {
+      if (_editingId == null) {
+        final created = await _db.createFrpProfile(
+          name: name,
+          serverAddr: serverAddr,
+          serverPort: serverPort,
+          token: token,
+          proxyName: proxyName,
+          remotePort: remotePort,
+          localAddr: localAddr,
+          localPort: localPort,
+          version: version,
+          useTcpMux: useTcpMux,
+          authMode: authMode,
+        );
+        if (!mounted) return;
+        setState(() => _editingId = created.id);
+      } else {
+        await _db.updateFrpProfile(
+          id: _editingId!,
+          name: name,
+          serverAddr: serverAddr,
+          serverPort: serverPort,
+          token: token,
+          proxyName: proxyName,
+          remotePort: remotePort,
+          localAddr: localAddr,
+          localPort: localPort,
+          version: version,
+          useTcpMux: useTcpMux,
+          authMode: authMode,
+        );
+      }
+      await widget.onSaved();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败：$e'), duration: const Duration(seconds: 3)),
+        );
+      }
     }
+  }
+
+  /// 正在跑隧道且编辑的是当前在用的那条 → 禁止改参数（避免与连接不一致）
+  bool get _formLocked {
+    final p = widget.profile;
+    if (p == null) return false;
+    final s = widget.frpService.status;
+    final up = s == FrpTunnelStatus.running || s == FrpTunnelStatus.connecting;
+    if (!up) return false;
+    return p.id == widget.activeProfileId;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final locked = _formLocked;
+    final mq = MediaQuery.sizeOf(context);
+    final maxH = mq.height * 0.92;
+    final dialogW = mq.width >= 560 ? 520.0 : mq.width - 40;
+
+    return Dialog(
+      backgroundColor: AppColors.bgCard,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: SizedBox(
+        width: dialogW,
+        height: maxH,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isNew ? '新建配置' : '编辑配置',
+                      style: AppTextStyles.heading(size: 17, color: AppColors.textPrimary),
+                    ),
+                  ),
+                  if (locked)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Text(
+                        '运行中不可改',
+                        style: AppTextStyles.caption(size: 10, color: Colors.orange),
+                      ),
+                    )
+                  else
+                    Text(
+                      '修改将自动保存',
+                      style: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 22),
+                    color: AppColors.textMuted,
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: '关闭',
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _editorField(
+                      controller: _nameCtrl,
+                      label: '配置名称',
+                      hint: '例如 办公网 / 测试机',
+                      enabled: !locked,
+                      onChanged: _maybePersist,
+                    ),
+                    const SizedBox(height: 16),
+                    Text('服务端配置',
+                        style: AppTextStyles.caption(size: 12, color: AppColors.textMuted)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: _editorField(
+                            controller: _serverAddrCtrl,
+                            label: 'frp 服务器地址',
+                            hint: '例如 1.2.3.4',
+                            enabled: !locked,
+                            onChanged: _maybePersist,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _editorField(
+                            controller: _serverPortCtrl,
+                            label: '端口',
+                            hint: '7000',
+                            enabled: !locked,
+                            numeric: true,
+                            onChanged: _maybePersist,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _editorTokenField(enabled: !locked, onChanged: _maybePersist),
+                    const SizedBox(height: 16),
+                    Text('代理配置',
+                        style: AppTextStyles.caption(size: 12, color: AppColors.textMuted)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _editorField(
+                            controller: _proxyNameCtrl,
+                            label: '代理名称',
+                            hint: 'shell',
+                            enabled: !locked,
+                            onChanged: _maybePersist,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _editorField(
+                            controller: _remotePortCtrl,
+                            label: '远端端口',
+                            hint: '6000',
+                            enabled: !locked,
+                            numeric: true,
+                            onChanged: _maybePersist,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: _editorField(
+                            controller: _localAddrCtrl,
+                            label: '本地地址',
+                            hint: '127.0.0.1',
+                            enabled: !locked,
+                            onChanged: _maybePersist,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _editorField(
+                            controller: _localPortCtrl,
+                            label: '本地端口',
+                            hint: '4444',
+                            enabled: !locked,
+                            numeric: true,
+                            onChanged: _maybePersist,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: Text('高级选项',
+                          style: AppTextStyles.caption(size: 12, color: AppColors.textMuted)),
+                      children: [
+                        const SizedBox(height: 6),
+                        _editorField(
+                          controller: _versionCtrl,
+                          label: '客户端版本号（留空则不携带）',
+                          hint: '例如 0.51.3 / 0.61.1',
+                          enabled: !locked,
+                          onChanged: _maybePersist,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Switch(
+                              value: _useTcpMux,
+                              onChanged: locked
+                                  ? null
+                                  : (v) {
+                                      setState(() => _useTcpMux = v);
+                                      _maybePersist();
+                                    },
+                              activeThumbColor: AppColors.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'TCPMux（yamux 多路复用）',
+                                style: AppTextStyles.caption(size: 12, color: AppColors.textSecondary),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Switch(
+                              value: widget.frpService.autoReconnect,
+                              onChanged: (v) {
+                                setState(() => widget.frpService.autoReconnect = v);
+                              },
+                              activeThumbColor: AppColors.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '断开后自动重连（5 秒后重试）',
+                                style: AppTextStyles.caption(size: 12, color: AppColors.textSecondary),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text('认证算法：',
+                                style: AppTextStyles.caption(size: 12, color: AppColors.textSecondary)),
+                            const SizedBox(width: 8),
+                            DropdownButton<FrpAuthMode>(
+                              value: _authMode,
+                              isDense: true,
+                              dropdownColor: AppColors.bgCard,
+                              style: AppTextStyles.terminal(size: 12, color: AppColors.textPrimary),
+                              onChanged: locked
+                                  ? null
+                                  : (v) {
+                                      if (v != null) {
+                                        setState(() => _authMode = v);
+                                        _maybePersist();
+                                      }
+                                    },
+                              items: const [
+                                DropdownMenuItem(value: FrpAuthMode.md5, child: Text('MD5 (官方默认)')),
+                                DropdownMenuItem(value: FrpAuthMode.hmacSha1, child: Text('HMAC-SHA1')),
+                                DropdownMenuItem(value: FrpAuthMode.hmacSha256, child: Text('HMAC-SHA256')),
+                                DropdownMenuItem(value: FrpAuthMode.rawToken, child: Text('Raw Token')),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _editorTokenField({bool enabled = true, VoidCallback? onChanged}) {
+    return TextField(
+      controller: _tokenCtrl,
+      enabled: enabled,
+      autocorrect: false,
+      enableSuggestions: false,
+      onChanged: onChanged != null ? (_) => onChanged() : null,
+      style: AppTextStyles.terminal(size: 13, color: AppColors.textPrimary),
+      decoration: InputDecoration(
+        labelText: 'Token（可留空）',
+        labelStyle: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.bgCard),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.25)),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.bgCard.withValues(alpha: 0.5)),
+        ),
+        filled: true,
+        fillColor: AppColors.bgDark,
+      ),
+    );
+  }
+
+  Widget _editorField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    bool enabled = true,
+    bool numeric = false,
+    bool obscure = false,
+    VoidCallback? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      enabled: enabled,
+      obscureText: obscure,
+      keyboardType: numeric ? TextInputType.number : TextInputType.text,
+      onChanged: onChanged != null ? (_) => onChanged() : null,
+      style: AppTextStyles.terminal(size: 13, color: AppColors.textPrimary),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
+        hintStyle: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.bgCard),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.25)),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.bgCard.withValues(alpha: 0.5)),
+        ),
+        filled: true,
+        fillColor: AppColors.bgDark,
+      ),
+    );
   }
 }

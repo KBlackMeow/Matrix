@@ -842,6 +842,47 @@ class DatabaseHelperIo {
     );
   }
 
+  Future<FrpProfile?> updateFrpProfile({
+    required int id,
+    required String name,
+    required String serverAddr,
+    required int serverPort,
+    required String token,
+    required String proxyName,
+    required int remotePort,
+    required String localAddr,
+    required int localPort,
+    required String version,
+    required bool useTcpMux,
+    required FrpAuthMode authMode,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final n = await db.update(
+      'frp_profiles',
+      {
+        'name': name,
+        'server_addr': serverAddr,
+        'server_port': serverPort,
+        'token': token,
+        'proxy_name': proxyName,
+        'remote_port': remotePort,
+        'local_addr': localAddr,
+        'local_port': localPort,
+        'version': version,
+        'use_tcp_mux': useTcpMux ? 1 : 0,
+        'auth_mode': authMode.name,
+        'updated_at': now,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (n == 0) return null;
+    final maps = await db.query('frp_profiles', where: 'id = ?', whereArgs: [id], limit: 1);
+    if (maps.isEmpty) return null;
+    return FrpProfile.fromMap(maps.first.map((k, v) => MapEntry(k, v)));
+  }
+
   Future<List<FrpProfile>> getAllFrpProfiles() async {
     final db = await database;
     final maps = await db.query('frp_profiles', orderBy: 'updated_at DESC');
@@ -1005,5 +1046,34 @@ Future<FrpProfile> createFrpProfile({
     );
 
 Future<List<FrpProfile>> getAllFrpProfiles() => _io.getAllFrpProfiles();
+
+Future<FrpProfile?> updateFrpProfile({
+  required int id,
+  required String name,
+  required String serverAddr,
+  required int serverPort,
+  required String token,
+  required String proxyName,
+  required int remotePort,
+  required String localAddr,
+  required int localPort,
+  required String version,
+  required bool useTcpMux,
+  required FrpAuthMode authMode,
+}) =>
+    _io.updateFrpProfile(
+      id: id,
+      name: name,
+      serverAddr: serverAddr,
+      serverPort: serverPort,
+      token: token,
+      proxyName: proxyName,
+      remotePort: remotePort,
+      localAddr: localAddr,
+      localPort: localPort,
+      version: version,
+      useTcpMux: useTcpMux,
+      authMode: authMode,
+    );
 
 Future<int> deleteFrpProfile(int id) => _io.deleteFrpProfile(id);

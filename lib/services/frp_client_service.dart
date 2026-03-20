@@ -199,6 +199,12 @@ class FrpClientService {
   final Map<int, _MuxStream> _muxStreams = {};
   int _nextStreamId = 1;
 
+  /// yamux 控制 TCP 上 **add 与 await flush 绝不能交错**（否则会 StateError: StreamSink is bound…）。
+  /// 用单协程顺序：排空队列里所有 add → 再 await flush；期间不再启动另一路 microtask 去 add。
+  final List<void Function()> _muxOutboundQueue = [];
+  bool _muxWriterRunning = false;
+  bool _pendingTcpFlush = false;
+
   // ---- frp 控制通道 ----
   final List<int> _ctrlBuf = [];
   String? _runId;
@@ -217,6 +223,12 @@ class FrpClientService {
   // ---- 日志 ----
   final List<String> _logs = [];
   List<String> get logs => List.unmodifiable(_logs);
+
+  void clearLogs() {
+    _logs.clear();
+    onChanged?.call();
+  }
+
   void Function()? onChanged;
 
   // ---- 断开后自动重连 ----
@@ -340,7 +352,61 @@ class FrpClientService {
   // yamux 帧处理
   // --------------------------------------------------------------------------
 
+  void _muxOutgoing(void Function() op) {
+    _muxOutboundQueue.add(op);
+    _ensureMuxWriter();
+  }
+
+  void _ensureMuxWriter() {
+    if (_muxWriterRunning) return;
+    _muxWriterRunning = true;
+    unawaited(_runMuxWriterLoop());
+  }
+
+  Future<void> _runMuxWriterLoop() async {
+    try {
+      for (;;) {
+        while (_muxOutboundQueue.isNotEmpty) {
+          final batch = List<void Function()>.from(_muxOutboundQueue);
+          _muxOutboundQueue.clear();
+          for (final f in batch) {
+            try {
+              f();
+            } catch (e, st) {
+              _log('[yamux] outbound 异常：$e');
+              assert(() {
+                _log('[yamux] $st');
+                return true;
+              }());
+            }
+          }
+        }
+        if (_pendingTcpFlush) {
+          _pendingTcpFlush = false;
+          final s = _tcpSocket;
+          if (_tcpActive && s != null) {
+            try {
+              await s.flush();
+            } on StateError {
+              // socket 已关或与其它操作冲突
+            } catch (_) {}
+          }
+        }
+        if (_muxOutboundQueue.isEmpty && !_pendingTcpFlush) break;
+      }
+    } finally {
+      _muxWriterRunning = false;
+      if (_muxOutboundQueue.isNotEmpty || _pendingTcpFlush) {
+        _ensureMuxWriter();
+      }
+    }
+  }
+
   void _muxSendFrame(int type, int flags, int streamId, int length) {
+    _muxOutgoing(() => _muxSendFrameNow(type, flags, streamId, length));
+  }
+
+  void _muxSendFrameNow(int type, int flags, int streamId, int length) {
     if (!_tcpActive) return;
     final sock = _tcpSocket;
     if (sock == null) return;
@@ -364,17 +430,24 @@ class FrpClientService {
 
   void _muxSendData(int streamId, List<int> data) {
     if (data.isEmpty || !_tcpActive) return;
-    final sock = _tcpSocket;
-    if (sock == null) return;
+    if (_tcpSocket == null) return;
     // 仅控制流（stream 1）加密，工作流（stream 3+）明文（frps handleConnection 直接 ReadMsg）
     final payload = streamId == 1 ? _encryptPayload(data) : data;
-    _muxSendFrame(_mxData, 0, streamId, payload.length);
-    try {
-      sock.add(payload);
-    } on StateError catch (e) {
-      _log('[yamux] send data failed (StateError): $e');
-      _tcpActive = false;
-    }
+    final sid = streamId;
+    final pl = List<int>.from(payload);
+
+    _muxOutgoing(() {
+      if (!_tcpActive) return;
+      final sock = _tcpSocket;
+      if (sock == null) return;
+      _muxSendFrameNow(_mxData, 0, sid, pl.length);
+      try {
+        sock.add(pl);
+      } on StateError catch (e) {
+        _log('[yamux] send data failed (StateError): $e');
+        _tcpActive = false;
+      }
+    });
   }
 
   _MuxStream _muxOpenStream() {
@@ -389,23 +462,13 @@ class FrpClientService {
 
   void _tcpFlush() {
     if (!_tcpActive) return;
-    final sock = _tcpSocket;
-    if (sock == null) return;
-    // flush() 在 socket 销毁后可能抛出 StateError，需捕获
-    Future.microtask(() async {
-      if (!_tcpActive) return;
-      final s = _tcpSocket;
-      if (s == null) return;
-      try {
-        await s.flush();
-      } on StateError {
-        // StreamSink is bound to a stream - socket 已销毁
-      } catch (_) {}
-    });
+    if (_tcpSocket == null) return;
+    _pendingTcpFlush = true;
+    _ensureMuxWriter();
   }
 
   void _drainYamux() {
-    bool needFlush = false;
+    var needFlush = false;
     while (_yamuxBuf.length >= 12) {
       final bd = ByteData.sublistView(Uint8List.fromList(_yamuxBuf), 0, 12);
       final version = bd.getUint8(0);
@@ -729,6 +792,8 @@ class FrpClientService {
       final workFrpBuf = <int>[];
       final ready = Completer<void>();
       List<int> postHandshakeBuf = [];
+      /// StartWorkConn 已收到但本地 Socket 尚未 connect 前到达的数据（否则 local?.add 会丢）
+      final pendingBeforeLocal = <int>[];
       late void Function(List<int>) sendToWork;
 
       if (_useTcpMux) {
@@ -754,7 +819,12 @@ class FrpClientService {
 
         workSub = workStream.onData.listen((data) {
           if (ready.isCompleted) {
-            local?.add(data);
+            final loc = local;
+            if (loc != null) {
+              loc.add(data);
+            } else {
+              pendingBeforeLocal.addAll(data);
+            }
             return;
           }
           workFrpBuf.addAll(data);
@@ -803,7 +873,12 @@ class FrpClientService {
 
         workSub = workSocket.listen((data) {
           if (ready.isCompleted) {
-            local?.add(data);
+            final loc = local;
+            if (loc != null) {
+              loc.add(data);
+            } else {
+              pendingBeforeLocal.addAll(data);
+            }
             return;
           }
           workFrpBuf.addAll(data);
@@ -834,6 +909,10 @@ class FrpClientService {
       _log('桥接成功：frps ↔ ${cfg.localAddr}:${cfg.localPort}');
 
       if (postHandshakeBuf.isNotEmpty) local.add(postHandshakeBuf);
+      if (pendingBeforeLocal.isNotEmpty) {
+        local.add(pendingBeforeLocal);
+        pendingBeforeLocal.clear();
+      }
 
       workSub.onData((d) => local?.add(d));
       workSub.onDone(() => local?.destroy());
@@ -882,6 +961,9 @@ class FrpClientService {
   void _teardown() {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _muxOutboundQueue.clear();
+    _muxWriterRunning = false;
+    _pendingTcpFlush = false;
     _tcpActive = false;
     _pingTimer?.cancel();
     _pingTimer = null;

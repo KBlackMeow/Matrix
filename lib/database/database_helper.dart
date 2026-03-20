@@ -199,5 +199,34 @@ class DatabaseHelper {
 
   Future<List<FrpProfile>> getAllFrpProfiles() => impl.getAllFrpProfiles();
 
+  Future<FrpProfile?> updateFrpProfile({
+    required int id,
+    required String name,
+    required String serverAddr,
+    required int serverPort,
+    required String token,
+    required String proxyName,
+    required int remotePort,
+    required String localAddr,
+    required int localPort,
+    required String version,
+    required bool useTcpMux,
+    required FrpAuthMode authMode,
+  }) =>
+      impl.updateFrpProfile(
+        id: id,
+        name: name,
+        serverAddr: serverAddr,
+        serverPort: serverPort,
+        token: token,
+        proxyName: proxyName,
+        remotePort: remotePort,
+        localAddr: localAddr,
+        localPort: localPort,
+        version: version,
+        useTcpMux: useTcpMux,
+        authMode: authMode,
+      );
+
   Future<int> deleteFrpProfile(int id) => impl.deleteFrpProfile(id);
 }

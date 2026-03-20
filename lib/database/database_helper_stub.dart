@@ -169,6 +169,44 @@ Future<FrpProfile> createFrpProfile({
 Future<List<FrpProfile>> getAllFrpProfiles() async =>
     List.unmodifiable(_frpProfiles.reversed.toList());
 
+Future<FrpProfile?> updateFrpProfile({
+  required int id,
+  required String name,
+  required String serverAddr,
+  required int serverPort,
+  required String token,
+  required String proxyName,
+  required int remotePort,
+  required String localAddr,
+  required int localPort,
+  required String version,
+  required bool useTcpMux,
+  required FrpAuthMode authMode,
+}) async {
+  final i = _frpProfiles.indexWhere((p) => p.id == id);
+  if (i < 0) return null;
+  final old = _frpProfiles[i];
+  final now = DateTime.now();
+  final updated = FrpProfile(
+    id: id,
+    name: name,
+    serverAddr: serverAddr,
+    serverPort: serverPort,
+    token: token,
+    proxyName: proxyName,
+    remotePort: remotePort,
+    localAddr: localAddr,
+    localPort: localPort,
+    version: version,
+    useTcpMux: useTcpMux,
+    authMode: authMode,
+    createdAt: old.createdAt,
+    updatedAt: now,
+  );
+  _frpProfiles[i] = updated;
+  return updated;
+}
+
 Future<int> deleteFrpProfile(int id) async {
   final before = _frpProfiles.length;
   _frpProfiles.removeWhere((p) => p.id == id);
