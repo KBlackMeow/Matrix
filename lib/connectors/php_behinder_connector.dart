@@ -10,6 +10,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
+import 'shell_exec_connector.dart';
 
 /// `bing.php`：冰蝎 3.0 PHP 协议，AES 加密传输
 ///
@@ -156,7 +157,9 @@ class PhpBehinderConnector extends ShellConnector {
     final cd = (workingDir.isNotEmpty && workingDir.startsWith('/'))
         ? 'cd ${_sq(workingDir)} && '
         : '';
-    final b64 = base64.encode(utf8.encode('$cd$cmd'));
+    final b64 = base64.encode(utf8.encode(
+      '$cd${ShellExecConnector.quoteRmOperandIfNeeded(cmd)}',
+    ));
     // 与 php_eval 完全一致，raw string 中 $ 不转义（Dart 仅 ${} 会插值）
     final code =
         "\$c=base64_decode('$b64');"

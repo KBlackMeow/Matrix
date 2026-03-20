@@ -20,6 +20,34 @@ abstract class ShellExecConnector extends ShellConnector {
   /// POSIX 单引号转义
   static String sq(String s) => "'${s.replaceAll("'", "'\\''")}'";
 
+  /// `rm 含(1)的文件` 未加引号时 bash 会把 `(` 当子 shell；仅处理「rm + 若干 -选项 + 单个路径」且路径含 `()` 或 `[]`。
+  static String quoteRmOperandIfNeeded(String cmd) {
+    final t = cmd.trim();
+    if (t.isEmpty) return t;
+    if (t.contains("'") || t.contains('"')) return cmd;
+    if (!RegExp(r'^rm\s+').hasMatch(t)) return cmd;
+
+    final rest = t.substring(3).trimLeft();
+    final tokens =
+        RegExp(r'\S+').allMatches(rest).map((m) => m.group(0)!).toList();
+    if (tokens.isEmpty) return cmd;
+
+    var i = 0;
+    while (i < tokens.length && tokens[i].startsWith('-')) {
+      i++;
+    }
+    if (i >= tokens.length) return cmd;
+
+    final paths = tokens.sublist(i);
+    if (paths.length != 1) return cmd;
+
+    final path = paths[0];
+    if (!RegExp(r'[()[\]]').hasMatch(path)) return cmd;
+
+    final head = <String>['rm', ...tokens.sublist(0, i)].join(' ');
+    return '$head ${sq(path)}';
+  }
+
   /// 解析 `ls -la` 输出为 FileEntry 列表
   static List<FileEntry> parseLsLa(String raw) {
     final entries = <FileEntry>[];
@@ -108,7 +136,10 @@ abstract class ShellExecConnector extends ShellConnector {
     final cd = (workingDir.isNotEmpty && workingDir.startsWith('/'))
         ? 'cd ${sq(workingDir)} && '
         : '';
-    return sendRawCommand('$cd$cmd 2>&1');
+    // stdin 喂脚本仍会解析 ()；常见 rm 单路径先 sq；其余仍用 base64 避免其它元字符经 HTTP 出问题
+    final script = quoteRmOperandIfNeeded(cmd);
+    final b64 = base64.encode(utf8.encode(script));
+    return sendRawCommand('${cd}echo ${sq(b64)} | base64 -d | bash 2>&1');
   }
 
   @override

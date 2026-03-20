@@ -79,6 +79,15 @@ class AspWscriptConnector extends ShellExecConnector {
   // ── Windows 专用覆盖 ──────────────────────────────────────────────────────
 
   @override
+  Future<String> executeCommand(String cmd, {String workingDir = ''}) async {
+    final cd = (workingDir.isNotEmpty && workingDir.startsWith('/'))
+        ? 'cd ${ShellExecConnector.sq(workingDir)} && '
+        : '';
+    // 走 cmd.exe，不能使用 Linux 的 bash -c 包裹
+    return sendRawCommand('$cd$cmd 2>&1');
+  }
+
+  @override
   Future<String> getCurrentDir() async {
     final r = (await sendRawCommand('cd')).trim();
     if (r.isNotEmpty && !r.startsWith('[')) currentDir = r;

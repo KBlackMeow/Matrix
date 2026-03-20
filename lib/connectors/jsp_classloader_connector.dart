@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
+import 'shell_exec_connector.dart';
 
 /// ClassLoader 加载 M.class：默认马 `jsp_classloader_b64.jsp`；排错可选用
 /// `jsp_classloader_b64_debug.jsp`（明文错误，易暴露，勿当默认上线）。
@@ -266,7 +267,10 @@ class JspClassloaderConnector extends ShellConnector {
     }
     final r = await _sendJsp(
       'exec',
-      extraParams: {'_k': _execKey, _execKey: '$cd$cmd'},
+      extraParams: {
+        '_k': _execKey,
+        _execKey: '$cd${ShellExecConnector.quoteRmOperandIfNeeded(cmd)}',
+      },
     );
     return r.trim();
   }

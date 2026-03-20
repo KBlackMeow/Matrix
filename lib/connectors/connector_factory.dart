@@ -64,7 +64,8 @@ class ConnectorFactory {
         'jsp_classloader' =>
           'jsp_classloader_b64.jsp（排错版：jsp_classloader_b64_debug.jsp）',
         'jsp_behinder'    => 'jsp_behinder.jsp',
-        'jsp_runtime'     => 'jsp_runtime_get.jsp',
+        'jsp_runtime' =>
+          'jsp_runtime_get.jsp（原版 JSP；Matrix 用 echo|base64 -d|bash 传脚本）',
         'asp_wscript'     => 'asp_wscript_get.asp',
         'aspx_cmd'        => 'aspx_cmd_post.aspx',
         _                 => '',
@@ -77,6 +78,7 @@ class ConnectorFactory {
         'php_behinder'    => 'mAtrix_911',
         'jsp_behinder'    => 'mAtrix_911',
         'jsp_classloader' => 'mAtrix_911', // 与 jsp_classloader_b64.jsp 参数名一致
+        'jsp_runtime'     => 'mAtrix_911', // 与 jsp_runtime_get.jsp 一致
         _                 => 'cmd',
       };
 
@@ -88,6 +90,7 @@ class ConnectorFactory {
         'jsp_classloader' => 'POST', // agent body 过大，只走 POST
         'php_behinder'    => 'POST', // AES 加密 body
         'jsp_behinder'    => 'POST', // AES 加密 body
+        'jsp_runtime'     => 'POST', // 命令进表单参数；GET 易超长且中文路径 URL 编码膨胀
         _                 => null,
       };
 

@@ -26,7 +26,7 @@ class SeedService {
   //   php_probe_info.php      — phpinfo() 环境探测
   //   php_b64rot13_post.php   — base64+rot13 双重编码绕过
   // JSP
-  //   jsp_runtime_get.jsp     — Runtime.exec() + GET cmd
+  //   jsp_runtime_get.jsp     — UTF-8 + ProcessBuilder + 字节解码中文；Matrix 用 echo|base64 -d|bash
   //   jsp_classloader_b64.jsp — ClassLoader 动态加载字节码（冰蝎风格）
   // ASP
   //   asp_wscript_get.asp     — WScript.Shell + GET cmd
@@ -74,8 +74,9 @@ class SeedService {
       asset: 'assets/defaults/payloads/jsp_runtime_get.jsp',
       name: 'jsp_runtime_get.jsp',
       type: 'jsp',
-      description: 'JSP Runtime.exec() 命令执行，GET 参数 cmd，/bin/bash -c',
-      tags: 'jsp,runtime,exec,get,cmd',
+      description:
+          'JSP bash -c + mAtrix_911；UTF-8 请求/响应、子进程输出 UTF-8/GB18030/GBK、合并 stderr；Matrix 用 base64 管道传脚本',
+      tags: 'jsp,runtime,exec,post,utf8',
     ),
     _PayloadDef(
       asset: 'assets/defaults/payloads/jsp_classloader_b64.jsp',

@@ -14,6 +14,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
+import 'shell_exec_connector.dart';
 
 /// `jsp_behinder.jsp` / `bing.jsp`：冰蝎 3.0 协议，AES 加密传输
 ///
@@ -299,7 +300,8 @@ class JspBehinderConnector extends ShellConnector {
     } else {
       cd = '';
     }
-    final script = '$cd$cmd';
+    final script =
+        '$cd${ShellExecConnector.quoteRmOperandIfNeeded(cmd)}';
     final xv = _execScriptForXvHeader(script);
     final r = await _sendBehinder(
       'exec',
