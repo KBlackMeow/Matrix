@@ -62,6 +62,9 @@ dependencies:
   # MySQL 爆破（fscan 复刻）
   mysql1: ^0.20.0
 
+  # YAML 解析（POC 引擎）
+  yaml: ^3.1.2
+
   # 终端模拟器控件（完整终端使用）
   xterm: ^4.0.0
   pointycastle: ^3.9.1
@@ -91,6 +94,7 @@ flutter:
   assets:
     - data/
     - data/mem_shell/
+    - data/pocs/
     - assets/defaults/payloads/
     - assets/defaults/dicts/
     - data/shiro_keys.txt

@@ -3,17 +3,29 @@ import '../exp/shiro/shiro_exp_service.dart';
 import '../exp/shiro/shiro_payload_repo.dart';
 import '../exp/thinkphp/thinkphp_exp_service.dart';
 import '../exp/zentao/zentao_exp_service.dart';
+import 'poc_yaml_engine.dart';
 
-/// Web POC 漏洞扫描（webpoc）：ThinkPHP RCE、Shiro Key 等
+/// Web POC 漏洞扫描（webpoc）：
+///   - 内置：ThinkPHP RCE、Shiro Key、禅道 RCE
+///   - 兼容 fscan WebScan/pocs yml 格式（387 个 YAML POC）
 /// 输出格式对齐 fscan
 class WebPocService {
   final Duration timeout;
   final ShiroPayloadRepo _shiroRepo;
 
+  /// Lazily-loaded YAML POC list (shared across instances)
+  static List<PocDefinition>? _cachedPocs;
+
   WebPocService({
     this.timeout = const Duration(seconds: 10),
     ShiroPayloadRepo? shiroRepo,
   }) : _shiroRepo = shiroRepo ?? const ShiroPayloadRepo();
+
+  /// Ensure YAML POCs are loaded; returns the cached list.
+  static Future<List<PocDefinition>> _getPocs() async {
+    _cachedPocs ??= await PocYamlEngine.loadAllPocs();
+    return _cachedPocs!;
+  }
 
   /// 对单个 URL 执行 POC 扫描
   Future<List<WebPocResult>> scan(String url) async {
@@ -103,6 +115,21 @@ class WebPocService {
           pocName: '禅道 Repo 配置 RCE (CVE-2022-40978)',
           detail: '',
           params: {'zentaoBase': zentaoBase},
+        ));
+      }
+    } catch (_) {}
+
+    // 4. YAML POC 扫描（兼容 fscan WebScan/pocs 格式，387 个 POC）
+    try {
+      final pocs = await _getPocs();
+      final engine = PocYamlEngine(timeout: timeout);
+      await for (final r in engine.scanUrl(baseUri, pocs)) {
+        results.add(WebPocResult(
+          target: baseUri,
+          pocType: r.pocName,
+          pocName: r.pocName,
+          detail: r.detail,
+          params: null,
         ));
       }
     } catch (_) {}

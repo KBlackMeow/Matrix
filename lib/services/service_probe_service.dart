@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'banner_fingerprint.dart';
+
 class _Fp {
   final String name;
   final RegExp pattern;
@@ -130,7 +132,7 @@ class ServiceProbeService {
     try {
       client = HttpClient()
         ..connectionTimeout = timeout
-        ..badCertificateCallback = (_, __, ___) => true;
+        ..badCertificateCallback = (_, __, _) => true;
       final req = await client.getUrl(uri);
       req.headers.set('User-Agent', 'Mozilla/5.0 (compatible; MatrixScanner/1.0)');
       final res = await req.close().timeout(timeout);
@@ -442,7 +444,7 @@ class ServiceProbeService {
     try {
       client = HttpClient()
         ..connectionTimeout = timeout
-        ..badCertificateCallback = (_, __, ___) => true;
+        ..badCertificateCallback = (_, __, _) => true;
       final uri = Uri.parse('http://$host:$port/');
       final req = await client.getUrl(uri);
       final res = await req.close().timeout(timeout);
@@ -525,27 +527,9 @@ class ServiceProbeService {
   }
 
   Future<ServiceProbeResult> _probeBanner(String host, int port, String guessed) async {
-    try {
-      final socket = await Socket.connect(host, port, timeout: timeout);
-      String banner = '';
-      try {
-        banner = await socket.map((b) => utf8.decode(b)).first.timeout(
-          const Duration(milliseconds: 800),
-        );
-      } catch (_) {}
-      await socket.close();
-      banner = banner.trim().replaceAll(RegExp(r'[\x00-\x1f]+'), ' ');
-      return ServiceProbeResult(
-        service: guessed,
-        fingerprint: banner.isEmpty ? '(仅端口开放)' : banner.substring(0, banner.length.clamp(0, 120)),
-        vulnerabilities: [],
-      );
-    } catch (_) {
-      return ServiceProbeResult(
-        service: guessed,
-        fingerprint: '(仅端口开放)',
-        vulnerabilities: [],
-      );
-    }
+    // 使用 BannerFingerprintEngine 进行多轮主动/被动探测
+    // 覆盖 150+ 条服务规则，对应 fscan nmap-service-probes 行为
+    final engine = BannerFingerprintEngine(timeout: timeout);
+    return engine.identify(host, port, guessed);
   }
 }
