@@ -43,18 +43,34 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
 
   Future<void> _checkConnection() async {
     setState(() => _isChecking = true);
-    final alive = await _service.ping();
-    if (!alive && _service.lastPingDiagnostic != null) {
-      // 在调试终端打印完整错误信息，UI 里只展示摘要
-      debugPrint(
-        '[Matrix][ping] ${_service.lastPingDiagnostic}',
-      );
+    bool alive = false;
+    String? diagnostic;
+    try {
+      alive = await _service.ping();
+      diagnostic = _service.lastPingDiagnostic;
+    } catch (e, st) {
+      diagnostic = 'ping 未捕获异常: $e\n$st';
+      alive = false;
+    }
+    if (!alive) {
+      final line =
+          '[Matrix][ping] ok=$alive type=${widget.webshell.connectorType} '
+          'url=${widget.webshell.url} '
+          'diag=${diagnostic ?? "(null，该连接器未设置 lastPingDiagnostic)"}';
+      // print → 出现在执行 flutter run 的终端；debugPrint 在 macOS 上常被节流/不好找
+      // ignore: avoid_print
+      print(line);
+      debugPrint(line);
     }
     if (mounted) {
       setState(() {
         _isConnected = alive;
         _isChecking = false;
-        _lastPingError = alive ? null : _service.lastPingDiagnostic;
+        _lastPingError = alive
+            ? null
+            : (diagnostic ??
+                '无详细原因。请核对：① 连接器类型与目标脚本是否一致；② 地址能否在浏览器打开；'
+                    '③ 看运行 flutter run 的终端是否出现 [Matrix][ping] 一行日志。');
       });
     }
   }
@@ -99,14 +115,14 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 24,
                                   ),
-                                  child: Text(
-                                    _lastPingError!.length > 200
-                                        ? '${_lastPingError!.substring(0, 200)}…'
+                                  child: SelectableText(
+                                    _lastPingError!.length > 800
+                                        ? '${_lastPingError!.substring(0, 800)}…'
                                         : _lastPingError!,
                                     style: AppTextStyles.caption(
                                       color: AppColors.textMuted,
                                       size: 11,
-                                    ),
+                                    ).copyWith(height: 1.35),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
@@ -1100,7 +1116,7 @@ class _TabCompleter {
   List<String> _envVars = [];
   String _homeDir = '';
 
-  // 内置命令列表（无需请求服务器）
+  // 常见命令名白名单（仅用于行首 Tab；无法枚举远程 PATH 下全部可执行文件）
   static const List<String> _builtins = [
     'alias',
     'apt',
@@ -1144,6 +1160,7 @@ class _TabCompleter {
     'ls',
     'lsof',
     'mkdir',
+    'md5sum',
     'more',
     'mount',
     'mv',
@@ -1165,6 +1182,8 @@ class _TabCompleter {
     'rsync',
     'scp',
     'sed',
+    'sha1sum',
+    'sha256sum',
     'sh',
     'sleep',
     'sort',

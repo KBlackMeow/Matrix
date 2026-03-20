@@ -61,7 +61,8 @@ class ConnectorFactory {
         'php_behinder'    => 'php_behinder.php',
         'php_passthru'    => 'php_passthru_req.php',
         'php_probe'       => 'php_probe_info.php',
-        'jsp_classloader' => 'jsp_classloader_b64.jsp',
+        'jsp_classloader' =>
+          'jsp_classloader_b64.jsp（排错版：jsp_classloader_b64_debug.jsp）',
         'jsp_behinder'    => 'jsp_behinder.jsp',
         'jsp_runtime'     => 'jsp_runtime_get.jsp',
         'asp_wscript'     => 'asp_wscript_get.asp',
@@ -72,10 +73,11 @@ class ConnectorFactory {
   /// 返回该 connector 对应 payload 里使用的默认参数名。
   /// 用于在 UI 的"密码"字段中显示提示，避免参数名混淆。
   static String defaultParam(String connectorType) => switch (connectorType) {
-        'php_probe'    => '',        // 无参数
-        'php_behinder' => 'mAtrix_911', // 连接密码，或 16 位 hex 密钥
-        'jsp_behinder' => 'mAtrix_911', // 连接密码，或 16 位 hex 密钥
-        _              => 'cmd',     // 其余均默认 cmd
+        'php_probe'       => '',
+        'php_behinder'    => 'mAtrix_911',
+        'jsp_behinder'    => 'mAtrix_911',
+        'jsp_classloader' => 'mAtrix_911', // 与 jsp_classloader_b64.jsp 参数名一致
+        _                 => 'cmd',
       };
 
   /// 返回该连接器硬编码的请求方法（不受用户设置影响）。

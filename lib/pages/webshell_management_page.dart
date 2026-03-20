@@ -1127,9 +1127,12 @@ Future<List<_DetectResult>> _autoDetect({
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      final ok = await ConnectorFactory.create(ws)
-          .ping()
-          .timeout(const Duration(seconds: 6));
+      // ClassLoader 马首包需上传整段 agent + defineClass，远超 6s
+      final pingTimeout = type == 'jsp_classloader'
+          ? const Duration(seconds: 125)
+          : const Duration(seconds: 6);
+      final ok =
+          await ConnectorFactory.create(ws).ping().timeout(pingTimeout);
       return _DetectResult(type, ok, ok ? '有响应' : '无响应');
     } on TimeoutException {
       return _DetectResult(type, false, '超时');

