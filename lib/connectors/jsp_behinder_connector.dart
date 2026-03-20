@@ -356,6 +356,11 @@ class JspBehinderConnector extends ShellConnector {
     final target = _uploadPathFor(path);
     onProgress(0, total);
 
+    // Base64-encode the target path so the shell command stays pure ASCII —
+    // non-ASCII file names (e.g. Chinese) would otherwise be rejected by
+    // Dart's HTTP client as an invalid header field value.
+    final b64Target = base64.encode(utf8.encode(target));
+
     int offset = 0;
     bool first = true;
     while (offset < total) {
@@ -364,7 +369,7 @@ class JspBehinderConnector extends ShellConnector {
       final b64 = base64.encode(chunk);
       final redirect = first ? '>' : '>>';
       final cmd =
-          "echo ${_sq(b64)} | base64 -d $redirect ${_sq(target)} && echo 1 || echo 0";
+          "_p=\$(echo ${_sq(b64Target)} | base64 -d) && echo ${_sq(b64)} | base64 -d $redirect \"\$_p\" && echo 1 || echo 0";
       final r = await _sendBehinder(
         'exec',
         extraParams: {'_k': _execKey, _execKey: cmd},

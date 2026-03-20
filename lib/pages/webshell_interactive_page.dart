@@ -1658,6 +1658,7 @@ class _FileManagerTabState extends State<_FileManagerTab>
       if (!mounted) return;
       // 不再主动关闭当前页面，仅结束上传状态和进度
       setState(() => _uploading = false);
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
       transferred.dispose();
       if (e is _TransferCancelled) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1697,8 +1698,8 @@ class _FileManagerTabState extends State<_FileManagerTab>
       transferred.dispose();
       return;
     }
-    // 保持当前页面与对话框，由用户自行关闭
     setState(() => _uploading = false);
+    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
     transferred.dispose();
     if (!ok) {
       debugPrint(
@@ -1788,8 +1789,8 @@ class _FileManagerTabState extends State<_FileManagerTab>
         transferred.dispose();
         return;
       }
-      // 保持当前页面与对话框，由用户自行关闭
       setState(() => _downloading = false);
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
       transferred.dispose();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
