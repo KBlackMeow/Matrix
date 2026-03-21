@@ -9,6 +9,7 @@ import '../models/webshell.dart';
 import '../services/webshell_service.dart';
 import '../services/reverse_shell_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/matrix_console_log.dart';
 import 'reverse_shell_terminal_page.dart';
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
@@ -41,36 +42,41 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     _checkConnection();
   }
 
+  static const _kPingFailHint =
+      '请核对：① 连接器类型与目标脚本是否一致；② 地址能否在浏览器打开。';
+
   Future<void> _checkConnection() async {
     setState(() => _isChecking = true);
-    bool alive = false;
-    String? diagnostic;
+    var alive = false;
+    var pingLogPrinted = false;
     try {
       alive = await _service.ping();
-      diagnostic = _service.lastPingDiagnostic;
     } catch (e, st) {
-      diagnostic = 'ping 未捕获异常: $e\n$st';
       alive = false;
+      pingLogPrinted = true;
+      matrixConsoleLog(
+        '[ping] ok=false type=${widget.webshell.connectorType} '
+        'url=${widget.webshell.url} err=$e',
+      );
+      debugPrint('[ping] stack: $st');
+    }
+    if (!alive && !pingLogPrinted) {
+      matrixConsoleLog(
+        '[ping] ok=false type=${widget.webshell.connectorType} '
+        'url=${widget.webshell.url}',
+      );
     }
     if (!alive) {
-      final line =
-          '[Matrix][ping] ok=$alive type=${widget.webshell.connectorType} '
-          'url=${widget.webshell.url} '
-          'diag=${diagnostic ?? "(null，该连接器未设置 lastPingDiagnostic)"}';
-      // print → 出现在执行 flutter run 的终端；debugPrint 在 macOS 上常被节流/不好找
-      // ignore: avoid_print
-      print(line);
-      debugPrint(line);
+      final diag = _service.lastPingDiagnostic;
+      if (diag != null && diag.isNotEmpty) {
+        debugPrint('[ping] diagnostic:\n$diag');
+      }
     }
     if (mounted) {
       setState(() {
         _isConnected = alive;
         _isChecking = false;
-        _lastPingError = alive
-            ? null
-            : (diagnostic ??
-                '无详细原因。请核对：① 连接器类型与目标脚本是否一致；② 地址能否在浏览器打开；'
-                    '③ 看运行 flutter run 的终端是否出现 [Matrix][ping] 一行日志。');
+        _lastPingError = alive ? null : _kPingFailHint;
       });
     }
   }
@@ -116,9 +122,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                                     horizontal: 24,
                                   ),
                                   child: SelectableText(
-                                    _lastPingError!.length > 800
-                                        ? '${_lastPingError!.substring(0, 800)}…'
-                                        : _lastPingError!,
+                                    _lastPingError!,
                                     style: AppTextStyles.caption(
                                       color: AppColors.textMuted,
                                       size: 11,
