@@ -1,6 +1,6 @@
 # Matrix
 
-基于 Flutter 构建的跨平台渗透测试框架，支持 macOS、Windows、Linux、iOS、Android 及 Web。
+基于 Flutter 构建的跨平台渗透测试框架，支持 macOS、Windows、Linux。
 
 ## 主要功能
 
@@ -15,7 +15,7 @@
 
 ```bash
 flutter pub get
-flutter run -d macos   # 或 windows / linux / chrome / android
+flutter run -d macos   # 或 windows / linux
 ```
 
 ## 免责声明
