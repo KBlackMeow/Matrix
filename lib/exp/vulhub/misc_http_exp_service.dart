@@ -907,7 +907,7 @@ class SaltstackExpService {
   Future<ExpResult> check() async {
     try {
       final res = await http.get(Uri.parse('$_base/')).timeout(timeout);
-      if (res.body.contains('salt') || res.statusCode == 200) {
+      if (res.statusCode == 200 && (res.body.contains('salt') || res.body.contains('SaltStack') || res.body.contains('"status"'))) {
         return ExpResult(true, 'CVE-2020-16846', 'SaltStack API 端点可访问 (${res.statusCode})');
       }
     } catch (_) {}

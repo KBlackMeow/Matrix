@@ -160,15 +160,15 @@ class _SpringCardState extends State<_SpringCard> {
           ),
           const SizedBox(height: 8),
           Row(children: [
-            _actionBtn('检测', _check),
+            _actionBtn('检测', _running ? null : _check),
             const SizedBox(width: 8),
-            _actionBtn('检测全部', _checkAll),
+            _actionBtn('检测全部', _running ? null : _checkAll),
           ]),
           const SizedBox(height: 16),
           _secTitle('命令执行'),
           _tf(_cmdCtrl, '命令', 'id'),
           const SizedBox(height: 8),
-          _actionBtn('执行命令', _execRce),
+          _actionBtn('执行命令', _running ? null : _execRce),
         ]),
       ),
     );
