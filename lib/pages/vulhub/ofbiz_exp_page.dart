@@ -28,6 +28,7 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
+  String _execCve = 'CVE-2023-51467';
 
   OFBizExpService _svc() => OFBizExpService(
         baseUrl: _urlCtrl.text.trim(),
@@ -75,9 +76,11 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
     setState(() => running = true);
-    appendLog('[*] Groovy RCE 执行 (CVE-2023-51467): $cmd');
+    appendLog('[*] Groovy RCE 执行 ($_execCve): $cmd');
     try {
-      final out = await _svc().execRce(cmd);
+      final out = _execCve == 'CVE-2024-38856'
+          ? await _svc().execRce38856(cmd)
+          : await _svc().execRce(cmd);
       appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败');
     } catch (e) {
       appendLog('[!] 异常: $e');
@@ -120,6 +123,19 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
           ),
           const SizedBox(height: 16),
           vSecTitle('Groovy RCE 执行'),
+          RadioGroup<String>(
+            groupValue: _execCve,
+            onChanged: (v) { if (!running && v != null) setState(() => _execCve = v); },
+            child: Row(
+              children: [
+                const Radio<String>(value: 'CVE-2023-51467'),
+                const Text('CVE-2023-51467'),
+                const SizedBox(width: 12),
+                const Radio<String>(value: 'CVE-2024-38856'),
+                const Text('CVE-2024-38856'),
+              ],
+            ),
+          ),
           vTf(_cmdCtrl, '命令', 'id'),
           const SizedBox(height: 8),
           vBtn('执行命令', running ? null : _exec),
