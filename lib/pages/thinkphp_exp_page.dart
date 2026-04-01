@@ -230,12 +230,15 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       ];
       final results = await svc.checkAllRce();
       final found = <ThinkphpVulnType>[];
+      ThinkphpVulnType? firstHit;
       for (var i = 0; i < results.length; i++) {
         final r = results[i];
         if (r.vulnerable) {
           _appendLog('[+] ${r.vulnName}');
           _appendLog('[i] ${r.detail}');
-          found.add(rceTypes[i]);
+          final t = rceTypes[i];
+          found.add(t);
+          firstHit ??= t;
         } else {
           _appendLog('[-] ${r.vulnName}');
         }
@@ -243,7 +246,11 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       setState(() {
         _detectedRceVulns = found;
         _selectedRceVuln = found.isNotEmpty ? found.first : null;
+        if (firstHit != null) _selectedCheckType = firstHit;
       });
+      if (firstHit != null) {
+        _appendLog('[*] 已自动选择首个命中漏洞: ${firstHit.label}');
+      }
       if (found.isEmpty) _appendLog('[!] 未发现 RCE 漏洞');
     } catch (e) {
       _appendLog('[!] 异常: $e');
@@ -270,12 +277,14 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       );
       final results = await svc.checkAll();
       final found = <ThinkphpVulnType>[];
+      ThinkphpVulnType? firstHit;
       for (var i = 0; i < results.length; i++) {
         final r = results[i];
         if (r.vulnerable) {
           _appendLog('[+] ${r.vulnName}');
           _appendLog('[i] ${r.detail}');
           final t = ThinkphpVulnType.values[i];
+          firstHit ??= t;
           if (t.supportsRce) found.add(t);
         } else {
           _appendLog('[-] ${r.vulnName}');
@@ -284,7 +293,11 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       setState(() {
         _detectedRceVulns = found;
         _selectedRceVuln = found.isNotEmpty ? found.first : null;
+        if (firstHit != null) _selectedCheckType = firstHit;
       });
+      if (firstHit != null) {
+        _appendLog('[*] 已自动选择首个命中漏洞: ${firstHit.label}');
+      }
       if (found.isEmpty) _appendLog('[!] 未发现 RCE 漏洞');
     } catch (e) {
       _appendLog('[!] 异常: $e');

