@@ -70,9 +70,13 @@ abstract class BaseVulhubExpPageState<T extends BaseVulhubExpPage>
           children: [
             Icon(pageIcon, color: AppColors.primary),
             const SizedBox(width: 8),
-            Text(
-              appBarTitle,
-              style: AppTextStyles.heading(size: 14, color: AppColors.primary),
+            Expanded(
+              child: Text(
+                appBarTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.heading(size: 14, color: AppColors.primary),
+              ),
             ),
           ],
         ),

@@ -43,6 +43,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
 
   static const _kPingFailHint =
       '请核对：① 连接器类型与目标脚本是否一致；② 地址能否在浏览器打开。';
+  static const _kPingFallbackTag = '__MATRIX_PING_FALLBACK_OK__';
 
   Future<void> _checkConnection() async {
     setState(() => _isChecking = true);
@@ -64,6 +65,23 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
         '[ping] ok=false type=${widget.webshell.connectorType} '
         'url=${widget.webshell.url}',
       );
+    }
+    if (!alive && _service.supportsShellExec) {
+      // 某些目标会拦截/重定向 ping 动作，但命令执行通道仍可用。
+      try {
+        final probe = await _service
+            .executeCommand('echo $_kPingFallbackTag')
+            .timeout(const Duration(seconds: 8));
+        if (probe.contains(_kPingFallbackTag)) {
+          alive = true;
+          matrixConsoleLog(
+            '[ping] ok=true type=${widget.webshell.connectorType} '
+            'url=${widget.webshell.url} via=exec_fallback',
+          );
+        }
+      } catch (_) {
+        // 回退探测失败时保持原始 ping 结果。
+      }
     }
     if (!alive) {
       final diag = _service.lastPingDiagnostic;
