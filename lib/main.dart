@@ -21,6 +21,24 @@ import 'pages/dictionary_management_page.dart';
 import 'pages/info_collection_page.dart';
 import 'pages/thinkphp_exp_page.dart';
 import 'pages/zentao_exp_page.dart';
+import 'pages/vulhub/struts2_exp_page.dart';
+import 'pages/vulhub/spring_exp_page.dart';
+import 'pages/vulhub/httpd_exp_page.dart';
+import 'pages/vulhub/druid_exp_page.dart';
+import 'pages/vulhub/ofbiz_exp_page.dart';
+import 'pages/vulhub/solr_exp_page.dart';
+import 'pages/vulhub/confluence_exp_page.dart';
+import 'pages/vulhub/drupal_exp_page.dart';
+import 'pages/vulhub/elasticsearch_exp_page.dart';
+import 'pages/vulhub/flask_ssti_exp_page.dart';
+import 'pages/vulhub/php_exp_page.dart';
+import 'pages/vulhub/tomcat_exp_page.dart';
+import 'pages/vulhub/weblogic_exp_page.dart';
+import 'pages/vulhub/supervisor_exp_page.dart';
+import 'pages/vulhub/xxljob_exp_page.dart';
+import 'pages/vulhub/nacos_exp_page.dart';
+import 'pages/vulhub/shellshock_exp_page.dart';
+import 'pages/vulhub/saltstack_exp_page.dart';
 import 'models/webshell.dart';
 import 'pages/webshell_interactive_page.dart';
 import 'services/scan_session_service.dart';
@@ -556,8 +574,41 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
   }
 }
 
+class _ExpEntry {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String tag;
+  final Widget page;
+  const _ExpEntry({required this.icon, required this.title, required this.subtitle, required this.tag, required this.page});
+}
+
 class _ExpContent extends StatelessWidget {
   const _ExpContent();
+
+  static final List<_ExpEntry> _expEntries = [
+    _ExpEntry(icon: Icons.cookie, title: 'Apache Shiro CVE-2016-4437', subtitle: 'rememberMe Key 爆破 / Payload 注入', tag: 'Java · 通用', page: ShiroExpPage()),
+    _ExpEntry(icon: Icons.php, title: 'ThinkPHP CVE-2018-20062/CVE-2019-9082/CNVD-2022-86535', subtitle: '3.x/5.x/6.x 漏洞检测、RCE、GetShell', tag: 'PHP · 通用', page: ThinkphpExpPage()),
+    _ExpEntry(icon: Icons.storage, title: 'Zentao CVE-2024-24216', subtitle: '绕过登录 · Repo 配置写入冰蝎 WebShell', tag: 'PHP · 禅道', page: ZentaoExpPage()),
+    _ExpEntry(icon: Icons.bolt, title: 'Apache Struts2 S2-032/045/053/057/059', subtitle: 'OGNL 表达式注入 RCE 系列', tag: 'Java · Struts2', page: Struts2ExpPage()),
+    _ExpEntry(icon: Icons.local_florist, title: 'Spring Framework CVE-2022-22963/22965/2018-1273/2017-8046', subtitle: 'Spring4Shell / Cloud Function / Data SpEL 注入系列', tag: 'Java · Spring', page: SpringExpPage()),
+    _ExpEntry(icon: Icons.http, title: 'Apache HTTP Server CVE-2021-41773', subtitle: '路径规范化缺陷 — 路径穿越文件读取 + CGI RCE', tag: 'C · Apache', page: HttpdExpPage()),
+    _ExpEntry(icon: Icons.data_object, title: 'Apache Druid CVE-2021-25646', subtitle: '嵌入式 JavaScript 代码注入 RCE (≤ 0.20.0)', tag: 'Java · Druid', page: DruidExpPage()),
+    _ExpEntry(icon: Icons.business, title: 'Apache OFBiz CVE-2023-51467 / CVE-2024-38856', subtitle: 'Groovy 代码注入无需认证 RCE', tag: 'Java · OFBiz', page: OFBizExpPage()),
+    _ExpEntry(icon: Icons.search, title: 'Apache Solr CVE-2017-12629', subtitle: 'RunExecutableListener 任意命令执行 (< 7.1.0)', tag: 'Java · Solr', page: SolrExpPage()),
+    _ExpEntry(icon: Icons.article, title: 'Confluence CVE-2023-22527', subtitle: 'OGNL 模板注入无需认证 RCE (8.0–8.5.3)', tag: 'Java · Confluence', page: ConfluenceExpPage()),
+    _ExpEntry(icon: Icons.water_drop, title: 'Drupal CVE-2018-7600 (Drupalgeddon2)', subtitle: 'Form API #post_render 回调 PHP 代码执行', tag: 'PHP · Drupal', page: DrupalExpPage()),
+    _ExpEntry(icon: Icons.manage_search, title: 'Elasticsearch CVE-2015-1427', subtitle: 'Groovy 脚本沙箱逃逸 RCE (< 1.3.8 / < 1.4.3)', tag: 'Java · ES', page: ElasticsearchExpPage()),
+    _ExpEntry(icon: Icons.code, title: 'Flask / Jinja2 SSTI', subtitle: '服务端模板注入执行任意 Python 代码', tag: 'Python · Flask', page: FlaskSstiExpPage()),
+    _ExpEntry(icon: Icons.php, title: 'PHP 8.1.0-dev 后门 / CVE-2012-1823 PHP-CGI', subtitle: 'User-Agentt 后门 + CGI 参数注入 RCE', tag: 'PHP · 通用', page: PhpExpPage()),
+    _ExpEntry(icon: Icons.cloud_upload, title: 'Apache Tomcat CVE-2017-12615', subtitle: 'PUT 方法开启时上传 JSP Webshell RCE', tag: 'Java · Tomcat', page: TomcatExpPage()),
+    _ExpEntry(icon: Icons.dns, title: 'Oracle WebLogic CVE-2017-10271 / CVE-2020-14882', subtitle: 'XMLDecoder 反序列化 + 控制台未授权 RCE', tag: 'Java · WebLogic', page: WebLogicExpPage()),
+    _ExpEntry(icon: Icons.settings_applications, title: 'Supervisor CVE-2017-11610', subtitle: 'XML-RPC 未授权方法调用链 RCE (3.3.2)', tag: 'Python · Supervisor', page: SupervisorExpPage()),
+    _ExpEntry(icon: Icons.schedule, title: 'XXL-JOB 未授权访问执行器 RCE', subtitle: 'GLUE_SHELL 类型提交任意 Shell 命令 (2.2.0)', tag: 'Java · XXL-JOB', page: XxlJobExpPage()),
+    _ExpEntry(icon: Icons.cloud, title: 'Nacos CVE-2021-29441', subtitle: 'User-Agent 认证绕过，枚举/创建用户 (< 1.4.1)', tag: 'Java · Nacos', page: NacosExpPage()),
+    _ExpEntry(icon: Icons.terminal, title: 'Bash Shellshock CVE-2014-6271', subtitle: '环境变量函数定义解析注入 CGI RCE', tag: 'Shell · Bash', page: ShellshockExpPage()),
+    _ExpEntry(icon: Icons.grain, title: 'SaltStack CVE-2020-16846', subtitle: 'SSH 模块 ssh_priv 参数命令注入 RCE', tag: 'Python · SaltStack', page: SaltstackExpPage()),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -597,51 +648,18 @@ class _ExpContent extends StatelessWidget {
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.only(bottom: 16),
-            itemCount: 3,
+            itemCount: _expEntries.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              if (index == 0) {
-                return _ExpEntryCard(
-                  icon: Icons.cookie,
-                  title: 'Apache Shiro 反序列化',
-                  subtitle: 'rememberMe Key 爆破 / Payload 注入',
-                  tag: 'Java · 通用',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ShiroExpPage(),
-                      ),
-                    );
-                  },
-                );
-              }
-              if (index == 1) {
-                return _ExpEntryCard(
-                  icon: Icons.php,
-                  title: 'ThinkPHP 漏洞利用',
-                  subtitle: '3.x/5.x/6.x 漏洞检测、RCE、GetShell',
-                  tag: 'PHP · 通用',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ThinkphpExpPage(),
-                      ),
-                    );
-                  },
-                );
-              }
+              final e = _expEntries[index];
               return _ExpEntryCard(
-                icon: Icons.storage,
-                title: 'Zentao 仓库 RCE',
-                subtitle: '绕过登录 · Repo 配置写入冰蝎 WebShell',
-                tag: 'PHP · 禅道',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ZentaoExpPage(),
-                    ),
-                  );
-                },
+                icon: e.icon,
+                title: e.title,
+                subtitle: e.subtitle,
+                tag: e.tag,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => e.page),
+                ),
               );
             },
           ),
