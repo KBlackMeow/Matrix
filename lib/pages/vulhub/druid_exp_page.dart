@@ -1,98 +1,106 @@
 import 'package:flutter/material.dart';
+
+import '../../app/constants.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
-import '../../theme/app_theme.dart';
 import '_vulhub_page_helpers.dart';
+import 'base_vulhub_exp_page.dart';
 
-class DruidExpPage extends StatelessWidget {
+class DruidExpPage extends BaseVulhubExpPage {
   const DruidExpPage({super.key});
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: AppColors.bgDark,
-        appBar: AppBar(
-          backgroundColor: AppColors.bgElevated, elevation: 0,
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.of(context).pop()),
-          title: Row(children: [
-            const Icon(Icons.data_object, color: AppColors.primary), const SizedBox(width: 8),
-            Text('Apache Druid CVE-2021-25646 嵌入式 JavaScript RCE',
-                style: AppTextStyles.heading(size: 14, color: AppColors.primary)),
-          ]),
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            vulhubInfoCard(Icons.data_object, 'Apache Druid CVE-2021-25646',
-                'Sampler 接口强制执行用户提供的 JavaScript 代码，影响 <= 0.20.0'),
-            const SizedBox(height: 16),
-            const Expanded(child: _DruidCard()),
-          ]),
-        ),
-      );
+  State<DruidExpPage> createState() => _DruidPageState();
 }
 
-class _DruidCard extends StatefulWidget {
-  const _DruidCard();
+class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
   @override
-  State<_DruidCard> createState() => _DruidCardState();
-}
+  IconData get pageIcon => Icons.data_object;
 
-class _DruidCardState extends State<_DruidCard> {
+  @override
+  String get appBarTitle => 'Apache Druid CVE-2021-25646 嵌入式 JavaScript RCE';
+
+  @override
+  String get cardTitle => 'Apache Druid CVE-2021-25646';
+
+  @override
+  String get cardSubtitle => 'Sampler 接口强制执行用户提供的 JavaScript 代码，影响 <= 0.20.0';
+
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
-  final _logScroll = ScrollController();
-  String _log = ''; bool _running = false;
 
-  void _log_(String l) {
-    setState(() {
-      final lines = _log.isEmpty ? <String>[] : _log.split('\n');
-      lines.add(l); if (lines.length > 500) lines.removeRange(0, lines.length - 500);
-      _log = lines.join('\n');
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_logScroll.hasClients) _logScroll.animateTo(_logScroll.position.maxScrollExtent, duration: const Duration(milliseconds: 100), curve: Curves.easeOut);
-    });
-  }
-
-  DruidExpService _svc() => DruidExpService(baseUrl: _urlCtrl.text.trim(), timeout: Duration(seconds: int.tryParse(_timeoutCtrl.text.trim()) ?? 10));
+  DruidExpService _svc() => DruidExpService(
+        baseUrl: _urlCtrl.text.trim(),
+        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+      );
 
   Future<void> _check() async {
-    if (_urlCtrl.text.trim().isEmpty) { _log_('[!] 请输入目标 URL'); return; }
-    setState(() => _running = true); _log_('[*] 检测 CVE-2021-25646...');
-    try { final r = await _svc().check(); _log_(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到漏洞'); }
-    catch (e) { _log_('[!] 异常: $e'); }
-    finally { if (mounted) setState(() => _running = false); }
+    if (_urlCtrl.text.trim().isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
+    setState(() => running = true);
+    appendLog('[*] 检测 CVE-2021-25646...');
+    try {
+      final r = await _svc().check();
+      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到漏洞');
+    } catch (e) {
+      appendLog('[!] 异常: $e');
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
   }
 
   Future<void> _exec() async {
-    if (_urlCtrl.text.trim().isEmpty) { _log_('[!] 请输入目标 URL'); return; }
+    if (_urlCtrl.text.trim().isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
-    setState(() => _running = true); _log_('[*] 执行命令: $cmd');
+    setState(() => running = true);
+    appendLog('[*] 执行命令: $cmd');
     try {
       final out = await _svc().execRce(cmd);
-      _log_(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败');
-    } catch (e) { _log_('[!] 异常: $e'); }
-    finally { if (mounted) setState(() => _running = false); }
+      appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败');
+    } catch (e) {
+      appendLog('[!] 异常: $e');
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
   }
 
   @override
-  void dispose() { _urlCtrl.dispose(); _cmdCtrl.dispose(); _timeoutCtrl.dispose(); _logScroll.dispose(); super.dispose(); }
+  void dispose() {
+    _urlCtrl.dispose();
+    _cmdCtrl.dispose();
+    _timeoutCtrl.dispose();
+    super.dispose();
+  }
 
   @override
-  Widget build(BuildContext context) => VulhubExpCardShell(
-    running: _running, log: _log, logScroll: _logScroll,
-    onClearLog: () => setState(() => _log = ''),
-    leftPanel: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      vSecTitle('目标配置'),
-      vTf(_urlCtrl, '目标 URL', 'http://target.com:8888/'),
-      const SizedBox(height: 8),
-      vTf(_timeoutCtrl, '超时(s)', '10', type: TextInputType.number),
-      const SizedBox(height: 8),
-      vBtn('检测漏洞', _running ? null : _check),
-      const SizedBox(height: 16),
-      vSecTitle('命令执行'),
-      vTf(_cmdCtrl, '命令', 'id'),
-      const SizedBox(height: 8),
-      vBtn('执行命令', _running ? null : _exec),
-    ])),
-  );
+  Widget buildLeftPanel(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          vSecTitle('目标配置'),
+          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          const SizedBox(height: 8),
+          vTf(
+            _timeoutCtrl,
+            '超时(s)',
+            '${AppConstants.defaultHttpTimeoutSeconds}',
+            type: TextInputType.number,
+          ),
+          const SizedBox(height: 8),
+          vBtn('检测漏洞', running ? null : _check),
+          const SizedBox(height: 16),
+          vSecTitle('命令执行'),
+          vTf(_cmdCtrl, '命令', 'id'),
+          const SizedBox(height: 8),
+          vBtn('执行命令', running ? null : _exec),
+        ],
+      ),
+    );
+  }
 }

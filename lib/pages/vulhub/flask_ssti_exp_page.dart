@@ -1,103 +1,108 @@
 import 'package:flutter/material.dart';
+
+import '../../app/constants.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
-import '../../theme/app_theme.dart';
 import '_vulhub_page_helpers.dart';
+import 'base_vulhub_exp_page.dart';
 
-class FlaskSstiExpPage extends StatelessWidget {
+class FlaskSstiExpPage extends BaseVulhubExpPage {
   const FlaskSstiExpPage({super.key});
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: AppColors.bgDark,
-        appBar: AppBar(
-          backgroundColor: AppColors.bgElevated, elevation: 0,
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.of(context).pop()),
-          title: Row(children: [
-            const Icon(Icons.code, color: AppColors.primary), const SizedBox(width: 8),
-            Text('Flask / Jinja2 SSTI 服务端模板注入 RCE',
-                style: AppTextStyles.heading(size: 14, color: AppColors.primary)),
-          ]),
-        ),
-        body: Padding(padding: const EdgeInsets.all(24),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            vulhubInfoCard(Icons.code, 'Flask / Jinja2 SSTI', '服务端 Jinja2 模板注入，通过 URL 参数执行任意 Python 代码'),
-            const SizedBox(height: 16),
-            const Expanded(child: _SstiCard()),
-          ]),
-        ),
-      );
+  State<FlaskSstiExpPage> createState() => _FlaskSstiPageState();
 }
 
-class _SstiCard extends StatefulWidget {
-  const _SstiCard();
+class _FlaskSstiPageState extends BaseVulhubExpPageState<FlaskSstiExpPage> {
   @override
-  State<_SstiCard> createState() => _SstiCardState();
-}
+  IconData get pageIcon => Icons.code;
+  @override
+  String get appBarTitle => 'Flask / Jinja2 SSTI 服务端模板注入 RCE';
+  @override
+  String get cardTitle => 'Flask / Jinja2 SSTI';
+  @override
+  String get cardSubtitle => '服务端 Jinja2 模板注入，通过 URL 参数执行任意 Python 代码';
 
-class _SstiCardState extends State<_SstiCard> {
   final _urlCtrl = TextEditingController();
   final _paramCtrl = TextEditingController(text: 'name');
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
-  final _logScroll = ScrollController();
-  String _log = ''; bool _running = false;
-
-  void _log_(String l) {
-    setState(() {
-      final lines = _log.isEmpty ? <String>[] : _log.split('\n');
-      lines.add(l); if (lines.length > 500) lines.removeRange(0, lines.length - 500);
-      _log = lines.join('\n');
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_logScroll.hasClients) _logScroll.animateTo(_logScroll.position.maxScrollExtent, duration: const Duration(milliseconds: 100), curve: Curves.easeOut);
-    });
-  }
 
   FlaskSstiExpService _svc() => FlaskSstiExpService(
-    baseUrl: _urlCtrl.text.trim(),
-    paramName: _paramCtrl.text.trim().isEmpty ? 'name' : _paramCtrl.text.trim(),
-    timeout: Duration(seconds: int.tryParse(_timeoutCtrl.text.trim()) ?? 10),
-  );
+        baseUrl: _urlCtrl.text.trim(),
+        paramName: _paramCtrl.text.trim().isEmpty ? 'name' : _paramCtrl.text.trim(),
+        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+      );
 
   Future<void> _check() async {
-    if (_urlCtrl.text.trim().isEmpty) { _log_('[!] 请输入目标 URL'); return; }
-    setState(() => _running = true); _log_('[*] 检测 Jinja2 SSTI（233×233=54289）...');
-    try { final r = await _svc().check(); _log_(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到 SSTI'); }
-    catch (e) { _log_('[!] 异常: $e'); }
-    finally { if (mounted) setState(() => _running = false); }
+    if (_urlCtrl.text.trim().isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
+    setState(() => running = true);
+    appendLog('[*] 检测 Jinja2 SSTI（233×233=54289）...');
+    try {
+      final r = await _svc().check();
+      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到 SSTI');
+    } catch (e) {
+      appendLog('[!] 异常: $e');
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
   }
 
   Future<void> _exec() async {
-    if (_urlCtrl.text.trim().isEmpty) { _log_('[!] 请输入目标 URL'); return; }
+    if (_urlCtrl.text.trim().isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
-    setState(() => _running = true); _log_('[*] SSTI RCE 执行: $cmd');
+    setState(() => running = true);
+    appendLog('[*] SSTI RCE 执行: $cmd');
     try {
       final out = await _svc().execRce(cmd);
-      _log_(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败');
-    } catch (e) { _log_('[!] 异常: $e'); }
-    finally { if (mounted) setState(() => _running = false); }
+      appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败');
+    } catch (e) {
+      appendLog('[!] 异常: $e');
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
   }
 
   @override
-  void dispose() { _urlCtrl.dispose(); _paramCtrl.dispose(); _cmdCtrl.dispose(); _timeoutCtrl.dispose(); _logScroll.dispose(); super.dispose(); }
+  void dispose() {
+    _urlCtrl.dispose();
+    _paramCtrl.dispose();
+    _cmdCtrl.dispose();
+    _timeoutCtrl.dispose();
+    super.dispose();
+  }
 
   @override
-  Widget build(BuildContext context) => VulhubExpCardShell(
-    running: _running, log: _log, logScroll: _logScroll,
-    onClearLog: () => setState(() => _log = ''),
-    leftPanel: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      vSecTitle('目标配置'),
-      vTf(_urlCtrl, '目标 URL', 'http://target.com:8080/'),
-      const SizedBox(height: 8),
-      vTf(_paramCtrl, 'URL 注入参数名', 'name'),
-      const SizedBox(height: 8),
-      vTf(_timeoutCtrl, '超时(s)', '10', type: TextInputType.number),
-      const SizedBox(height: 8),
-      vBtn('检测 SSTI', _running ? null : _check),
-      const SizedBox(height: 16),
-      vSecTitle('命令执行'),
-      vTf(_cmdCtrl, '命令', 'id'),
-      const SizedBox(height: 8),
-      vBtn('执行命令', _running ? null : _exec),
-    ])),
-  );
+  Widget buildLeftPanel(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          vSecTitle('目标配置'),
+          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          const SizedBox(height: 8),
+          vTf(_paramCtrl, 'URL 注入参数名', 'name'),
+          const SizedBox(height: 8),
+          vTf(
+            _timeoutCtrl,
+            '超时(s)',
+            '${AppConstants.defaultHttpTimeoutSeconds}',
+            type: TextInputType.number,
+          ),
+          const SizedBox(height: 8),
+          vBtn('检测 SSTI', running ? null : _check),
+          const SizedBox(height: 16),
+          vSecTitle('命令执行'),
+          vTf(_cmdCtrl, '命令', 'id'),
+          const SizedBox(height: 8),
+          vBtn('执行命令', running ? null : _exec),
+        ],
+      ),
+    );
+  }
 }

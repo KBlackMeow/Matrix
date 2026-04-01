@@ -1,103 +1,108 @@
 import 'package:flutter/material.dart';
+
+import '../../app/constants.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
-import '../../theme/app_theme.dart';
 import '_vulhub_page_helpers.dart';
+import 'base_vulhub_exp_page.dart';
 
-class SaltstackExpPage extends StatelessWidget {
+class SaltstackExpPage extends BaseVulhubExpPage {
   const SaltstackExpPage({super.key});
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: AppColors.bgDark,
-        appBar: AppBar(
-          backgroundColor: AppColors.bgElevated, elevation: 0,
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.of(context).pop()),
-          title: Row(children: [
-            const Icon(Icons.grain, color: AppColors.primary), const SizedBox(width: 8),
-            Text('SaltStack CVE-2020-16846 SSH 模块命令注入 RCE',
-                style: AppTextStyles.heading(size: 14, color: AppColors.primary)),
-          ]),
-        ),
-        body: Padding(padding: const EdgeInsets.all(24),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            vulhubInfoCard(Icons.grain, 'SaltStack CVE-2020-16846', 'SSH 模块 ssh_priv 参数命令注入，通过 REST API 触发'),
-            const SizedBox(height: 16),
-            const Expanded(child: _SaltstackCard()),
-          ]),
-        ),
-      );
+  State<SaltstackExpPage> createState() => _SaltstackPageState();
 }
 
-class _SaltstackCard extends StatefulWidget {
-  const _SaltstackCard();
+class _SaltstackPageState extends BaseVulhubExpPageState<SaltstackExpPage> {
   @override
-  State<_SaltstackCard> createState() => _SaltstackCardState();
-}
+  IconData get pageIcon => Icons.grain;
+  @override
+  String get appBarTitle => 'SaltStack CVE-2020-16846 SSH 模块命令注入 RCE';
+  @override
+  String get cardTitle => 'SaltStack CVE-2020-16846';
+  @override
+  String get cardSubtitle => 'SSH 模块 ssh_priv 参数命令注入，通过 REST API 触发';
 
-class _SaltstackCardState extends State<_SaltstackCard> {
   final _urlCtrl = TextEditingController();
   final _tokenCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
-  final _logScroll = ScrollController();
-  String _log = ''; bool _running = false;
-
-  void _log_(String l) {
-    setState(() {
-      final lines = _log.isEmpty ? <String>[] : _log.split('\n');
-      lines.add(l); if (lines.length > 500) lines.removeRange(0, lines.length - 500);
-      _log = lines.join('\n');
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_logScroll.hasClients) _logScroll.animateTo(_logScroll.position.maxScrollExtent, duration: const Duration(milliseconds: 100), curve: Curves.easeOut);
-    });
-  }
 
   SaltstackExpService _svc() => SaltstackExpService(
-    baseUrl: _urlCtrl.text.trim(),
-    token: _tokenCtrl.text.trim(),
-    timeout: Duration(seconds: int.tryParse(_timeoutCtrl.text.trim()) ?? 10),
-  );
+        baseUrl: _urlCtrl.text.trim(),
+        token: _tokenCtrl.text.trim(),
+        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+      );
 
   Future<void> _check() async {
-    if (_urlCtrl.text.trim().isEmpty) { _log_('[!] 请输入目标 URL'); return; }
-    setState(() => _running = true); _log_('[*] 检测 SaltStack API...');
-    try { final r = await _svc().check(); _log_(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到服务'); }
-    catch (e) { _log_('[!] 异常: $e'); }
-    finally { if (mounted) setState(() => _running = false); }
+    if (_urlCtrl.text.trim().isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
+    setState(() => running = true);
+    appendLog('[*] 检测 SaltStack API...');
+    try {
+      final r = await _svc().check();
+      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到服务');
+    } catch (e) {
+      appendLog('[!] 异常: $e');
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
   }
 
   Future<void> _exec() async {
-    if (_urlCtrl.text.trim().isEmpty) { _log_('[!] 请输入目标 URL'); return; }
+    if (_urlCtrl.text.trim().isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
-    setState(() => _running = true); _log_('[*] SSH 模块命令注入: $cmd');
+    setState(() => running = true);
+    appendLog('[*] SSH 模块命令注入: $cmd');
     try {
       final out = await _svc().execRce(cmd);
-      _log_(out != null && out.isNotEmpty ? '[+] 响应:\n$out' : '[-] 无响应');
-    } catch (e) { _log_('[!] 异常: $e'); }
-    finally { if (mounted) setState(() => _running = false); }
+      appendLog(out != null && out.isNotEmpty ? '[+] 响应:\n$out' : '[-] 无响应');
+    } catch (e) {
+      appendLog('[!] 异常: $e');
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
   }
 
   @override
-  void dispose() { _urlCtrl.dispose(); _tokenCtrl.dispose(); _cmdCtrl.dispose(); _timeoutCtrl.dispose(); _logScroll.dispose(); super.dispose(); }
+  void dispose() {
+    _urlCtrl.dispose();
+    _tokenCtrl.dispose();
+    _cmdCtrl.dispose();
+    _timeoutCtrl.dispose();
+    super.dispose();
+  }
 
   @override
-  Widget build(BuildContext context) => VulhubExpCardShell(
-    running: _running, log: _log, logScroll: _logScroll,
-    onClearLog: () => setState(() => _log = ''),
-    leftPanel: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      vSecTitle('目标配置'),
-      vTf(_urlCtrl, '目标 URL', 'http://target.com:8000/'),
-      const SizedBox(height: 8),
-      vTf(_tokenCtrl, 'API Token（已登录时填写）', ''),
-      const SizedBox(height: 8),
-      vTf(_timeoutCtrl, '超时(s)', '10', type: TextInputType.number),
-      const SizedBox(height: 8),
-      vBtn('检测 API', _running ? null : _check),
-      const SizedBox(height: 16),
-      vSecTitle('SSH 模块命令注入'),
-      vTf(_cmdCtrl, '命令', 'id'),
-      const SizedBox(height: 8),
-      vBtn('执行命令', _running ? null : _exec),
-    ])),
-  );
+  Widget buildLeftPanel(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          vSecTitle('目标配置'),
+          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          const SizedBox(height: 8),
+          vTf(_tokenCtrl, 'API Token（已登录时填写）', ''),
+          const SizedBox(height: 8),
+          vTf(
+            _timeoutCtrl,
+            '超时(s)',
+            '${AppConstants.defaultHttpTimeoutSeconds}',
+            type: TextInputType.number,
+          ),
+          const SizedBox(height: 8),
+          vBtn('检测 API', running ? null : _check),
+          const SizedBox(height: 16),
+          vSecTitle('SSH 模块命令注入'),
+          vTf(_cmdCtrl, '命令', 'id'),
+          const SizedBox(height: 8),
+          vBtn('执行命令', running ? null : _exec),
+        ],
+      ),
+    );
+  }
 }

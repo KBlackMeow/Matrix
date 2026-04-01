@@ -7,6 +7,13 @@ import 'package:sqflite/sqflite.dart';
 // ConflictAlgorithm is exported by sqflite
 import 'package:path_provider/path_provider.dart';
 
+import 'io/project_dao.dart';
+import 'io/payload_dao.dart';
+import 'io/scan_session_dao.dart';
+import 'io/webshell_dao.dart';
+import 'io/dictionary_dao.dart';
+import 'io/frp_profile_dao.dart';
+import 'io/meta_dao.dart';
 import '../models/project.dart';
 import '../models/webshell.dart';
 import '../models/payload.dart';
@@ -22,6 +29,22 @@ class DatabaseHelperIo {
   factory DatabaseHelperIo() => _instance;
 
   DatabaseHelperIo._internal();
+
+  late final ProjectDao _projectDao = ProjectDao(() => database);
+  late final WebshellDao _webshellDao = WebshellDao(() => database);
+  late final ScanSessionDao _scanSessionDao = ScanSessionDao(() => database);
+  late final PayloadDao _payloadDao = PayloadDao(
+        () => database,
+        payloadsDirProvider: _payloadsDir,
+        hashedFileName: _hashedFileName,
+      );
+  late final DictionaryDao _dictionaryDao = DictionaryDao(
+        () => database,
+        payloadsDirProvider: _payloadsDir,
+        hashedDictFileName: _hashedDictFileName,
+      );
+  late final FrpProfileDao _frpProfileDao = FrpProfileDao(() => database);
+  late final MetaDao _metaDao = MetaDao(() => database);
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -307,60 +330,27 @@ class DatabaseHelperIo {
   }
 
   Future<Project> createProject(String name, {required String domain, String? description}) async {
-    final db = await database;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final id = await db.insert('projects', {
-      'name': name,
-      'domain': domain,
-      'description': description,
-      'created_at': now,
-      'updated_at': now,
-    });
-    return Project(
-      id: id,
-      name: name,
+    return _projectDao.createProject(
+      name,
       domain: domain,
       description: description,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(now),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
     );
   }
 
   Future<List<Project>> getAllProjects() async {
-    final db = await database;
-    final maps = await db.query('projects', orderBy: 'updated_at DESC');
-    return maps.map((m) => Project.fromMap(m)).toList();
+    return _projectDao.getAllProjects();
   }
 
   Future<Project?> getProjectById(int id) async {
-    final db = await database;
-    final maps = await db.query('projects', where: 'id = ?', whereArgs: [id]);
-    if (maps.isEmpty) return null;
-    return Project.fromMap(maps.first);
+    return _projectDao.getProjectById(id);
   }
 
   Future<int> updateProject(Project project) async {
-    final db = await database;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return db.update(
-      'projects',
-      {
-        'name': project.name,
-        'domain': project.domain,
-        'description': project.description,
-        'updated_at': now,
-      },
-      where: 'id = ?',
-      whereArgs: [project.id],
-    );
+    return _projectDao.updateProject(project);
   }
 
   Future<int> deleteProject(int id) async {
-    final db = await database;
-    await db.delete('info_collection', where: 'project_id = ?', whereArgs: [id]);
-    await db.delete('webshells', where: 'project_id = ?', whereArgs: [id]);
-    await db.delete('scan_sessions', where: 'project_id = ?', whereArgs: [id]);
-    return db.delete('projects', where: 'id = ?', whereArgs: [id]);
+    return _projectDao.deleteProject(id);
   }
 
   // ── Scan Sessions（扫描会话持久化）────────────────────────────────────────────
@@ -371,65 +361,29 @@ class DatabaseHelperIo {
     required String target,
     String? configJson,
   }) async {
-    final db = await database;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return db.insert('scan_sessions', {
-      'project_id': projectId,
-      'scan_type': scanType,
-      'target': target,
-      'config_json': configJson,
-      'log_text': '',
-      'status': 'running',
-      'created_at': now,
-      'updated_at': now,
-    });
+    return _scanSessionDao.createScanSession(
+      projectId: projectId,
+      scanType: scanType,
+      target: target,
+      configJson: configJson,
+    );
   }
 
   Future<Map<String, dynamic>?> getLatestScanSession(int projectId, String scanType) async {
-    final db = await database;
-    final rows = await db.query(
-      'scan_sessions',
-      where: 'project_id = ? AND scan_type = ?',
-      whereArgs: [projectId, scanType],
-      orderBy: 'updated_at DESC',
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return rows.first.map((k, v) => MapEntry(k.toString(), v));
+    return _scanSessionDao.getLatestScanSession(projectId, scanType);
   }
 
   Future<void> updateScanSession(int id, {String? logText, String? status}) async {
-    final db = await database;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final updates = <String, dynamic>{'updated_at': now};
-    if (logText != null) updates['log_text'] = logText;
-    if (status != null) updates['status'] = status;
-    await db.update('scan_sessions', updates, where: 'id = ?', whereArgs: [id]);
+    return _scanSessionDao.updateScanSession(id, logText: logText, status: status);
   }
 
   /// 启动时清理遗留的 running 会话（强制退出时未能更新状态）
   Future<void> resetStaleRunningSessions() async {
-    final db = await database;
-    await db.update(
-      'scan_sessions',
-      {'status': 'interrupted', 'updated_at': DateTime.now().millisecondsSinceEpoch},
-      where: 'status = ?',
-      whereArgs: ['running'],
-    );
+    return _scanSessionDao.resetStaleRunningSessions();
   }
 
   Future<void> appendScanLog(int id, String text) async {
-    final db = await database;
-    final rows = await db.query('scan_sessions', where: 'id = ?', whereArgs: [id]);
-    if (rows.isEmpty) return;
-    final current = rows.first['log_text'] as String? ?? '';
-    final updated = current.isEmpty ? text : '$current\n$text';
-    await db.update(
-      'scan_sessions',
-      {'log_text': updated, 'updated_at': DateTime.now().millisecondsSinceEpoch},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return _scanSessionDao.appendScanLog(id, text);
   }
 
   // ── Payload 文件目录 ────────────────────────────────────────────────────────
@@ -462,17 +416,11 @@ class DatabaseHelperIo {
   // ── Meta 键值对 ─────────────────────────────────────────────────────────────
 
   Future<String?> getMetaValue(String key) async {
-    final db = await database;
-    final rows =
-        await db.query('meta', where: 'key = ?', whereArgs: [key]);
-    if (rows.isEmpty) return null;
-    return rows.first['value'] as String?;
+    return _metaDao.getMetaValue(key);
   }
 
   Future<void> setMetaValue(String key, String value) async {
-    final db = await database;
-    await db.insert('meta', {'key': key, 'value': value},
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    return _metaDao.setMetaValue(key, value);
   }
 
   Future<Payload> createPayload({
@@ -483,119 +431,26 @@ class DatabaseHelperIo {
     String? description,
     String? tags,
   }) async {
-    final db = await database;
-    final now = DateTime.now().millisecondsSinceEpoch;
-
-    // 先插入行拿到自增 ID，file_path 暂时为空
-    final id = await db.insert('payloads', {
-      'name': name,
-      'type': type,
-      'file_path': '',
-      'is_default': isDefault ? 1 : 0,
-      'description': description,
-      'tags': tags,
-      'created_at': now,
-      'updated_at': now,
-    });
-
-    // 写入本地文件（MD5 混淆文件名）
-    final dir = await _payloadsDir();
-    final file = File('${dir.path}/${_hashedFileName(id, name)}');
-    await file.writeAsString(content);
-
-    // 更新 file_path
-    await db.update(
-      'payloads',
-      {'file_path': file.path},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-
-    return Payload(
-      id: id,
+    return _payloadDao.createPayload(
       name: name,
       type: type,
       content: content,
-      filePath: file.path,
       isDefault: isDefault,
       description: description,
       tags: tags,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(now),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
     );
   }
 
   Future<List<Payload>> getAllPayloads() async {
-    final db = await database;
-    // 默认项置顶，其余按更新时间倒序
-    final maps = await db.query('payloads',
-        orderBy: 'is_default DESC, updated_at DESC');
-    final result = <Payload>[];
-    for (final m in maps) {
-      final filePath = (m['file_path'] as String?) ?? '';
-      String content = '';
-      if (filePath.isNotEmpty) {
-        try {
-          content = await File(filePath).readAsString();
-        } catch (_) {
-          content = '// 文件丢失: $filePath';
-        }
-      }
-      result.add(Payload(
-        id: m['id'] as int,
-        name: m['name'] as String,
-        type: (m['type'] as String?) ?? 'php',
-        content: content,
-        filePath: filePath,
-        isDefault: (m['is_default'] as int? ?? 0) == 1,
-        description: m['description'] as String?,
-        tags: m['tags'] as String?,
-        createdAt:
-            DateTime.fromMillisecondsSinceEpoch(m['created_at'] as int),
-        updatedAt:
-            DateTime.fromMillisecondsSinceEpoch(m['updated_at'] as int),
-      ));
-    }
-    return result;
+    return _payloadDao.getAllPayloads();
   }
 
   Future<int> updatePayload(Payload payload) async {
-    final db = await database;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    // 同步更新文件内容
-    if (payload.filePath.isNotEmpty) {
-      try {
-        await File(payload.filePath).writeAsString(payload.content);
-      } catch (_) {}
-    }
-    return db.update(
-      'payloads',
-      {
-        'name': payload.name,
-        'type': payload.type,
-        'description': payload.description,
-        'tags': payload.tags,
-        'updated_at': now,
-      },
-      where: 'id = ?',
-      whereArgs: [payload.id],
-    );
+    return _payloadDao.updatePayload(payload);
   }
 
   Future<int> deletePayload(int id) async {
-    final db = await database;
-    // 先查询 file_path 再删文件
-    final rows = await db.query('payloads',
-        columns: ['file_path'], where: 'id = ?', whereArgs: [id]);
-    if (rows.isNotEmpty) {
-      final fp = rows.first['file_path'] as String? ?? '';
-      if (fp.isNotEmpty) {
-        try {
-          await File(fp).delete();
-        } catch (_) {}
-      }
-    }
-    return db.delete('payloads', where: 'id = ?', whereArgs: [id]);
+    return _payloadDao.deletePayload(id);
   }
 
   // ── Dictionary CRUD ─────────────────────────────────────────────────────────
@@ -608,115 +463,33 @@ class DatabaseHelperIo {
     String? description,
     String? tags,
   }) async {
-    final db = await database;
-    final now = DateTime.now().millisecondsSinceEpoch;
-
-    // 先插入占位行拿到自增 ID
-    final id = await db.insert('dictionaries', {
-      'name': name,
-      'category': category,
-      'file_path': '',
-      'line_count': 0,
-      'file_size': 0,
-      'is_default': isDefault ? 1 : 0,
-      'description': description,
-      'tags': tags,
-      'created_at': now,
-      'updated_at': now,
-    });
-
-    // 写入哈希文件
-    final dir = await _payloadsDir();
-    final file = File('${dir.path}/${_hashedDictFileName(id, name)}');
-    await file.writeAsBytes(bytes);
-
-    // 统计行数和大小
-    final lineCount = bytes.where((b) => b == 10).length +
-        (bytes.isNotEmpty && bytes.last != 10 ? 1 : 0);
-    final fileSize = bytes.length;
-
-    await db.update(
-      'dictionaries',
-      {'file_path': file.path, 'line_count': lineCount, 'file_size': fileSize},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-
-    return Dictionary(
-      id: id,
+    return _dictionaryDao.createDictionary(
       name: name,
       category: category,
-      filePath: file.path,
-      lineCount: lineCount,
-      fileSize: fileSize,
+      bytes: bytes,
       isDefault: isDefault,
       description: description,
       tags: tags,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(now),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
     );
   }
 
   Future<List<Dictionary>> getAllDictionaries() async {
-    final db = await database;
-    // 默认项置顶
-    final maps = await db.query('dictionaries',
-        orderBy: 'is_default DESC, updated_at DESC');
-    return maps.map((m) => Dictionary.fromMap(m)).toList();
+    return _dictionaryDao.getAllDictionaries();
   }
 
   /// 更新字典内容（用于内置字典与 asset 同步）
   Future<void> updateDictionaryContent(Dictionary dict, List<int> bytes) async {
-    if (dict.filePath.isEmpty) return;
-    final file = File(dict.filePath);
-    await file.writeAsBytes(bytes);
-    final lineCount = bytes.where((b) => b == 10).length +
-        (bytes.isNotEmpty && bytes.last != 10 ? 1 : 0);
-    final fileSize = bytes.length;
-    final db = await database;
-    await db.update(
-      'dictionaries',
-      {
-        'line_count': lineCount,
-        'file_size': fileSize,
-        'updated_at': DateTime.now().millisecondsSinceEpoch,
-      },
-      where: 'id = ?',
-      whereArgs: [dict.id],
-    );
+    return _dictionaryDao.updateDictionaryContent(dict, bytes);
   }
 
   /// 读取字典前 [maxLines] 行作为预览
   Future<String> readDictionaryPreview(String filePath,
       {int maxLines = 300}) async {
-    if (filePath.isEmpty) return '';
-    try {
-      final lines = <String>[];
-      await File(filePath)
-          .openRead()
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .take(maxLines)
-          .forEach(lines.add);
-      return lines.join('\n');
-    } catch (_) {
-      return '// 文件丢失: $filePath';
-    }
+    return _dictionaryDao.readDictionaryPreview(filePath, maxLines: maxLines);
   }
 
   Future<int> deleteDictionary(int id) async {
-    final db = await database;
-    final rows = await db.query('dictionaries',
-        columns: ['file_path'], where: 'id = ?', whereArgs: [id]);
-    if (rows.isNotEmpty) {
-      final fp = rows.first['file_path'] as String? ?? '';
-      if (fp.isNotEmpty) {
-        try {
-          await File(fp).delete();
-        } catch (_) {}
-      }
-    }
-    return db.delete('dictionaries', where: 'id = ?', whereArgs: [id]);
+    return _dictionaryDao.deleteDictionary(id);
   }
 
   Future<Webshell> createWebshell(
@@ -728,68 +501,27 @@ class DatabaseHelperIo {
     String type = 'php',
     String connectorType = 'php_eval',
   }) async {
-    final db = await database;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final id = await db.insert('webshells', {
-      'project_id': projectId,
-      'name': name,
-      'url': url,
-      'password': password,
-      'type': type,
-      'method': method,
-      'status': 1,
-      'connector_type': connectorType,
-      'created_at': now,
-      'updated_at': now,
-    });
-    return Webshell(
-      id: id,
-      projectId: projectId,
+    return _webshellDao.createWebshell(
+      projectId,
       name: name,
       url: url,
       password: password,
-      type: type,
       method: method,
+      type: type,
       connectorType: connectorType,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(now),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
     );
   }
 
   Future<List<Webshell>> getWebshellsByProject(int projectId) async {
-    final db = await database;
-    final maps = await db.query(
-      'webshells',
-      where: 'project_id = ?',
-      whereArgs: [projectId],
-      orderBy: 'updated_at DESC',
-    );
-    return maps.map((m) => Webshell.fromMap(m)).toList();
+    return _webshellDao.getWebshellsByProject(projectId);
   }
 
   Future<int> updateWebshell(Webshell webshell) async {
-    final db = await database;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return db.update(
-      'webshells',
-      {
-        'name': webshell.name,
-        'url': webshell.url,
-        'password': webshell.password,
-        'type': webshell.type,
-        'method': webshell.method,
-        'status': webshell.status,
-        'connector_type': webshell.connectorType,
-        'updated_at': now,
-      },
-      where: 'id = ?',
-      whereArgs: [webshell.id],
-    );
+    return _webshellDao.updateWebshell(webshell);
   }
 
   Future<int> deleteWebshell(int id) async {
-    final db = await database;
-    return db.delete('webshells', where: 'id = ?', whereArgs: [id]);
+    return _webshellDao.deleteWebshell(id);
   }
 
   // ── FRP Profiles ─────────────────────────────────────────────────────────────
@@ -807,25 +539,7 @@ class DatabaseHelperIo {
     required bool useTcpMux,
     required FrpAuthMode authMode,
   }) async {
-    final db = await database;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final id = await db.insert('frp_profiles', {
-      'name': name,
-      'server_addr': serverAddr,
-      'server_port': serverPort,
-      'token': token,
-      'proxy_name': proxyName,
-      'remote_port': remotePort,
-      'local_addr': localAddr,
-      'local_port': localPort,
-      'version': version,
-      'use_tcp_mux': useTcpMux ? 1 : 0,
-      'auth_mode': authMode.name,
-      'created_at': now,
-      'updated_at': now,
-    });
-    return FrpProfile(
-      id: id,
+    return _frpProfileDao.createFrpProfile(
       name: name,
       serverAddr: serverAddr,
       serverPort: serverPort,
@@ -837,8 +551,6 @@ class DatabaseHelperIo {
       version: version,
       useTcpMux: useTcpMux,
       authMode: authMode,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(now),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
     );
   }
 
@@ -856,42 +568,28 @@ class DatabaseHelperIo {
     required bool useTcpMux,
     required FrpAuthMode authMode,
   }) async {
-    final db = await database;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final n = await db.update(
-      'frp_profiles',
-      {
-        'name': name,
-        'server_addr': serverAddr,
-        'server_port': serverPort,
-        'token': token,
-        'proxy_name': proxyName,
-        'remote_port': remotePort,
-        'local_addr': localAddr,
-        'local_port': localPort,
-        'version': version,
-        'use_tcp_mux': useTcpMux ? 1 : 0,
-        'auth_mode': authMode.name,
-        'updated_at': now,
-      },
-      where: 'id = ?',
-      whereArgs: [id],
+    return _frpProfileDao.updateFrpProfile(
+      id: id,
+      name: name,
+      serverAddr: serverAddr,
+      serverPort: serverPort,
+      token: token,
+      proxyName: proxyName,
+      remotePort: remotePort,
+      localAddr: localAddr,
+      localPort: localPort,
+      version: version,
+      useTcpMux: useTcpMux,
+      authMode: authMode,
     );
-    if (n == 0) return null;
-    final maps = await db.query('frp_profiles', where: 'id = ?', whereArgs: [id], limit: 1);
-    if (maps.isEmpty) return null;
-    return FrpProfile.fromMap(maps.first.map((k, v) => MapEntry(k, v)));
   }
 
   Future<List<FrpProfile>> getAllFrpProfiles() async {
-    final db = await database;
-    final maps = await db.query('frp_profiles', orderBy: 'updated_at DESC');
-    return maps.map((m) => FrpProfile.fromMap(m.map((k, v) => MapEntry(k, v)))).toList();
+    return _frpProfileDao.getAllFrpProfiles();
   }
 
   Future<int> deleteFrpProfile(int id) async {
-    final db = await database;
-    return db.delete('frp_profiles', where: 'id = ?', whereArgs: [id]);
+    return _frpProfileDao.deleteFrpProfile(id);
   }
 }
 

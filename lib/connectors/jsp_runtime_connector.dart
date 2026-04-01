@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../app/constants.dart';
 import 'shell_connector.dart';
 import 'shell_exec_connector.dart';
 import '../utils/encoding_utils.dart';
@@ -23,7 +24,9 @@ class JspRuntimeConnector extends ShellExecConnector {
       };
 
   String get _param =>
-      webshell.password?.isNotEmpty == true ? webshell.password! : 'mAtrix_911';
+      webshell.password?.isNotEmpty == true
+          ? webshell.password!
+          : AppConstants.defaultShellPassword;
 
   static const String _kLocalePrelude =
       'export LANG=C.UTF-8 LC_ALL=C.UTF-8 LC_CTYPE=C.UTF-8; ';

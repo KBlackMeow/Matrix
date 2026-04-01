@@ -9,8 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 
-import 'package:crypto/crypto.dart' as crypto;
-
+import '../core/crypto/behinder_crypto.dart';
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
@@ -38,29 +37,7 @@ class JspBehinderConnector extends ShellConnector {
   /// 冰蝎密钥：支持两种格式
   /// 1. 16 位十六进制（如 e45e329feb5d925b）→ 直接作为密钥，用于匹配 payload 中的 String k="xxx"
   /// 2. 其他 → 视为连接密码，密钥 = MD5(password)[0:16]
-  String get _aesKey {
-    final pass = webshell.password?.trim().isNotEmpty == true
-        ? webshell.password!.trim()
-        : 'mAtrix_911';
-    if (pass.length == 16 && _isHex16(pass)) {
-      return pass.toLowerCase();
-    }
-    final md5 = crypto.md5.convert(utf8.encode(pass)).toString();
-    return md5.substring(0, 16);
-  }
-
-  static bool _isHex16(String s) {
-    if (s.length != 16) return false;
-    for (var i = 0; i < 16; i++) {
-      final c = s.codeUnitAt(i);
-      if (!((c >= 0x30 && c <= 0x39) ||
-          (c >= 0x61 && c <= 0x66) ||
-          (c >= 0x41 && c <= 0x46))) {
-        return false;
-      }
-    }
-    return true;
-  }
+  String get _aesKey => BehinderCrypto.deriveKey(webshell.password);
 
   static bool _isHex32(String s) {
     if (s.length != 32) return false;

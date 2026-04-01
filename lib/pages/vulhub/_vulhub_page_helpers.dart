@@ -2,6 +2,8 @@
 // Each page file imports this via a part or a direct import.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import '../../app/constants.dart';
+import '../../core/log/log_buffer.dart';
 import '../../theme/app_theme.dart';
 
 Widget vulhubInfoCard(IconData icon, String title, String subtitle) => Container(
@@ -229,10 +231,14 @@ mixin VulhubLogMixin {
 
   void appendLog(String line, {required void Function(void Function()) setState}) {
     setState(() {
-      final lines = log.isEmpty ? <String>[] : log.split('\n');
-      lines.add(line);
-      if (lines.length > 500) lines.removeRange(0, lines.length - 500);
-      log = lines.join('\n');
+      final buffer = LogBuffer(maxLines: AppConstants.logBufferSize);
+      if (log.isNotEmpty) {
+        for (final existing in log.split('\n')) {
+          buffer.append(existing);
+        }
+      }
+      buffer.append(line);
+      log = buffer.joined;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (logScroll.hasClients) {

@@ -1,0 +1,304 @@
+import 'package:flutter/material.dart';
+
+import '../../theme/app_theme.dart';
+
+class MenuItem {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+
+  const MenuItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+  });
+}
+
+class SidebarMenuItem extends StatelessWidget {
+  final MenuItem item;
+  final bool isSelected;
+  final double expandProgress;
+  final VoidCallback onTap;
+
+  const SidebarMenuItem({
+    super.key,
+    required this.item,
+    required this.isSelected,
+    required this.expandProgress,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final labelOpacity = ((expandProgress - 0.3) / 0.5).clamp(0.0, 1.0);
+    final horizontalPadding = 12.0 + expandProgress * 4.0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              vertical: 12,
+              horizontal: horizontalPadding,
+            ),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.bgCard : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isSelected ? item.selectedIcon : item.icon,
+                  size: 22,
+                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                ),
+                Expanded(
+                  child: Opacity(
+                    opacity: labelOpacity,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: Text(
+                        item.label,
+                        style: TextStyle(
+                          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                          fontSize: 14,
+                          fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 工作区内容区域
+class WorkspaceContent extends StatelessWidget {
+  final String title;
+
+  const WorkspaceContent({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 欢迎卡片
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.bgCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.5),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '> 欢迎使用 Matrix',
+                  style: AppTextStyles.terminal(size: 22, color: AppColors.primary),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '当前页面：$title · 开始您的工作吧',
+                  style: AppTextStyles.body(size: 14, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          // 快捷入口
+          Text(
+            '快捷入口',
+            style: AppTextStyles.heading(size: 16, color: AppColors.primary),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _QuickActionCard(
+                icon: Icons.add_circle_outline,
+                label: '新建',
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 16),
+              _QuickActionCard(
+                icon: Icons.upload_file,
+                label: '上传',
+                color: AppColors.cyan,
+              ),
+              const SizedBox(width: 16),
+              _QuickActionCard(
+                icon: Icons.folder_open,
+                label: '打开',
+                color: AppColors.red,
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          // 最近活动
+          Text(
+            '最近活动',
+            style: AppTextStyles.heading(size: 16, color: AppColors.primary),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.bgCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.border,
+                width: 1,
+              ),
+            ),
+            child: Column(
+              children: List.generate(
+                4,
+                (index) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.bgElevated,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.4),
+                            width: 1,
+                          ),
+                        ),
+                        child: Icon(
+                          [Icons.edit, Icons.folder, Icons.insert_drive_file, Icons.share][index],
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '项目文件 ${index + 1}',
+                              style: AppTextStyles.body(size: 14, color: AppColors.textPrimary),
+                            ),
+                            Text(
+                              '${2 + index} 小时前',
+                              style: AppTextStyles.caption(color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Material(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: () {},
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            decoration: BoxDecoration(
+              color: AppColors.bgCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.border,
+                width: 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: color.withValues(alpha: 0.5),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  label,
+                  style: AppTextStyles.body(color: AppColors.textPrimary),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 赛博风格点阵网格背景（静态，零性能消耗）
+class CyberGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.primary.withValues(alpha: 0.035)
+      ..strokeWidth = 1;
+    const spacing = 28.0;
+    for (double x = 0; x < size.width; x += spacing) {
+      for (double y = 0; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), 1, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(CyberGridPainter old) => false;
+}

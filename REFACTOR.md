@@ -532,3 +532,38 @@ abstract class AppConstants {
 ```
 
 > **注意：** 每个阶段完成后应运行完整回归测试，确认功能不退化再进入下一阶段。
+
+---
+
+## 四、当前已完成（2026-04-01）
+
+### 4.1 已落地项
+
+- [x] **阶段 1 / G：提取常量**
+  - 已新增 `lib/app/constants.dart`
+  - 当前包含：`defaultShellPassword`、`logBufferSize`、`defaultHttpTimeoutSeconds`
+
+- [x] **阶段 3 / 主入口拆分（先行完成）**
+  - 已新增 `lib/app/app.dart`、`lib/app/router.dart`
+  - `lib/main.dart` 已收敛为应用启动入口，路由/壳层职责已分离
+
+- [x] **目录级重构：`lib/app/app.dart` 的 part 拆分**
+  - 已将 `lib/app/parts/layout_widgets.dart`
+  - `lib/app/parts/main_layout.dart`
+  - `lib/app/parts/exp_content.dart`
+  - `lib/app/parts/shiro_exp.dart`
+  - 从 `part/part of` 改为独立库文件（普通 `import`）
+  - 跨文件私有符号已按需公开（例如 `ExpContent`、`WorkspaceContent`、`CyberGridPainter` 等）
+
+- [x] **阶段 3 / A（部分完成）：`webshell_interactive_page` part 拆分**
+  - 已将以下文件从 `part/part of` 改为独立库文件：
+    - `lib/pages/webshell_interactive_page.dart`
+    - `lib/pages/webshell_interactive_terminal_shared.dart`
+    - `lib/pages/webshell_interactive_file_manager.dart`
+    - `lib/pages/webshell_interactive_system_priv_esc.dart`
+  - 依赖已收敛到各自文件 `import`，并完成跨文件类型暴露与引用替换（如 `TabCompleter`、`FileManagerTab`、`SystemInfoTab`、`PrivEscTab`）
+
+### 4.2 现状说明（与“目标目录图”的差异）
+
+- `webshell_interactive` 目前已完成**库级拆分**，但仍位于 `lib/pages/` 同级文件形式；尚未迁移到 `lib/pages/webshell/interactive/` 目录。
+- `A` 项中的“按 `command_tab/file_manager_tab/shell_terminal_tab/reverse_shell_tab` 完整分层”已完成第一步（去 part + 依赖收敛），后续可继续按职责进一步细拆。

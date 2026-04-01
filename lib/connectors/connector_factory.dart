@@ -1,4 +1,5 @@
 import '../models/webshell.dart';
+import '../app/constants.dart';
 import 'shell_connector.dart';
 import 'php_eval_connector.dart';
 import 'php_b64rot13_connector.dart';
@@ -75,10 +76,10 @@ class ConnectorFactory {
   /// 用于在 UI 的"密码"字段中显示提示，避免参数名混淆。
   static String defaultParam(String connectorType) => switch (connectorType) {
         'php_probe'       => '',
-        'php_behinder'    => 'mAtrix_911',
-        'jsp_behinder'    => 'mAtrix_911',
-        'jsp_classloader' => 'mAtrix_911', // 与 jsp_classloader_b64.jsp 参数名一致
-        'jsp_runtime'     => 'mAtrix_911', // 与 jsp_runtime_get.jsp 一致
+        'php_behinder'    => AppConstants.defaultShellPassword,
+        'jsp_behinder'    => AppConstants.defaultShellPassword,
+        'jsp_classloader' => AppConstants.defaultShellPassword, // 与 jsp_classloader_b64.jsp 参数名一致
+        'jsp_runtime'     => AppConstants.defaultShellPassword, // 与 jsp_runtime_get.jsp 一致
         _                 => 'cmd',
       };
 

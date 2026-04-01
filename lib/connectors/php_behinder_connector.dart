@@ -5,8 +5,7 @@ import 'dart:typed_data';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:http/http.dart' as http;
 
-import 'package:crypto/crypto.dart' as crypto;
-
+import '../core/crypto/behinder_crypto.dart';
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
 import 'shell_connector.dart';
@@ -22,29 +21,7 @@ class PhpBehinderConnector extends ShellConnector {
   late final http.Client _client = http.Client();
   final Map<String, String> _cookies = {};
 
-  String get _aesKey {
-    final pass = webshell.password?.trim().isNotEmpty == true
-        ? webshell.password!.trim()
-        : 'mAtrix_911';
-    if (pass.length == 16 && _isHex16(pass)) {
-      return pass.toLowerCase();
-    }
-    final md5 = crypto.md5.convert(utf8.encode(pass)).toString();
-    return md5.substring(0, 16);
-  }
-
-  static bool _isHex16(String s) {
-    if (s.length != 16) return false;
-    for (var i = 0; i < 16; i++) {
-      final c = s.codeUnitAt(i);
-      if (!((c >= 0x30 && c <= 0x39) ||
-          (c >= 0x61 && c <= 0x66) ||
-          (c >= 0x41 && c <= 0x46))) {
-        return false;
-      }
-    }
-    return true;
-  }
+  String get _aesKey => BehinderCrypto.deriveKey(webshell.password);
 
   @override
   Set<ConnectorCapability> get capabilities => const {

