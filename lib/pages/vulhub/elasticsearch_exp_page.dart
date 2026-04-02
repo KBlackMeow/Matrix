@@ -31,9 +31,9 @@ class _ElasticsearchPageState
   final _timeoutCtrl = TextEditingController();
 
   ElasticsearchExpService _svc() => ElasticsearchExpService(
-        baseUrl: _urlCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-      );
+    baseUrl: _urlCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+  );
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
@@ -62,7 +62,9 @@ class _ElasticsearchPageState
     appendLog('[*] Groovy 脚本 RCE: $cmd');
     try {
       final out = await _svc().execRce(cmd);
-      appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败');
+      appendLog(
+        out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败',
+      );
     } catch (e) {
       appendLog('[!] 异常: $e');
     } finally {
