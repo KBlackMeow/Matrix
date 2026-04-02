@@ -335,7 +335,6 @@ class ElasticsearchExpService {
     } catch (_) {}
     return null;
   }
-
 }
 
 class FlaskSstiExpService {
