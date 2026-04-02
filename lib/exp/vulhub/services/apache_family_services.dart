@@ -49,7 +49,8 @@ class ApacheHttpdExpService {
     Socket? socket;
     try {
       socket = isHttps
-          ? await SecureSocket.connect(host, port, timeout: timeout)
+          ? await SecureSocket.connect(host, port,
+              timeout: timeout, onBadCertificate: (_) => true)
           : await Socket.connect(host, port, timeout: timeout);
       socket.write(request.toString());
       await socket.flush();
