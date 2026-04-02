@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../pages/thinkphp_exp_page.dart';
-import '../../pages/vulhub/confluence_exp_page.dart';
 import '../../pages/vulhub/drupal_exp_page.dart';
 import '../../pages/vulhub/druid_exp_page.dart';
 import '../../pages/vulhub/elasticsearch_exp_page.dart';
@@ -104,13 +103,6 @@ class ExpContent extends StatelessWidget {
       subtitle: 'RunExecutableListener 任意命令执行 (< 7.1.0)',
       tag: 'Java · Solr',
       page: SolrExpPage(),
-    ),
-    ExpEntry(
-      icon: Icons.article,
-      title: 'Confluence CVE-2023-22527',
-      subtitle: 'OGNL 模板注入无需认证 RCE (8.0–8.5.3)',
-      tag: 'Java · Confluence',
-      page: ConfluenceExpPage(),
     ),
     ExpEntry(
       icon: Icons.water_drop,

