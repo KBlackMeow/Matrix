@@ -20,17 +20,14 @@ class _ShellshockPageState extends BaseVulhubExpPageState<ShellshockExpPage> {
   @override
   String get cardTitle => 'Bash Shellshock CVE-2014-6271';
   @override
-  String get cardSubtitle => '通过 User-Agent/Referer 环境变量注入触发 Bash 函数解析 RCE';
+  String get cardSubtitle => '通过 User-Agent 环境变量注入触发 Bash 函数解析 RCE';
 
   final _urlCtrl = TextEditingController();
-  final _cgiCtrl = TextEditingController(text: '/cgi-bin/test.cgi');
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
 
   ShellshockExpService _svc() => ShellshockExpService(
         baseUrl: _urlCtrl.text.trim(),
-        cgiPath:
-            _cgiCtrl.text.trim().isEmpty ? '/cgi-bin/test.cgi' : _cgiCtrl.text.trim(),
         timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
       );
 
@@ -42,7 +39,8 @@ class _ShellshockPageState extends BaseVulhubExpPageState<ShellshockExpPage> {
     setState(() => running = true);
     appendLog('[*] 检测 Shellshock CVE-2014-6271...');
     try {
-      final r = await _svc().check();
+      final svc = _svc();
+      final r = await svc.check(onLog: (line) => appendLog(line));
       appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到 Shellshock');
     } catch (e) {
       appendLog('[!] 异常: $e');
@@ -60,8 +58,8 @@ class _ShellshockPageState extends BaseVulhubExpPageState<ShellshockExpPage> {
     setState(() => running = true);
     appendLog('[*] Shellshock 执行: $cmd');
     try {
-      final out = await _svc().execRce(cmd);
-      appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出');
+      final out = await _svc().execRce(cmd, onLog: appendLog);
+      appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出（Shellshock 未触发或无回显）');
     } catch (e) {
       appendLog('[!] 异常: $e');
     } finally {
@@ -72,7 +70,6 @@ class _ShellshockPageState extends BaseVulhubExpPageState<ShellshockExpPage> {
   @override
   void dispose() {
     _urlCtrl.dispose();
-    _cgiCtrl.dispose();
     _cmdCtrl.dispose();
     _timeoutCtrl.dispose();
     super.dispose();
@@ -86,8 +83,6 @@ class _ShellshockPageState extends BaseVulhubExpPageState<ShellshockExpPage> {
         children: [
           vSecTitle('目标配置'),
           vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
-          const SizedBox(height: 8),
-          vTf(_cgiCtrl, 'CGI 路径', '/cgi-bin/test.cgi'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,

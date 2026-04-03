@@ -203,8 +203,11 @@ InputDecoration vInputDec(String label, String hint) => InputDecoration(
           borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.6))),
     );
 
-Widget vTf(TextEditingController c, String label, String hint, {TextInputType? type}) => TextField(
+Widget vTf(TextEditingController c, String label, String hint,
+        {TextInputType? type, bool enabled = true}) =>
+    TextField(
       controller: c,
+      enabled: enabled,
       style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
       keyboardType: type,
       decoration: vInputDec(label, hint),

