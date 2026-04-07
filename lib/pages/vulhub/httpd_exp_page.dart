@@ -108,52 +108,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
       appendLog('[!] 请输入目标 URL');
       return;
     }
-    final mode = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        String selected = 'script';
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('选择完整终端方案'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  RadioListTile<String>(
-                    value: 'script',
-                    groupValue: selected,
-                    onChanged: (v) => setState(() => selected = v!),
-                    title: const Text('内置反弹 · script 模式'),
-                  ),
-                  RadioListTile<String>(
-                    value: 'bash',
-                    groupValue: selected,
-                    onChanged: (v) => setState(() => selected = v!),
-                    title: const Text('内置反弹 · bash 模式'),
-                  ),
-                  RadioListTile<String>(
-                    value: 'socat',
-                    groupValue: selected,
-                    onChanged: (v) => setState(() => selected = v!),
-                    title: const Text('socat 反弹（手动执行）'),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(null),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(selected),
-                  child: const Text('确定'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+    final mode = await showReverseShellModeDialog(context);
     if (mode == null) return;
 
     final lhost = _lhostCtrl.text.trim();
@@ -167,6 +122,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
     _rs.lport = lport;
     _rs.saveConfig();
 
+    if (!mounted) return;
     final nav = Navigator.of(context);
     _rs.onSession = (session) {
       session.label = 'HTTPd-CVE-2021-41773';

@@ -32,6 +32,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
+  final _credCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController(text: AppConstants.defaultShellPassword);
 
   SpringVulnType _selected = SpringVulnType.springCloudFunction;
@@ -39,6 +40,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   SpringExpService _svc() => SpringExpService(
         url: _urlCtrl.text.trim(),
         timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+        credentials: _credCtrl.text.trim(),
       );
 
   Future<void> _check() async {
@@ -151,47 +153,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
       appendLog('[!] 请输入目标 URL');
       return;
     }
-    final mode = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        String selected = 'script';
-        return StatefulBuilder(
-          builder: (context, setState) => AlertDialog(
-            title: const Text('选择完整终端方案'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                RadioListTile<String>(
-                  value: 'script',
-                  groupValue: selected,
-                  onChanged: (v) => setState(() => selected = v!),
-                  title: const Text('内置反弹 · script 模式'),
-                  subtitle: const Text('优先 script，失败回退 bash/sh', style: TextStyle(fontSize: 11)),
-                ),
-                RadioListTile<String>(
-                  value: 'bash',
-                  groupValue: selected,
-                  onChanged: (v) => setState(() => selected = v!),
-                  title: const Text('内置反弹 · bash 模式'),
-                  subtitle: const Text('仅使用 bash/sh 反弹', style: TextStyle(fontSize: 11)),
-                ),
-                RadioListTile<String>(
-                  value: 'socat',
-                  groupValue: selected,
-                  onChanged: (v) => setState(() => selected = v!),
-                  title: const Text('socat 反弹（手动执行）'),
-                  subtitle: const Text('目标上手动执行命令获得完整 TTY', style: TextStyle(fontSize: 11)),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-              FilledButton(onPressed: () => Navigator.pop(context, selected), child: const Text('确定')),
-            ],
-          ),
-        );
-      },
-    );
+    final mode = await showReverseShellModeDialog(context);
     if (mode == null) return;
 
     if (mode == 'socat') {
@@ -282,6 +244,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
     _urlCtrl.dispose();
     _cmdCtrl.dispose();
     _timeoutCtrl.dispose();
+    _credCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
@@ -292,6 +255,9 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         vSecTitle('目标配置'),
         vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+        const SizedBox(height: 8),
+        vTf(_credCtrl, 'Basic Auth 凭据', 'user:pass（CVE-2016-4977 / Spring4Shell）',
+            enabled: !running),
         const SizedBox(height: 8),
         vTf(
           _timeoutCtrl,

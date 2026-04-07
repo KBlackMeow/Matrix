@@ -38,11 +38,15 @@ class _SaltstackPageState extends BaseVulhubExpPageState<SaltstackExpPage> {
       appendLog('[!] 请输入目标 URL');
       return;
     }
+    if (_tokenCtrl.text.trim().isEmpty) {
+      appendLog('[!] 请输入 API Token');
+      return;
+    }
     setState(() => running = true);
     appendLog('[*] 检测 SaltStack API...');
     try {
       final r = await _svc().check();
-      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到服务');
+      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到服务: ${r.detail}');
     } catch (e) {
       appendLog('[!] 异常: $e');
     } finally {
@@ -53,6 +57,10 @@ class _SaltstackPageState extends BaseVulhubExpPageState<SaltstackExpPage> {
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
       appendLog('[!] 请输入目标 URL');
+      return;
+    }
+    if (_tokenCtrl.text.trim().isEmpty) {
+      appendLog('[!] 请输入 API Token');
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -86,7 +94,7 @@ class _SaltstackPageState extends BaseVulhubExpPageState<SaltstackExpPage> {
           vSecTitle('目标配置'),
           vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
           const SizedBox(height: 8),
-          vTf(_tokenCtrl, 'API Token（已登录时填写）', ''),
+          vTf(_tokenCtrl, 'API Token *', ''),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,

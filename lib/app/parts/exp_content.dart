@@ -6,6 +6,7 @@ import '../../pages/vulhub/druid_exp_page.dart';
 import '../../pages/vulhub/elasticsearch_exp_page.dart';
 import '../../pages/vulhub/flask_ssti_exp_page.dart';
 import '../../pages/vulhub/httpd_exp_page.dart';
+import '../../pages/vulhub/aria2_exp_page.dart';
 import '../../pages/vulhub/nacos_exp_page.dart';
 import '../../pages/vulhub/ofbiz_exp_page.dart';
 import '../../pages/vulhub/php_exp_page.dart';
@@ -180,6 +181,13 @@ class ExpContent extends StatelessWidget {
       subtitle: 'SSH 模块 ssh_priv 参数命令注入 RCE',
       tag: 'Python · SaltStack',
       page: SaltstackExpPage(),
+    ),
+    ExpEntry(
+      icon: Icons.download,
+      title: 'Aria2 未授权 RPC → Cron 写入 RCE',
+      subtitle: 'JSON-RPC 未授权，addUri 写入 /etc/cron.d/ 触发反弹 Shell',
+      tag: 'C · Aria2',
+      page: Aria2ExpPage(),
     ),
   ];
 

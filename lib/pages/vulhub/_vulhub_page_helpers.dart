@@ -2,8 +2,6 @@
 // Each page file imports this via a part or a direct import.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
-import '../../app/constants.dart';
-import '../../core/log/log_buffer.dart';
 import '../../theme/app_theme.dart';
 
 Widget vulhubInfoCard(IconData icon, String title, String subtitle) => Container(
@@ -224,30 +222,55 @@ Widget vBtn(String label, VoidCallback? onPressed) => SizedBox(
       ),
     );
 
-/// Mixin: log management helpers for Vulhub exp page states.
-mixin VulhubLogMixin {
-  String get log;
-  set log(String v);
-  ScrollController get logScroll;
-  bool get running;
-  set running(bool v);
-
-  void appendLog(String line, {required void Function(void Function()) setState}) {
-    setState(() {
-      final buffer = LogBuffer(maxLines: AppConstants.logBufferSize);
-      if (log.isNotEmpty) {
-        for (final existing in log.split('\n')) {
-          buffer.append(existing);
-        }
-      }
-      buffer.append(line);
-      log = buffer.joined;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (logScroll.hasClients) {
-        logScroll.animateTo(logScroll.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 100), curve: Curves.easeOut);
-      }
-    });
-  }
+/// Shows the reverse-shell mode picker dialog used by exploit pages.
+/// Returns the selected mode string ('script' | 'bash' | 'socat') or null if cancelled.
+Future<String?> showReverseShellModeDialog(BuildContext context) {
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) {
+      String selected = 'script';
+      return StatefulBuilder(
+        builder: (ctx2, setInner) => AlertDialog(
+          title: const Text('选择完整终端方案'),
+          content: RadioGroup<String>(
+            groupValue: selected,
+            onChanged: (v) { if (v != null) setInner(() => selected = v); },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                RadioListTile<String>(
+                  value: 'script',
+                  title: Text('内置反弹 · script 模式'),
+                  subtitle: Text('优先 script，失败回退 bash/sh',
+                      style: TextStyle(fontSize: 11)),
+                ),
+                RadioListTile<String>(
+                  value: 'bash',
+                  title: Text('内置反弹 · bash 模式'),
+                  subtitle: Text('仅使用 bash/sh 反弹',
+                      style: TextStyle(fontSize: 11)),
+                ),
+                RadioListTile<String>(
+                  value: 'socat',
+                  title: Text('socat 反弹（手动执行）'),
+                  subtitle: Text('目标上手动执行命令获得完整 TTY',
+                      style: TextStyle(fontSize: 11)),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx2),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx2, selected),
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
