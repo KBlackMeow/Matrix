@@ -28,7 +28,7 @@ import '../theme/app_theme.dart';
 import '../widgets/dirsearch_card.dart';
 import '../widgets/port_scan_card.dart';
 
-/// 信息收集入口：4 种扫描类型
+/// 信息收集入口：3 种扫描类型
 class InfoCollectionLandingPage extends StatelessWidget {
   final Project project;
   final VoidCallback onSwitchProject;
@@ -131,14 +131,6 @@ class InfoCollectionLandingPage extends StatelessWidget {
                       tag: 'dirsearch',
                       onTap: () =>
                           _navigateTo(context, _DirectoryScanPage(project: project)),
-                    ),
-                    _ScanTypeCard(
-                      icon: Icons.fingerprint,
-                      title: '指纹信息扫描',
-                      subtitle: '识别 CMS、框架、中间件等组件',
-                      tag: 'Wappalyzer',
-                      onTap: () => _navigateTo(
-                          context, _FingerprintScanPage(project: project)),
                     ),
                     _ScanTypeCard(
                       icon: Icons.bug_report,
@@ -309,23 +301,6 @@ class _PortScanPage extends StatelessWidget {
         projectId: project.id,
         initialTarget: _initialTarget(),
       ),
-    );
-  }
-}
-
-/// 指纹扫描页（占位）
-class _FingerprintScanPage extends StatelessWidget {
-  final Project project;
-
-  const _FingerprintScanPage({required this.project});
-
-  @override
-  Widget build(BuildContext context) {
-    return _PlaceholderScanPage(
-      icon: Icons.fingerprint,
-      title: '指纹信息扫描',
-      subtitle: 'CMS/框架识别功能开发中',
-      project: project,
     );
   }
 }
@@ -540,21 +515,7 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
     }
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => Scaffold(
-          backgroundColor: AppColors.bgDark,
-          appBar: AppBar(
-            backgroundColor: AppColors.bgElevated,
-            elevation: 0,
-            title: Text(
-              v.name,
-              style: AppTextStyles.heading(size: 14, color: AppColors.primary),
-            ),
-          ),
-          body: Padding(
-            padding: const EdgeInsets.all(24),
-            child: page,
-          ),
-        ),
+        builder: (_) => page,
       ),
     );
   }
@@ -834,43 +795,3 @@ class _FoundVuln {
   _FoundVuln({required this.type, required this.name, required this.detail});
 }
 
-class _PlaceholderScanPage extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Project project;
-
-  const _PlaceholderScanPage({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.project,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 64, color: AppColors.textSecondary.withValues(alpha: 0.5)),
-          const SizedBox(height: 24),
-          Text(
-            title,
-            style: AppTextStyles.heading(size: 18, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: AppTextStyles.body(size: 14, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '目标: ${project.domain}',
-            style: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
-          ),
-        ],
-      ),
-    );
-  }
-}
