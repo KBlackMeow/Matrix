@@ -84,3 +84,5 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 tools/*
+vulhub-rce-list.md
+.gitignore
