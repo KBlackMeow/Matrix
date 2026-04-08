@@ -45,6 +45,26 @@
 
 ---
 
+## Matrix 工具对齐说明（2026-04）
+
+> 本文档保留完整 Vulhub 漏洞索引，同时标注当前 Matrix 内置模块的实现状态与实战价值（以“可直接利用、兼容性、可稳定落地 shell”为准）。
+
+### 当前高价值（建议优先）
+
+- `Apache Tomcat CVE-2017-12615`：PUT 直写 JSP，检测/执行/GetShell 链路完整。
+- `Apache Struts2 S2-032 / S2-045 / S2-053 / S2-057 / S2-059`：已保留，支持稳定检测与命令执行；其中多条支持文件写入 GetShell。
+- `Spring4Shell CVE-2022-22965`、`Drupal CVE-2018-7600`：命令执行与落地能力较强，实战价值高。
+
+### 已下线（低价值 / 条件复杂 / 通用性差）
+
+- `S2-005`：回显与 shell 语义不稳定，更多用于“可执行证明”而非稳定武器化。
+- `S2-007`：依赖字段与报错链，环境耦合高。
+- `S2-052`：盲注特征明显，回显弱，落地效率低。
+- `Openfire CVE-2023-32315`：当前实现链路未完成插件上传闭环。
+- `RocketMQ CVE-2023-33246`：二进制协议 + 盲注触发，验证成本高、通用性低。
+
+---
+
 ## Apache ActiveMQ
 
 ### CVE-2023-46604 — OpenWire 反序列化 RCE
@@ -329,11 +349,16 @@ curl -X POST http://<target-ip>:8983/solr/demo/update \
 
 ## Apache Struts2
 
-### S2-005 (CVE-2010-1870) — OGNL 参数名注入
+### S2-005 (CVE-2010-1870) — OGNL 参数名注入（工具已下线）
 
 - **影响版本：** Struts 2.0.0 - 2.1.8.1
 - **目录：** `struts2/s2-005`
 - **出处：** `/Users/illya/Projects/vulhub-master/struts2/s2-005/README.md`
+- **Matrix 状态：** 已下线（低价值）
+- **下线原因：**
+  - 官方 GET PoC 以盲注/无回显为主，稳定性受环境影响明显。
+  - 命令链多为 `Runtime.exec(split)` 语义，重定向/管道等 shell 特性兼容差。
+  - 更适合作为“RCE 触发证明”，不适合生产级稳定利用链。
 
 **PoC：**
 
@@ -344,11 +369,13 @@ Host: <target-ip>:8080
 
 ---
 
-### S2-007 — 表单验证 OGNL 注入
+### S2-007 — 表单验证 OGNL 注入（工具已下线）
 
 - **影响版本：** Struts 2.0.0 - 2.2.3
 - **目录：** `struts2/s2-007`
 - **出处：** `/Users/illya/Projects/vulhub-master/struts2/s2-007/README.md`
+- **Matrix 状态：** 已下线（低价值）
+- **下线原因：** 强依赖特定表单字段与报错回显链，跨目标通用性较差。
 
 **PoC：**
 
@@ -364,6 +391,8 @@ age=' + (#_memberAccess["allowStaticMethodAccess"]=true,#foo=new java.lang.Boole
 - **影响版本：** Struts 2.3.20 - 2.3.28
 - **目录：** `struts2/s2-032`
 - **出处：** `/Users/illya/Projects/vulhub-master/struts2/s2-032/README.md`
+- **Matrix 状态：** 保留（高价值）
+- **利用特征：** 回显链明确，命令执行稳定，可作为 Struts2 首选检测入口之一。
 
 **PoC：**
 
@@ -379,6 +408,8 @@ Host: <target-ip>:8080
 - **影响版本：** Struts 2.3.5 - 2.3.31, 2.5 - 2.5.10
 - **目录：** `struts2/s2-045`
 - **出处：** `/Users/illya/Projects/vulhub-master/struts2/s2-045/README.md`
+- **Matrix 状态：** 保留（高价值）
+- **利用特征：** 兼容性高，命令执行稳定，支持文件写入链路（GetShell）。
 
 **PoC：**
 
@@ -391,11 +422,13 @@ Content-Length: 0
 
 ---
 
-### S2-052 — REST API XML 反序列化 RCE
+### S2-052 — REST API XML 反序列化 RCE（工具已下线）
 
 - **影响版本：** Struts 2.1.2 - 2.3.33, 2.5 - 2.5.12
 - **目录：** `struts2/s2-052`
 - **出处：** `/Users/illya/Projects/vulhub-master/struts2/s2-052/README.md`
+- **Matrix 状态：** 已下线（低价值）
+- **下线原因：** 盲注场景为主，回显弱、验证成本高，实战链路不稳定。
 
 **PoC：**
 
@@ -450,6 +483,8 @@ Content-Type: application/xml
 - **影响版本：** Struts 2.0.1 - 2.3.33, 2.5 - 2.5.10
 - **目录：** `struts2/s2-053`
 - **出处：** `/Users/illya/Projects/vulhub-master/struts2/s2-053/README.md`
+- **Matrix 状态：** 保留（高价值）
+- **利用特征：** 回显清晰、命令链稳定，支持文件落地与 GetShell。
 
 **PoC（POST body）：**
 
@@ -464,6 +499,8 @@ name=%{(#dm=@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS).(#_memberAccess?(#_memberAc
 - **影响版本：** Struts <= 2.3.34, 2.5.16
 - **目录：** `struts2/s2-057`
 - **出处：** `/Users/illya/Projects/vulhub-master/struts2/s2-057/README.md`
+- **Matrix 状态：** 保留（高价值）
+- **利用特征：** 结果在 `Location` 头回显，需禁用重定向跟随；支持 GetShell。
 
 **PoC：**
 
@@ -482,6 +519,8 @@ curl "http://<target-ip>:8080/struts2-showcase/%24%7B%23_memberAccess%3d@ognl.Og
 - **影响版本：** Struts 2.0.0 - 2.5.20
 - **目录：** `struts2/s2-059`
 - **出处：** `/Users/illya/Projects/vulhub-master/struts2/s2-059/README.md`
+- **Matrix 状态：** 保留（高价值）
+- **利用特征：** 利用链成熟，支持命令执行与文件写入通道。
 
 **PoC（POST body）：**
 
@@ -951,6 +990,8 @@ SELECT 1 AS "\']=0;require=process.mainModule.constructor._load;/*",
 - **漏洞类型：** UTF-16 路径穿越（setup 环境绕过认证）
 - **目录：** `openfire/CVE-2023-32315`
 - **出处：** `/Users/illya/Projects/vulhub-master/openfire/CVE-2023-32315/README.md`
+- **Matrix 状态：** 已下线（低价值）
+- **下线原因：** 当前实现未内嵌完整插件上传闭环，实战链路不完整。
 
 **PoC：**
 
@@ -1092,6 +1133,8 @@ redis-cli -h <target-ip> EVAL \
 - **漏洞类型：** rocketmqHome 配置参数命令注入
 - **目录：** `rocketmq/CVE-2023-33246`
 - **出处：** `/Users/illya/Projects/vulhub-master/rocketmq/CVE-2023-33246/README.md`
+- **Matrix 状态：** 已下线（低价值）
+- **下线原因：** 依赖 Remoting 二进制协议与盲注触发，回显弱且验证成本高。
 
 **PoC：**
 
@@ -1573,6 +1616,18 @@ curl -X POST http://<target-ip>:9999/run \
 
 ## 统计汇总
 
+### Matrix 当前版本重点映射
+
+| 模块 | 状态 | 价值 | 备注 |
+|------|------|------|------|
+| Struts2 S2-032/045/053/057/059 | 保留 | 高 | 支持稳定检测与命令执行，部分支持 GetShell |
+| Struts2 S2-005/007/052 | 下线 | 低 | 盲注/回显弱/环境依赖强，通用性差 |
+| Tomcat CVE-2017-12615 | 保留 | 高 | PUT 直写 JSP，链路短、成功率高 |
+| Openfire CVE-2023-32315 | 下线 | 低 | 当前实现未形成插件上传闭环 |
+| RocketMQ CVE-2023-33246 | 下线 | 低 | 二进制协议盲注，验证成本高 |
+
+---
+
 | 编号 | 漏洞 / CVE | 影响软件 | 漏洞类型 |
 |------|-----------|----------|---------|
 | 1 | CVE-2023-46604 | Apache ActiveMQ | OpenWire 反序列化 |
@@ -1586,11 +1641,11 @@ curl -X POST http://<target-ip>:9999/run \
 | 9 | CVE-2024-45195 | Apache OFBiz | 文件上传 + 反序列化 |
 | 10 | CVE-2016-4437 | Apache Shiro | RememberMe 反序列化 |
 | 11 | CVE-2017-12629 | Apache Solr | RunExecutableListener |
-| 12 | S2-005 | Apache Struts2 | OGNL 参数名注入 |
-| 13 | S2-007 | Apache Struts2 | 表单验证 OGNL 注入 |
+| 12 | S2-005（已下线） | Apache Struts2 | OGNL 参数名注入 |
+| 13 | S2-007（已下线） | Apache Struts2 | 表单验证 OGNL 注入 |
 | 14 | S2-032 | Apache Struts2 | DMI OGNL 注入 |
 | 15 | S2-045 (CVE-2017-5638) | Apache Struts2 | Content-Type OGNL |
-| 16 | S2-052 | Apache Struts2 | REST XML 反序列化 |
+| 16 | S2-052（已下线） | Apache Struts2 | REST XML 反序列化 |
 | 17 | S2-053 | Apache Struts2 | Freemarker OGNL |
 | 18 | S2-057 (CVE-2018-11776) | Apache Struts2 | Namespace OGNL |
 | 19 | S2-059 (CVE-2019-0230) | Apache Struts2 | 标签属性二次求值 |
@@ -1612,14 +1667,14 @@ curl -X POST http://<target-ip>:9999/run \
 | 35 | CVE-2021-29442 | Nacos | Derby SQL RCE |
 | 36 | CVE-2017-14849 | Node.js | 路径穿越 |
 | 37 | CVE-2017-16082 | node-postgres | 代码注入 |
-| 38 | CVE-2023-32315 | Openfire | 认证绕过插件上传 |
+| 38 | CVE-2023-32315（已下线） | Openfire | 认证绕过插件上传 |
 | 39 | PHP 8.1.0-dev 后门 | PHP | User-Agentt 后门 |
 | 40 | CVE-2012-1823 | PHP-CGI | 参数注入 |
 | 41 | CVE-2019-11043 | PHP-FPM | 缓冲区溢出 |
 | 42 | PHP XDebug | PHP XDebug | DBGp 远程调试 |
 | 43 | CVE-2019-5418 | Rails | Accept 头路径穿越 |
 | 44 | CVE-2022-0543 | Redis | Lua 沙箱逃逸 |
-| 45 | CVE-2023-33246 | RocketMQ | 命令注入 |
+| 45 | CVE-2023-33246（已下线） | RocketMQ | 命令注入 |
 | 46 | CVE-2023-37582 | RocketMQ | 任意文件写入 |
 | 47 | CVE-2020-11651 | SaltStack | 认证绕过 |
 | 48 | CVE-2020-16846 | SaltStack | SSH 模块命令注入 |

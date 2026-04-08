@@ -75,7 +75,10 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
       Struts2VulnType? firstHit;
       for (final t in Struts2VulnType.values) {
         appendLog('[*] 检测 ${t.label}...');
-        final effectivePath = t == Struts2VulnType.s2053 ? 'hello.action' : path;
+        final effectivePath = switch (t) {
+          Struts2VulnType.s2053 => 'hello.action',
+          _ => path,
+        };
         final r = await svc.checkSingle(t, path: effectivePath);
         if (r.vulnerable) {
           appendLog('[+] ${r.vulnName}: ${r.detail}');
@@ -87,11 +90,11 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
       if (firstHit != null && mounted) {
         setState(() {
           _selected = firstHit!;
-          if (firstHit == Struts2VulnType.s2053) {
-            _pathCtrl.text = 'hello.action';
-          } else if (firstHit == Struts2VulnType.s2057) {
-            _pathCtrl.text = 'struts2-showcase';
-          }
+          _pathCtrl.text = switch (firstHit) {
+            Struts2VulnType.s2053 => 'hello.action',
+            Struts2VulnType.s2057 => 'struts2-showcase',
+            _ => _pathCtrl.text,
+          };
         });
         appendLog('[*] 已自动选择首个命中漏洞: ${firstHit.label}');
       }
@@ -327,7 +330,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
           const SizedBox(height: 8),
           vTf(_timeoutCtrl, '超时(s)', '10', type: TextInputType.number),
           const SizedBox(height: 8),
-          vTf(_pathCtrl, 'S2-053/057 路径', 'struts2-showcase / hello'),
+          vTf(_pathCtrl, '路径 (005/007/052/053/057)', 'struts2-showcase'),
           const SizedBox(height: 16),
           vSecTitle('漏洞选择'),
           DropdownButtonFormField<Struts2VulnType>(
@@ -344,12 +347,14 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
                 ? null
                 : (t) {
                     if (t == null) return;
-                    setState(() => _selected = t);
-                    if (t == Struts2VulnType.s2053) {
-                      _pathCtrl.text = 'hello.action';
-                    } else if (t == Struts2VulnType.s2057) {
-                      _pathCtrl.text = 'struts2-showcase';
-                    }
+                    setState(() {
+                      _selected = t;
+                      _pathCtrl.text = switch (t) {
+                        Struts2VulnType.s2053 => 'hello.action',
+                        Struts2VulnType.s2057 => 'struts2-showcase',
+                        _ => _pathCtrl.text,
+                      };
+                    });
                   },
             decoration: vInputDec('CVE', ''),
           ),

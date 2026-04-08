@@ -7,6 +7,7 @@ import '../../pages/vulhub/elasticsearch_exp_page.dart';
 import '../../pages/vulhub/flask_ssti_exp_page.dart';
 import '../../pages/vulhub/httpd_exp_page.dart';
 import '../../pages/vulhub/aria2_exp_page.dart';
+import '../../pages/vulhub/confluence_exp_page.dart';
 import '../../pages/vulhub/nacos_exp_page.dart';
 import '../../pages/vulhub/ofbiz_exp_page.dart';
 import '../../pages/vulhub/php_exp_page.dart';
@@ -142,10 +143,17 @@ class ExpContent extends StatelessWidget {
     ),
     ExpEntry(
       icon: Icons.dns,
-      title: 'Oracle WebLogic CVE-2017-10271 / CVE-2020-14882',
-      subtitle: 'XMLDecoder 反序列化 + 控制台未授权 RCE',
+      title: 'Oracle WebLogic CVE-2017-10271 / CVE-2020-14882 / CVE-2018-2894',
+      subtitle: 'XMLDecoder 反序列化 + 控制台未授权 + WS 测试页文件上传 RCE',
       tag: 'Java · WebLogic',
       page: WebLogicExpPage(),
+    ),
+    ExpEntry(
+      icon: Icons.article,
+      title: 'Confluence CVE-2023-22527 OGNL 注入 RCE',
+      subtitle: 'Velocity 模板注入 → OGNL 执行，无需认证 (8.0 – 8.5.3)',
+      tag: 'Java · Confluence',
+      page: ConfluenceExpPage(),
     ),
     ExpEntry(
       icon: Icons.settings_applications,

