@@ -2,14 +2,27 @@
 
 基于 Flutter 构建的跨平台渗透测试框架，支持 macOS、Windows、Linux。
 
-## 主要功能
+## 项目介绍
 
-- **Webshell 管理**：支持 PHP / JSP / ASP 多种协议，提供交互式终端与文件管理
-- **漏洞利用**：内置 Apache Shiro、ThinkPHP、Zentao 利用模块，通用 POC 引擎支持 389 条 YAML 规则
-- **网络侦察**：端口扫描、Web 目录枚举、服务指纹识别、ICMP/NetBIOS 探测
-- **暴力破解**：支持 MySQL、Redis、FTP、SMB、MSSQL 等常见服务
-- **反弹 Shell**：多平台 Shell 生成与交互式监听
-- **内网穿透**：集成 FRP，支持 TCP/SOCKS5 隧道
+Matrix 是一个基于 Flutter 的跨平台安全测试工具，支持 macOS、Windows、Linux。当前版本聚焦于 Web 漏洞利用与 Webshell 管理，提供从漏洞验证到命令执行的实战化流程。
+
+## 支持的功能
+
+- Webshell 管理与交互式命令执行
+- 多类型 Webshell 连接器支持（PHP / JSP / ASP / ASPX）
+- Vulhub 系列漏洞利用模块
+- ThinkPHP、Shiro、Zentao 等常见漏洞利用能力
+- 快速验证与批量化利用流程支持
+
+## 支持的 EXP 类型
+
+- Vulhub RCE 系列 EXP
+- Struts2 系列 EXP（S2）
+- Spring 系列 EXP
+- ThinkPHP 系列 EXP
+- Shiro 系列 EXP
+- Zentao EXP
+- 其他常见中间件与组件漏洞 EXP（如 Tomcat、WebLogic、Nacos、Drupal、Elasticsearch、Shellshock 等）
 
 ## 快速开始
 

