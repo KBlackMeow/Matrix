@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:pointycastle/block/aes.dart';
 import 'package:pointycastle/api.dart';
+import '../core/net/net_client.dart';
 
 // ---------------------------------------------------------------------------
 // 配置
@@ -189,6 +190,10 @@ class FrpClientService {
 
   // ---- TCP ----
   Socket? _tcpSocket;
+  final NetClient _netClient = NetClient(
+    connectTimeout: const Duration(seconds: 10),
+    readTimeout: const Duration(seconds: 10),
+  );
   bool _tcpActive = false;
   StreamSubscription<List<int>>? _tcpSub;
   Timer? _pingTimer;
@@ -272,7 +277,10 @@ class FrpClientService {
 
   Future<void> _connect(FrpTunnelConfig cfg) async {
     _log('正在连接 ${cfg.serverAddr}:${cfg.serverPort}  tcpMux=${cfg.useTcpMux}');
-    _tcpSocket = await Socket.connect(cfg.serverAddr, cfg.serverPort);
+    _tcpSocket = (await _netClient.connectTcp(cfg.serverAddr, cfg.serverPort))?.rawSocket;
+    if (_tcpSocket == null) {
+      throw Exception('无法连接 FRP 服务端');
+    }
     _tcpSocket!.setOption(SocketOption.tcpNoDelay, true);
     _tcpActive = true;
     _log('TCP 已连接');
@@ -786,6 +794,7 @@ class FrpClientService {
 
   Future<void> _openWorkConn(FrpTunnelConfig cfg) async {
     Socket? local;
+    SocketConnection? localConn;
     StreamSubscription<List<int>>? workSub;
     void Function()? closeWork;
     try {
@@ -853,8 +862,11 @@ class FrpClientService {
         };
       } else {
         // ---- 非 tcpMux 模式：新 TCP 连接 ----
-        final workSocket =
-            await Socket.connect(cfg.serverAddr, cfg.serverPort);
+        final workConn = await _netClient.connectTcp(cfg.serverAddr, cfg.serverPort);
+        if (workConn == null) {
+          throw Exception('无法建立 FRP 工作连接');
+        }
+        final workSocket = workConn.rawSocket;
         final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
         final body = <String, dynamic>{
           'run_id': _runId ?? '',
@@ -905,7 +917,11 @@ class FrpClientService {
       await ready.future.timeout(const Duration(hours: 24),
           onTimeout: () => throw TimeoutException('等待 StartWorkConn 超时（24h）'));
 
-      local = await Socket.connect(cfg.localAddr, cfg.localPort);
+      localConn = await _netClient.connectTcp(cfg.localAddr, cfg.localPort);
+      if (localConn == null) {
+        throw Exception('无法连接本地服务 ${cfg.localAddr}:${cfg.localPort}');
+      }
+      local = localConn.rawSocket;
       _log('桥接成功：frps ↔ ${cfg.localAddr}:${cfg.localPort}');
 
       if (postHandshakeBuf.isNotEmpty) local.add(postHandshakeBuf);
@@ -920,13 +936,14 @@ class FrpClientService {
 
       local.listen(
         sendToWork,
-        onDone: closeWork!,
-        onError: (_) => closeWork!(),
+        onDone: () => closeWork?.call(),
+        onError: (_) => closeWork?.call(),
         cancelOnError: true,
       );
     } catch (e) {
       _log('工作连接失败：$e');
       local?.destroy();
+      await localConn?.close();
       await workSub?.cancel();
       closeWork?.call(); // 发送 yamux FIN、关闭流并从 _muxStreams 移除，避免影响后续连接
     }

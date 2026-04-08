@@ -40,9 +40,11 @@ class _DirsearchCardState extends State<DirsearchCard> {
 
   int? _sessionId;
   StreamSubscription<DirscanProgress>? _progressSubscription;
+  StreamSubscription<DirscanFoundEvent>? _foundSubscription;
   Timer? _pollTimer;
   final _scanSession = ScanSessionService();
   final _bgService = DirscanBackgroundService();
+  final Set<String> _resultKeys = <String>{};
 
   @override
   void initState() {
@@ -58,26 +60,15 @@ class _DirsearchCardState extends State<DirsearchCard> {
       setState(() {
         if (meta.target != null) _urlController.text = meta.target!;
         if (meta.log.isNotEmpty) {
-          _results = meta.log
-              .split('\n')
-              .where((l) => l.contains('|'))
-              .map((l) {
-            final p = l.split('|');
-            if (p.length >= 3) {
-              return DirsearchResult(
-                path: p[0],
-                statusCode: int.tryParse(p[1]) ?? 0,
-                contentLength: int.tryParse(p[2]) ?? 0,
-              );
-            }
-            return null;
-          }).whereType<DirsearchResult>().toList();
+          _results = _parseResultsFromLog(meta.log);
+          _rebuildResultKeys();
         }
         if (meta.status == 'running') {
           _running = true;
           _sessionId = meta.id;
           _startPolling();
           _subscribeProgress();
+          _subscribeFound();
         }
       });
     }
@@ -119,6 +110,25 @@ class _DirsearchCardState extends State<DirsearchCard> {
     });
   }
 
+  void _subscribeFound() {
+    _foundSubscription?.cancel();
+    final sid = _sessionId;
+    if (sid == null) return;
+    _foundSubscription = _bgService.foundEvents.listen((event) {
+      if (!mounted || event.sessionId != sid) return;
+      final key = _resultKey(event.result);
+      if (_resultKeys.contains(key)) return;
+      setState(() {
+        _results.add(event.result);
+        _resultKeys.add(key);
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_resultsScrollController.hasClients) return;
+        _resultsScrollController.jumpTo(_resultsScrollController.position.maxScrollExtent);
+      });
+    });
+  }
+
   void _stopPolling() {
     _pollTimer?.cancel();
     _pollTimer = null;
@@ -129,20 +139,8 @@ class _DirsearchCardState extends State<DirsearchCard> {
     final meta = await _scanSession.loadSessionWithMeta(widget.projectId!, 'dir_scan');
     if (meta == null || !mounted) return;
     setState(() {
-      _results = meta.log
-          .split('\n')
-          .where((l) => l.contains('|'))
-          .map((l) {
-        final p = l.split('|');
-        if (p.length >= 3) {
-          return DirsearchResult(
-            path: p[0],
-            statusCode: int.tryParse(p[1]) ?? 0,
-            contentLength: int.tryParse(p[2]) ?? 0,
-          );
-        }
-        return null;
-      }).whereType<DirsearchResult>().toList();
+      _results = _parseResultsFromLog(meta.log);
+      _rebuildResultKeys();
       if (meta.status != 'running') {
         _running = false;
         _stopPolling();
@@ -153,6 +151,7 @@ class _DirsearchCardState extends State<DirsearchCard> {
   @override
   void dispose() {
     _progressSubscription?.cancel();
+    _foundSubscription?.cancel();
     _stopPolling();
     _urlController.dispose();
     _extensionsController.dispose();
@@ -167,6 +166,7 @@ class _DirsearchCardState extends State<DirsearchCard> {
   Future<void> _clearResults() async {
     setState(() {
       _results = [];
+      _resultKeys.clear();
       _statusMessage = '';
       _progressCurrent = 0;
       _progressTotal = 0;
@@ -255,12 +255,14 @@ class _DirsearchCardState extends State<DirsearchCard> {
     setState(() {
       _running = true;
       _results = [];
+      _resultKeys.clear();
       _statusMessage = '后台扫描已启动，离开页面后继续运行';
       _progressCurrent = 0;
       _progressTotal = 0;
     });
     _startPolling();
     _subscribeProgress();
+    _subscribeFound();
   }
 
   void _stopScan() {
@@ -273,6 +275,33 @@ class _DirsearchCardState extends State<DirsearchCard> {
     if (bytes < 1024) return '${bytes}B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+  }
+
+  List<DirsearchResult> _parseResultsFromLog(String log) {
+    return log
+        .split('\n')
+        .where((l) => l.contains('|'))
+        .map((l) {
+          final p = l.split('|');
+          if (p.length >= 3) {
+            return DirsearchResult(
+              path: p[0],
+              statusCode: int.tryParse(p[1]) ?? 0,
+              contentLength: int.tryParse(p[2]) ?? 0,
+            );
+          }
+          return null;
+        })
+        .whereType<DirsearchResult>()
+        .toList();
+  }
+
+  String _resultKey(DirsearchResult r) => '${r.path}|${r.statusCode}|${r.contentLength}';
+
+  void _rebuildResultKeys() {
+    _resultKeys
+      ..clear()
+      ..addAll(_results.map(_resultKey));
   }
 
   InputDecoration _inputDecoration(String label, String hint) {

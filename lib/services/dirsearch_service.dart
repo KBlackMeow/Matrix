@@ -229,6 +229,15 @@ class _FullResponse {
   });
 }
 
+class _ScriptAliasProfile {
+  final int status;
+  final int contentLength;
+  const _ScriptAliasProfile({
+    required this.status,
+    required this.contentLength,
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Blacklists — ported from dirsearch db/400_blacklist.txt etc.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -428,6 +437,12 @@ class DirsearchService {
 
   /// Per-prefix wildcard scanners (key = prefix e.g. ".", ".ht").
   final _prefixScanners = <String, _WildcardScanner>{};
+  /// Script alias scanners for patterns like "/index.php/anything".
+  final _scriptAliasScanners = <String, _WildcardScanner>{};
+  /// Script alias baseline profile keyed by script root (e.g. "/index.php").
+  final _scriptAliasProfiles = <String, _ScriptAliasProfile>{};
+  /// Concrete script-file scanners keyed by "<dir>|<ext>".
+  final _scriptFileScanners = <String, _WildcardScanner>{};
 
   /// Response hash → occurrence count (for filter_threshold).
   final _responseHashes = <int, int>{};
@@ -839,6 +854,10 @@ class DirsearchService {
     if (qi >= 0) cleanPath = cleanPath.substring(0, qi);
     final fi = cleanPath.indexOf('#');
     if (fi >= 0) cleanPath = cleanPath.substring(0, fi);
+    final isConcreteScriptFile = RegExp(
+      r'\.(?:php|asp|aspx|jsp)$',
+      caseSensitive: false,
+    ).hasMatch(cleanPath);
 
     // Filename for prefix matching (last component after final "/")
     final filename = cleanPath.contains('/')
@@ -850,7 +869,13 @@ class DirsearchService {
     }
 
     for (final entry in _suffixScanners.entries) {
-      if (cleanPath.endsWith(entry.key)) yield entry.value;
+      if (!cleanPath.endsWith(entry.key)) continue;
+      // Avoid false negatives: for concrete script files like "upload/shell.php",
+      // do not apply dynamic-script extension wildcard scanners.
+      if (isConcreteScriptFile && _isDynamicScriptSuffix(entry.key)) {
+        continue;
+      }
+      yield entry.value;
     }
 
     if (_defaultScanner != null) yield _defaultScanner!;
@@ -952,6 +977,7 @@ class DirsearchService {
           int? contentLength;
           String? location;
           String? body;
+          final concreteScript = _extractConcreteScriptInfo(path);
 
           if (_needsBodyForFilters) {
             // Single GET retrieves status + body in one round-trip
@@ -972,6 +998,25 @@ class DirsearchService {
           if (code == null) {
             _tick(++completed, total, onProgress);
             continue;
+          }
+
+          // Heuristic fix:
+          // Some targets reply 200 with 0B for arbitrary dynamic routes on HEAD.
+          // For such cases, do a lightweight GET-body verification once.
+          if (code == 200 &&
+              (contentLength ?? 0) == 0 &&
+              (location == null || location.isEmpty)) {
+            final verifyBody = body ?? await _fetchBody(client, fullUrl);
+            if (verifyBody == null || verifyBody.isEmpty) {
+              // Silent webshells may legitimately return 200 with empty body.
+              // Keep concrete script files and continue filtering later.
+              if (concreteScript == null) {
+                _tick(++completed, total, onProgress);
+                continue;
+              }
+            }
+            body = verifyBody;
+            contentLength = verifyBody?.length ?? contentLength;
           }
 
           // -- Status filtering -----------------------------------------------
@@ -1007,7 +1052,9 @@ class DirsearchService {
           }
 
           // -- Wildcard scanner check ----------------------------------------
-          final applicableScanners = _scannersFor(path).toList();
+          final applicableScanners = concreteScript != null
+              ? await _scannersForConcreteScript(client, concreteScript)
+              : _scannersFor(path).toList();
           bool isWildcard = false;
 
           if (applicableScanners.isNotEmpty) {
@@ -1033,6 +1080,73 @@ class DirsearchService {
           if (isWildcard) {
             _tick(++completed, total, onProgress);
             continue;
+          }
+
+          // Script alias wildcard filtering:
+          // e.g. "/index.php/anything" returns the same 200 page for arbitrary tails.
+          if (code == 200) {
+            // Strong guard: keep "/index.php" itself, but drop
+            // "/index.php/..." style front-controller tail routes.
+            if (_isScriptAliasTailPath(path) &&
+                (location == null || location.isEmpty)) {
+              _tick(++completed, total, onProgress);
+              continue;
+            }
+
+            final scriptRoot = _extractScriptRoot(path);
+            if (scriptRoot != null) {
+              final rootNoLeadingSlash = scriptRoot.startsWith('/')
+                  ? scriptRoot.substring(1)
+                  : scriptRoot;
+              _WildcardScanner? scriptScanner =
+                  _scriptAliasScanners[scriptRoot];
+              scriptScanner ??= await _buildScanner(
+                client,
+                '$rootNoLeadingSlash/${_randomHex(8)}',
+                '$rootNoLeadingSlash/${_randomHex(8)}',
+              );
+              if (scriptScanner != null) {
+                _scriptAliasScanners[scriptRoot] = scriptScanner;
+                final compareBody = body ?? await _fetchBody(client, fullUrl);
+                final real = scriptScanner.check(
+                  responseStatus: code,
+                  responseBody: compareBody,
+                  responseRedirect: location,
+                  requestPath: path,
+                );
+                if (!real) {
+                  _tick(++completed, total, onProgress);
+                  continue;
+                }
+              }
+
+              // Additional guard for reflected front-controller routes:
+              // build one baseline under same script root and compare
+              // status + content-length pattern.
+              _ScriptAliasProfile? profile = _scriptAliasProfiles[scriptRoot];
+              if (profile == null) {
+                final probePath = '$rootNoLeadingSlash/${_randomHex(10)}';
+                final probeUri = Uri.parse('$base$probePath');
+                final probe = await _probePath(client: client, url: probeUri);
+                if (probe.code != null) {
+                  profile = _ScriptAliasProfile(
+                    status: probe.code!,
+                    contentLength: probe.contentLength ?? 0,
+                  );
+                  _scriptAliasProfiles[scriptRoot] = profile;
+                }
+              }
+
+              if (profile != null &&
+                  profile.status == code &&
+                  profile.contentLength > 0 &&
+                  (contentLength ?? 0) > 0 &&
+                  ((contentLength ?? 0) - profile.contentLength).abs() <= 32 &&
+                  (location == null || location.isEmpty)) {
+                _tick(++completed, total, onProgress);
+                continue;
+              }
+            }
           }
 
           // -- Record result -------------------------------------------------
@@ -1074,6 +1188,80 @@ class DirsearchService {
     final basePath =
         Uri.tryParse(base)?.path.let((p) => p.isEmpty ? '/' : p) ?? '/';
     return locPath == '/' || locPath == basePath;
+  }
+
+  /// Extract script root from a path like "/index.php/a/b" => "/index.php".
+  static String? _extractScriptRoot(String path) {
+    final clean = path.split('?').first.split('#').first;
+    final m = RegExp(
+      r'^(/?.+?\.(?:php|asp|aspx|jsp))(?:/.*)$',
+      caseSensitive: false,
+    ).firstMatch(clean);
+    return m?.group(1);
+  }
+
+  /// True for paths that look like front-controller script aliases:
+  /// "/index.php/anything", "/foo.asp/bar", etc.
+  static bool isScriptAliasPath(String path) =>
+      _extractScriptRoot(path) != null;
+
+  /// True only for "/index.php/..." style paths, not "/index.php" itself.
+  static bool _isScriptAliasTailPath(String path) {
+    final clean = path.split('?').first.split('#').first;
+    final root = _extractScriptRoot(clean);
+    if (root == null) return false;
+    return clean != root;
+  }
+
+  static bool _isDynamicScriptSuffix(String suffix) {
+    switch (suffix.toLowerCase()) {
+      case '.php':
+      case '.asp':
+      case '.aspx':
+      case '.jsp':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  static ({String dirPrefix, String extension})? _extractConcreteScriptInfo(
+    String path,
+  ) {
+    var clean = path.startsWith('/') ? path.substring(1) : path;
+    final qi = clean.indexOf('?');
+    if (qi >= 0) clean = clean.substring(0, qi);
+    final fi = clean.indexOf('#');
+    if (fi >= 0) clean = clean.substring(0, fi);
+    if (clean.isEmpty || clean.endsWith('/')) return null;
+
+    final m = RegExp(r'^(.*?)([^/]+\.(php|asp|aspx|jsp))$',
+            caseSensitive: false)
+        .firstMatch(clean);
+    if (m == null) return null;
+    final dir = m.group(1) ?? '';
+    final ext = '.${(m.group(3) ?? '').toLowerCase()}';
+    final dirPrefix = dir.isEmpty ? '' : dir;
+    return (dirPrefix: dirPrefix, extension: ext);
+  }
+
+  Future<List<_WildcardScanner>> _scannersForConcreteScript(
+    http.Client client,
+    ({String dirPrefix, String extension}) info,
+  ) async {
+    final key = '${info.dirPrefix}|${info.extension}';
+    _WildcardScanner? scanner = _scriptFileScanners[key];
+    scanner ??= await _buildScanner(
+      client,
+      '${info.dirPrefix}${_randomHex(10)}${info.extension}',
+      '${info.dirPrefix}${_randomHex(10)}${info.extension}',
+    );
+    if (scanner != null) {
+      _scriptFileScanners[key] = scanner;
+      return <_WildcardScanner>[scanner];
+    }
+    // Fallback to generic scanners only when dedicated probe is unavailable.
+    return _scannersFor('${info.dirPrefix}x${info.extension}').toList();
   }
 }
 

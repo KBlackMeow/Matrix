@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import '../core/net/net_client.dart';
 import 'service_probe_service.dart';
 
 /// 纯 Dart 实现的端口扫描（复刻 fscan 端口扫描功能）
@@ -14,7 +15,9 @@ class PortScanService {
     this.timeout = const Duration(seconds: 3),
     this.threads = 200,
     this.enableServiceProbe = true,
-  });
+  }) : _netClient = NetClient(connectTimeout: timeout, readTimeout: timeout);
+
+  final NetClient _netClient;
 
   /// 解析目标，返回 IP 列表
   static Future<List<String>> parseTargets(String input) async {
@@ -135,14 +138,17 @@ class PortScanService {
   /// 某些 Web 服务器在 TCP 握手完成后立即发 RST（无 HTTP 请求时），
   /// 若等 close() 再判断会因 RST 异常误报端口关闭。
   Future<bool> _isPortOpen(String host, int port) async {
-    Socket? socket;
+    SocketConnection? conn;
     try {
-      socket = await Socket.connect(host, port, timeout: timeout);
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) return false;
       return true; // TCP 三次握手成功 = 端口开放
     } catch (_) {
       return false;
     } finally {
-      try { socket?.destroy(); } catch (_) {}
+      try {
+        await conn?.close();
+      } catch (_) {}
     }
   }
 

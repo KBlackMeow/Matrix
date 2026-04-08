@@ -1,13 +1,16 @@
 import 'dart:io';
 import 'dart:typed_data';
+import '../core/net/net_client.dart';
 
 /// NetBIOS 探测与域控识别（复刻 fscan）
 /// 使用 NBSTAT 通配符查询（type 0x21）返回所有注册名称及 MAC
 /// 通过名称后缀 0x1C 正确识别域控制器（替代不可靠的字符串匹配）
 class NetbiosService {
   final Duration timeout;
+  final NetClient _netClient;
 
-  NetbiosService({this.timeout = const Duration(seconds: 3)});
+  NetbiosService({this.timeout = const Duration(seconds: 3)})
+      : _netClient = NetClient(connectTimeout: timeout, readTimeout: timeout);
 
   // ── NBSTAT 响应解析 ───────────────────────────────────────────────────────
 
@@ -155,10 +158,11 @@ class NetbiosService {
   /// 连接 TCP 135，发送 DCE/RPC BIND，扫描响应中的私有 IP 地址
   /// 对应 fscan FindNet.go：通过 EPM 响应发现双网卡主机的额外 IP
   Future<List<String>> _probeRpc135(String host) async {
-    Socket? s;
+    SocketConnection? conn;
     try {
-      s = await Socket.connect(host, 135,
-          timeout: const Duration(seconds: 2));
+      conn = await _netClient.connectTcp(host, 135);
+      final s = conn?.rawSocket;
+      if (s == null) return [];
 
       final allData = <int>[];
       s.listen(
@@ -178,7 +182,7 @@ class NetbiosService {
       return [];
     } finally {
       try {
-        s?.destroy();
+        await conn?.close();
       } catch (_) {}
     }
   }

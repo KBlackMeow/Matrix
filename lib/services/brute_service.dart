@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:mysql1/mysql1.dart';
+import '../core/net/net_client.dart';
 
 /// 密码爆破（复刻 fscan）
 /// 并发执行，支持 Redis、FTP、MySQL、MSSQL、PostgreSQL、Telnet
@@ -11,6 +12,7 @@ import 'package:mysql1/mysql1.dart';
 /// 对应 fscan SMB.go concurrentSmbScan 中的 lockedUsers map 机制
 class BruteService {
   final Duration timeout;
+  final NetClient _netClient;
 
   /// 同时并发的凭据数量
   final int concurrency;
@@ -18,7 +20,7 @@ class BruteService {
   BruteService({
     this.timeout = const Duration(seconds: 5),
     this.concurrency = 5,
-  });
+  }) : _netClient = NetClient(connectTimeout: timeout, readTimeout: timeout);
 
   // ── 账号锁定异常 ──────────────────────────────────────────────────────────
 
@@ -82,18 +84,19 @@ class BruteService {
   }
 
   Future<bool> _tryRedis(String host, int port, String pwd) async {
-    Socket? socket;
+    SocketConnection? conn;
     try {
-      socket = await Socket.connect(host, port, timeout: timeout);
-      socket.write('AUTH $pwd\r\n');
-      await socket.flush();
-      final data = await socket.map((b) => utf8.decode(b, allowMalformed: true)).first.timeout(timeout);
-      await socket.close();
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) return false;
+      await conn.write(utf8.encode('AUTH $pwd\r\n'));
+      final data = utf8.decode(await conn.read(maxBytes: 2048), allowMalformed: true);
       return data.contains('+OK') && !data.contains('-ERR');
     } catch (_) {
       return false;
     } finally {
-      try { socket?.destroy(); } catch (_) {}
+      try {
+        await conn?.close();
+      } catch (_) {}
     }
   }
 
@@ -111,26 +114,26 @@ class BruteService {
   }
 
   Future<bool> _tryFtp(String host, int port, String user, String pwd) async {
-    Socket? socket;
+    SocketConnection? conn;
     try {
-      socket = await Socket.connect(host, port, timeout: timeout);
-      final stream = socket.map((b) => utf8.decode(b, allowMalformed: true))
-          .transform(const LineSplitter());
-      await stream.first.timeout(timeout); // 220 banner
-      socket.writeln('USER $user');
-      await socket.flush();
-      await stream.first.timeout(timeout);
-      socket.writeln('PASS $pwd');
-      await socket.flush();
-      final res = await stream.first.timeout(timeout);
-      await socket.close();
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) return false;
+      await conn.read(maxBytes: 512); // 220 banner
+      await conn.write(utf8.encode('USER $user\r\n'));
+      await conn.read(maxBytes: 512);
+      await conn.write(utf8.encode('PASS $pwd\r\n'));
+      final res = utf8.decode(await conn.read(maxBytes: 512), allowMalformed: true)
+          .split(RegExp(r'\r?\n'))
+          .firstWhere((e) => e.isNotEmpty, orElse: () => '');
       // 421 = service unavailable (account locked); 530 = auth fail
       if (res.startsWith('421')) return false;
       return res.startsWith('230');
     } catch (_) {
       return false;
     } finally {
-      try { socket?.destroy(); } catch (_) {}
+      try {
+        await conn?.close();
+      } catch (_) {}
     }
   }
 
@@ -219,22 +222,17 @@ class BruteService {
   /// TDS Login7：返回 'ok' / _kLocked / _kDisabled / _kExpired / null
   /// 对应 fscan SMB.go 中的 STATUS_ACCOUNT_LOCKED_OUT / STATUS_ACCOUNT_DISABLED 处理
   Future<String?> _tryMssqlStatus(String host, int port, String user, String pwd) async {
-    Socket? socket;
+    SocketConnection? conn;
     try {
-      socket = await Socket.connect(host, port, timeout: timeout);
-      socket.setOption(SocketOption.tcpNoDelay, true);
-
-      socket.add(_tdsPrelogin());
-      await socket.flush();
-
-      final preResp = await socket.first.timeout(timeout);
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) return null;
+      conn.rawSocket.setOption(SocketOption.tcpNoDelay, true);
+      await conn.write(_tdsPrelogin());
+      final preResp = await conn.read(maxBytes: 8192);
       if (preResp.isEmpty || preResp[0] != 0x04) return null;
 
-      socket.add(_tdsLogin7(host, user, pwd));
-      await socket.flush();
-
-      final loginResp = await socket.first.timeout(timeout);
-      await socket.close();
+      await conn.write(_tdsLogin7(host, user, pwd));
+      final loginResp = await conn.read(maxBytes: 8192);
 
       for (var i = 8; i < loginResp.length; i++) {
         if (loginResp[i] == 0xAD) return 'ok'; // LOGINACK = success
@@ -257,7 +255,9 @@ class BruteService {
     } catch (_) {
       return null;
     } finally {
-      try { socket?.destroy(); } catch (_) {}
+      try {
+        await conn?.close();
+      } catch (_) {}
     }
   }
 
@@ -424,9 +424,10 @@ class BruteService {
   /// SQLSTATE 28000 = invalid_authorization_specification（账号禁用/不存在）
   /// SQLSTATE 28P01 = invalid_password（密码错误）
   Future<String?> _tryPostgresStatus(String host, int port, String user, String pwd) async {
-    Socket? socket;
+    SocketConnection? conn;
     try {
-      socket = await Socket.connect(host, port, timeout: timeout);
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) return null;
 
       // Startup message: len(4) + protocol(4) + "user\0" + user + "\0" + "database\0postgres\0\0"
       final userBytes = utf8.encode(user);
@@ -442,11 +443,10 @@ class BruteService {
         ...startup.buffer.asUint8List(),
         ...body,
       ]);
-      socket.add(startupBytes);
-      await socket.flush();
+      await conn.write(startupBytes);
 
       // Read authentication request
-      final data = await socket.first.timeout(timeout);
+      final data = await conn.read(maxBytes: 8192);
       if (data.length < 9) return null;
 
       final msgType = data[0];
@@ -495,11 +495,9 @@ class BruteService {
         return null; // Unsupported auth type (e.g. SCRAM)
       }
 
-      socket.add(authMsg);
-      await socket.flush();
+      await conn.write(authMsg);
 
-      final authResp = await socket.first.timeout(timeout);
-      await socket.close();
+      final authResp = await conn.read(maxBytes: 8192);
 
       if (authResp.isEmpty) return null;
       // 'E' = ErrorResponse after password send
@@ -519,7 +517,9 @@ class BruteService {
     } catch (_) {
       return null;
     } finally {
-      try { socket?.destroy(); } catch (_) {}
+      try {
+        await conn?.close();
+      } catch (_) {}
     }
   }
 
@@ -538,10 +538,11 @@ class BruteService {
   }
 
   Future<bool> _tryTelnet(String host, int port, String user, String pwd) async {
-    Socket? socket;
+    SocketConnection? conn;
     try {
-      socket = await Socket.connect(host, port, timeout: timeout);
-      final client = _TelnetSession(socket, timeout: timeout);
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) return false;
+      final client = _TelnetSession(conn.rawSocket, timeout: timeout);
       await client.init();
 
       final type = client.detectType();
@@ -561,7 +562,7 @@ class BruteService {
     } catch (_) {
       return false;
     } finally {
-      await socket?.close();
+      await conn?.close();
     }
   }
 

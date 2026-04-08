@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'dart:typed_data';
+import '../core/net/net_client.dart';
 
 /// MS17-010 永恒之蓝漏洞检测（复刻 fscan）
 /// 完整 SMB1 协议：Negotiate → SessionSetup → TreeConnect → TransNamedPipe
@@ -7,29 +7,31 @@ import 'dart:typed_data';
 /// 额外检测 DOUBLEPULSAR 后门 (reply[34] == 0x51)
 class Ms17010Service {
   final Duration timeout;
+  final NetClient _netClient;
 
-  Ms17010Service({this.timeout = const Duration(seconds: 5)});
+  Ms17010Service({this.timeout = const Duration(seconds: 5)})
+      : _netClient = NetClient(connectTimeout: timeout, readTimeout: timeout);
 
   /// 检测结果
   Future<Ms17010Result> check(String host, {int port = 445}) async {
+    SocketConnection? conn;
     try {
-      final socket = await Socket.connect(host, port, timeout: timeout);
-      socket.setOption(SocketOption.tcpNoDelay, true);
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) return Ms17010Result(host: host);
 
       try {
-        return await _scan(socket, host);
+        return await _scan(conn, host);
       } finally {
-        socket.destroy();
+        await conn.close();
       }
     } catch (_) {
       return Ms17010Result(host: host);
     }
   }
 
-  Future<Ms17010Result> _scan(Socket socket, String host) async {
+  Future<Ms17010Result> _scan(SocketConnection socket, String host) async {
     // ── Step 1: SMB1 Negotiate ──────────────────────────────────────────
-    socket.add(_negotiateRequest());
-    await socket.flush();
+    await socket.write(_negotiateRequest());
 
     final negResp = await _read(socket, 36);
     if (negResp == null) return Ms17010Result(host: host);
@@ -39,8 +41,7 @@ class Ms17010Service {
     if (negStatus != 0) return Ms17010Result(host: host);
 
     // ── Step 2: SMB1 SessionSetup (anonymous NTLMSSP) ───────────────────
-    socket.add(_sessionSetupRequest());
-    await socket.flush();
+    await socket.write(_sessionSetupRequest());
 
     final sessResp = await _read(socket, 36);
     if (sessResp == null) return Ms17010Result(host: host);
@@ -57,8 +58,7 @@ class Ms17010Service {
 
     // ── Step 3: TreeConnect to \\*\IPC$ ─────────────────────────────────
     final treeReq = _treeConnectRequest(uid0, uid1);
-    socket.add(treeReq);
-    await socket.flush();
+    await socket.write(treeReq);
 
     final treeResp = await _read(socket, 36);
     if (treeResp == null) return Ms17010Result(host: host, os: osName);
@@ -69,8 +69,7 @@ class Ms17010Service {
 
     // ── Step 4: TransNamedPipe ──────────────────────────────────────────
     final pipeReq = _transNamedPipeRequest(tid0, tid1, uid0, uid1);
-    socket.add(pipeReq);
-    await socket.flush();
+    await socket.write(pipeReq);
 
     final pipeResp = await _read(socket, 36);
     if (pipeResp == null) return Ms17010Result(host: host, os: osName);
@@ -88,8 +87,7 @@ class Ms17010Service {
 
     // ── Step 5: DOUBLEPULSAR backdoor check ─────────────────────────────
     final trans2Req = _trans2SessionSetupRequest(tid0, tid1, uid0, uid1);
-    socket.add(trans2Req);
-    await socket.flush();
+    await socket.write(trans2Req);
 
     final dpResp = await _read(socket, 36);
     final hasDoublePulsar = dpResp != null && dpResp.length > 34 && dpResp[34] == 0x51;
@@ -325,9 +323,9 @@ class Ms17010Service {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
-  Future<Uint8List?> _read(Socket socket, int minLen) async {
+  Future<Uint8List?> _read(SocketConnection socket, int minLen) async {
     try {
-      final data = await socket.first.timeout(timeout);
+      final data = await socket.read(maxBytes: 65535);
       if (data.length < minLen) return null;
       final buf = Uint8List(data.length);
       buf.setRange(0, data.length, data);

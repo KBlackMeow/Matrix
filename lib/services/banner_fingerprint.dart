@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 
+import '../core/net/net_client.dart';
 import 'service_probe_service.dart';
 
 /// Banner 指纹识别引擎（复刻 fscan nmap-service-probes）
@@ -21,8 +21,13 @@ import 'service_probe_service.dart';
 ///   Modbus/Industrial
 class BannerFingerprintEngine {
   final Duration timeout;
+  final NetClient _netClient;
 
-  BannerFingerprintEngine({this.timeout = const Duration(seconds: 3)});
+  BannerFingerprintEngine({this.timeout = const Duration(seconds: 3)})
+      : _netClient = NetClient(
+          connectTimeout: const Duration(milliseconds: 1500),
+          readTimeout: const Duration(milliseconds: 1200),
+        );
 
   // ── 主动探测字节 ────────────────────────────────────────────────────────
 
@@ -263,45 +268,36 @@ class BannerFingerprintEngine {
 
   /// 被动读取初始 banner（不发送任何数据）
   Future<String?> _readBanner(String host, int port) async {
-    Socket? socket;
+    SocketConnection? conn;
     try {
-      socket = await Socket.connect(host, port,
-          timeout: const Duration(milliseconds: 1500));
-      String banner = '';
-      try {
-        banner = await socket
-            .map((b) => String.fromCharCodes(b))
-            .first
-            .timeout(const Duration(milliseconds: 1200));
-      } catch (_) {}
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) return null;
+      final banner = utf8.decode(await conn.read(maxBytes: 4096), allowMalformed: true);
       return banner.isEmpty ? null : banner;
     } catch (_) {
       return null;
     } finally {
-      try { socket?.destroy(); } catch (_) {}
+      try {
+        await conn?.close();
+      } catch (_) {}
     }
   }
 
   /// 发送探测字节，读取响应
   Future<String?> _probeSend(String host, int port, List<int> probe) async {
-    Socket? socket;
+    SocketConnection? conn;
     try {
-      socket = await Socket.connect(host, port,
-          timeout: const Duration(milliseconds: 1500));
-      socket.add(probe);
-      await socket.flush();
-      String banner = '';
-      try {
-        banner = await socket
-            .map((b) => String.fromCharCodes(b))
-            .first
-            .timeout(const Duration(milliseconds: 1200));
-      } catch (_) {}
+      conn = await _netClient.connectTcp(host, port);
+      if (conn == null) return null;
+      await conn.write(probe);
+      final banner = utf8.decode(await conn.read(maxBytes: 4096), allowMalformed: true);
       return banner.isEmpty ? null : banner;
     } catch (_) {
       return null;
     } finally {
-      try { socket?.destroy(); } catch (_) {}
+      try {
+        await conn?.close();
+      } catch (_) {}
     }
   }
 

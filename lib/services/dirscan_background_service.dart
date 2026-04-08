@@ -21,6 +21,9 @@ class DirscanBackgroundService {
   /// 进度流：供 UI 订阅
   final _progressController = StreamController<DirscanProgress>.broadcast();
   Stream<DirscanProgress> get progress => _progressController.stream;
+  final _foundController = StreamController<DirscanFoundEvent>.broadcast();
+  Stream<DirscanFoundEvent> get foundEvents => _foundController.stream;
+  static const int _minRecursiveBodySize = 16;
 
   // ── 启动扫描 ─────────────────────────────────────────────────────────────
 
@@ -183,6 +186,12 @@ class DirscanBackgroundService {
           onFound: (r) {
             _scanSession.appendLog(
                 sessionId, '${r.path}|${r.statusCode}|${r.contentLength}');
+            if (!_foundController.isClosed) {
+              _foundController.add(DirscanFoundEvent(
+                sessionId: sessionId,
+                result: r,
+              ));
+            }
             resultsCount++;
           },
           onProgress: (cur, _) {
@@ -204,10 +213,23 @@ class DirscanBackgroundService {
 
         for (final r in found) {
           if (!recursionStatusCodes.contains(r.statusCode)) continue;
+          // Ignore noisy empty-body 200s to prevent runaway recursion
+          if (r.statusCode == 200 && r.contentLength < _minRecursiveBodySize) {
+            continue;
+          }
+          // Front-controller alias paths (e.g. /index.php/...) should never
+          // be used as recursive roots.
+          if (DirsearchService.isScriptAliasPath(r.path)) {
+            continue;
+          }
 
           final cleanPath = r.path.startsWith('/')
               ? r.path.substring(1)
               : r.path;
+          // Script files should be reported but never used as recursive roots.
+          if (_isScriptFilePath(cleanPath)) {
+            continue;
+          }
 
           // redirect-based recursion: "/admin" → "/admin/" 时加入队列
           // (对应 dirsearch recur_for_redirect)
@@ -343,6 +365,12 @@ class DirscanBackgroundService {
   static bool _hasExtension(String path) =>
       RegExp(r'\w+\.[a-zA-Z0-9]{2,5}(/)?$').hasMatch(path);
 
+  static bool _isScriptFilePath(String path) {
+    final normalized = path.endsWith('/') ? path.substring(0, path.length - 1) : path;
+    return RegExp(r'\.(php|asp|aspx|jsp)$', caseSensitive: false)
+        .hasMatch(normalized);
+  }
+
   /// 从完整 URL 或相对路径中提取 path 部分
   static String? _extractPath(String urlOrPath) {
     final uri = Uri.tryParse(urlOrPath);
@@ -358,6 +386,7 @@ class DirscanBackgroundService {
   }
 
   void dispose() {
+    _foundController.close();
     _progressController.close();
   }
 }
@@ -385,5 +414,15 @@ class DirscanProgress {
     this.resultsCount = 0,
     this.status = 'running',
     this.message,
+  });
+}
+
+class DirscanFoundEvent {
+  final int sessionId;
+  final DirsearchResult result;
+
+  DirscanFoundEvent({
+    required this.sessionId,
+    required this.result,
   });
 }

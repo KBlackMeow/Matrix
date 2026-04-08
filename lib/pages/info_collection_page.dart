@@ -1,8 +1,27 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import '../models/project.dart';
+import '../pages/thinkphp_exp_page.dart';
+import '../pages/zentao_exp_page.dart';
+import '../pages/vulhub/aria2_exp_page.dart';
+import '../pages/vulhub/drupal_exp_page.dart';
+import '../pages/vulhub/druid_exp_page.dart';
+import '../pages/vulhub/elasticsearch_exp_page.dart';
+import '../pages/vulhub/flask_ssti_exp_page.dart';
+import '../pages/vulhub/httpd_exp_page.dart';
+import '../pages/vulhub/nacos_exp_page.dart';
+import '../pages/vulhub/ofbiz_exp_page.dart';
+import '../pages/vulhub/php_exp_page.dart';
+import '../pages/vulhub/saltstack_exp_page.dart';
+import '../pages/vulhub/shellshock_exp_page.dart';
+import '../pages/vulhub/solr_exp_page.dart';
+import '../pages/vulhub/supervisor_exp_page.dart';
+import '../pages/vulhub/tomcat_exp_page.dart';
+import '../pages/vulhub/weblogic_exp_page.dart';
+import '../pages/vulhub/xxljob_exp_page.dart';
 import '../services/scan_session_service.dart';
 import '../services/vulnerability_scan_background_service.dart';
 import '../theme/app_theme.dart';
@@ -325,7 +344,6 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
   late final TextEditingController _urlController;
   bool _running = false;
   final List<_FoundVuln> _foundVulns = [];
-  final List<String> _scanLogs = [];
   int? _sessionId;
   StreamSubscription<VulnScanEvent>? _vulnSubscription;
   Timer? _pollTimer;
@@ -349,14 +367,11 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
         if (meta.target != null) _urlController.text = meta.target!;
         if (meta.log.isNotEmpty) {
           _foundVulns.clear();
-          _scanLogs.clear();
           for (final line in meta.log.split('\n')) {
             if (line.contains('\t')) {
               final p = line.split('\t');
               if (p.length >= 3) {
-                if (p[0] == 'Zentao-LOG') {
-                  _scanLogs.add(p[1]);
-                } else {
+                if (p[0] != 'Zentao-LOG') {
                   _foundVulns.add(_FoundVuln(type: p[0], name: p[1], detail: p.sublist(2).join('\t')));
                 }
               }
@@ -389,14 +404,11 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
     if (meta == null || !mounted) return;
     setState(() {
       _foundVulns.clear();
-      _scanLogs.clear();
       for (final line in meta.log.split('\n')) {
         if (line.contains('\t')) {
           final p = line.split('\t');
           if (p.length >= 3) {
-            if (p[0] == 'Zentao-LOG') {
-              _scanLogs.add(p[1]);
-            } else {
+            if (p[0] != 'Zentao-LOG') {
               _foundVulns.add(_FoundVuln(type: p[0], name: p[1], detail: p.sublist(2).join('\t')));
             }
           }
@@ -416,9 +428,7 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
     _vulnSubscription = _bgService.vulnEvents.listen((event) {
       if (!mounted || event.sessionId != sid) return;
       setState(() {
-        if (event.type == 'Zentao-LOG') {
-          _scanLogs.add(event.name);
-        } else {
+        if (event.type != 'Zentao-LOG') {
           _foundVulns.add(_FoundVuln(type: event.type, name: event.name, detail: event.detail));
         }
       });
@@ -436,7 +446,6 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
   Future<void> _clearVulns() async {
     setState(() {
       _foundVulns.clear();
-      _scanLogs.clear();
     });
     if (_sessionId != null) {
       await _scanSession.clearSessionLog(_sessionId!);
@@ -469,10 +478,106 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
     setState(() {
       _running = true;
       _foundVulns.clear();
-      _scanLogs.clear();
     });
     _startPolling();
     _subscribeVulns();
+  }
+
+  Widget? _expPageFor(_FoundVuln v) {
+    final type = v.type.toLowerCase();
+    final name = v.name.toLowerCase();
+    final text = '${v.type} ${v.name} ${v.detail}'.toLowerCase();
+
+    if (type.contains('thinkphp')) return const ThinkphpExpPage();
+    if (type.contains('zentao')) return const ZentaoExpPage();
+    if (text.contains('nacos')) return const NacosExpPage();
+    if (text.contains('shellshock')) return const ShellshockExpPage();
+    if (text.contains('aria2')) return const Aria2ExpPage();
+    if (text.contains('saltstack') || text.contains('cve-2020-16846')) {
+      return const SaltstackExpPage();
+    }
+    if (text.contains('supervisor') || text.contains('cve-2017-11610')) {
+      return const SupervisorExpPage();
+    }
+    if (text.contains('xxl-job') || text.contains('xxljob')) {
+      return const XxlJobExpPage();
+    }
+    if (text.contains('apache') || text.contains('cve-2021-41773')) {
+      return const HttpdExpPage();
+    }
+    if (text.contains('druid') || text.contains('cve-2021-25646')) {
+      return const DruidExpPage();
+    }
+    if (text.contains('ofbiz') || name.contains('38856') || name.contains('51467')) {
+      return const OFBizExpPage();
+    }
+    if (text.contains('solr')) return const SolrExpPage();
+    if (text.contains('drupal')) return const DrupalExpPage();
+    if (text.contains('elasticsearch')) return const ElasticsearchExpPage();
+    if (text.contains('flask') || text.contains('ssti')) {
+      return const FlaskSstiExpPage();
+    }
+    if (text.contains('php') || text.contains('cgi')) return const PhpExpPage();
+    if (text.contains('tomcat') || name.contains('2017-12615')) {
+      return const TomcatExpPage();
+    }
+    if (text.contains('weblogic') ||
+        name.contains('2017-10271') ||
+        name.contains('2020-14882') ||
+        name.contains('14883')) {
+      return const WebLogicExpPage();
+    }
+    return null;
+  }
+
+  void _openExpPage(_FoundVuln v) {
+    final page = _expPageFor(v);
+    if (page == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('该漏洞暂未配置对应 EXP 页面')),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.bgDark,
+          appBar: AppBar(
+            backgroundColor: AppColors.bgElevated,
+            elevation: 0,
+            title: Text(
+              v.name,
+              style: AppTextStyles.heading(size: 14, color: AppColors.primary),
+            ),
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(24),
+            child: page,
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<_FoundVuln> _unmappedVulns() =>
+      _foundVulns.where((v) => _expPageFor(v) == null).toList();
+
+  Future<void> _copyUnmappedVulns() async {
+    final list = _unmappedVulns();
+    if (list.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前没有未映射项')),
+      );
+      return;
+    }
+    final text = list
+        .map((v) => '${v.type}\t${v.name}\t${v.detail}')
+        .join('\n');
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已复制未映射项 (${list.length})')),
+    );
   }
 
   @override
@@ -592,13 +697,22 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
                       ),
                       const Spacer(),
                       TextButton.icon(
-                        onPressed: (_running || (_foundVulns.isEmpty && _scanLogs.isEmpty))
+                        onPressed: (_running || _foundVulns.isEmpty)
                             ? null
                             : _clearVulns,
                         icon: const Icon(Icons.delete_outline, size: 14),
                         label: const Text('清空'),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.red,
+                          textStyle: const TextStyle(fontSize: 11),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _foundVulns.isEmpty ? null : _copyUnmappedVulns,
+                        icon: const Icon(Icons.copy_all, size: 14),
+                        label: Text('复制未映射(${_unmappedVulns().length})'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
                           textStyle: const TextStyle(fontSize: 11),
                         ),
                       ),
@@ -609,7 +723,7 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
                     Expanded(
                       child: Center(
                         child: Text(
-                          '点击「开始扫描」检测 Shiro、ThinkPHP 漏洞',
+                          '点击「开始扫描」执行内置 + Vulhub 漏洞检测',
                           style: AppTextStyles.caption(size: 13, color: AppColors.textMuted),
                         ),
                       ),
@@ -629,7 +743,11 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
                         itemCount: _foundVulns.length,
                         itemBuilder: (context, i) {
                           final v = _foundVulns[i];
-                          return Container(
+                          final hasPage = _expPageFor(v) != null;
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => _openExpPage(v),
+                            child: Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
@@ -673,6 +791,13 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
                                         style: AppTextStyles.heading(size: 13, color: AppColors.textPrimary),
                                       ),
                                     ),
+                                    Icon(
+                                      hasPage ? Icons.open_in_new : Icons.info_outline,
+                                      size: 16,
+                                      color: hasPage
+                                          ? AppColors.primary.withValues(alpha: 0.8)
+                                          : AppColors.textMuted,
+                                    ),
                                   ],
                                 ),
                                 if (v.detail.isNotEmpty) ...[
@@ -686,47 +811,11 @@ class _VulnerabilityScanPageState extends State<_VulnerabilityScanPage> {
                                 ],
                               ],
                             ),
+                            ),
                           );
                         },
                       ),
                     ),
-                  // 扫描日志区域（仅在有日志时显示）
-                  if (_scanLogs.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Container(
-                          width: 3,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: AppColors.textMuted.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '检测日志',
-                          style: AppTextStyles.heading(size: 11, color: AppColors.textMuted),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      constraints: const BoxConstraints(maxHeight: 160),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgDark,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: SingleChildScrollView(
-                        child: SelectableText(
-                          _scanLogs.join('\n'),
-                          style: AppTextStyles.terminal(size: 11, color: AppColors.textMuted),
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
