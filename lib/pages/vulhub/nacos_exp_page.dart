@@ -256,7 +256,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
           const SizedBox(height: 8),
           vTf(_lportCtrl, 'LPORT', '4444', type: TextInputType.number),
           const SizedBox(height: 8),
-          vBtn('写入 Cron Shell', running ? null : _writeCronShell),
+          vBtn('GetShell', running ? null : _writeCronShell),
         ],
       ),
     );

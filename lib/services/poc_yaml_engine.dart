@@ -402,11 +402,11 @@ class PocYamlEngine {
         if (values.isNotEmpty) respHeaders[name] = values.join(';');
       });
 
-      // Read body (cap at 1 MB), decompress gzip (mirrors fscan getRespBody)
+      // Read body (cap at 512 KB), decompress gzip (mirrors fscan getRespBody)
       final rawBuf = <int>[];
       await for (final chunk in resp) {
         rawBuf.addAll(chunk);
-        if (rawBuf.length > 1024 * 1024) break;
+        if (rawBuf.length > 512 * 1024) break;
       }
       final bodyBuf = _decompressBody(rawBuf, respHeaders);
 

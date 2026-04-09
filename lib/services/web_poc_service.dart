@@ -27,6 +27,9 @@ class WebPocService {
     return _cachedPocs!;
   }
 
+  /// 扫描结束后调用，释放解析好的 POC 对象图。
+  static void clearCache() => _cachedPocs = null;
+
   /// 对单个 URL 执行 POC 扫描
   Future<List<WebPocResult>> scan(String url) async {
     final results = <WebPocResult>[];

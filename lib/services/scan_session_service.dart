@@ -52,28 +52,37 @@ class ScanSessionService {
   }
 
   /// 追加日志（带节流，减少 DB 写入）
-  String _pendingLog = '';
+  final StringBuffer _pendingBuf = StringBuffer();
+  int _pendingLines = 0;
   int _pendingSessionId = 0;
   Timer? _flushTimer;
   static const _flushInterval = Duration(milliseconds: 300);
+  static const _maxPendingLines = 1000;
 
   void appendLog(int sessionId, String line) {
     if (_pendingSessionId != sessionId && _pendingSessionId != 0) {
       _flushNow();
     }
     _pendingSessionId = sessionId;
-    _pendingLog = _pendingLog.isEmpty ? line : '$_pendingLog\n$line';
-    _flushTimer ??= Timer(_flushInterval, _flushNow);
+    if (_pendingLines > 0) _pendingBuf.write('\n');
+    _pendingBuf.write(line);
+    _pendingLines++;
+    if (_pendingLines >= _maxPendingLines) {
+      _flushNow();
+    } else {
+      _flushTimer ??= Timer(_flushInterval, _flushNow);
+    }
   }
 
   void _flushNow() {
     _flushTimer?.cancel();
     _flushTimer = null;
-    if (_pendingSessionId == 0 || _pendingLog.isEmpty) return;
+    if (_pendingSessionId == 0 || _pendingLines == 0) return;
     final id = _pendingSessionId;
-    final log = _pendingLog;
+    final log = _pendingBuf.toString();
     _pendingSessionId = 0;
-    _pendingLog = '';
+    _pendingBuf.clear();
+    _pendingLines = 0;
     _db.appendScanLog(id, log);
   }
 

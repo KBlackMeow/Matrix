@@ -6,6 +6,7 @@ import 'fscan_service.dart';
 import 'port_scan_service.dart';
 import 'scan_session_service.dart';
 import 'service_probe_service.dart';
+import 'web_poc_service.dart';
 
 /// 端口扫描后台服务：扫描与 UI 解耦，离开页面后继续运行
 class PortScanBackgroundService {
@@ -253,6 +254,7 @@ class PortScanBackgroundService {
         sessionId,
         status: cancelled ? 'cancelled' : 'completed',
       );
+      WebPocService.clearCache();
     }
   }
 

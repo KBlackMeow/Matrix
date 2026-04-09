@@ -118,7 +118,7 @@ class _TomcatPageState extends BaseVulhubExpPageState<TomcatExpPage> {
             children: [
               vBtn('检测漏洞', running ? null : _check),
               const SizedBox(width: 8),
-              vBtn('上传 Shell', running ? null : _getShell),
+              vBtn('GetShell', running ? null : _getShell),
             ],
           ),
           const SizedBox(height: 16),

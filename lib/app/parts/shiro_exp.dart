@@ -716,7 +716,7 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                           ),
                           const SizedBox(height: 8),
                           _shiroActionBtn(
-                            '注入内存马',
+                            'GetShell',
                             _handleInjectMemShell,
                             enabled: _currentKey != null,
                           ),

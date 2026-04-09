@@ -86,3 +86,4 @@ Desktop.ini
 tools/*
 vulhub-rce-list.md
 .gitignore
+SIMPLIFY_SPEC.md

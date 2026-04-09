@@ -191,7 +191,7 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
           const SizedBox(height: 8),
           vTf(_lportCtrl, '攻击机端口', '4444', type: TextInputType.number),
           const SizedBox(height: 8),
-          vBtn('完整终端（反弹Shell）', running ? null : _showReverseShellDialog),
+          vBtn('GetShell', running ? null : _showReverseShellDialog),
         ],
       ),
     );

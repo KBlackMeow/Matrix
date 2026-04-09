@@ -373,7 +373,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
           vSecTitle('GetShell'),
           vTf(_passwordCtrl, '冰蝎密码', 'mAtrix_911'),
           const SizedBox(height: 8),
-          vBtn('GetShell (写入冰蝎 JSP)', running ? null : _getShell),
+          vBtn('GetShell', running ? null : _getShell),
         ],
       ),
     );

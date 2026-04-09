@@ -293,10 +293,10 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
         vSecTitle('GetShell'),
         vTf(_passwordCtrl, '冰蝎密码', AppConstants.defaultShellPassword),
         const SizedBox(height: 8),
-        vBtn('GetShell (写入 JSP)', running ? null : _getShell),
+        vBtn('GetShell', running ? null : _getShell),
         const SizedBox(height: 16),
         vSecTitle('完整终端'),
-        vBtn('完整 Shell（反弹）', running ? null : _showReverseShellDialog),
+        vBtn('GetShell', running ? null : _showReverseShellDialog),
       ]),
     );
   }
