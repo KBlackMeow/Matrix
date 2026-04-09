@@ -3,9 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../models/project.dart';
-import '../../pages/dictionary_management_page.dart';
 import '../../pages/frp_tunnel_page.dart';
-import '../../pages/info_collection_page.dart';
 import '../../pages/payload_management_page.dart';
 import '../../pages/project_management_page.dart';
 import '../../pages/project_scoped_page.dart';
@@ -36,11 +34,9 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
 
   final List<MenuItem> _menuItems = [
     MenuItem(icon: Icons.folder_outlined, label: '项目管理', selectedIcon: Icons.folder),
-    MenuItem(icon: Icons.search_outlined, label: '信息收集', selectedIcon: Icons.search),
     MenuItem(icon: Icons.terminal_outlined, label: 'Webshell管理', selectedIcon: Icons.terminal),
     MenuItem(icon: Icons.bug_report_outlined, label: 'EXP管理', selectedIcon: Icons.bug_report),
     MenuItem(icon: Icons.code_outlined, label: 'Payload管理', selectedIcon: Icons.code),
-    MenuItem(icon: Icons.menu_book_outlined, label: '字典管理', selectedIcon: Icons.menu_book),
     MenuItem(icon: Icons.computer_outlined, label: '完整终端', selectedIcon: Icons.computer),
     MenuItem(icon: Icons.alt_route_outlined, label: 'FRP隧道', selectedIcon: Icons.alt_route),
   ];
@@ -69,41 +65,20 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
     if (_selectedIndex == 0) {
       return ProjectManagementPage(
         selectedProject: _selectedProject,
-        onEnterInfoCollection: (project) {
-          setState(() {
-            _selectedProject = project;
-            _selectedIndex = 1;
-          });
-        },
         onEnterExp: (project) {
           setState(() {
-            _selectedIndex = 3;
+            _selectedIndex = 2;
           });
         },
         onEnterWebshell: (project) {
           setState(() {
             _selectedProject = project;
-            _selectedIndex = 2;
+            _selectedIndex = 1;
           });
         },
       );
     }
     if (_selectedIndex == 1) {
-      return ProjectScopedPage(
-        selectedProject: _selectedProject,
-        onSelectProject: (p) => setState(() => _selectedProject = p),
-        onClearProject: () => setState(() => _selectedProject = null),
-        onNavigateToProjectManagement: () => setState(() {
-          _selectedIndex = 0;
-          _selectedProject = null;
-        }),
-        title: '信息收集',
-        icon: Icons.search,
-        contentBuilder: (project, onSwitchProject) =>
-            InfoCollectionLandingPage(project: project, onSwitchProject: onSwitchProject),
-      );
-    }
-    if (_selectedIndex == 2) {
       return ProjectScopedPage(
         selectedProject: _selectedProject,
         onSelectProject: (p) => setState(() => _selectedProject = p),
@@ -118,19 +93,16 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
             WebshellManagementPage(project: project, onSwitchProject: onSwitchProject),
       );
     }
-    if (_selectedIndex == 4) {
-      return const PayloadManagementPage();
-    }
-    if (_selectedIndex == 3) {
+    if (_selectedIndex == 2) {
       return const exp.ExpContent();
     }
-    if (_selectedIndex == 5) {
-      return const DictionaryManagementPage();
+    if (_selectedIndex == 3) {
+      return const PayloadManagementPage();
     }
-    if (_selectedIndex == 6) {
+    if (_selectedIndex == 4) {
       return const ReverseShellDashboardPage();
     }
-    if (_selectedIndex == 7) {
+    if (_selectedIndex == 5) {
       return const FrpTunnelPage();
     }
     return WorkspaceContent(title: _menuItems[_selectedIndex].label);

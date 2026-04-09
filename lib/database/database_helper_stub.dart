@@ -1,7 +1,6 @@
 import '../models/project.dart';
 import '../models/webshell.dart';
 import '../models/payload.dart';
-import '../models/dictionary.dart';
 import '../models/frp_profile.dart';
 import '../services/frp_client_service.dart';
 import 'database_helper_web.dart';
@@ -73,60 +72,6 @@ Future<List<Payload>> getAllPayloads() => _web.getAllPayloads();
 Future<int> updatePayload(Payload payload) => _web.updatePayload(payload);
 
 Future<int> deletePayload(int id) => _web.deletePayload(id);
-
-// Dictionary 顶层方法（Web 内存实现）
-
-Future<Dictionary> createDictionary({
-  required String name,
-  required String category,
-  required List<int> bytes,
-  bool isDefault = false,
-  String? description,
-  String? tags,
-}) =>
-    _web.createDictionary(
-      name: name,
-      category: category,
-      bytes: bytes,
-      isDefault: isDefault,
-      description: description,
-      tags: tags,
-    );
-
-Future<List<Dictionary>> getAllDictionaries() => _web.getAllDictionaries();
-
-Future<void> updateDictionaryContent(Dictionary dict, List<int> bytes) =>
-    _web.updateDictionaryContent(dict, bytes);
-
-Future<String> readDictionaryPreview(String filePath, {int maxLines = 300}) =>
-    _web.readDictionaryPreview(filePath, maxLines: maxLines);
-
-Future<int> deleteDictionary(int id) => _web.deleteDictionary(id);
-
-// Scan Sessions（Web 内存实现，会话内有效）
-Future<int> createScanSession({
-  required int projectId,
-  required String scanType,
-  required String target,
-  String? configJson,
-}) =>
-    _web.createScanSession(
-      projectId: projectId,
-      scanType: scanType,
-      target: target,
-      configJson: configJson,
-    );
-
-Future<Map<String, dynamic>?> getLatestScanSession(int projectId, String scanType) =>
-    _web.getLatestScanSession(projectId, scanType);
-
-Future<void> updateScanSession(int id, {String? logText, String? status}) =>
-    _web.updateScanSession(id, logText: logText, status: status);
-
-Future<void> appendScanLog(int id, String line) => _web.appendScanLog(id, line);
-
-// Web 内存存储，重启即清空，无需重置
-Future<void> resetStaleRunningSessions() async {}
 
 // FRP Profiles（Web 无持久化，仅会话内有效）
 final _frpProfiles = <FrpProfile>[];

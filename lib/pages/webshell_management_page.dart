@@ -887,16 +887,15 @@ class _ConnectorTypeDropdown extends StatelessWidget {
   });
 
   static const _options = <(String, String)>[
-    ('php_eval',        'PHP Eval           —  php_eval_post.php'),
-    ('php_b64rot13',    'PHP B64+ROT13      —  php_b64rot13_post.php'),
-    ('php_behinder',    'PHP 冰蝎           —  php_behinder.php'),
-    ('php_passthru',    'PHP Passthru       —  php_passthru_req.php'),
-    ('php_probe',       'PHP Probe          —  php_probe_info.php'),
-    ('jsp_classloader', 'JSP ClassLoader    —  jsp_classloader_b64.jsp'),
-    ('jsp_behinder',    'JSP 冰蝎           —  jsp_behinder.jsp'),
-    ('jsp_runtime',     'JSP Runtime        —  jsp_runtime_get.jsp'),
-    ('asp_wscript',     'ASP WScript        —  asp_wscript_get.asp'),
-    ('aspx_cmd',        'ASPX .NET Process  —  aspx_cmd_post.aspx'),
+    ('php_eval',        'PHP Eval'),
+    ('php_b64rot13',    'PHP B64+ROT13'),
+    ('php_behinder',    'PHP 冰蝎 (Behinder)'),
+    ('php_passthru',    'PHP Passthru'),
+    ('jsp_classloader', 'JSP ClassLoader'),
+    ('jsp_behinder',    'JSP 冰蝎 (Behinder)'),
+    ('jsp_runtime',     'JSP Runtime'),
+    ('asp_wscript',     'ASP WScript'),
+    ('aspx_cmd',        'ASPX .NET'),
   ];
 
   @override
@@ -906,8 +905,7 @@ class _ConnectorTypeDropdown extends StatelessWidget {
       return DropdownMenuItem<String>(
         value: o.$1,
         child: Text(o.$2,
-            style: AppTextStyles.body(
-                color: AppColors.textPrimary, size: 13)),
+            style: AppTextStyles.body(color: AppColors.textPrimary, size: 13)),
       );
     }).toList();
 
@@ -940,14 +938,7 @@ class _ConnectorTypeDropdown extends StatelessWidget {
       ),
       dropdownColor: AppColors.bgCard,
       style: AppTextStyles.body(color: AppColors.textPrimary, size: 13),
-      items: _options.map((o) {
-        return DropdownMenuItem<String>(
-          value: o.$1,
-          child: Text(o.$2,
-              style: AppTextStyles.body(
-                  color: AppColors.textPrimary, size: 13)),
-        );
-      }).toList(),
+      items: items,
       onChanged: (v) {
         if (v != null) onChanged(v);
       },
@@ -973,38 +964,26 @@ class _PasswordParamField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final defaultParam = ConnectorFactory.defaultParam(connectorType);
-    final isProbe = connectorType == 'php_probe';
     final isBehinder = connectorType == 'jsp_behinder' || connectorType == 'php_behinder';
-    final hint = isProbe
-        ? '探测模式，无需参数名'
-        : isBehinder
-            ? '默认 mAtrix_911，或 payload 中 k 的 16 位 hex'
-            : (defaultParam.isNotEmpty ? '参数名，默认: $defaultParam' : '');
+    final hint = isBehinder
+        ? '默认 mAtrix_911，或 payload 中 k 的 16 位 hex'
+        : (defaultParam.isNotEmpty ? '参数名，默认: $defaultParam' : '');
 
-    final labelText = isProbe
-        ? '参数名（不适用）'
-        : isBehinder
-            ? '连接密码/密钥 *'
-            : '参数名 *';
-    final helperText = isProbe
-        ? null
-        : isBehinder
-            ? '连接密码（MD5 前 16 位为密钥）；或直接填 payload 中 String k="xxx" 的 hex 值'
-            : 'Payload 中接收命令的 HTTP 参数名（如 \$_POST["$defaultParam"]）';
+    final labelText = isBehinder ? '连接密码/密钥 *' : '参数名 *';
+    final helperText = isBehinder
+        ? '连接密码（MD5 前 16 位为密钥）；或直接填 payload 中 String k="xxx" 的 hex 值'
+        : 'Payload 中接收命令的 HTTP 参数名（如 \$_POST["$defaultParam"]）';
 
     return TextField(
       controller: controller,
-      obscureText: obscureText && !isProbe,
-      enabled: !isProbe,
-      style: TextStyle(
-        color: isProbe ? AppColors.textMuted : AppColors.textPrimary,
+      obscureText: obscureText,
+      style: const TextStyle(
+        color: AppColors.textPrimary,
         fontFamily: 'monospace',
       ),
       decoration: InputDecoration(
         labelText: labelText,
-        labelStyle: TextStyle(
-          color: isProbe ? AppColors.textMuted : AppColors.textSecondary,
-        ),
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
         hintText: hint,
         hintStyle: AppTextStyles.caption(
             color: AppColors.textMuted, size: 12),
@@ -1014,9 +993,7 @@ class _PasswordParamField extends StatelessWidget {
         helperMaxLines: 2,
         enabledBorder: OutlineInputBorder(
           borderSide: BorderSide(
-            color: isProbe
-                ? AppColors.border.withValues(alpha: 0.4)
-                : AppColors.primary.withValues(alpha: 0.5),
+            color: AppColors.primary.withValues(alpha: 0.5),
           ),
         ),
         disabledBorder: OutlineInputBorder(
@@ -1026,18 +1003,16 @@ class _PasswordParamField extends StatelessWidget {
         focusedBorder: const OutlineInputBorder(
           borderSide: BorderSide(color: AppColors.primary),
         ),
-        suffixIcon: isProbe
-            ? null
-            : IconButton(
-                icon: Icon(
-                  obscureText
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
-                onPressed: onToggleObscure,
-              ),
+        suffixIcon: IconButton(
+          icon: Icon(
+            obscureText
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
+            color: AppColors.textSecondary,
+            size: 20,
+          ),
+          onPressed: onToggleObscure,
+        ),
       ),
     );
   }

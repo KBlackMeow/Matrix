@@ -62,9 +62,7 @@ class ProjectDao {
 
   Future<int> deleteProject(int id) async {
     final db = await _databaseProvider();
-    await db.delete('info_collection', where: 'project_id = ?', whereArgs: [id]);
     await db.delete('webshells', where: 'project_id = ?', whereArgs: [id]);
-    await db.delete('scan_sessions', where: 'project_id = ?', whereArgs: [id]);
     return db.delete('projects', where: 'id = ?', whereArgs: [id]);
   }
 }

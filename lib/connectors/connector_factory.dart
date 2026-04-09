@@ -5,7 +5,6 @@ import 'php_eval_connector.dart';
 import 'php_b64rot13_connector.dart';
 import 'php_behinder_connector.dart';
 import 'php_passthru_connector.dart';
-import 'php_probe_connector.dart';
 import 'jsp_classloader_connector.dart';
 import 'jsp_behinder_connector.dart';
 import 'jsp_runtime_connector.dart';
@@ -22,7 +21,6 @@ class ConnectorFactory {
       'php_b64rot13'    => PhpB64Rot13Connector(webshell),
       'php_behinder'    => PhpBehinderConnector(webshell),
       'php_passthru'    => PhpPassthruConnector(webshell),
-      'php_probe'       => PhpProbeConnector(webshell),
       'jsp_classloader' => JspClassloaderConnector(webshell),
       'jsp_behinder'    => JspBehinderConnector(webshell),
       'jsp_runtime'     => JspRuntimeConnector(webshell),
@@ -46,7 +44,6 @@ class ConnectorFactory {
         'php_b64rot13'    => 'PHP-B64',
         'php_behinder'    => 'PHP-BEHINDER',
         'php_passthru'    => 'PHP-CMD',
-        'php_probe'       => 'PHP-PROBE',
         'jsp_classloader' => 'JSP-CL',
         'jsp_behinder'    => 'JSP-BEHINDER',
         'jsp_runtime'     => 'JSP-CMD',
@@ -61,7 +58,6 @@ class ConnectorFactory {
         'php_b64rot13'    => 'php_b64rot13_post.php',
         'php_behinder'    => 'php_behinder.php',
         'php_passthru'    => 'php_passthru_req.php',
-        'php_probe'       => 'php_probe_info.php',
         'jsp_classloader' =>
           'jsp_classloader_b64.jsp（排错版：jsp_classloader_b64_debug.jsp）',
         'jsp_behinder'    => 'jsp_behinder.jsp',
@@ -75,7 +71,6 @@ class ConnectorFactory {
   /// 返回该 connector 对应 payload 里使用的默认参数名。
   /// 用于在 UI 的"密码"字段中显示提示，避免参数名混淆。
   static String defaultParam(String connectorType) => switch (connectorType) {
-        'php_probe'       => '',
         'php_behinder'    => AppConstants.defaultShellPassword,
         'jsp_behinder'    => AppConstants.defaultShellPassword,
         'jsp_classloader' => AppConstants.defaultShellPassword, // 与 jsp_classloader_b64.jsp 参数名一致
@@ -87,7 +82,6 @@ class ConnectorFactory {
   /// 返回 null 表示连接器尊重用户选择。
   static String? fixedMethod(String connectorType) => switch (connectorType) {
         'php_b64rot13'    => 'POST', // 只读 $_POST['cmd']
-        'php_probe'       => 'GET',  // 直接 GET，无参数
         'jsp_classloader' => 'POST', // agent body 过大，只走 POST
         'php_behinder'    => 'POST', // AES 加密 body
         'jsp_behinder'    => 'POST', // AES 加密 body
@@ -100,7 +94,6 @@ class ConnectorFactory {
     'php_b64rot13',
     'php_behinder',
     'php_passthru',
-    'php_probe',
     'jsp_classloader',
     'jsp_behinder',
     'jsp_runtime',

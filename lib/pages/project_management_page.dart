@@ -8,14 +8,12 @@ import '../theme/app_theme.dart';
 /// 项目管理页面：创建、编辑、删除
 class ProjectManagementPage extends StatefulWidget {
   final Project? selectedProject;
-  final void Function(Project project) onEnterInfoCollection;
   final void Function(Project project) onEnterWebshell;
   final void Function(Project project) onEnterExp;
 
   const ProjectManagementPage({
     super.key,
     this.selectedProject,
-    required this.onEnterInfoCollection,
     required this.onEnterWebshell,
     required this.onEnterExp,
   });
@@ -363,7 +361,6 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                           project: project,
                           onEdit: () => _showEditDialog(project),
                           onDelete: () => _showDeleteConfirm(project),
-                          onEnterInfoCollection: () => widget.onEnterInfoCollection(project),
                           onEnterWebshell: () => widget.onEnterWebshell(project),
                           onEnterExp: () => widget.onEnterExp(project),
                         );
@@ -379,7 +376,6 @@ class _ProjectCard extends StatelessWidget {
   final Project project;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-  final VoidCallback onEnterInfoCollection;
   final VoidCallback onEnterWebshell;
   final VoidCallback onEnterExp;
 
@@ -387,7 +383,6 @@ class _ProjectCard extends StatelessWidget {
     required this.project,
     required this.onEdit,
     required this.onDelete,
-    required this.onEnterInfoCollection,
     required this.onEnterWebshell,
     required this.onEnterExp,
   });
@@ -472,21 +467,10 @@ class _ProjectCard extends StatelessWidget {
             icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
             color: AppColors.bgCard,
             onSelected: (value) {
-              if (value == 'info') onEnterInfoCollection();
               if (value == 'webshell') onEnterWebshell();
               if (value == 'exp') onEnterExp();
             },
             itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'info',
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, color: AppColors.primary, size: 20),
-                    const SizedBox(width: 12),
-                    Text('进入信息收集', style: AppTextStyles.body(color: AppColors.textPrimary)),
-                  ],
-                ),
-              ),
               PopupMenuItem(
                 value: 'webshell',
                 child: Row(

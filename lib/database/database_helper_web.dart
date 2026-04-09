@@ -1,7 +1,6 @@
 import '../models/project.dart';
 import '../models/webshell.dart';
 import '../models/payload.dart';
-import '../models/dictionary.dart';
 
 /// Web 平台内存存储（SQLite 不支持 Web，数据仅会话内有效）
 class DatabaseHelperWeb {
@@ -9,13 +8,9 @@ class DatabaseHelperWeb {
   final List<Project> _projects = [];
   final List<Webshell> _webshells = [];
   final List<Payload> _payloads = [];
-  final List<Dictionary> _dictionaries = [];
-  final List<Map<String, dynamic>> _scanSessions = [];
   int _nextId = 1;
   int _nextWebshellId = 1;
   int _nextPayloadId = 1;
-  int _nextDictId = 1;
-  int _nextScanSessionId = 1;
 
   factory DatabaseHelperWeb() => _instance;
 
@@ -57,7 +52,6 @@ class DatabaseHelperWeb {
 
   Future<int> deleteProject(int id) async {
     _webshells.removeWhere((w) => w.projectId == id);
-    _scanSessions.removeWhere((s) => s['project_id'] == id);
     final len = _projects.length;
     _projects.removeWhere((p) => p.id == id);
     return len - _projects.length;
@@ -154,112 +148,4 @@ class DatabaseHelperWeb {
     return len - _payloads.length;
   }
 
-  // Dictionary 内存实现
-
-  Future<Dictionary> createDictionary({
-    required String name,
-    required String category,
-    required List<int> bytes,
-    bool isDefault = false,
-    String? description,
-    String? tags,
-  }) async {
-    final now = DateTime.now();
-    final lineCount =
-        bytes.where((b) => b == 10).length +
-        (bytes.isNotEmpty && bytes.last != 10 ? 1 : 0);
-    final dict = Dictionary(
-      id: _nextDictId++,
-      name: name,
-      category: category,
-      filePath: '',
-      lineCount: lineCount,
-      fileSize: bytes.length,
-      isDefault: isDefault,
-      description: description,
-      tags: tags,
-      createdAt: now,
-      updatedAt: now,
-    );
-    _dictionaries.insert(0, dict);
-    return dict;
-  }
-
-  Future<List<Dictionary>> getAllDictionaries() async {
-    return List.from(_dictionaries)
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-  }
-
-  Future<void> updateDictionaryContent(Dictionary dict, List<int> bytes) async {
-    final lineCount = bytes.where((b) => b == 10).length +
-        (bytes.isNotEmpty && bytes.last != 10 ? 1 : 0);
-    final fileSize = bytes.length;
-    final index = _dictionaries.indexWhere((d) => d.id == dict.id);
-    if (index >= 0) {
-      _dictionaries[index] = dict.copyWith(
-        lineCount: lineCount,
-        fileSize: fileSize,
-        updatedAt: DateTime.now(),
-      );
-    }
-  }
-
-  Future<String> readDictionaryPreview(String filePath,
-      {int maxLines = 300}) async =>
-      '// Web 模式：文件预览不可用';
-
-  Future<int> deleteDictionary(int id) async {
-    final len = _dictionaries.length;
-    _dictionaries.removeWhere((d) => d.id == id);
-    return len - _dictionaries.length;
-  }
-
-  // Scan Sessions 内存实现（Web 会话内有效）
-  Future<int> createScanSession({
-    required int projectId,
-    required String scanType,
-    required String target,
-    String? configJson,
-  }) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final id = _nextScanSessionId++;
-    _scanSessions.insert(0, {
-      'id': id,
-      'project_id': projectId,
-      'scan_type': scanType,
-      'target': target,
-      'config_json': configJson,
-      'log_text': '',
-      'status': 'running',
-      'created_at': now,
-      'updated_at': now,
-    });
-    return id;
-  }
-
-  Future<Map<String, dynamic>?> getLatestScanSession(int projectId, String scanType) async {
-    final matches = _scanSessions
-        .where((s) => s['project_id'] == projectId && s['scan_type'] == scanType)
-        .toList();
-    if (matches.isEmpty) return null;
-    matches.sort((a, b) => (b['updated_at'] as int).compareTo(a['updated_at'] as int));
-    return matches.first;
-  }
-
-  Future<void> updateScanSession(int id, {String? logText, String? status}) async {
-    final idx = _scanSessions.indexWhere((s) => s['id'] == id);
-    if (idx < 0) return;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    _scanSessions[idx]['updated_at'] = now;
-    if (logText != null) _scanSessions[idx]['log_text'] = logText;
-    if (status != null) _scanSessions[idx]['status'] = status;
-  }
-
-  Future<void> appendScanLog(int id, String line) async {
-    final idx = _scanSessions.indexWhere((s) => s['id'] == id);
-    if (idx < 0) return;
-    final current = _scanSessions[idx]['log_text'] as String? ?? '';
-    _scanSessions[idx]['log_text'] = current.isEmpty ? line : '$current\n$line';
-    _scanSessions[idx]['updated_at'] = DateTime.now().millisecondsSinceEpoch;
-  }
 }

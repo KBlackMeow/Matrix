@@ -2,15 +2,6 @@ import 'package:flutter/services.dart';
 
 import '../database/database_helper.dart';
 
-/// 根据文件名推断字典分类
-String _inferDictCategory(String name) {
-  final lower = name.toLowerCase();
-  if (lower.contains('password') || lower.contains('pass') || lower.contains('top100') || lower.contains('top200') || lower.contains('top1000')) return 'passwords';
-  if (lower.contains('username') || lower.contains('user')) return 'usernames';
-  if (lower.contains('subdomain')) return 'subdomains';
-  return 'paths';
-}
-
 /// 内置默认数据种子化服务
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
@@ -23,7 +14,6 @@ class SeedService {
   // PHP
   //   php_eval_post.php       — eval() + POST cmd
   //   php_passthru_req.php    — passthru() + REQUEST cmd
-  //   php_probe_info.php      — phpinfo() 环境探测
   //   php_b64rot13_post.php   — base64+rot13 双重编码绕过
   // JSP
   //   jsp_runtime_get.jsp     — UTF-8 + ProcessBuilder + 字节解码中文；Matrix 用 echo|base64 -d|bash
@@ -46,13 +36,6 @@ class SeedService {
       type: 'php',
       description: 'PHP passthru() 命令执行，GET/POST 参数 cmd，回显直接输出',
       tags: 'php,passthru,request,cmd',
-    ),
-    _PayloadDef(
-      asset: 'assets/defaults/payloads/php_probe_info.php',
-      name: 'php_probe_info.php',
-      type: 'php',
-      description: 'phpinfo() 环境信息探测，用于确认目标 PHP 版本及配置',
-      tags: 'php,phpinfo,probe,recon',
     ),
     _PayloadDef(
       asset: 'assets/defaults/payloads/php_b64rot13_post.php',
@@ -118,7 +101,6 @@ class SeedService {
     // ── 名称统一（旧版使用简短名，新版与 asset 文件名对齐）──────────────────
     _PayloadPatch(names: ['php_simple.php'],  newName: 'php_eval_post.php'),
     _PayloadPatch(names: ['php_cmd.php'],     newName: 'php_passthru_req.php'),
-    _PayloadPatch(names: ['php_info.php'],    newName: 'php_probe_info.php'),
     _PayloadPatch(names: ['jsp_simple.jsp'],  newName: 'jsp_runtime_get.jsp'),
     _PayloadPatch(names: ['asp_simple.asp'],  newName: 'asp_wscript_get.asp'),
     // ── 内容修复 + 重命名 ────────────────────────────────────────────────
@@ -134,43 +116,10 @@ class SeedService {
     ),
   ];
 
-  static const _defaultDicts = [
-    _DictDef(
-      asset: 'assets/defaults/dicts/top200_passwords.txt',
-      name: 'top200_passwords.txt',
-      category: 'passwords',
-      description: '常见弱密码 TOP 200，涵盖数字、字母、常见组合及常用服务默认密码',
-      tags: 'passwords,weak,common,top200',
-    ),
-    _DictDef(
-      asset: 'assets/defaults/dicts/common_paths.txt',
-      name: 'common_paths.txt',
-      category: 'paths',
-      description: '常见 Web 目录与敏感路径，含管理后台、配置文件、备份文件等',
-      tags: 'paths,dirs,web,admin,backup',
-    ),
-    _DictDef(
-      asset: 'assets/defaults/dicts/common_usernames.txt',
-      name: 'common_usernames.txt',
-      category: 'usernames',
-      description: '常见系统与服务用户名，含操作系统内置账号、常见服务账号',
-      tags: 'usernames,system,service,default',
-    ),
-    _DictDef(
-      asset: 'assets/defaults/dicts/common_subdomains.txt',
-      name: 'common_subdomains.txt',
-      category: 'subdomains',
-      description: '常见子域名前缀，适用于子域名枚举与 DNS 爆破',
-      tags: 'subdomains,dns,recon,brute',
-    ),
-  ];
-
   /// 应用启动时调用，幂等；storedVersion < currentVersion 时补充新版本的条目
   static Future<void> seed(DatabaseHelper db) async {
     // Patch 检查每次启动都运行（与版本号无关），内容不一致时直接覆盖
     await _applyPatches(db);
-    // 字典同步：每次启动检测 assets/defaults/dicts 变化，自动更新或新增
-    await _syncDefaultDicts(db);
 
     final stored = await db.getMetaValue(_kMetaKey);
     final storedVersion = int.tryParse(stored ?? '0') ?? 0;
@@ -192,24 +141,6 @@ class SeedService {
         );
       } catch (_) {
         // asset 缺失时跳过，不中断启动
-      }
-    }
-
-    for (final def in _defaultDicts) {
-      if (storedVersion >= 1) continue; // 字典仅在首次安装时种子化
-      try {
-        final data = await rootBundle.load(def.asset);
-        final bytes = data.buffer.asUint8List();
-        await db.createDictionary(
-          name: def.name,
-          category: def.category,
-          bytes: bytes,
-          isDefault: true,
-          description: def.description,
-          tags: def.tags,
-        );
-      } catch (_) {
-        // asset 缺失时跳过
       }
     }
 
@@ -265,65 +196,6 @@ class SeedService {
     }
   }
 
-  /// 每次启动同步 assets/defaults/dicts 下的字典：检测文件变化并更新，新增的自动导入
-  static Future<void> _syncDefaultDicts(DatabaseHelper db) async {
-    try {
-      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
-      final dictAssets = manifest
-          .listAssets()
-          .where((k) => k.startsWith('assets/defaults/dicts/'))
-          .toList();
-
-      final existingDicts = await db.getAllDictionaries();
-      final dictByName = {for (final d in existingDicts) d.name: d};
-
-      for (final assetPath in dictAssets) {
-        final name = assetPath.split('/').last;
-        if (name.isEmpty) continue;
-        try {
-          final data = await rootBundle.load(assetPath);
-          final bytes = data.buffer.asUint8List();
-          final fileSize = bytes.length;
-
-          final existing = dictByName[name];
-          if (existing != null) {
-            if (existing.isDefault && existing.fileSize != fileSize) {
-              await db.updateDictionaryContent(existing, bytes);
-            }
-          } else {
-            final category = _dictDefCategory(name) ?? _inferDictCategory(name);
-            final def = _findDictDef(name);
-            await db.createDictionary(
-              name: name,
-              category: category,
-              bytes: bytes,
-              isDefault: true,
-              description: def?.description,
-              tags: def?.tags,
-            );
-          }
-        } catch (_) {
-          // asset 加载失败时跳过
-        }
-      }
-    } catch (_) {
-      // AssetManifest 不可用时静默跳过（如部分测试环境）
-    }
-  }
-
-  static String? _dictDefCategory(String name) {
-    for (final d in _defaultDicts) {
-      if (d.name == name) return d.category;
-    }
-    return null;
-  }
-
-  static _DictDef? _findDictDef(String name) {
-    for (final d in _defaultDicts) {
-      if (d.name == name) return d;
-    }
-    return null;
-  }
 }
 
 class _PayloadDef {
@@ -360,18 +232,3 @@ class _PayloadPatch {
   });
 }
 
-class _DictDef {
-  final String asset;
-  final String name;
-  final String category;
-  final String description;
-  final String tags;
-
-  const _DictDef({
-    required this.asset,
-    required this.name,
-    required this.category,
-    required this.description,
-    required this.tags,
-  });
-}

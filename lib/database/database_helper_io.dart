@@ -9,15 +9,12 @@ import 'package:path_provider/path_provider.dart';
 
 import 'io/project_dao.dart';
 import 'io/payload_dao.dart';
-import 'io/scan_session_dao.dart';
 import 'io/webshell_dao.dart';
-import 'io/dictionary_dao.dart';
 import 'io/frp_profile_dao.dart';
 import 'io/meta_dao.dart';
 import '../models/project.dart';
 import '../models/webshell.dart';
 import '../models/payload.dart';
-import '../models/dictionary.dart';
 import '../models/frp_profile.dart';
 import '../services/frp_client_service.dart';
 
@@ -32,16 +29,10 @@ class DatabaseHelperIo {
 
   late final ProjectDao _projectDao = ProjectDao(() => database);
   late final WebshellDao _webshellDao = WebshellDao(() => database);
-  late final ScanSessionDao _scanSessionDao = ScanSessionDao(() => database);
   late final PayloadDao _payloadDao = PayloadDao(
         () => database,
         payloadsDirProvider: _payloadsDir,
         hashedFileName: _hashedFileName,
-      );
-  late final DictionaryDao _dictionaryDao = DictionaryDao(
-        () => database,
-        payloadsDirProvider: _payloadsDir,
-        hashedDictFileName: _hashedDictFileName,
       );
   late final FrpProfileDao _frpProfileDao = FrpProfileDao(() => database);
   late final MetaDao _metaDao = MetaDao(() => database);
@@ -73,19 +64,6 @@ class DatabaseHelperIo {
         description TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE info_collection (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        project_id INTEGER,
-        title TEXT NOT NULL,
-        content TEXT,
-        type TEXT,
-        source TEXT,
-        created_at INTEGER NOT NULL,
-        FOREIGN KEY (project_id) REFERENCES projects (id)
       )
     ''');
 
@@ -127,45 +105,8 @@ class DatabaseHelperIo {
       )
     ''');
 
-    await db.execute('''
-      CREATE TABLE dictionaries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        category TEXT NOT NULL DEFAULT 'custom',
-        file_path TEXT NOT NULL DEFAULT '',
-        line_count INTEGER NOT NULL DEFAULT 0,
-        file_size INTEGER NOT NULL DEFAULT 0,
-        is_default INTEGER NOT NULL DEFAULT 0,
-        description TEXT,
-        tags TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )
-    ''');
-
-    await db.execute(
-      'CREATE INDEX idx_info_project ON info_collection(project_id)',
-    );
     await db.execute(
       'CREATE INDEX idx_webshell_project ON webshells(project_id)',
-    );
-
-    await db.execute('''
-      CREATE TABLE scan_sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        project_id INTEGER,
-        scan_type TEXT NOT NULL,
-        target TEXT NOT NULL,
-        config_json TEXT,
-        log_text TEXT,
-        status TEXT NOT NULL DEFAULT 'running',
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        FOREIGN KEY (project_id) REFERENCES projects (id)
-      )
-    ''');
-    await db.execute(
-      'CREATE INDEX idx_scan_sessions_project_type ON scan_sessions(project_id, scan_type)',
     );
 
     await db.execute('''
@@ -257,29 +198,11 @@ class DatabaseHelperIo {
       await db.execute('DROP TABLE payloads');
       await db.execute('ALTER TABLE payloads_v5 RENAME TO payloads');
     }
-    if (oldVersion < 6) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS dictionaries (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          category TEXT NOT NULL DEFAULT 'custom',
-          file_path TEXT NOT NULL DEFAULT '',
-          line_count INTEGER NOT NULL DEFAULT 0,
-          file_size INTEGER NOT NULL DEFAULT 0,
-          description TEXT,
-          tags TEXT,
-          created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL
-        )
-      ''');
-    }
     if (oldVersion < 7) {
       await db.execute(
           'CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
       await db.execute(
           'ALTER TABLE payloads ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0');
-      await db.execute(
-          'ALTER TABLE dictionaries ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0');
     }
     if (oldVersion < 8) {
       await db.execute(
@@ -287,25 +210,6 @@ class DatabaseHelperIo {
       // 旧 JSP 类型自动映射到 jsp_classloader
       await db.execute(
           "UPDATE webshells SET connector_type = 'jsp_classloader' WHERE type = 'jsp'");
-    }
-    if (oldVersion < 9) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS scan_sessions (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          project_id INTEGER,
-          scan_type TEXT NOT NULL,
-          target TEXT NOT NULL,
-          config_json TEXT,
-          log_text TEXT,
-          status TEXT NOT NULL DEFAULT 'running',
-          created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL,
-          FOREIGN KEY (project_id) REFERENCES projects (id)
-        )
-      ''');
-      await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_scan_sessions_project_type ON scan_sessions(project_id, scan_type)',
-      );
     }
     if (oldVersion < 10) {
       await db.execute('''
@@ -353,44 +257,10 @@ class DatabaseHelperIo {
     return _projectDao.deleteProject(id);
   }
 
-  // ── Scan Sessions（扫描会话持久化）────────────────────────────────────────────
-
-  Future<int> createScanSession({
-    required int projectId,
-    required String scanType,
-    required String target,
-    String? configJson,
-  }) async {
-    return _scanSessionDao.createScanSession(
-      projectId: projectId,
-      scanType: scanType,
-      target: target,
-      configJson: configJson,
-    );
-  }
-
-  Future<Map<String, dynamic>?> getLatestScanSession(int projectId, String scanType) async {
-    return _scanSessionDao.getLatestScanSession(projectId, scanType);
-  }
-
-  Future<void> updateScanSession(int id, {String? logText, String? status}) async {
-    return _scanSessionDao.updateScanSession(id, logText: logText, status: status);
-  }
-
-  /// 启动时清理遗留的 running 会话（强制退出时未能更新状态）
-  Future<void> resetStaleRunningSessions() async {
-    return _scanSessionDao.resetStaleRunningSessions();
-  }
-
-  Future<void> appendScanLog(int id, String text) async {
-    return _scanSessionDao.appendScanLog(id, text);
-  }
-
   // ── Payload 文件目录 ────────────────────────────────────────────────────────
 
   // 盐值：用于混淆文件名，不对外暴露
   static const _kSalt = 'mx_payload_s3cr3t_2026';
-  static const _kDictSalt = 'mx_dict_s3cr3t_2026';
 
   Future<Directory> _payloadsDir() async {
     final docs = await getApplicationDocumentsDirectory();
@@ -402,12 +272,6 @@ class DatabaseHelperIo {
   /// Payload 文件名：MD5(盐 + id + originalName)
   static String _hashedFileName(int id, String name) {
     final input = utf8.encode('$_kSalt$id$name');
-    return md5.convert(input).toString();
-  }
-
-  /// Dictionary 文件名：MD5(字典盐 + id + originalName)
-  static String _hashedDictFileName(int id, String name) {
-    final input = utf8.encode('$_kDictSalt$id$name');
     return md5.convert(input).toString();
   }
 
@@ -451,45 +315,6 @@ class DatabaseHelperIo {
 
   Future<int> deletePayload(int id) async {
     return _payloadDao.deletePayload(id);
-  }
-
-  // ── Dictionary CRUD ─────────────────────────────────────────────────────────
-
-  Future<Dictionary> createDictionary({
-    required String name,
-    required String category,
-    required List<int> bytes,
-    bool isDefault = false,
-    String? description,
-    String? tags,
-  }) async {
-    return _dictionaryDao.createDictionary(
-      name: name,
-      category: category,
-      bytes: bytes,
-      isDefault: isDefault,
-      description: description,
-      tags: tags,
-    );
-  }
-
-  Future<List<Dictionary>> getAllDictionaries() async {
-    return _dictionaryDao.getAllDictionaries();
-  }
-
-  /// 更新字典内容（用于内置字典与 asset 同步）
-  Future<void> updateDictionaryContent(Dictionary dict, List<int> bytes) async {
-    return _dictionaryDao.updateDictionaryContent(dict, bytes);
-  }
-
-  /// 读取字典前 [maxLines] 行作为预览
-  Future<String> readDictionaryPreview(String filePath,
-      {int maxLines = 300}) async {
-    return _dictionaryDao.readDictionaryPreview(filePath, maxLines: maxLines);
-  }
-
-  Future<int> deleteDictionary(int id) async {
-    return _dictionaryDao.deleteDictionary(id);
   }
 
   Future<Webshell> createWebshell(
@@ -661,59 +486,6 @@ Future<List<Payload>> getAllPayloads() => _io.getAllPayloads();
 Future<int> updatePayload(Payload payload) => _io.updatePayload(payload);
 
 Future<int> deletePayload(int id) => _io.deletePayload(id);
-
-// Dictionary 相关顶层方法
-
-Future<Dictionary> createDictionary({
-  required String name,
-  required String category,
-  required List<int> bytes,
-  bool isDefault = false,
-  String? description,
-  String? tags,
-}) =>
-    _io.createDictionary(
-      name: name,
-      category: category,
-      bytes: bytes,
-      isDefault: isDefault,
-      description: description,
-      tags: tags,
-    );
-
-Future<List<Dictionary>> getAllDictionaries() => _io.getAllDictionaries();
-
-Future<void> updateDictionaryContent(Dictionary dict, List<int> bytes) =>
-    _io.updateDictionaryContent(dict, bytes);
-
-Future<String> readDictionaryPreview(String filePath, {int maxLines = 300}) =>
-    _io.readDictionaryPreview(filePath, maxLines: maxLines);
-
-Future<int> deleteDictionary(int id) => _io.deleteDictionary(id);
-
-// Scan Sessions 顶层方法
-Future<int> createScanSession({
-  required int projectId,
-  required String scanType,
-  required String target,
-  String? configJson,
-}) =>
-    _io.createScanSession(
-      projectId: projectId,
-      scanType: scanType,
-      target: target,
-      configJson: configJson,
-    );
-
-Future<Map<String, dynamic>?> getLatestScanSession(int projectId, String scanType) =>
-    _io.getLatestScanSession(projectId, scanType);
-
-Future<void> updateScanSession(int id, {String? logText, String? status}) =>
-    _io.updateScanSession(id, logText: logText, status: status);
-
-Future<void> appendScanLog(int id, String line) => _io.appendScanLog(id, line);
-
-Future<void> resetStaleRunningSessions() => _io.resetStaleRunningSessions();
 
 // FRP Profiles 顶层方法
 Future<FrpProfile> createFrpProfile({

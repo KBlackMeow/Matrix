@@ -12,7 +12,7 @@ class Webshell {
   /// 1=在线, 0=离线
   final int status;
   /// 连接器类型，驱动运行时行为：
-  /// php_eval / php_b64rot13 / php_passthru / php_probe /
+  /// php_eval / php_b64rot13 / php_passthru /
   /// jsp_classloader / jsp_runtime / asp_wscript
   final String connectorType;
   final DateTime createdAt;

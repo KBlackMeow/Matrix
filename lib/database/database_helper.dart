@@ -1,7 +1,6 @@
 import '../models/project.dart';
 import '../models/webshell.dart';
 import '../models/payload.dart';
-import '../models/dictionary.dart';
 import '../models/frp_profile.dart';
 import '../services/frp_client_service.dart';
 import 'database_helper_stub.dart'
@@ -104,69 +103,6 @@ class DatabaseHelper {
   Future<int> deletePayload(int id) async {
     return impl.deletePayload(id);
   }
-
-  // Dictionary 相关
-
-  Future<Dictionary> createDictionary({
-    required String name,
-    required String category,
-    required List<int> bytes,
-    bool isDefault = false,
-    String? description,
-    String? tags,
-  }) async {
-    return impl.createDictionary(
-      name: name,
-      category: category,
-      bytes: bytes,
-      isDefault: isDefault,
-      description: description,
-      tags: tags,
-    );
-  }
-
-  Future<List<Dictionary>> getAllDictionaries() async {
-    return impl.getAllDictionaries();
-  }
-
-  Future<void> updateDictionaryContent(Dictionary dict, List<int> bytes) async {
-    return impl.updateDictionaryContent(dict, bytes);
-  }
-
-  Future<String> readDictionaryPreview(String filePath,
-      {int maxLines = 300}) async {
-    return impl.readDictionaryPreview(filePath, maxLines: maxLines);
-  }
-
-  Future<int> deleteDictionary(int id) async {
-    return impl.deleteDictionary(id);
-  }
-
-  // Scan Sessions（扫描会话持久化）
-  Future<int> createScanSession({
-    required int projectId,
-    required String scanType,
-    required String target,
-    String? configJson,
-  }) async {
-    return impl.createScanSession(
-      projectId: projectId,
-      scanType: scanType,
-      target: target,
-      configJson: configJson,
-    );
-  }
-
-  Future<Map<String, dynamic>?> getLatestScanSession(int projectId, String scanType) =>
-      impl.getLatestScanSession(projectId, scanType);
-
-  Future<void> updateScanSession(int id, {String? logText, String? status}) =>
-      impl.updateScanSession(id, logText: logText, status: status);
-
-  Future<void> appendScanLog(int id, String line) => impl.appendScanLog(id, line);
-
-  /// 启动时将所有遗留的 running 会话重置为 interrupted
-  Future<void> resetStaleRunningSessions() => impl.resetStaleRunningSessions();
 
   // FRP Profiles
 
