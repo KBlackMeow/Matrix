@@ -57,11 +57,6 @@
 - 多 Server 配置管理
 - 控制通道 AES-128-CFB 加密
 
-### 项目与 Payload 管理
-
-- 按目标归档 Webshell 与利用记录
-- 内置 Payload 模板库（可自定义）
-
 ---
 
 ## 快速开始
