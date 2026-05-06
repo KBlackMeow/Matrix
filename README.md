@@ -34,29 +34,29 @@
 
 ### 漏洞利用（EXP）
 
-| 框架 / 组件 | CVE / 漏洞 |
+| 框架 / 组件 | 漏洞编号 |
 |------------|-----------|
-| Apache Shiro | 默认密钥爆破 + 反序列化 RCE，内存马注入 |
-| ThinkPHP | 5.x RCE（CVE-2018-20062、CVE-2019-9082），6.x 反序列化 |
-| Struts2 | S2-001 / 045 / 048 / 052 / 057 / 059 / 061 |
-| Spring | Spring4Shell、Cloud Function SPEL、Data REST、OAuth2、AMQP |
-| WebLogic | CVE-2017-10271、CVE-2020-14882 |
-| Tomcat | CVE-2017-12615 |
-| Apache HTTPD | CVE-2021-41773 |
+| Apache Shiro | CVE-2016-4437 |
+| ThinkPHP | CVE-2018-20062 / CVE-2019-9082 / CNVD-2022-86535 |
+| Zentao（禅道） | CVE-2024-24216 |
+| Apache Struts2 | S2-032 / S2-045 / S2-053 / S2-057 / S2-059 |
+| Spring Framework | CVE-2022-22963 / CVE-2022-22965 / CVE-2018-1273 / CVE-2017-8046 |
+| Apache HTTP Server | CVE-2021-41773 |
+| Apache Druid | CVE-2021-25646 |
+| Apache OFBiz | CVE-2023-51467 / CVE-2024-38856 |
+| Apache Solr | CVE-2017-12629 |
 | Drupal | CVE-2018-7600 |
 | Elasticsearch | CVE-2015-1427 |
-| SaltStack | CVE-2020-16846 / CVE-2020-25592 |
-| Nacos | CVE-2021-29441 |
-| XXL-Job | 未授权 Executor RCE |
+| Flask / Jinja2 SSTI | SSTI |
+| PHP | PHP 8.1.0-dev / CVE-2012-1823 |
+| Apache Tomcat | CVE-2017-12615 |
+| Oracle WebLogic | CVE-2017-10271 / CVE-2020-14882 |
 | Supervisor | CVE-2017-11610 |
-| Aria2 | 未授权 RPC 任意文件写入 |
-| Solr | CVE-2017-12629 |
-| Flask / SSTI | Jinja2 SSTI RCE |
-| PHP CGI | CVE-2012-1823 |
-| Shellshock | CVE-2014-6271 |
-| OFBiz | CVE-2023-51467 / CVE-2024-38856 |
-| Zentao（禅道） | 多版本未授权 RCE |
-| Druid | 未授权访问信息泄露 |
+| XXL-JOB | 未授权 Executor RCE |
+| Nacos | CVE-2021-29441 |
+| Bash Shellshock | CVE-2014-6271 |
+| SaltStack | CVE-2020-16846 |
+| Aria2 | 未授权 JSON-RPC |
 
 EXP 辅助能力：
 - ThinkPHP RCE 检测、命令执行与 GetShell

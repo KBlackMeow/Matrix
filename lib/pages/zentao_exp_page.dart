@@ -2,7 +2,8 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle, Clipboard, ClipboardData;
+import 'package:flutter/services.dart'
+    show rootBundle, Clipboard, ClipboardData;
 
 import '../app/constants.dart';
 import '../database/database_helper.dart';
@@ -77,7 +78,11 @@ class ZentaoExpPage extends StatelessWidget {
                         width: 1,
                       ),
                     ),
-                    child: const Icon(Icons.storage, color: AppColors.primary, size: 22),
+                    child: const Icon(
+                      Icons.storage,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -153,6 +158,48 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
     });
   }
 
+  Duration get _timeout => Duration(
+    seconds:
+        int.tryParse(_timeoutController.text.trim()) ??
+        AppConstants.defaultHttpTimeoutSeconds,
+  );
+
+  Future<void> _handleDetect() async {
+    final url = _urlController.text.trim();
+    if (url.isEmpty) {
+      _appendLog('[!] 请输入禅道根路径，如 http://localhost:8080');
+      return;
+    }
+    setState(() => _running = true);
+    _appendLog('[*] 探测禅道安装路径与登录绕过条件...');
+    try {
+      final detected = await ZentaoExpService.detectZentaoBase(
+        url,
+        timeout: _timeout,
+        onLog: _appendLog,
+      );
+      if (detected == null) {
+        _appendLog('[-] 未识别到禅道路径或 zentaosid Cookie');
+        return;
+      }
+      if (detected != url && mounted) {
+        setState(() => _urlController.text = detected);
+        _appendLog('[*] 已更新目标路径: $detected');
+      }
+      final svc = ZentaoExpService(url: detected, timeout: _timeout);
+      final sid = await svc.tryBypassLogin(onLog: _appendLog);
+      if (sid != null) {
+        _appendLog('[+] 登录绕过条件满足，可继续尝试 GetShell');
+      } else {
+        _appendLog('[-] 未满足登录绕过条件，GetShell 成功率较低');
+      }
+    } catch (e) {
+      _appendLog('[!] 探测异常: $e');
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
+
   Future<void> _handleGetShell() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
@@ -165,17 +212,18 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
       final password = _passwordController.text.trim().isEmpty
           ? AppConstants.defaultShellPassword
           : _passwordController.text.trim();
-      var shellContent = await rootBundle
-          .loadString('assets/defaults/payloads/webshell/php_behinder.php');
-      final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
-      shellContent = shellContent.replaceFirst(RegExp(r'\$key="[0-9a-f]{16}"'), '\$key="$key"');
-      final svc = ZentaoExpService(
-        url: url,
-        timeout: Duration(
-          seconds: int.tryParse(_timeoutController.text.trim()) ??
-              AppConstants.defaultHttpTimeoutSeconds,
-        ),
+      var shellContent = await rootBundle.loadString(
+        'assets/defaults/payloads/webshell/php_behinder.php',
       );
+      final key = md5
+          .convert(utf8.encode(password))
+          .toString()
+          .substring(0, 16);
+      shellContent = shellContent.replaceFirst(
+        RegExp(r'\$key="[0-9a-f]{16}"'),
+        '\$key="$key"',
+      );
+      final svc = ZentaoExpService(url: url, timeout: _timeout);
       String? shellUrl;
       shellUrl = await svc.getShell(
         shellContent: shellContent,
@@ -195,7 +243,10 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
   }
 
   Future<void> _openWebshellFromResult(
-      BuildContext context, String shellUrl, String password) async {
+    BuildContext context,
+    String shellUrl,
+    String password,
+  ) async {
     final now = DateTime.now();
     Webshell ws = Webshell(
       id: 0,
@@ -225,17 +276,18 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
         );
       }
     } catch (_) {}
-    if (!mounted) return;
+    if (!context.mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => WebshellInteractivePage(webshell: ws),
-      ),
+      MaterialPageRoute(builder: (_) => WebshellInteractivePage(webshell: ws)),
     );
   }
 
   Future<Project?> _showProjectPicker(
-      BuildContext context, DatabaseHelper db) async {
+    BuildContext context,
+    DatabaseHelper db,
+  ) async {
     final projects = await db.getAllProjects();
+    if (!context.mounted) return null;
     if (projects.isEmpty) {
       return _showCreateProjectDialog(context, db);
     }
@@ -246,7 +298,9 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
   }
 
   Future<Project?> _showCreateProjectDialog(
-      BuildContext context, DatabaseHelper db) async {
+    BuildContext context,
+    DatabaseHelper db,
+  ) async {
     final nameController = TextEditingController();
     final domainController = TextEditingController();
 
@@ -254,8 +308,10 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgCard,
-        title: Text('暂无项目',
-            style: AppTextStyles.heading(color: AppColors.primary)),
+        title: Text(
+          '暂无项目',
+          style: AppTextStyles.heading(color: AppColors.primary),
+        ),
         content: SizedBox(
           width: 360,
           child: Column(
@@ -275,11 +331,14 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                   labelText: '项目名称',
                   hintText: '例如：禅道测试环境',
                   hintStyle: AppTextStyles.caption(
-                      size: 11, color: AppColors.textMuted),
+                    size: 11,
+                    color: AppColors.textMuted,
+                  ),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.5)),
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -294,11 +353,14 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                   labelText: '域名或ID *',
                   hintText: '例如：zentaopms',
                   hintStyle: AppTextStyles.caption(
-                      size: 11, color: AppColors.textMuted),
+                    size: 11,
+                    color: AppColors.textMuted,
+                  ),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.5)),
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -311,19 +373,24 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('取消',
-                style: AppTextStyles.body(color: AppColors.textSecondary)),
+            child: Text(
+              '取消',
+              style: AppTextStyles.body(color: AppColors.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () {
               if (nameController.text.trim().isEmpty ||
-                  domainController.text.trim().isEmpty) return;
+                  domainController.text.trim().isEmpty) {
+                return;
+              }
               Navigator.pop(ctx, true);
             },
-            style:
-                FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            child: Text('创建',
-                style: AppTextStyles.body(color: AppColors.bgDark)),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            child: Text(
+              '创建',
+              style: AppTextStyles.body(color: AppColors.bgDark),
+            ),
           ),
         ],
       ),
@@ -360,18 +427,31 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
 
   TextSpan _buildLogRichText(String log) {
     if (log.isEmpty) {
-      return TextSpan(text: '> 等待操作', style: TextStyle(color: AppColors.textMuted, fontFamily: 'Monaco'));
+      return TextSpan(
+        text: '> 等待操作',
+        style: TextStyle(color: AppColors.textMuted, fontFamily: 'Monaco'),
+      );
     }
     final lines = log.split('\n');
     final spans = <TextSpan>[];
-    final baseStyle = AppTextStyles.terminal(size: 12, color: AppColors.textSecondary);
+    final baseStyle = AppTextStyles.terminal(
+      size: 12,
+      color: AppColors.textSecondary,
+    );
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
       final color = _logLineColor(line);
-      spans.add(TextSpan(
-        text: line + (i < lines.length - 1 ? '\n' : ''),
-        style: baseStyle.copyWith(color: color, fontWeight: line.startsWith('[+]') || line.startsWith('[!]') ? FontWeight.w600 : null),
-      ));
+      spans.add(
+        TextSpan(
+          text: line + (i < lines.length - 1 ? '\n' : ''),
+          style: baseStyle.copyWith(
+            color: color,
+            fontWeight: line.startsWith('[+]') || line.startsWith('[!]')
+                ? FontWeight.w600
+                : null,
+          ),
+        ),
+      );
     }
     return TextSpan(children: spans);
   }
@@ -396,14 +476,19 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                   color: AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(Icons.storage,
-                    color: AppColors.primary, size: 18),
+                child: const Icon(
+                  Icons.storage,
+                  color: AppColors.primary,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
               Text(
                 'Zentao CVE-2024-24216 · GetShell',
                 style: AppTextStyles.heading(
-                    size: 14, color: AppColors.textPrimary),
+                  size: 14,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
@@ -423,7 +508,9 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                         TextField(
                           controller: _urlController,
                           style: AppTextStyles.body(
-                              size: 12, color: AppColors.textPrimary),
+                            size: 12,
+                            color: AppColors.textPrimary,
+                          ),
                           decoration: _inputDecoration(
                             '禅道根路径',
                             'http://localhost:8080',
@@ -433,25 +520,34 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                         TextField(
                           controller: _timeoutController,
                           style: AppTextStyles.body(
-                              size: 12, color: AppColors.textPrimary),
-                          decoration:
-                              _inputDecoration('超时(s)', '10'),
+                            size: 12,
+                            color: AppColors.textPrimary,
+                          ),
+                          decoration: _inputDecoration('超时(s)', '10'),
                           keyboardType: TextInputType.number,
                         ),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _passwordController,
                           style: AppTextStyles.body(
-                              size: 12, color: AppColors.textPrimary),
-                          decoration:
-                              _inputDecoration(
-                                'GetShell 密码',
-                                AppConstants.defaultShellPassword,
-                              ),
+                            size: 12,
+                            color: AppColors.textPrimary,
+                          ),
+                          decoration: _inputDecoration(
+                            'GetShell 密码',
+                            AppConstants.defaultShellPassword,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         _sectionTitle('利用动作'),
-                        _actionBtn('GetShell', _handleGetShell),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _actionBtn('探测/验证绕过', _handleDetect),
+                            _actionBtn('写入 WebShell', _handleGetShell),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -493,13 +589,23 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                             ),
                             const Spacer(),
                             TextButton.icon(
-                              onPressed: _log.isEmpty ? null : () async {
-                                await Clipboard.setData(ClipboardData(text: _log));
-                                if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
-                                );
-                              },
+                              onPressed: _log.isEmpty
+                                  ? null
+                                  : () async {
+                                      final messenger = ScaffoldMessenger.of(
+                                        context,
+                                      );
+                                      await Clipboard.setData(
+                                        ClipboardData(text: _log),
+                                      );
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('已复制到剪贴板'),
+                                          duration: Duration(seconds: 1),
+                                        ),
+                                      );
+                                    },
                               icon: const Icon(Icons.copy, size: 14),
                               label: const Text('复制'),
                               style: TextButton.styleFrom(
@@ -508,7 +614,9 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                               ),
                             ),
                             TextButton.icon(
-                              onPressed: _log.isEmpty ? null : () => setState(() => _log = ''),
+                              onPressed: _log.isEmpty
+                                  ? null
+                                  : () => setState(() => _log = ''),
                               icon: const Icon(Icons.clear_all, size: 14),
                               label: const Text('清空'),
                               style: TextButton.styleFrom(
@@ -518,15 +626,17 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
                             ),
                           ],
                         ),
-                        const Divider(
-                            height: 1, color: AppColors.border),
+                        const Divider(height: 1, color: AppColors.border),
                         const SizedBox(height: 4),
                         Expanded(
                           child: SingleChildScrollView(
                             controller: _logScrollController,
                             child: SelectableText.rich(
                               _buildLogRichText(_log),
-                              style: AppTextStyles.terminal(size: 12, color: AppColors.textMuted),
+                              style: AppTextStyles.terminal(
+                                size: 12,
+                                color: AppColors.textMuted,
+                              ),
                             ),
                           ),
                         ),
@@ -556,9 +666,13 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
             ),
           ),
           const SizedBox(width: 8),
-          Text(title,
-              style: AppTextStyles.heading(
-                  size: 12, color: AppColors.textSecondary)),
+          Text(
+            title,
+            style: AppTextStyles.heading(
+              size: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );
@@ -568,12 +682,10 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      hintStyle:
-          AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+      hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
       floatingLabelBehavior: FloatingLabelBehavior.always,
       isDense: true,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
@@ -581,8 +693,7 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide:
-            BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
+        borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
       ),
     );
   }
@@ -611,8 +722,10 @@ class _ProjectPickerDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.bgCard,
-      title:
-          Text('选择项目', style: AppTextStyles.heading(color: AppColors.primary)),
+      title: Text(
+        '选择项目',
+        style: AppTextStyles.heading(color: AppColors.primary),
+      ),
       content: SizedBox(
         width: 360,
         child: ListView.builder(
@@ -621,14 +734,25 @@ class _ProjectPickerDialog extends StatelessWidget {
           itemBuilder: (ctx, i) {
             final p = projects[i];
             return ListTile(
-              leading: const Icon(Icons.folder_outlined,
-                  color: AppColors.primary, size: 20),
-              title: Text(p.name,
-                  style: AppTextStyles.body(
-                      size: 13, color: AppColors.textPrimary)),
-              subtitle: Text(p.domain,
-                  style: AppTextStyles.caption(
-                      size: 11, color: AppColors.textMuted)),
+              leading: const Icon(
+                Icons.folder_outlined,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              title: Text(
+                p.name,
+                style: AppTextStyles.body(
+                  size: 13,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                p.domain,
+                style: AppTextStyles.caption(
+                  size: 11,
+                  color: AppColors.textMuted,
+                ),
+              ),
               onTap: () => Navigator.pop(context, p),
             );
           },
@@ -637,11 +761,12 @@ class _ProjectPickerDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('取消',
-              style: AppTextStyles.body(color: AppColors.textSecondary)),
+          child: Text(
+            '取消',
+            style: AppTextStyles.body(color: AppColors.textSecondary),
+          ),
         ),
       ],
     );
   }
 }
-

