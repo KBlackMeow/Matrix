@@ -20,9 +20,17 @@
 交互功能：
 - 交互式终端
 - 可视化文件管理器（上传 / 下载 / 删除 / 重命名）
+- 支持从 Payload 库选择文件并上传到当前远程目录
 - 系统信息采集（OS、权限、网络、进程）
 - 提权向量检测（SUID、sudo 免密、内核版本）
 - 反弹 Shell 生成
+
+### Payload 管理
+
+- 内置 PHP / JSP / ASP / ASPX 常用 payload
+- 支持从本地文件导入 payload，并在详情页复制、下载或转 Base64
+- 支持二进制 payload 的 Base64 存储与下载
+- Webshell 文件管理器可直接选择 Payload 库中的文件上传到目标目录
 
 ### 漏洞利用（EXP）
 
@@ -50,6 +58,12 @@
 | Zentao（禅道） | 多版本未授权 RCE |
 | Druid | 未授权访问信息泄露 |
 
+EXP 辅助能力：
+- ThinkPHP RCE 检测、命令执行与 GetShell
+- ThinkPHP 3.x Log RCE GetShell 会落地真实 PHP Webshell 后再进入连接流程
+- JSP 冰蝎 payload 使用 `java.util.Base64`，兼容高版本 JDK / Tomcat
+- 默认 payload 会在启动时幂等修复，缺失项会在后续启动继续补种
+
 ### 内网穿透
 
 内置 FRP 客户端：
@@ -65,6 +79,8 @@
 flutter pub get
 flutter run -d macos    # 或 windows / linux
 ```
+
+> 当前主要面向桌面端（macOS / Windows / Linux），不以 Flutter Web 作为支持目标。
 
 ---
 
