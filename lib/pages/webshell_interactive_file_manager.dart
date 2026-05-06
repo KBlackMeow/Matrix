@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../database/database_helper.dart';
+import '../models/payload.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 
@@ -26,6 +29,7 @@ class FileManagerTab extends StatefulWidget {
 
 class _FileManagerTabState extends State<FileManagerTab>
     with AutomaticKeepAliveClientMixin {
+  final DatabaseHelper _db = DatabaseHelper();
   String _currentPath = '/';
   List<FileEntry> _files = [];
   bool _loading = true;
@@ -114,22 +118,90 @@ class _FileManagerTabState extends State<FileManagerTab>
 
   Future<void> _uploadFile() async {
     if (!widget.service.supportsFileWrite) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('当前连接器不支持文件写入'),
-        backgroundColor: AppColors.red,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('当前连接器不支持文件写入'),
+          backgroundColor: AppColors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
-    final file = await openFile(acceptedTypeGroups: const [XTypeGroup(label: '所有文件')]);
+    final file = await openFile(
+      acceptedTypeGroups: const [XTypeGroup(label: '所有文件')],
+    );
     if (file == null || !mounted) return;
     final bytes = await file.readAsBytes();
     if (!mounted) return;
-    final remotePath = _join(_currentPath, file.name);
+    await _uploadBytes(file.name, bytes);
+  }
+
+  Future<void> _uploadPayloadFile() async {
+    if (!widget.service.supportsFileWrite) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('当前连接器不支持文件写入'),
+          backgroundColor: AppColors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final payloads = await _db.getAllPayloads();
+    if (!mounted) return;
+    if (payloads.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('暂无可上传的 Payload'),
+          backgroundColor: AppColors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final selected = await showDialog<Payload>(
+      context: context,
+      builder: (_) => _PayloadPickerDialog(payloads: payloads),
+    );
+    if (selected == null || !mounted) return;
+
+    final bytes = _payloadBytes(selected);
+    if (bytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payload 解码失败: ${selected.name}'),
+          backgroundColor: AppColors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    await _uploadBytes(selected.name, bytes);
+  }
+
+  Uint8List? _payloadBytes(Payload payload) {
+    const binaryPrefix = '__MATRIX_BINARY_B64__:';
+    if (payload.content.startsWith(binaryPrefix)) {
+      try {
+        return base64Decode(payload.content.substring(binaryPrefix.length));
+      } catch (_) {
+        return null;
+      }
+    }
+    return Uint8List.fromList(utf8.encode(payload.content));
+  }
+
+  Future<void> _uploadBytes(String fileName, Uint8List bytes) async {
+    if (!mounted) return;
+    final remotePath = _join(_currentPath, fileName);
     final transferred = ValueNotifier<int>(0);
     _uploadCancelled = false;
     bool ok = false;
     bool usedBinaryPath = false;
+    bool progressShown = false;
     try {
       // 若检测为文本文件且体积较小，则走文本写入；大文件一律走分块上传，避免单次请求超限。
       final looksBinary = _isBinary(bytes);
@@ -145,7 +217,7 @@ class _FileManagerTabState extends State<FileManagerTab>
           context: context,
           barrierDismissible: false,
           builder: (_) => _TransferProgressDialog(
-            fileName: file.name,
+            fileName: fileName,
             fileSize: bytes.length,
             transferred: transferred,
             isUpload: true,
@@ -157,15 +229,16 @@ class _FileManagerTabState extends State<FileManagerTab>
             },
           ),
         );
+        progressShown = true;
         ok = await widget.service.writeFileBinaryWithProgress(
           remotePath,
           bytes,
           (sent, _) {
-              if (!mounted) return;
-              if (_uploadCancelled) {
-                throw _TransferCancelled();
-              }
-              transferred.value = sent;
+            if (!mounted) return;
+            if (_uploadCancelled) {
+              throw _TransferCancelled();
+            }
+            transferred.value = sent;
           },
         );
       }
@@ -173,29 +246,32 @@ class _FileManagerTabState extends State<FileManagerTab>
       if (!mounted) return;
       // 不再主动关闭当前页面，仅结束上传状态和进度
       setState(() => _uploading = false);
-      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      if (progressShown && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
       transferred.dispose();
       if (e is _TransferCancelled) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              '上传已取消',
-              style: TextStyle(color: Colors.white),
-            ),
+            content: Text('上传已取消', style: TextStyle(color: Colors.white)),
             backgroundColor: Color(0xFF064D2E), // 暗绿色背景
             behavior: SnackBarBehavior.floating,
           ),
         );
       } else {
         debugPrint(
-          '[Matrix][上传] 异常 file=${file.name} path=$remotePath size=${bytes.length} error=$e',
+          '[Matrix][上传] 异常 file=$fileName path=$remotePath size=${bytes.length} error=$e',
         );
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content:
-              Text('上传失败: $e', style: const TextStyle(color: Colors.white)),
-          backgroundColor: AppColors.red,
-          behavior: SnackBarBehavior.floating,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '上传失败: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: AppColors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
       return;
     }
@@ -214,22 +290,25 @@ class _FileManagerTabState extends State<FileManagerTab>
       return;
     }
     setState(() => _uploading = false);
-    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+    if (progressShown && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
     transferred.dispose();
     if (!ok) {
       debugPrint(
-        '[Matrix][上传] 失败 file=${file.name} path=$remotePath size=${bytes.length} '
+        '[Matrix][上传] 失败 file=$fileName path=$remotePath size=${bytes.length} '
         'usedBinaryPath=$usedBinaryPath',
       );
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          ok ? '已上传 ${file.name}' : '上传失败',
+          ok ? '已上传 $fileName' : '上传失败',
           style: const TextStyle(color: Colors.white),
         ),
-        backgroundColor:
-            ok ? const Color(0xFF064D2E) : AppColors.red, // 成功用暗绿，失败用红
+        backgroundColor: ok
+            ? const Color(0xFF064D2E)
+            : AppColors.red, // 成功用暗绿，失败用红
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -318,16 +397,23 @@ class _FileManagerTabState extends State<FileManagerTab>
         ),
       );
     } catch (e) {
-      if (!mounted) { transferred.dispose(); return; }
+      if (!mounted) {
+        transferred.dispose();
+        return;
+      }
       Navigator.of(context).pop();
       setState(() => _downloading = false);
       transferred.dispose();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content:
-            Text('下载失败: $e', style: const TextStyle(color: Colors.white)),
-        backgroundColor: AppColors.red,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '下载失败: $e',
+            style: const TextStyle(color: Colors.white),
+          ),
+          backgroundColor: AppColors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -423,10 +509,21 @@ class _FileManagerTabState extends State<FileManagerTab>
               ),
               if (widget.service.supportsFileWrite)
                 IconButton(
-                  onPressed: _loading || _uploading || _downloading ? null : _uploadFile,
+                  onPressed: _loading || _uploading || _downloading
+                      ? null
+                      : _uploadFile,
                   icon: const Icon(Icons.upload_file, size: 16),
                   color: AppColors.primary,
                   tooltip: '上传文件',
+                ),
+              if (widget.service.supportsFileWrite)
+                IconButton(
+                  onPressed: _loading || _uploading || _downloading
+                      ? null
+                      : _uploadPayloadFile,
+                  icon: const Icon(Icons.inventory_2_outlined, size: 16),
+                  color: AppColors.cyan,
+                  tooltip: '上传 Payload',
                 ),
               IconButton(
                 onPressed: _loading ? null : () => _loadDirectory(_currentPath),
@@ -491,11 +588,12 @@ class _FileManagerTabState extends State<FileManagerTab>
                       onEdit: f.isDirectory || f.name == '..'
                           ? null
                           : () => _showEditDialog(f),
-                      onDownload: f.isDirectory || f.name == '..' || _downloading
+                      onDownload:
+                          f.isDirectory || f.name == '..' || _downloading
                           ? null
                           : widget.service.supportsFileRead
-                              ? () => _downloadFile(f)
-                              : null,
+                          ? () => _downloadFile(f)
+                          : null,
                       onDelete: f.name == '..' ? null : () => _deleteFile(f),
                     );
                   },
@@ -539,117 +637,117 @@ class _FileRow extends StatelessWidget {
       builder: (ctx, constraints) {
         final w = constraints.maxWidth;
         return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: Color(0xFF1C2128), width: 0.8),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isUp
-                  ? Icons.subdirectory_arrow_left
-                  : entry.isDirectory
-                  ? Icons.folder_rounded
-                  : _fileIcon(entry.name),
-              size: 18,
-              color: isUp
-                  ? AppColors.textMuted
-                  : entry.isDirectory
-                  ? AppColors.amber
-                  : _fileIconColor(entry.name),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            decoration: const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Color(0xFF1C2128), width: 0.8),
+              ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              flex: 5,
-              child: Text(
-                entry.name,
-                style: AppTextStyles.body(
-                  size: 13,
+            child: Row(
+              children: [
+                Icon(
+                  isUp
+                      ? Icons.subdirectory_arrow_left
+                      : entry.isDirectory
+                      ? Icons.folder_rounded
+                      : _fileIcon(entry.name),
+                  size: 18,
                   color: isUp
                       ? AppColors.textMuted
                       : entry.isDirectory
                       ? AppColors.amber
-                      : AppColors.textPrimary,
+                      : _fileIconColor(entry.name),
                 ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (w > 480)
-            SizedBox(
-              width: 80,
-              child: Text(
-                entry.formattedSize,
-                style: AppTextStyles.caption(
-                  size: 12,
-                  color: AppColors.textSecondary,
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 5,
+                  child: Text(
+                    entry.name,
+                    style: AppTextStyles.body(
+                      size: 13,
+                      color: isUp
+                          ? AppColors.textMuted
+                          : entry.isDirectory
+                          ? AppColors.amber
+                          : AppColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-            ),
-            if (w > 560)
-            SizedBox(
-              width: 60,
-              child: Text(
-                entry.permissions,
-                style: AppTextStyles.caption(
-                  size: 12,
-                  color: AppColors.primary,
-                ).copyWith(letterSpacing: 0.5),
-              ),
-            ),
-            if (w > 640)
-            SizedBox(
-              width: 130,
-              child: Text(
-                entry.modified,
-                style: AppTextStyles.caption(
-                  size: 11,
-                  color: AppColors.textSecondary,
+                if (w > 480)
+                  SizedBox(
+                    width: 80,
+                    child: Text(
+                      entry.formattedSize,
+                      style: AppTextStyles.caption(
+                        size: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                if (w > 560)
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      entry.permissions,
+                      style: AppTextStyles.caption(
+                        size: 12,
+                        color: AppColors.primary,
+                      ).copyWith(letterSpacing: 0.5),
+                    ),
+                  ),
+                if (w > 640)
+                  SizedBox(
+                    width: 130,
+                    child: Text(
+                      entry.modified,
+                      style: AppTextStyles.caption(
+                        size: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                SizedBox(
+                  width: w > 480 ? 120 : 100,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (onView != null)
+                        _iconBtn(
+                          Icons.visibility_outlined,
+                          AppColors.cyan,
+                          '查看',
+                          onView!,
+                        ),
+                      if (onEdit != null)
+                        _iconBtn(
+                          Icons.edit_outlined,
+                          AppColors.primary,
+                          '编辑',
+                          onEdit!,
+                        ),
+                      if (onDownload != null)
+                        _iconBtn(
+                          Icons.download_outlined,
+                          AppColors.primaryDim,
+                          '下载',
+                          onDownload!,
+                        ),
+                      if (onDelete != null)
+                        _iconBtn(
+                          Icons.delete_outline,
+                          AppColors.red,
+                          '删除',
+                          onDelete!,
+                        ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
-            SizedBox(
-              width: w > 480 ? 120 : 100,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (onView != null)
-                    _iconBtn(
-                      Icons.visibility_outlined,
-                      AppColors.cyan,
-                      '查看',
-                      onView!,
-                    ),
-                  if (onEdit != null)
-                    _iconBtn(
-                      Icons.edit_outlined,
-                      AppColors.primary,
-                      '编辑',
-                      onEdit!,
-                    ),
-                  if (onDownload != null)
-                    _iconBtn(
-                      Icons.download_outlined,
-                      AppColors.primaryDim,
-                      '下载',
-                      onDownload!,
-                    ),
-                  if (onDelete != null)
-                    _iconBtn(
-                      Icons.delete_outline,
-                      AppColors.red,
-                      '删除',
-                      onDelete!,
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
         );
       },
     );
@@ -716,6 +814,111 @@ class _FileRow extends StatelessWidget {
   }
 }
 
+class _PayloadPickerDialog extends StatelessWidget {
+  final List<Payload> payloads;
+
+  const _PayloadPickerDialog({required this.payloads});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: SizedBox(
+        width: 520,
+        height: 520,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: const BoxDecoration(
+                color: AppColors.bgElevated,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
+                border: Border(bottom: BorderSide(color: AppColors.border)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.inventory_2_outlined,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '选择 Payload 上传',
+                      style: AppTextStyles.heading(
+                        size: 14,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 18,
+                      color: AppColors.textSecondary,
+                    ),
+                    tooltip: '关闭',
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: payloads.length,
+                separatorBuilder: (_, _) =>
+                    const Divider(height: 1, color: AppColors.border),
+                itemBuilder: (context, index) {
+                  final payload = payloads[index];
+                  final isBinary = payload.content.startsWith(
+                    '__MATRIX_BINARY_B64__:',
+                  );
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(
+                      isBinary
+                          ? Icons.memory_outlined
+                          : Icons.insert_drive_file_outlined,
+                      color: isBinary ? AppColors.amber : AppColors.primary,
+                      size: 20,
+                    ),
+                    title: Text(
+                      payload.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body(
+                        size: 13,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      '${payload.type.toUpperCase()}'
+                      '${payload.isDefault ? ' · 内置' : ''}'
+                      '${isBinary ? ' · Binary' : ''}',
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption(
+                        size: 11,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    onTap: () => Navigator.pop(context, payload),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─── 传输进度对话框 ─────────────────────────────────────────────────────────────
 
 class _TransferProgressDialog extends StatelessWidget {
@@ -774,7 +977,9 @@ class _TransferProgressDialog extends StatelessWidget {
                         onPressed: onCancel,
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           minimumSize: const Size(0, 0),
                         ),
                         child: Text(
@@ -790,7 +995,10 @@ class _TransferProgressDialog extends StatelessWidget {
                   const SizedBox(height: 14),
                   Text(
                     fileName,
-                    style: AppTextStyles.terminal(size: 12, color: AppColors.cyan),
+                    style: AppTextStyles.terminal(
+                      size: 12,
+                      color: AppColors.cyan,
+                    ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
@@ -801,8 +1009,9 @@ class _TransferProgressDialog extends StatelessWidget {
                       value: progress,
                       minHeight: 6,
                       backgroundColor: AppColors.bgDark,
-                      valueColor:
-                          const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -813,12 +1022,16 @@ class _TransferProgressDialog extends StatelessWidget {
                         Text(
                           '${_fmtSize(sent)} / ${_fmtSize(fileSize)}',
                           style: AppTextStyles.caption(
-                              color: AppColors.textSecondary, size: 11),
+                            color: AppColors.textSecondary,
+                            size: 11,
+                          ),
                         ),
                         Text(
                           '${(progress * 100).round()}%',
                           style: AppTextStyles.caption(
-                              color: AppColors.primary, size: 11),
+                            color: AppColors.primary,
+                            size: 11,
+                          ),
                         ),
                       ],
                     )
@@ -826,7 +1039,9 @@ class _TransferProgressDialog extends StatelessWidget {
                     Text(
                       isUpload ? '正在上传...' : '正在接收数据，请稍候...',
                       style: AppTextStyles.caption(
-                          color: AppColors.textSecondary, size: 11),
+                        color: AppColors.textSecondary,
+                        size: 11,
+                      ),
                     ),
                 ],
               );
