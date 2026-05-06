@@ -214,6 +214,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
         ),
       );
       const rceTypes = [
+        ThinkphpVulnType.tp2,
         ThinkphpVulnType.tp50,
         ThinkphpVulnType.tp5010,
         ThinkphpVulnType.tp5022_5129,
@@ -222,7 +223,6 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
         ThinkphpVulnType.tp5024_5130,
         ThinkphpVulnType.tp5ViewDisplay,
         ThinkphpVulnType.tp5MethodFilter,
-        ThinkphpVulnType.tp5FileInclude,
         ThinkphpVulnType.tp3,
         ThinkphpVulnType.tp3Module,
         ThinkphpVulnType.tp3ModuleTypo,
@@ -259,53 +259,6 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     }
   }
 
-  Future<void> _handleCheckAll() async {
-    final url = _urlController.text.trim();
-    if (url.isEmpty) {
-      _appendLog('[!] 请输入目标 URL');
-      return;
-    }
-    setState(() => _running = true);
-    _appendLog('[*] 批量检测全部漏洞...');
-    try {
-      final svc = ThinkphpExpService(
-        url: url,
-        timeout: Duration(
-          seconds: int.tryParse(_timeoutController.text.trim()) ??
-              AppConstants.defaultHttpTimeoutSeconds,
-        ),
-      );
-      final results = await svc.checkAll();
-      final found = <ThinkphpVulnType>[];
-      ThinkphpVulnType? firstHit;
-      for (var i = 0; i < results.length; i++) {
-        final r = results[i];
-        if (r.vulnerable) {
-          _appendLog('[+] ${r.vulnName}');
-          _appendLog('[i] ${r.detail}');
-          final t = ThinkphpVulnType.values[i];
-          firstHit ??= t;
-          if (t.supportsRce) found.add(t);
-        } else {
-          _appendLog('[-] ${r.vulnName}');
-        }
-      }
-      setState(() {
-        _detectedRceVulns = found;
-        _selectedRceVuln = found.isNotEmpty ? found.first : null;
-        if (firstHit != null) _selectedCheckType = firstHit;
-      });
-      if (firstHit != null) {
-        _appendLog('[*] 已自动选择首个命中漏洞: ${firstHit.label}');
-      }
-      if (found.isEmpty) _appendLog('[!] 未发现 RCE 漏洞');
-    } catch (e) {
-      _appendLog('[!] 异常: $e');
-    } finally {
-      if (mounted) setState(() => _running = false);
-    }
-  }
-
   Future<void> _handleExeRce() async {
     final url = _urlController.text.trim();
     final vuln = _selectedRceVuln;
@@ -317,12 +270,9 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       _appendLog('[!] 请先检测并选择要利用的 RCE 漏洞');
       return;
     }
-    final defaultInput = vuln == ThinkphpVulnType.tp5FileInclude ? '/etc/passwd' : 'id';
-    final cmd = _cmdController.text.trim().isEmpty ? defaultInput : _cmdController.text.trim();
+    final cmd = _cmdController.text.trim().isEmpty ? 'id' : _cmdController.text.trim();
     setState(() => _running = true);
-    _appendLog(vuln == ThinkphpVulnType.tp5FileInclude
-        ? '[*] 读取文件 ($vuln.label): $cmd'
-        : '[*] 执行命令 ($vuln.label): $cmd');
+    _appendLog('[*] 执行命令 ($vuln.label): $cmd');
     try {
       final svc = ThinkphpExpService(
         url: url,
@@ -333,9 +283,9 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       );
       final out = await svc.exeRce(vuln, cmd);
       if (out != null && out.isNotEmpty) {
-        _appendLog(vuln == ThinkphpVulnType.tp5FileInclude ? '[+] 文件内容:\n$out' : '[+] 输出:\n$out');
+        _appendLog('[+] 输出:\n$out');
       } else {
-        _appendLog(vuln == ThinkphpVulnType.tp5FileInclude ? '[-] 读取失败或文件不存在' : '[-] 无输出或执行失败');
+        _appendLog('[-] 无输出或执行失败');
       }
     } catch (e) {
       _appendLog('[!] 异常: $e');
@@ -361,7 +311,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       final password = _passwordController.text.trim().isEmpty
           ? AppConstants.defaultShellPassword
           : _passwordController.text.trim();
-      var shellContent = await rootBundle.loadString('assets/defaults/payloads/php_behinder.php');
+      var shellContent = await rootBundle.loadString('assets/defaults/payloads/webshell/php_behinder.php');
       final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
       shellContent = shellContent.replaceFirst(RegExp(r'\$key="[0-9a-f]{16}"'), '\$key="$key"');
       final svc = ThinkphpExpService(
@@ -628,8 +578,6 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                         Row(
                           children: [
                             _actionBtn('检测全部RCE', _handleCheckAllRce),
-                            const SizedBox(width: 8),
-                            _actionBtn('检测全部', _handleCheckAll),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -692,15 +640,15 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                           controller: _cmdController,
                           style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
                           decoration: _inputDecoration(
-                            _selectedRceVuln == ThinkphpVulnType.tp5FileInclude ? '文件路径' : '命令',
-                            _selectedRceVuln == ThinkphpVulnType.tp5FileInclude ? '/etc/passwd' : 'id',
+                            '命令',
+                            'id',
                           ),
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
                             _actionBtn(
-                              _selectedRceVuln == ThinkphpVulnType.tp5FileInclude ? '读取文件' : '执行命令',
+                              '执行命令',
                               _handleExeRce,
                               enabled: _selectedRceVuln != null,
                             ),

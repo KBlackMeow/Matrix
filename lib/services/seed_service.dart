@@ -24,28 +24,28 @@ class SeedService {
   static const _defaultPayloads = [
     // ── PHP ──────────────────────────────────────────────────────────────
     _PayloadDef(
-      asset: 'assets/defaults/payloads/php_eval_post.php',
+      asset: 'assets/defaults/payloads/webshell/php_eval_post.php',
       name: 'php_eval_post.php',
       type: 'php',
       description: 'PHP eval() webshell，POST 参数 cmd，最基础的一句话木马',
       tags: 'php,eval,post,classic',
     ),
     _PayloadDef(
-      asset: 'assets/defaults/payloads/php_passthru_req.php',
+      asset: 'assets/defaults/payloads/webshell/php_passthru_req.php',
       name: 'php_passthru_req.php',
       type: 'php',
       description: 'PHP passthru() 命令执行，GET/POST 参数 cmd，回显直接输出',
       tags: 'php,passthru,request,cmd',
     ),
     _PayloadDef(
-      asset: 'assets/defaults/payloads/php_b64rot13_post.php',
+      asset: 'assets/defaults/payloads/webshell/php_b64rot13_post.php',
       name: 'php_b64rot13_post.php',
       type: 'php',
       description: 'ROT13 + Base64 双重编码绕过 WAF，POST 参数 cmd',
       tags: 'php,bypass,base64,rot13,waf',
     ),
     _PayloadDef(
-      asset: 'assets/defaults/payloads/php_behinder.php',
+      asset: 'assets/defaults/payloads/webshell/php_behinder.php',
       name: 'php_behinder.php',
       type: 'php',
       description: 'PHP 冰蝎 3.0（Behinder），AES 加密，func|params 格式，默认密码 mAtrix_911',
@@ -54,7 +54,7 @@ class SeedService {
     ),
     // ── JSP ──────────────────────────────────────────────────────────────
     _PayloadDef(
-      asset: 'assets/defaults/payloads/jsp_runtime_get.jsp',
+      asset: 'assets/defaults/payloads/webshell/jsp_runtime_get.jsp',
       name: 'jsp_runtime_get.jsp',
       type: 'jsp',
       description:
@@ -62,14 +62,14 @@ class SeedService {
       tags: 'jsp,runtime,exec,post,utf8',
     ),
     _PayloadDef(
-      asset: 'assets/defaults/payloads/jsp_classloader_b64.jsp',
+      asset: 'assets/defaults/payloads/webshell/jsp_classloader_b64.jsp',
       name: 'jsp_classloader_b64.jsp',
       type: 'jsp',
       description: 'JSP ClassLoader 动态加载字节码（冰蝎风格），GET 参数 cmd 传 Base64 类文件',
       tags: 'jsp,classloader,bytecode,base64,behinder',
     ),
     _PayloadDef(
-      asset: 'assets/defaults/payloads/jsp_behinder.jsp',
+      asset: 'assets/defaults/payloads/webshell/jsp_behinder.jsp',
       name: 'jsp_behinder.jsp',
       type: 'jsp',
       description: 'JSP 冰蝎 3.0（Behinder），AES 加密，payload 只读 body 第一行，agent 读第二行取参',
@@ -78,7 +78,7 @@ class SeedService {
     ),
     // ── ASP ──────────────────────────────────────────────────────────────
     _PayloadDef(
-      asset: 'assets/defaults/payloads/asp_wscript_get.asp',
+      asset: 'assets/defaults/payloads/webshell/asp_wscript_get.asp',
       name: 'asp_wscript_get.asp',
       type: 'asp',
       description: 'ASP WScript.Shell 命令执行，GET 参数 cmd，cmd.exe /c',
@@ -86,7 +86,7 @@ class SeedService {
     ),
     // ── ASPX ─────────────────────────────────────────────────────────────
     _PayloadDef(
-      asset: 'assets/defaults/payloads/aspx_cmd_post.aspx',
+      asset: 'assets/defaults/payloads/webshell/aspx_cmd_post.aspx',
       name: 'aspx_cmd_post.aspx',
       type: 'aspx',
       description: 'ASPX .NET Process 命令执行，GET/POST 参数 cmd，纯文本输出，支持 PowerShell',

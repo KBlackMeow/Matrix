@@ -134,7 +134,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
       final password = _passwordCtrl.text.trim().isEmpty
           ? AppConstants.defaultShellPassword
           : _passwordCtrl.text.trim();
-      var shellContent = await rootBundle.loadString('assets/defaults/payloads/jsp_behinder.jsp');
+      var shellContent = await rootBundle.loadString('assets/defaults/payloads/webshell/jsp_behinder.jsp');
       final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
       shellContent = shellContent.replaceFirst(
           RegExp(r'String k="[0-9a-f]{16}"'), 'String k="$key"');

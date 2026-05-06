@@ -90,7 +90,7 @@ flutter:
   assets:
     - data/
     - data/mem_shell/
-    - assets/defaults/payloads/
+    - assets/defaults/payloads/webshell/
     - data/shiro_keys.txt
     - data/shiro_payload_principal.b64
     - data/jsp_agent_M.b64

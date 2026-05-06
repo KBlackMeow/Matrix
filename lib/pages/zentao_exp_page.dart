@@ -166,7 +166,7 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
           ? AppConstants.defaultShellPassword
           : _passwordController.text.trim();
       var shellContent = await rootBundle
-          .loadString('assets/defaults/payloads/php_behinder.php');
+          .loadString('assets/defaults/payloads/webshell/php_behinder.php');
       final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
       shellContent = shellContent.replaceFirst(RegExp(r'\$key="[0-9a-f]{16}"'), '\$key="$key"');
       final svc = ZentaoExpService(

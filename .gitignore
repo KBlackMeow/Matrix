@@ -87,3 +87,4 @@ tools/*
 vulhub-rce-list.md
 .gitignore
 SIMPLIFY_SPEC.md
+ELECTRON_MIGRATION_SPEC.md

