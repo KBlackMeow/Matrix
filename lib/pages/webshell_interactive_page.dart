@@ -113,47 +113,46 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
           _buildHeader(),
           _buildTabBar(),
           Expanded(
-            child: _isChecking || !_isConnected
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+            child: Column(
+              children: [
+                if (_isChecking)
+                  LinearProgressIndicator(
+                    backgroundColor: AppColors.bgCard,
+                    color: AppColors.primary.withValues(alpha: 0.5),
+                    minHeight: 2,
+                  )
+                else if (!_isConnected)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    color: AppColors.red.withValues(alpha: 0.08),
+                    child: Row(
                       children: [
-                        if (_isChecking)
-                          Text(
-                            '正在检测连接…',
-                            style: AppTextStyles.caption(color: AppColors.textMuted),
-                          )
-                        else
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '连接失败',
-                                style: AppTextStyles.caption(color: AppColors.red),
-                              ),
-                              if (_lastPingError != null &&
-                                  _lastPingError!.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                  ),
-                                  child: SelectableText(
-                                    _lastPingError!,
-                                    style: AppTextStyles.caption(
-                                      color: AppColors.textMuted,
-                                      size: 11,
-                                    ).copyWith(height: 1.35),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ],
-                            ],
+                        const Icon(Icons.warning_amber_rounded, color: AppColors.red, size: 15),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _lastPingError != null && _lastPingError!.isNotEmpty
+                                ? _lastPingError!
+                                : '连接失败，命令执行可能异常',
+                            style: AppTextStyles.caption(color: AppColors.red, size: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: _checkConnection,
+                          child: Text(
+                            '重试',
+                            style: AppTextStyles.caption(color: AppColors.primary, size: 12),
+                          ),
+                        ),
                       ],
                     ),
-                  )
-                : AnimatedBuilder(
+                  ),
+                Expanded(
+                  child: AnimatedBuilder(
                     animation: _tabController,
                     builder: (context, _) {
                       return TabBarView(
@@ -183,6 +182,9 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                       );
                     },
                   ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

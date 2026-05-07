@@ -573,7 +573,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
 
 // ─── Webshell 卡片 ────────────────────────────────────────────────────────────
 
-class _WebshellCard extends StatelessWidget {
+class _WebshellCard extends StatefulWidget {
   final Webshell webshell;
   final VoidCallback onEnter;
   final VoidCallback onEdit;
@@ -587,19 +587,41 @@ class _WebshellCard extends StatelessWidget {
   });
 
   @override
+  State<_WebshellCard> createState() => _WebshellCardState();
+}
+
+class _WebshellCardState extends State<_WebshellCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final isOnline = webshell.status == 1;
-    return InkWell(
-      onTap: onEnter,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border),
-        ),
+    final isOnline = widget.webshell.status == 1;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onEnter,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: _hovered ? AppColors.bgElevated : AppColors.bgCard,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _hovered ? AppColors.primary.withValues(alpha: 0.55) : AppColors.border,
+              width: _hovered ? 1.2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: _hovered ? 0.14 : 0.0),
+                blurRadius: 14,
+                spreadRadius: 0,
+              ),
+            ],
+          ),
         child: Row(
           children: [
             // 状态指示点
@@ -647,7 +669,7 @@ class _WebshellCard extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          webshell.name,
+                          widget.webshell.name,
                           style: AppTextStyles.body(
                             size: 14,
                             color: AppColors.textPrimary,
@@ -658,17 +680,17 @@ class _WebshellCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       _Tag(
                         label:
-                            ConnectorFactory.shortLabel(webshell.connectorType),
-                        color: webshell.connectorType.startsWith('jsp')
+                            ConnectorFactory.shortLabel(widget.webshell.connectorType),
+                        color: widget.webshell.connectorType.startsWith('jsp')
                             ? AppColors.amber
-                            : webshell.connectorType.startsWith('asp')
+                            : widget.webshell.connectorType.startsWith('asp')
                                 ? Colors.purple.shade300
                                 : AppColors.cyan,
                       ),
                       const SizedBox(width: 6),
                       _Tag(
-                        label: webshell.method,
-                        color: webshell.method == 'POST'
+                        label: widget.webshell.method,
+                        color: widget.webshell.method == 'POST'
                             ? AppColors.cyan
                             : AppColors.amber,
                       ),
@@ -679,7 +701,7 @@ class _WebshellCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          webshell.url,
+                          widget.webshell.url,
                           style: AppTextStyles.caption(
                             size: 12,
                             color: AppColors.primary,
@@ -691,7 +713,7 @@ class _WebshellCard extends StatelessWidget {
                       InkWell(
                         onTap: () {
                           Clipboard.setData(
-                            ClipboardData(text: webshell.url),
+                            ClipboardData(text: widget.webshell.url),
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -710,11 +732,11 @@ class _WebshellCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (webshell.password != null &&
-                      webshell.password!.isNotEmpty) ...[
+                  if (widget.webshell.password != null &&
+                      widget.webshell.password!.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
-                      '密码: ${'•' * webshell.password!.length.clamp(1, 12)}',
+                      '密码: ${'•' * widget.webshell.password!.length.clamp(1, 12)}',
                       style: AppTextStyles.caption(
                         size: 11,
                         color: AppColors.textMuted,
@@ -727,14 +749,13 @@ class _WebshellCard extends StatelessWidget {
             // 操作按钮
             LayoutBuilder(
               builder: (ctx, constraints) {
-                // constraints.maxWidth 在 Row 内恒为 0，用 MediaQuery 判断父级宽度
                 final screenW = MediaQuery.of(ctx).size.width;
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (screenW > 680) ...[
                       Text(
-                        _formatDate(webshell.createdAt),
+                        _formatDate(widget.webshell.createdAt),
                         style: AppTextStyles.caption(
                           size: 11,
                           color: AppColors.textMuted,
@@ -744,14 +765,14 @@ class _WebshellCard extends StatelessWidget {
                     ],
                     const SizedBox(width: 4),
                     IconButton(
-                      onPressed: onEdit,
+                      onPressed: widget.onEdit,
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       color: AppColors.cyan,
                       tooltip: '编辑',
                       splashRadius: 18,
                     ),
                     IconButton(
-                      onPressed: onDelete,
+                      onPressed: widget.onDelete,
                       icon: const Icon(Icons.delete_outline, size: 18),
                       color: AppColors.red,
                       tooltip: '删除',
@@ -762,6 +783,7 @@ class _WebshellCard extends StatelessWidget {
               },
             ),
           ],
+        ),
         ),
       ),
     );

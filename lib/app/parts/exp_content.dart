@@ -3,39 +3,12 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'exp_registry.dart';
 
-class ExpContent extends StatefulWidget {
+class ExpContent extends StatelessWidget {
   const ExpContent({super.key});
 
   @override
-  State<ExpContent> createState() => _ExpContentState();
-}
-
-class _ExpContentState extends State<ExpContent> {
-  final Set<ExpMaturity> _selectedMaturities = ExpMaturity.values.toSet();
-
-  void _toggleMaturity(ExpMaturity maturity) {
-    setState(() {
-      if (_selectedMaturities.contains(maturity)) {
-        if (_selectedMaturities.length == 1) return;
-        _selectedMaturities.remove(maturity);
-      } else {
-        _selectedMaturities.add(maturity);
-      }
-    });
-  }
-
-  void _selectAllMaturities() {
-    setState(() {
-      _selectedMaturities
-        ..clear()
-        ..addAll(ExpMaturity.values);
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final entries = visibleExpEntries(maturities: _selectedMaturities);
-    final allSelected = _selectedMaturities.length == ExpMaturity.values.length;
+    final entries = visibleExpEntries();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -74,28 +47,7 @@ class _ExpContentState extends State<ExpContent> {
             ],
           ),
         ),
-        const SizedBox(height: 24),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            FilterChip(
-              label: const Text('全部'),
-              selected: allSelected,
-              onSelected: (_) => _selectAllMaturities(),
-            ),
-            for (final maturity in ExpMaturity.values)
-              FilterChip(
-                label: Text(maturity.label),
-                selected: _selectedMaturities.contains(maturity),
-                selectedColor: maturity.color.withValues(alpha: 0.18),
-                checkmarkColor: maturity.color,
-                side: BorderSide(color: maturity.color.withValues(alpha: 0.35)),
-                onSelected: (_) => _toggleMaturity(maturity),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.only(bottom: 16),
@@ -108,7 +60,7 @@ class _ExpContentState extends State<ExpContent> {
                 title: e.title,
                 subtitle: e.subtitle,
                 tag: e.tag,
-                maturity: e.maturity,
+
                 onTap: () => Navigator.of(
                   context,
                 ).push(MaterialPageRoute(builder: (_) => e.page)),
@@ -121,12 +73,11 @@ class _ExpContentState extends State<ExpContent> {
   }
 }
 
-class _ExpEntryCard extends StatelessWidget {
+class _ExpEntryCard extends StatefulWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final String tag;
-  final ExpMaturity maturity;
   final VoidCallback? onTap;
 
   const _ExpEntryCard({
@@ -134,26 +85,51 @@ class _ExpEntryCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.tag,
-    required this.maturity,
     required this.onTap,
   });
 
   @override
+  State<_ExpEntryCard> createState() => _ExpEntryCardState();
+}
+
+class _ExpEntryCardState extends State<_ExpEntryCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
+    final enabled = widget.onTap != null;
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : MouseCursor.defer,
+      onEnter: enabled ? (_) => setState(() => _hovered = true) : null,
+      onExit: enabled ? (_) => setState(() => _hovered = false) : null,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
-            color: enabled
-                ? AppColors.bgCard
-                : AppColors.bgCard.withValues(alpha: 0.7),
+            color: !enabled
+                ? AppColors.bgCard.withValues(alpha: 0.7)
+                : _hovered
+                    ? AppColors.bgElevated
+                    : AppColors.bgCard,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(
+              color: _hovered && enabled
+                  ? AppColors.primary.withValues(alpha: 0.55)
+                  : AppColors.border,
+              width: _hovered && enabled ? 1.2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(
+                  alpha: _hovered && enabled ? 0.14 : 0.0,
+                ),
+                blurRadius: 14,
+                spreadRadius: 0,
+              ),
+            ],
           ),
           child: Row(
             children: [
@@ -167,7 +143,7 @@ class _ExpEntryCard extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.5),
                   ),
                 ),
-                child: Icon(icon, color: AppColors.primary, size: 24),
+                child: Icon(widget.icon, color: AppColors.primary, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -176,7 +152,7 @@ class _ExpEntryCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      title,
+                      widget.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.heading(
@@ -186,7 +162,7 @@ class _ExpEntryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      subtitle,
+                      widget.subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.caption(
@@ -198,15 +174,7 @@ class _ExpEntryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                alignment: WrapAlignment.end,
-                children: [
-                  _EntryPill(label: maturity.label, color: maturity.color),
-                  _EntryPill(label: tag, color: AppColors.textSecondary),
-                ],
-              ),
+              _EntryPill(label: widget.tag, color: AppColors.textSecondary),
             ],
           ),
         ),

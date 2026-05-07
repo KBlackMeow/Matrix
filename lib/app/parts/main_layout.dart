@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -21,7 +22,7 @@ class MainLayout extends StatefulWidget {
   State<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
+class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
   Project? _selectedProject;
   bool _sidebarExpanded = true;
@@ -29,8 +30,20 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
   static const double _sidebarWidth = 220.0;
   static const double _sidebarCollapsedWidth = 72.0;
 
-  late final AnimationController _blinkController;
-  late final Animation<double> _blinkAnimation;
+  // 静态页面只创建一次；动态页面在 _selectedProject 变化时重建
+  // RepaintBoundary 让每个页面的 layer 在 IndexedStack 切换时被缓存，
+  // 再次切换回来时直接复用 GPU layer，不重新光栅化。
+  late ProjectManagementPage _projectPage;
+  late ProjectScopedPage _webshellPage;
+  late RepaintBoundary _projectBoundary;
+  late RepaintBoundary _webshellBoundary;
+  static const List<Widget> _staticPages = [
+    RepaintBoundary(child: exp.ExpContent()),
+    RepaintBoundary(child: PayloadManagementPage()),
+    RepaintBoundary(child: ReverseShellDashboardPage()),
+    RepaintBoundary(child: FrpTunnelPage()),
+  ];
+  late List<Widget> _pages;
 
   final List<MenuItem> _menuItems = [
     MenuItem(icon: Icons.folder_outlined, label: '项目管理', selectedIcon: Icons.folder),
@@ -44,77 +57,60 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _blinkController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-    _blinkAnimation = CurvedAnimation(parent: _blinkController, curve: Curves.easeInOut);
+    _rebuildDynamicPages();
   }
 
-  @override
-  void dispose() {
-    _blinkController.dispose();
-    super.dispose();
+  void _rebuildDynamicPages() {
+    _projectPage = ProjectManagementPage(
+      selectedProject: _selectedProject,
+      onEnterExp: (_) => setState(() => _selectedIndex = 2),
+      onEnterWebshell: (project) {
+        setState(() {
+          _selectedProject = project;
+          _selectedIndex = 1;
+          _rebuildDynamicPages();
+        });
+      },
+    );
+    _webshellPage = ProjectScopedPage(
+      selectedProject: _selectedProject,
+      onSelectProject: (p) {
+        setState(() {
+          _selectedProject = p;
+          _rebuildDynamicPages();
+        });
+      },
+      onClearProject: () {
+        setState(() {
+          _selectedProject = null;
+          _rebuildDynamicPages();
+        });
+      },
+      onNavigateToProjectManagement: () {
+        setState(() {
+          _selectedIndex = 0;
+          _selectedProject = null;
+          _rebuildDynamicPages();
+        });
+      },
+      title: 'Webshell管理',
+      icon: Icons.terminal,
+      contentBuilder: (project, onSwitchProject) =>
+          WebshellManagementPage(project: project, onSwitchProject: onSwitchProject),
+    );
+    _projectBoundary = RepaintBoundary(child: _projectPage);
+    _webshellBoundary = RepaintBoundary(child: _webshellPage);
+    _pages = [_projectBoundary, _webshellBoundary, ..._staticPages];
   }
 
   void _handleMenuTap(int index) {
     setState(() => _selectedIndex = index);
   }
 
-  Widget _buildWorkspaceContent() {
-    if (_selectedIndex == 0) {
-      return ProjectManagementPage(
-        selectedProject: _selectedProject,
-        onEnterExp: (project) {
-          setState(() {
-            _selectedIndex = 2;
-          });
-        },
-        onEnterWebshell: (project) {
-          setState(() {
-            _selectedProject = project;
-            _selectedIndex = 1;
-          });
-        },
-      );
-    }
-    if (_selectedIndex == 1) {
-      return ProjectScopedPage(
-        selectedProject: _selectedProject,
-        onSelectProject: (p) => setState(() => _selectedProject = p),
-        onClearProject: () => setState(() => _selectedProject = null),
-        onNavigateToProjectManagement: () => setState(() {
-          _selectedIndex = 0;
-          _selectedProject = null;
-        }),
-        title: 'Webshell管理',
-        icon: Icons.terminal,
-        contentBuilder: (project, onSwitchProject) =>
-            WebshellManagementPage(project: project, onSwitchProject: onSwitchProject),
-      );
-    }
-    if (_selectedIndex == 2) {
-      return const exp.ExpContent();
-    }
-    if (_selectedIndex == 3) {
-      return const PayloadManagementPage();
-    }
-    if (_selectedIndex == 4) {
-      return const ReverseShellDashboardPage();
-    }
-    if (_selectedIndex == 5) {
-      return const FrpTunnelPage();
-    }
-    return WorkspaceContent(title: _menuItems[_selectedIndex].label);
-  }
-
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final bool isMobile = constraints.maxWidth < 720;
-
-        return Scaffold(
+    final bool isMobile = MediaQuery.sizeOf(context).width < 720;
+    return Scaffold(
           body: Stack(
             children: [
               // 右侧工作区（底层）
@@ -126,127 +122,113 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
                   color: AppColors.bgDark,
                   child: Stack(
                     children: [
-                      // 赛博网格背景
+                      // 赛博网格背景：独立 layer，初次光栅化后永久缓存
                       Positioned.fill(
-                        child: CustomPaint(painter: CyberGridPainter()),
+                        child: RepaintBoundary(
+                          child: CustomPaint(painter: CyberGridPainter()),
+                        ),
                       ),
                       Positioned.fill(
-                        child: Column(
+                        child: RepaintBoundary(
+                          child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // 顶部栏
-                            Container(
-                              height: 64,
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
-                              decoration: BoxDecoration(
-                                color: AppColors.bgElevated,
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color: AppColors.primary.withValues(alpha: 0.5),
-                                    width: 1,
+                            // 顶部栏：独立 layer，标题变化不触发内容区重绘
+                            RepaintBoundary(
+                              child: Container(
+                                height: 64,
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                decoration: BoxDecoration(
+                                  color: AppColors.bgElevated,
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: AppColors.primary.withValues(alpha: 0.5),
+                                      width: 1,
+                                    ),
                                   ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary.withValues(alpha: 0.06),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.primary.withValues(alpha: 0.06),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  // 闪烁状态点
-                                  AnimatedBuilder(
-                                    animation: _blinkAnimation,
-                                    builder: (_, _) => Container(
-                                      width: 8,
-                                      height: 8,
-                                      margin: const EdgeInsets.only(right: 10),
+                                child: Row(
+                                  children: [
+                                    const RepaintBoundary(child: _BlinkDot()),
+                                    Text(
+                                      '>_ ',
+                                      style: AppTextStyles.terminal(
+                                        size: 14,
+                                        color: AppColors.primary.withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    Text(
+                                      _menuItems[_selectedIndex].label,
+                                      style: AppTextStyles.heading(
+                                        size: 18,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    IconButton(
+                                      icon: const Icon(Icons.search),
+                                      onPressed: () {},
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.notifications_outlined),
+                                      onPressed: () {},
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      width: 36,
+                                      height: 36,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: AppColors.primary.withValues(
-                                          alpha: 0.5 + _blinkAnimation.value * 0.5,
+                                        border: Border.all(
+                                          color: AppColors.primary.withValues(alpha: 0.6),
+                                          width: 1.5,
                                         ),
+                                        color: AppColors.primary.withValues(alpha: 0.1),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: AppColors.primary.withValues(
-                                              alpha: _blinkAnimation.value * 0.7,
-                                            ),
+                                            color: AppColors.primary.withValues(alpha: 0.2),
                                             blurRadius: 8,
-                                            spreadRadius: 1,
                                           ),
                                         ],
                                       ),
-                                    ),
-                                  ),
-                                  Text(
-                                    '>_ ',
-                                    style: AppTextStyles.terminal(
-                                      size: 14,
-                                      color: AppColors.primary.withValues(alpha: 0.5),
-                                    ),
-                                  ),
-                                  Text(
-                                    _menuItems[_selectedIndex].label,
-                                    style: AppTextStyles.heading(
-                                      size: 18,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  IconButton(
-                                    icon: const Icon(Icons.search),
-                                    onPressed: () {},
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.notifications_outlined),
-                                    onPressed: () {},
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // 黑客风格用户头像
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: AppColors.primary.withValues(alpha: 0.6),
-                                        width: 1.5,
-                                      ),
-                                      color: AppColors.primary.withValues(alpha: 0.1),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppColors.primary.withValues(alpha: 0.2),
-                                          blurRadius: 8,
-                                        ),
-                                      ],
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'R',
-                                        style: AppTextStyles.heading(
-                                          size: 14,
-                                          color: AppColors.primary,
+                                      child: Center(
+                                        child: Text(
+                                          'R',
+                                          style: AppTextStyles.heading(
+                                            size: 14,
+                                            color: AppColors.primary,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
-                            // 工作区内容
+                            // 工作区内容：expand 给子页面紧约束 → relayout boundary
                             Expanded(
                               child: Padding(
                                 padding: const EdgeInsets.all(24),
-                                child: _buildWorkspaceContent(),
+                                child: IndexedStack(
+                                  index: _selectedIndex,
+                                  sizing: StackFit.expand,
+                                  children: _pages,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
+                    ),
                     ],
                   ),
                 ),
@@ -271,7 +253,7 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
                 bottom: 0,
                 left: _sidebarHidden ? -_sidebarWidth : 0,
                 width: _sidebarExpanded ? _sidebarWidth : _sidebarCollapsedWidth,
-                child: _buildSidebar(),
+                child: RepaintBoundary(child: _buildSidebar()),
               ),
 
               // 桌面端：隐藏后的展开按钮
@@ -295,8 +277,6 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
             ],
           ),
         );
-      },
-    );
   }
 
   Widget _buildSidebar() {
@@ -386,11 +366,13 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
               itemBuilder: (context, index) {
                 final item = _menuItems[index];
                 final isSelected = _selectedIndex == index;
-                return SidebarMenuItem(
-                  item: item,
-                  isSelected: isSelected,
-                  expandProgress: t,
-                  onTap: () => _handleMenuTap(index),
+                return RepaintBoundary(
+                  child: SidebarMenuItem(
+                    item: item,
+                    isSelected: isSelected,
+                    expandProgress: t,
+                    onTap: () => _handleMenuTap(index),
+                  ),
                 );
               },
             ),
@@ -436,6 +418,55 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _BlinkDot extends StatefulWidget {
+  const _BlinkDot();
+
+  @override
+  State<_BlinkDot> createState() => _BlinkDotState();
+}
+
+class _BlinkDotState extends State<_BlinkDot> {
+  bool _on = true;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 900), (_) {
+      if (mounted) setState(() => _on = !_on);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: _on ? 1.0 : 0.3,
+      child: Container(
+        width: 8,
+        height: 8,
+        margin: const EdgeInsets.only(right: 10),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.primary,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.6),
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
       ),
     );
   }

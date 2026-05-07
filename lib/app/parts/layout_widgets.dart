@@ -14,7 +14,7 @@ class MenuItem {
   });
 }
 
-class SidebarMenuItem extends StatelessWidget {
+class SidebarMenuItem extends StatefulWidget {
   final MenuItem item;
   final bool isSelected;
   final double expandProgress;
@@ -29,32 +29,46 @@ class SidebarMenuItem extends StatelessWidget {
   });
 
   @override
+  State<SidebarMenuItem> createState() => _SidebarMenuItemState();
+}
+
+class _SidebarMenuItemState extends State<SidebarMenuItem> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final labelOpacity = ((expandProgress - 0.3) / 0.5).clamp(0.0, 1.0);
-    final horizontalPadding = 12.0 + expandProgress * 4.0;
+    final labelOpacity = ((widget.expandProgress - 0.3) / 0.5).clamp(0.0, 1.0);
+    final horizontalPadding = 12.0 + widget.expandProgress * 4.0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOut,
             padding: EdgeInsets.symmetric(
               vertical: 12,
               horizontal: horizontalPadding,
             ),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.bgCard : Colors.transparent,
+              color: widget.isSelected
+                  ? AppColors.primary.withValues(alpha: 0.12)
+                  : _hovered
+                      ? AppColors.primary.withValues(alpha: 0.06)
+                      : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
                 Icon(
-                  isSelected ? item.selectedIcon : item.icon,
+                  widget.isSelected ? widget.item.selectedIcon : widget.item.icon,
                   size: 22,
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  color: widget.isSelected ? AppColors.primary : AppColors.textSecondary,
                 ),
                 Expanded(
                   child: Opacity(
@@ -62,11 +76,11 @@ class SidebarMenuItem extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.only(left: 12),
                       child: Text(
-                        item.label,
+                        widget.item.label,
                         style: TextStyle(
-                          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                          color: widget.isSelected ? AppColors.primary : AppColors.textSecondary,
                           fontSize: 14,
-                          fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                          fontWeight: widget.isSelected ? FontWeight.w500 : FontWeight.normal,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),

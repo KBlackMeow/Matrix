@@ -372,7 +372,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
   }
 }
 
-class _ProjectCard extends StatelessWidget {
+class _ProjectCard extends StatefulWidget {
   final Project project;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -388,124 +388,147 @@ class _ProjectCard extends StatelessWidget {
   });
 
   @override
+  State<_ProjectCard> createState() => _ProjectCardState();
+}
+
+class _ProjectCardState extends State<_ProjectCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
-            ),
-            child: const Icon(Icons.folder, color: AppColors.primary, size: 24),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: _hovered ? AppColors.bgElevated : AppColors.bgCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _hovered ? AppColors.primary.withValues(alpha: 0.55) : AppColors.border,
+            width: _hovered ? 1.2 : 1,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: _hovered ? 0.14 : 0.0),
+              blurRadius: 14,
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
+              ),
+              child: const Icon(Icons.folder, color: AppColors.primary, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        widget.project.name,
+                        style: AppTextStyles.heading(size: 16, color: AppColors.textPrimary),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.border,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          widget.project.domain,
+                          style: AppTextStyles.caption(color: AppColors.primary),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.border,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'ID: ${widget.project.id}',
+                          style: AppTextStyles.caption(color: AppColors.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (widget.project.description != null && widget.project.description!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
                     Text(
-                      project.name,
-        style: AppTextStyles.heading(size: 16, color: AppColors.textPrimary),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.border,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        project.domain,
-                        style: AppTextStyles.caption(color: AppColors.primary),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.border,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'ID: ${project.id}',
-                        style: AppTextStyles.caption(color: AppColors.textSecondary),
-                      ),
+                      widget.project.description!,
+                      style: AppTextStyles.body(size: 13, color: AppColors.textSecondary),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                ),
-                if (project.description != null && project.description!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    project.description!,
-                    style: AppTextStyles.body(size: 13, color: AppColors.textSecondary),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    '创建于 ${_formatDate(widget.project.createdAt)} · 更新于 ${_formatDate(widget.project.updatedAt)}',
+                    style: AppTextStyles.caption(color: AppColors.textMuted),
                   ),
                 ],
-                const SizedBox(height: 4),
-                Text(
-                  '创建于 ${_formatDate(project.createdAt)} · 更新于 ${_formatDate(project.updatedAt)}',
-                  style: AppTextStyles.caption(color: AppColors.textMuted),
+              ),
+            ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+              color: AppColors.bgCard,
+              onSelected: (value) {
+                if (value == 'webshell') widget.onEnterWebshell();
+                if (value == 'exp') widget.onEnterExp();
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'webshell',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.terminal, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 12),
+                      Text('进入Webshell', style: AppTextStyles.body(color: AppColors.textPrimary)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'exp',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.bug_report, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 12),
+                      Text('进入EXP', style: AppTextStyles.body(color: AppColors.textPrimary)),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
-            color: AppColors.bgCard,
-            onSelected: (value) {
-              if (value == 'webshell') onEnterWebshell();
-              if (value == 'exp') onEnterExp();
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'webshell',
-                child: Row(
-                  children: [
-                    const Icon(Icons.terminal, color: AppColors.primary, size: 20),
-                    const SizedBox(width: 12),
-                    Text('进入Webshell', style: AppTextStyles.body(color: AppColors.textPrimary)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'exp',
-                child: Row(
-                  children: [
-                    const Icon(Icons.bug_report, color: AppColors.primary, size: 20),
-                    const SizedBox(width: 12),
-                    Text('进入EXP', style: AppTextStyles.body(color: AppColors.textPrimary)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          IconButton(
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined),
-            color: AppColors.cyan,
-            tooltip: '编辑',
-          ),
-          IconButton(
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline),
-            color: AppColors.red,
-            tooltip: '删除',
-          ),
-        ],
+            IconButton(
+              onPressed: widget.onEdit,
+              icon: const Icon(Icons.edit_outlined),
+              color: AppColors.cyan,
+              tooltip: '编辑',
+            ),
+            IconButton(
+              onPressed: widget.onDelete,
+              icon: const Icon(Icons.delete_outline),
+              color: AppColors.red,
+              tooltip: '删除',
+            ),
+          ],
+        ),
       ),
     );
   }

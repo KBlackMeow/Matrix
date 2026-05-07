@@ -148,7 +148,7 @@ class _ProjectScopedPageState extends State<ProjectScopedPage> {
   }
 }
 
-class _ProjectSelectCard extends StatelessWidget {
+class _ProjectSelectCard extends StatefulWidget {
   final Project project;
   final VoidCallback onTap;
 
@@ -158,20 +158,40 @@ class _ProjectSelectCard extends StatelessWidget {
   });
 
   @override
+  State<_ProjectSelectCard> createState() => _ProjectSelectCardState();
+}
+
+class _ProjectSelectCardState extends State<_ProjectSelectCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOut,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
+              color: _hovered ? AppColors.bgElevated : AppColors.bgCard,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(
+                color: _hovered ? AppColors.primary.withValues(alpha: 0.55) : AppColors.border,
+                width: _hovered ? 1.2 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: _hovered ? 0.14 : 0.0),
+                  blurRadius: 14,
+                  spreadRadius: 0,
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -191,12 +211,12 @@ class _ProjectSelectCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        project.name,
+                        widget.project.name,
                         style: AppTextStyles.heading(size: 16, color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        project.domain,
+                        widget.project.domain,
                         style: AppTextStyles.caption(size: 13, color: AppColors.primary),
                       ),
                     ],

@@ -9,6 +9,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // _installMatrixDebugPrint();
   initDatabase(); // 初始化 SQLite（桌面端使用 FFI）
-  await SeedService.seed(DatabaseHelper()); // 首次启动种子化内置默认数据
   runApp(const MyApp());
+  // seed 在后台运行，不阻塞 UI 启动
+  SeedService.seed(DatabaseHelper());
 }

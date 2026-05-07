@@ -20,7 +20,6 @@ import '../../pages/vulhub/tomcat_exp_page.dart';
 import '../../pages/vulhub/weblogic_exp_page.dart';
 import '../../pages/vulhub/xxljob_exp_page.dart';
 import '../../pages/zentao_exp_page.dart';
-import '../../theme/app_theme.dart';
 import 'shiro_exp.dart' as shiro;
 
 class ExpEntry {
@@ -28,7 +27,6 @@ class ExpEntry {
   final String title;
   final String subtitle;
   final String tag;
-  final ExpMaturity maturity;
   final bool enabled;
   final Widget page;
 
@@ -37,22 +35,9 @@ class ExpEntry {
     required this.title,
     required this.subtitle,
     required this.tag,
-    required this.maturity,
     this.enabled = true,
     required this.page,
   });
-}
-
-enum ExpMaturity {
-  verified('已验证', AppColors.primary),
-  lab('靶场适配', AppColors.cyan),
-  experimental('实验性', AppColors.amber),
-  environment('环境依赖', AppColors.textSecondary);
-
-  final String label;
-  final Color color;
-
-  const ExpMaturity(this.label, this.color);
 }
 
 final List<ExpEntry> expEntries = [
@@ -61,7 +46,7 @@ final List<ExpEntry> expEntries = [
     title: 'Apache Shiro CVE-2016-4437',
     subtitle: 'rememberMe Key 爆破 / Payload 注入',
     tag: 'Java · 通用',
-    maturity: ExpMaturity.environment,
+
     page: shiro.ShiroExpPage(),
   ),
   ExpEntry(
@@ -69,7 +54,7 @@ final List<ExpEntry> expEntries = [
     title: 'ThinkPHP CVE-2018-20062/CVE-2019-9082/CNVD-2022-86535',
     subtitle: '3.x/5.x/6.x 漏洞检测、RCE、GetShell',
     tag: 'PHP · 通用',
-    maturity: ExpMaturity.lab,
+
     page: ThinkphpExpPage(),
   ),
   ExpEntry(
@@ -77,7 +62,7 @@ final List<ExpEntry> expEntries = [
     title: 'Zentao CVE-2024-24216',
     subtitle: '绕过登录 · Repo 配置写入冰蝎 WebShell',
     tag: 'PHP · 禅道',
-    maturity: ExpMaturity.experimental,
+
     page: ZentaoExpPage(),
   ),
   ExpEntry(
@@ -85,7 +70,7 @@ final List<ExpEntry> expEntries = [
     title: 'Apache Struts2 S2-032/045/053/057/059',
     subtitle: 'OGNL 表达式注入 RCE 系列',
     tag: 'Java · Struts2',
-    maturity: ExpMaturity.lab,
+
     page: Struts2ExpPage(),
   ),
   ExpEntry(
@@ -93,7 +78,7 @@ final List<ExpEntry> expEntries = [
     title: 'Spring Framework CVE-2022-22963/22965/2018-1273/2017-8046',
     subtitle: 'Spring4Shell / Cloud Function / Data SpEL 注入系列',
     tag: 'Java · Spring',
-    maturity: ExpMaturity.lab,
+
     page: SpringExpPage(),
   ),
   ExpEntry(
@@ -101,7 +86,7 @@ final List<ExpEntry> expEntries = [
     title: 'Apache HTTP Server CVE-2021-41773',
     subtitle: '路径规范化缺陷 — 路径穿越文件读取 + CGI RCE',
     tag: 'C · Apache',
-    maturity: ExpMaturity.lab,
+
     page: HttpdExpPage(),
   ),
   ExpEntry(
@@ -109,7 +94,7 @@ final List<ExpEntry> expEntries = [
     title: 'Apache Druid CVE-2021-25646',
     subtitle: '嵌入式 JavaScript 代码注入 RCE (≤ 0.20.0)',
     tag: 'Java · Druid',
-    maturity: ExpMaturity.lab,
+
     page: DruidExpPage(),
   ),
   ExpEntry(
@@ -117,7 +102,7 @@ final List<ExpEntry> expEntries = [
     title: 'Apache OFBiz CVE-2023-51467 / CVE-2024-38856',
     subtitle: 'Groovy 代码注入无需认证 RCE',
     tag: 'Java · OFBiz',
-    maturity: ExpMaturity.lab,
+
     page: OFBizExpPage(),
   ),
   ExpEntry(
@@ -125,7 +110,7 @@ final List<ExpEntry> expEntries = [
     title: 'Apache Solr CVE-2017-12629',
     subtitle: 'RunExecutableListener 任意命令执行 (< 7.1.0)',
     tag: 'Java · Solr',
-    maturity: ExpMaturity.lab,
+
     page: SolrExpPage(),
   ),
   ExpEntry(
@@ -133,7 +118,7 @@ final List<ExpEntry> expEntries = [
     title: 'Drupal CVE-2018-7600 (Drupalgeddon2)',
     subtitle: 'Form API #post_render 回调 PHP 代码执行',
     tag: 'PHP · Drupal',
-    maturity: ExpMaturity.lab,
+
     page: DrupalExpPage(),
   ),
   ExpEntry(
@@ -141,7 +126,7 @@ final List<ExpEntry> expEntries = [
     title: 'Elasticsearch CVE-2015-1427',
     subtitle: 'Groovy 脚本沙箱逃逸 RCE (< 1.3.8 / < 1.4.3)',
     tag: 'Java · ES',
-    maturity: ExpMaturity.lab,
+
     page: ElasticsearchExpPage(),
   ),
   ExpEntry(
@@ -149,7 +134,7 @@ final List<ExpEntry> expEntries = [
     title: 'Flask / Jinja2 SSTI',
     subtitle: '服务端模板注入执行任意 Python 代码',
     tag: 'Python · Flask',
-    maturity: ExpMaturity.lab,
+
     page: FlaskSstiExpPage(),
   ),
   ExpEntry(
@@ -157,7 +142,7 @@ final List<ExpEntry> expEntries = [
     title: 'PHP 8.1.0-dev 后门 / CVE-2012-1823 PHP-CGI',
     subtitle: 'User-Agentt 后门 + CGI 参数注入 RCE',
     tag: 'PHP · 通用',
-    maturity: ExpMaturity.lab,
+
     page: PhpExpPage(),
   ),
   ExpEntry(
@@ -165,7 +150,7 @@ final List<ExpEntry> expEntries = [
     title: 'Apache Tomcat CVE-2017-12615',
     subtitle: 'PUT 方法开启时上传 JSP Webshell RCE',
     tag: 'Java · Tomcat',
-    maturity: ExpMaturity.lab,
+
     page: TomcatExpPage(),
   ),
   ExpEntry(
@@ -173,7 +158,7 @@ final List<ExpEntry> expEntries = [
     title: 'Oracle WebLogic CVE-2017-10271 / CVE-2020-14882',
     subtitle: 'XMLDecoder 反序列化 + 控制台未授权 + WS 测试页文件上传 RCE',
     tag: 'Java · WebLogic',
-    maturity: ExpMaturity.lab,
+
     page: WebLogicExpPage(),
   ),
   ExpEntry(
@@ -181,7 +166,7 @@ final List<ExpEntry> expEntries = [
     title: 'Supervisor CVE-2017-11610',
     subtitle: 'XML-RPC 未授权方法调用链 RCE (3.3.2)',
     tag: 'Python · Supervisor',
-    maturity: ExpMaturity.lab,
+
     page: SupervisorExpPage(),
   ),
   ExpEntry(
@@ -189,7 +174,7 @@ final List<ExpEntry> expEntries = [
     title: 'XXL-JOB 未授权访问执行器 RCE',
     subtitle: 'GLUE_SHELL 类型提交任意 Shell 命令 (2.2.0)',
     tag: 'Java · XXL-JOB',
-    maturity: ExpMaturity.lab,
+
     page: XxlJobExpPage(),
   ),
   ExpEntry(
@@ -197,7 +182,7 @@ final List<ExpEntry> expEntries = [
     title: 'Nacos CVE-2021-29441',
     subtitle: 'User-Agent 认证绕过，枚举/创建用户 (< 1.4.1)',
     tag: 'Java · Nacos',
-    maturity: ExpMaturity.environment,
+
     page: NacosExpPage(),
   ),
   ExpEntry(
@@ -205,7 +190,7 @@ final List<ExpEntry> expEntries = [
     title: 'Bash Shellshock CVE-2014-6271',
     subtitle: '环境变量函数定义解析注入 CGI RCE',
     tag: 'Shell · Bash',
-    maturity: ExpMaturity.lab,
+
     page: ShellshockExpPage(),
   ),
   ExpEntry(
@@ -213,7 +198,7 @@ final List<ExpEntry> expEntries = [
     title: 'SaltStack CVE-2020-16846',
     subtitle: 'SSH 模块 ssh_priv 参数命令注入 RCE',
     tag: 'Python · SaltStack',
-    maturity: ExpMaturity.environment,
+
     page: SaltstackExpPage(),
   ),
   ExpEntry(
@@ -221,18 +206,13 @@ final List<ExpEntry> expEntries = [
     title: 'Aria2 未授权 RPC → Cron 写入 RCE',
     subtitle: 'JSON-RPC 未授权，addUri 写入 /etc/cron.d/ 触发反弹 Shell',
     tag: 'C · Aria2',
-    maturity: ExpMaturity.environment,
+
     page: Aria2ExpPage(),
   ),
 ];
 
-List<ExpEntry> visibleExpEntries({
-  bool includeDisabled = false,
-  Set<ExpMaturity>? maturities,
-}) {
-  return expEntries.where((entry) {
-    if (!includeDisabled && !entry.enabled) return false;
-    if (maturities != null && !maturities.contains(entry.maturity)) return false;
-    return true;
-  }).toList(growable: false);
+List<ExpEntry> visibleExpEntries({bool includeDisabled = false}) {
+  return expEntries
+      .where((e) => includeDisabled || e.enabled)
+      .toList(growable: false);
 }

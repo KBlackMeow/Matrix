@@ -238,97 +238,114 @@ class _ReverseShellDashboardPageState
                       const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final s = sessions[index];
-                    return Material(
-                      color: AppColors.bgCard,
-                      borderRadius: BorderRadius.circular(10),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(10),
-                        onTap: () {
-                          if (!s.isAlive) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('该会话已断开，无法打开终端'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                            return;
-                          }
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  ReverseShellTerminalPage(session: s),
-                            ),
-                          );
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          child: Row(
-                            children: [
-                              // 存活状态指示点
-                              Container(
-                                width: 8,
-                                height: 8,
-                                margin: const EdgeInsets.only(right: 10),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: s.isAlive
-                                      ? AppColors.primary
-                                      : AppColors.textMuted,
-                                  boxShadow: s.isAlive
-                                      ? [
-                                          BoxShadow(
-                                            color: AppColors.primary
-                                                .withValues(alpha: 0.6),
-                                            blurRadius: 6,
-                                          )
-                                        ]
-                                      : null,
-                                ),
-                              ),
-                              const Icon(Icons.terminal,
-                                  color: AppColors.primary, size: 20),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      s.label != null && s.label!.isNotEmpty
-                                          ? '${s.label} (${s.id})'
-                                          : s.id,
-                                      style: AppTextStyles.body(
-                                          size: 14,
-                                          color: s.isAlive
-                                              ? AppColors.textPrimary
-                                              : AppColors.textMuted),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (!s.isAlive)
-                                      Text(
-                                        '已断开',
-                                        style: AppTextStyles.caption(
-                                            size: 11, color: AppColors.red),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              Icon(
-                                Icons.chevron_right,
-                                color: s.isAlive
-                                    ? AppColors.textSecondary
-                                    : AppColors.textMuted,
-                                size: 18,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
+                    return _SessionCard(session: s);
                   },
                 ),
         ),
       ],
+    );
+  }
+}
+
+class _SessionCard extends StatefulWidget {
+  final dynamic session;
+  const _SessionCard({required this.session});
+
+  @override
+  State<_SessionCard> createState() => _SessionCardState();
+}
+
+class _SessionCardState extends State<_SessionCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.session;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: () {
+            if (!s.isAlive) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('该会话已断开，无法打开终端'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              return;
+            }
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ReverseShellTerminalPage(session: s),
+              ),
+            );
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOut,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: _hovered ? AppColors.bgElevated : AppColors.bgCard,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _hovered ? AppColors.primary.withValues(alpha: 0.55) : AppColors.border,
+                width: _hovered ? 1.2 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: _hovered ? 0.14 : 0.0),
+                  blurRadius: 14,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: s.isAlive ? AppColors.primary : AppColors.textMuted,
+                    boxShadow: s.isAlive
+                        ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.6), blurRadius: 6)]
+                        : null,
+                  ),
+                ),
+                const Icon(Icons.terminal, color: AppColors.primary, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.label != null && s.label!.isNotEmpty ? '${s.label} (${s.id})' : s.id,
+                        style: AppTextStyles.body(
+                          size: 14,
+                          color: s.isAlive ? AppColors.textPrimary : AppColors.textMuted,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (!s.isAlive)
+                        Text('已断开', style: AppTextStyles.caption(size: 11, color: AppColors.red)),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: s.isAlive ? AppColors.textSecondary : AppColors.textMuted,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

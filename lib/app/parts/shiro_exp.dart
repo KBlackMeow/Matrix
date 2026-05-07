@@ -149,23 +149,22 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
     _logScrollController.dispose();
     _memShellPasswordController.dispose();
     _memShellPathController.dispose();
+    _logNotifier.dispose();
     super.dispose();
   }
 
   ShiroEncryptionMode _encryptionMode = ShiroEncryptionMode.cbc;
-  String _log = '';
+  final _logNotifier = ValueNotifier<String>('');
   bool _running = false;
   bool _verboseMode = false;
   final _payloadRepo = const ShiroPayloadRepo();
 
   void _appendLog(String line) {
-    setState(() {
-      final existing = _log.isEmpty ? <String>[] : _log.split('\n');
-      existing.add(line);
-      const maxLines = 500;
-      final trimmed = existing.length > maxLines ? existing.sublist(existing.length - maxLines) : existing;
-      _log = trimmed.join('\n');
-    });
+    final existing = _logNotifier.value.isEmpty ? <String>[] : _logNotifier.value.split('\n');
+    existing.add(line);
+    const maxLines = 500;
+    final trimmed = existing.length > maxLines ? existing.sublist(existing.length - maxLines) : existing;
+    _logNotifier.value = trimmed.join('\n');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_logScrollController.hasClients) {
         _logScrollController.animateTo(
@@ -737,69 +736,72 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: AppColors.border),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                margin: const EdgeInsets.only(right: 6),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _running ? AppColors.primary : AppColors.textMuted,
+                      child: ValueListenableBuilder<String>(
+                        valueListenable: _logNotifier,
+                        builder: (context, log, _) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  margin: const EdgeInsets.only(right: 6),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _running ? AppColors.primary : AppColors.textMuted,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                _running ? '运行中' : '空闲',
-                                style: AppTextStyles.caption(
-                                  size: 11,
-                                  color: _running ? AppColors.primary : AppColors.textSecondary,
+                                Text(
+                                  _running ? '运行中' : '空闲',
+                                  style: AppTextStyles.caption(
+                                    size: 11,
+                                    color: _running ? AppColors.primary : AppColors.textSecondary,
+                                  ),
                                 ),
-                              ),
-                              const Spacer(),
-                              TextButton.icon(
-                                onPressed: _log.isEmpty
-                                    ? null
-                                    : () async {
-                                        final messenger = ScaffoldMessenger.of(context);
-                                        await Clipboard.setData(ClipboardData(text: _log));
-                                        if (!mounted) return;
-                                        messenger.showSnackBar(
-                                          const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
-                                        );
-                                      },
-                                icon: const Icon(Icons.copy, size: 14),
-                                label: const Text('复制'),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: AppColors.textSecondary,
-                                  textStyle: const TextStyle(fontSize: 11),
+                                const Spacer(),
+                                TextButton.icon(
+                                  onPressed: log.isEmpty
+                                      ? null
+                                      : () async {
+                                          final messenger = ScaffoldMessenger.of(context);
+                                          await Clipboard.setData(ClipboardData(text: log));
+                                          if (!mounted) return;
+                                          messenger.showSnackBar(
+                                            const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
+                                          );
+                                        },
+                                  icon: const Icon(Icons.copy, size: 14),
+                                  label: const Text('复制'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.textSecondary,
+                                    textStyle: const TextStyle(fontSize: 11),
+                                  ),
                                 ),
-                              ),
-                              TextButton.icon(
-                                onPressed: _log.isEmpty ? null : () => setState(() => _log = ''),
-                                icon: const Icon(Icons.clear_all, size: 14),
-                                label: const Text('清空'),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: AppColors.textSecondary,
-                                  textStyle: const TextStyle(fontSize: 11),
+                                TextButton.icon(
+                                  onPressed: log.isEmpty ? null : () { _logNotifier.value = ''; },
+                                  icon: const Icon(Icons.clear_all, size: 14),
+                                  label: const Text('清空'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.textSecondary,
+                                    textStyle: const TextStyle(fontSize: 11),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 1, color: AppColors.border),
-                          const SizedBox(height: 4),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              controller: _logScrollController,
-                              child: SelectableText.rich(
-                                _shiroBuildLogRichText(_log),
-                                style: AppTextStyles.terminal(size: 12, color: AppColors.textMuted),
+                              ],
+                            ),
+                            const Divider(height: 1, color: AppColors.border),
+                            const SizedBox(height: 4),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                controller: _logScrollController,
+                                child: SelectableText.rich(
+                                  _shiroBuildLogRichText(log),
+                                  style: AppTextStyles.terminal(size: 12, color: AppColors.textMuted),
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
