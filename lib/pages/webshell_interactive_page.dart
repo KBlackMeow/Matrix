@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 import '../models/webshell.dart';
 import '../services/reverse_shell_service.dart';
@@ -365,6 +366,10 @@ class _TerminalTabState extends State<_TerminalTab>
   late final TabCompleter _completer;
   // Tab 补全正在写入文本时设为 true，避免 onChanged 重置补全状态
   bool _tabbing = false;
+  DateTime? _lastTabAt;
+  bool _lastTabWasDouble = false;
+  OverlayEntry? _completionOverlay;
+  Timer? _completionOverlayTimer;
 
   @override
   bool get wantKeepAlive => true;
@@ -379,10 +384,11 @@ class _TerminalTabState extends State<_TerminalTab>
   Future<void> _initDir() async {
     final dir = await widget.service.getCurrentDir();
     if (mounted) setState(() => _currentDir = dir);
-    // 并发预热：初始目录列表、环境变量名、HOME 目录（共 3 次请求，同时发出）
+    // 并发预热：目录列表、环境变量、HOME、可用命令（同时发出）
     _completer.warmDir(dir);
     _completer.fetchEnvVars();
     _completer.fetchHomeDir();
+    _completer.fetchAvailableCommands(dir);
   }
 
   Future<void> _execute(String raw) async {
@@ -434,7 +440,10 @@ class _TerminalTabState extends State<_TerminalTab>
         output = execResult.substring(0, idx).trim();
         final newDir = execResult.substring(idx + sep.length).trim();
         if (newDir.isNotEmpty && mounted) {
+          final prevDir = _currentDir;
           setState(() => _currentDir = newDir);
+          // cd 后使旧目录缓存失效（旧目录内可能有文件变动）
+          _completer.invalidateDir(prevDir);
           _completer.warmDir(newDir);
         }
       }
@@ -445,7 +454,7 @@ class _TerminalTabState extends State<_TerminalTab>
         entry.output = output.isEmpty ? '(无输出)' : output;
         _executing = false;
       });
-      // 命令执行后使当前目录缓存失效，以便 touch/echo 等创建的文件能被 Tab 补全
+      // 命令执行后使当前目录缓存失效，确保 touch/mkdir/rm 等操作能被 Tab 补全识别
       _completer.invalidateDir(_currentDir);
       _scrollToBottom(animated: true); // 平滑滚动到最新输出
       // 执行完毕后恢复焦点
@@ -999,7 +1008,10 @@ class _TerminalTabState extends State<_TerminalTab>
         ),
         onChanged: (_) {
           // 非 Tab 产生的文字变更 → 退出补全循环
-          if (!_tabbing) _completer.reset();
+          if (!_tabbing) {
+            _completer.reset();
+            _lastTabWasDouble = false;
+          }
         },
         onSubmitted: (v) {
           _execute(v);
@@ -1013,6 +1025,14 @@ class _TerminalTabState extends State<_TerminalTab>
 
   Future<void> _doTabComplete() async {
     if (_executing) return;
+    final now = DateTime.now();
+    final isDoubleTabNow =
+        _lastTabAt != null &&
+        now.difference(_lastTabAt!) <= const Duration(milliseconds: 1200);
+    _lastTabAt = now;
+    final shouldShowOverlay = isDoubleTabNow && !_lastTabWasDouble;
+    _lastTabWasDouble = isDoubleTabNow;
+
     final newText = await _completer.onTab(_inputController.text, _currentDir);
     if (newText != null && mounted) {
       _tabbing = true;
@@ -1022,6 +1042,158 @@ class _TerminalTabState extends State<_TerminalTab>
       );
       _tabbing = false;
     }
+    if (shouldShowOverlay && mounted) {
+      _showCompletionCandidates();
+    }
+  }
+
+  void _showCompletionCandidates() {
+    if (!mounted) return;
+    final raw = _completer.allMatches;
+    final indexed = <(int idx, String text)>[];
+    for (var i = 0; i < raw.length; i++) {
+      final t = raw[i].trimRight();
+      if (t.isNotEmpty) indexed.add((i, t));
+    }
+    final total = _completer.matchCount;
+    _completionOverlay?.remove();
+    _completionOverlayTimer?.cancel();
+
+    final List<(int idx, String text)> lines = total == 0
+        ? const <(int idx, String text)>[]
+        : indexed.take(20).toList(growable: false);
+    final hidden = total - lines.length;
+    final overlay = Overlay.of(context);
+    _completionOverlay = OverlayEntry(
+      builder: (_) => Positioned(
+        right: 18,
+        bottom: 90,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: 460,
+            constraints: const BoxConstraints(maxHeight: 340),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.bgElevated.withValues(alpha: 0.97),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Tab 候选（$total）',
+                        style: AppTextStyles.caption(
+                          size: 11,
+                          color: AppColors.amber,
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: _removeCompletionOverlay,
+                      borderRadius: BorderRadius.circular(4),
+                      child: const Padding(
+                        padding: EdgeInsets.all(2),
+                        child: Icon(
+                          Icons.close,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (total == 0)
+                  Text(
+                    '当前无候选',
+                    style: AppTextStyles.terminal(
+                      size: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: lines.length,
+                      itemBuilder: (context, i) {
+                        final item = lines[i];
+                        return InkWell(
+                          onTap: () => _pickCompletion(item.$1),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 5,
+                            ),
+                            child: Text(
+                              item.$2,
+                              style: AppTextStyles.terminal(
+                                size: 12,
+                                color: AppColors.cyan,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                if (hidden > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      '... +$hidden',
+                      style: AppTextStyles.caption(
+                        size: 11,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(_completionOverlay!);
+    _completionOverlayTimer = Timer(
+      const Duration(seconds: 8),
+      _removeCompletionOverlay,
+    );
+  }
+
+  void _pickCompletion(int index) {
+    final newText = _completer.applyMatchAt(index);
+    if (newText == null || !mounted) return;
+    _tabbing = true;
+    _inputController.text = newText;
+    _inputController.selection = TextSelection.collapsed(offset: newText.length);
+    _tabbing = false;
+    _lastTabWasDouble = false;
+    _inputFocus.requestFocus();
+    _removeCompletionOverlay();
+  }
+
+  void _removeCompletionOverlay() {
+    _completionOverlayTimer?.cancel();
+    _completionOverlayTimer = null;
+    _completionOverlay?.remove();
+    _completionOverlay = null;
   }
 
   Widget _toolbarBtn({
@@ -1044,6 +1216,7 @@ class _TerminalTabState extends State<_TerminalTab>
 
   @override
   void dispose() {
+    _removeCompletionOverlay();
     _inputController.dispose();
     _scrollController.dispose();
     _inputFocus.dispose();

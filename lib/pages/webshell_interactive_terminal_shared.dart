@@ -80,112 +80,13 @@ class ModeToggle extends StatelessWidget {
 //   • 命令位置（无空格前缀）→ 内置命令名 + 当前目录文件一起参与补全
 //   • $VAR 形式         → 环境变量名补全
 //   • ~ 展开           → 用 HOME 目录替换 ~，保留原始 ~ 在输出中
-//   • 目录列表按需拉取并缓存，同一目录只请求一次服务器
+//   • 命令与目录候选均实时查询目标，不依赖本地硬编码或目录缓存
 // ─────────────────────────────────────────────────────────────────────────────
 class TabCompleter {
   final WebshellService service;
 
-  final Map<String, List<({String name, bool isDir})>> _cache = {};
   List<String> _envVars = [];
   String _homeDir = '';
-
-  // 常见命令名白名单（仅用于行首 Tab；无法枚举远程 PATH 下全部可执行文件）
-  static const List<String> _builtins = [
-    'alias',
-    'apt',
-    'awk',
-    'base64',
-    'basename',
-    'bash',
-    'cat',
-    'cd',
-    'chmod',
-    'chown',
-    'chroot',
-    'clear',
-    'cp',
-    'crontab',
-    'curl',
-    'cut',
-    'date',
-    'dd',
-    'df',
-    'diff',
-    'dirname',
-    'du',
-    'echo',
-    'env',
-    'exit',
-    'export',
-    'find',
-    'grep',
-    'gunzip',
-    'gzip',
-    'head',
-    'hostname',
-    'id',
-    'ifconfig',
-    'ip',
-    'kill',
-    'killall',
-    'less',
-    'ln',
-    'ls',
-    'lsof',
-    'mkdir',
-    'md5sum',
-    'more',
-    'mount',
-    'mv',
-    'nano',
-    'netstat',
-    'nohup',
-    'nslookup',
-    'passwd',
-    'perl',
-    'php',
-    'ping',
-    'printenv',
-    'ps',
-    'python',
-    'python3',
-    'pwd',
-    'rm',
-    'rmdir',
-    'rsync',
-    'scp',
-    'sed',
-    'sha1sum',
-    'sha256sum',
-    'sh',
-    'sleep',
-    'sort',
-    'ssh',
-    'stat',
-    'strings',
-    'su',
-    'sudo',
-    'tail',
-    'tar',
-    'tee',
-    'touch',
-    'tr',
-    'uname',
-    'uniq',
-    'unset',
-    'unzip',
-    'uptime',
-    'useradd',
-    'vi',
-    'vim',
-    'wc',
-    'wget',
-    'which',
-    'whoami',
-    'xargs',
-    'zip',
-    'zsh',
-  ];
 
   // 当前补全循环状态
   List<String> _matches = [];
@@ -199,6 +100,9 @@ class TabCompleter {
   TabCompleter(this.service);
 
   bool get isActive => _active;
+  int get matchCount => _matches.length;
+  List<String> get previewMatches => _matches.take(8).toList(growable: false);
+  List<String> get allMatches => List.unmodifiable(_matches);
 
   void reset() {
     _matches = [];
@@ -209,17 +113,10 @@ class TabCompleter {
     _atLcp = false;
   }
 
-  Future<void> warmDir(String dir) async {
-    if (_cache.containsKey(dir)) return;
-    try {
-      _cache[dir] = await service.listNamesForCompletion(dir);
-    } catch (_) {}
-  }
+  Future<void> warmDir(String dir, {bool force = false}) async {}
 
   /// 使指定目录的缓存失效，写入新文件后调用以便 Tab 补全能识别新文件
-  void invalidateDir(String dir) {
-    _cache.remove(dir);
-  }
+  void invalidateDir(String dir) {}
 
   Future<void> fetchEnvVars() async {
     try {
@@ -231,6 +128,32 @@ class TabCompleter {
     try {
       _homeDir = await service.getHomeDir();
     } catch (_) {}
+  }
+
+  /// 仅基于目标 PATH 扫描可执行文件，构建命令补全列表（无硬编码兜底）
+  Future<List<String>> fetchAvailableCommands(String workingDir) async {
+    try {
+      final result = await service.executeCommand(
+        'IFS=:; for d in \$PATH; do '
+        '[ -d "\$d" ] || continue; '
+        'for f in "\$d"/*; do '
+        '[ -f "\$f" ] && [ -x "\$f" ] && printf "%s\n" "\${f##*/}"; '
+        'done; '
+        'done',
+        workingDir: workingDir,
+      ).timeout(const Duration(seconds: 2));
+      final found = result
+          .split('\n')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      return found;
+    } catch (_) {
+      // 扫描失败时不使用任何本地硬编码命令兜底。
+      return [];
+    }
   }
 
   // ~ 展开（仅用于服务器查询，输出保留原始 ~）
@@ -274,6 +197,52 @@ class TabCompleter {
   String _fmt(({String name, bool isDir}) e) =>
       e.isDir ? '${e.name}/' : '${e.name} ';
 
+  static String _sq(String s) => "'${s.replaceAll("'", "'\\''")}'";
+
+  Future<List<({String name, bool isDir})>> _listByPrefix(
+    String dir,
+    String prefix,
+  ) async {
+    try {
+      final result = await service.executeCommand(
+        'd=${_sq(dir)}; p=${_sq(prefix)}; '
+        'for f in "\$d"/"\$p"*; do '
+        '[ -e "\$f" ] || continue; '
+        'n="\${f##*/}"; '
+        'if [ -d "\$f" ]; then printf "%s|d\n" "\$n"; '
+        'else printf "%s|f\n" "\$n"; fi; '
+        'done',
+        workingDir: dir,
+      );
+      if (result.isEmpty) return [];
+      final out = <({String name, bool isDir})>[];
+      for (final line in result.split('\n')) {
+        final t = line.trim();
+        if (t.isEmpty) continue;
+        final sep = t.lastIndexOf('|');
+        if (sep <= 0 || sep >= t.length - 1) continue;
+        final name = t.substring(0, sep);
+        final flag = t.substring(sep + 1);
+        if (name.isEmpty || name == '.') continue;
+        out.add((name: name, isDir: flag == 'd'));
+      }
+      out.sort((a, b) => a.name.compareTo(b.name));
+      return out;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<({String name, bool isDir})>> _listDirLive(String dir) async {
+    try {
+      final out = await service.listNamesForCompletion(dir);
+      out.sort((a, b) => a.name.compareTo(b.name));
+      return out;
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// 按 Tab 键时调用，返回新的完整输入字符串；无候选时返回 null
   Future<String?> onTab(String input, String cwd) async {
     // ── 已在补全循环中 ────────────────────────────────────────────────────────
@@ -310,9 +279,12 @@ class TabCompleter {
     // ── 空 token：命令位置列出命令+文件，参数位置列出当前目录 ──────────────
     if (token.isEmpty) {
       final all = <String>[];
-      if (isCmd) all.addAll(_builtins.map((c) => '$c '));
-      await warmDir(cwd);
-      all.addAll((_cache[cwd] ?? []).map(_fmt));
+      if (isCmd) {
+        final liveCmds = await fetchAvailableCommands(cwd);
+        all.addAll(liveCmds.map((c) => '$c '));
+      }
+      final cwdEntries = await _listDirLive(cwd);
+      all.addAll(cwdEntries.map(_fmt));
       _tokenPrefix = '';
       _matches = all;
       return _startCycle(0);
@@ -333,12 +305,11 @@ class TabCompleter {
     final isPathLike =
         token.contains('/') || token.startsWith('~') || token.startsWith('.');
     if (isCmd && !isPathLike) {
-      final cmdM = _builtins
+      final cmdM = (await fetchAvailableCommands(cwd))
           .where((c) => c.startsWith(token))
           .map((c) => '$c ')
           .toList();
-      await warmDir(cwd);
-      final fileM = (_cache[cwd] ?? [])
+      final fileM = (await _listDirLive(cwd))
           .where((e) => e.name.toLowerCase().startsWith(token.toLowerCase()))
           .map(_fmt)
           .toList();
@@ -377,12 +348,16 @@ class TabCompleter {
       lookupDir = _resolveDir(rawDir, cwd);
     }
 
-    await warmDir(lookupDir);
-    final entries = _cache[lookupDir] ?? [];
+    final entries = await _listDirLive(lookupDir);
     _matches = entries
         .where((e) => e.name.toLowerCase().startsWith(filePrefix.toLowerCase()))
         .map(_fmt)
         .toList();
+    if (_matches.isEmpty) {
+      // 目录列表为空或缓存与目标瞬时不一致时，按前缀直接向目标查询一次。
+      final direct = await _listByPrefix(lookupDir, filePrefix);
+      _matches = direct.map(_fmt).toList();
+    }
     return _startCycle(filePrefix.length);
   }
 
@@ -417,6 +392,14 @@ class TabCompleter {
   }
 
   String _build() => '$_inputPrefix$_tokenPrefix${_matches[_matchIdx]}';
+
+  String? applyMatchAt(int index) {
+    if (index < 0 || index >= _matches.length) return null;
+    _active = true;
+    _atLcp = false;
+    _matchIdx = index;
+    return _build();
+  }
 }
 
 class EntryBlock extends StatelessWidget {
