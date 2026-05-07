@@ -40,6 +40,13 @@ class _ProjectScopedPageState extends State<ProjectScopedPage> {
     _loadProjects();
   }
 
+  @override
+  void didUpdateWidget(covariant ProjectScopedPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 父级重建（项目编辑/删除后）时，强制刷新项目列表，避免菜单里仍显示旧名称。
+    _loadProjects();
+  }
+
   Future<void> _loadProjects() async {
     setState(() => _loading = true);
     final projects = await _db.getAllProjects();

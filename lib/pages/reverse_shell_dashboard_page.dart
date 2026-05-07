@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 import '../services/reverse_shell_service.dart';
 import '../theme/app_theme.dart';
@@ -16,23 +17,26 @@ class ReverseShellDashboardPage extends StatefulWidget {
 class _ReverseShellDashboardPageState
     extends State<ReverseShellDashboardPage> {
   final _service = ReverseShellService();
+  StreamSubscription<void>? _changesSub;
 
   @override
   void initState() {
     super.initState();
     // 首次进入时从数据库加载监听配置
     _service.loadConfig().then((_) {
+      _service.refreshListeningState(port: _service.lport);
       if (mounted) setState(() {});
     });
-    // 新会话建立 / 结束时刷新列表
-    _service.onSession = (session) {
+    // 统一订阅服务状态变化，避免与其他页面抢占 onSession 回调
+    _changesSub = _service.changes.listen((_) {
       if (mounted) setState(() {});
-    };
-    _service.onSessionClosed = (session) {
-      if (mounted) {
-        setState(() {});
-      }
-    };
+    });
+  }
+
+  @override
+  void dispose() {
+    _changesSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -82,8 +86,11 @@ class _ReverseShellDashboardPageState
                               final bindAddr = _service.bindAddress;
                               final bindPort = _service.bindPort;
                               final listening = _service.isListening;
+                              final occupied = _service.isPortOccupied;
                               final text = listening && bindAddr != null && bindPort != null
                                   ? '监听中：$bindAddr:$bindPort'
+                                  : occupied && bindAddr != null && bindPort != null
+                                  ? '端口占用：$bindAddr:$bindPort（可能已有监听）'
                                   : '未监听（配置：${_service.lhost}:${_service.lport}）';
                               return Text(
                                 text,
@@ -179,6 +186,18 @@ class _ReverseShellDashboardPageState
                               setState(() {});
                               return;
                             }
+                            if (_service.isPortOccupied) {
+                              await _service.refreshListeningState(port: _service.lport);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('端口处于占用状态，请先释放后再启动监听'),
+                                  ),
+                                );
+                              }
+                              setState(() {});
+                              return;
+                            }
                             // 启动监听
                             try {
                               await _service.startListening(
@@ -205,10 +224,16 @@ class _ReverseShellDashboardPageState
                           icon: Icon(
                             _service.isListening
                                 ? Icons.stop
-                                : Icons.play_arrow,
+                                : (_service.isPortOccupied
+                                    ? Icons.sync_problem
+                                    : Icons.play_arrow),
                             size: 16,
                           ),
-                          label: Text(_service.isListening ? '关闭监听' : '启动监听'),
+                          label: Text(
+                            _service.isListening
+                                ? '关闭监听'
+                                : (_service.isPortOccupied ? '端口占用' : '启动监听'),
+                          ),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(0, 32),
                           ),

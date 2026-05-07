@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -29,6 +28,7 @@ class _MainLayoutState extends State<MainLayout> {
   bool _sidebarHidden = false;
   static const double _sidebarWidth = 220.0;
   static const double _sidebarCollapsedWidth = 72.0;
+  static const double _menuItemExtent = 56.0;
 
   // 静态页面只创建一次；动态页面在 _selectedProject 变化时重建
   // RepaintBoundary 让每个页面的 layer 在 IndexedStack 切换时被缓存，
@@ -46,12 +46,36 @@ class _MainLayoutState extends State<MainLayout> {
   late List<Widget> _pages;
 
   final List<MenuItem> _menuItems = [
-    MenuItem(icon: Icons.folder_outlined, label: '项目管理', selectedIcon: Icons.folder),
-    MenuItem(icon: Icons.terminal_outlined, label: 'Webshell管理', selectedIcon: Icons.terminal),
-    MenuItem(icon: Icons.bug_report_outlined, label: 'EXP管理', selectedIcon: Icons.bug_report),
-    MenuItem(icon: Icons.code_outlined, label: 'Payload管理', selectedIcon: Icons.code),
-    MenuItem(icon: Icons.computer_outlined, label: '完整终端', selectedIcon: Icons.computer),
-    MenuItem(icon: Icons.alt_route_outlined, label: 'FRP隧道', selectedIcon: Icons.alt_route),
+    MenuItem(
+      icon: Icons.folder_outlined,
+      label: '项目管理',
+      selectedIcon: Icons.folder,
+    ),
+    MenuItem(
+      icon: Icons.terminal_outlined,
+      label: 'Webshell管理',
+      selectedIcon: Icons.terminal,
+    ),
+    MenuItem(
+      icon: Icons.bug_report_outlined,
+      label: 'EXP管理',
+      selectedIcon: Icons.bug_report,
+    ),
+    MenuItem(
+      icon: Icons.code_outlined,
+      label: 'Payload管理',
+      selectedIcon: Icons.code,
+    ),
+    MenuItem(
+      icon: Icons.computer_outlined,
+      label: '完整终端',
+      selectedIcon: Icons.computer,
+    ),
+    MenuItem(
+      icon: Icons.alt_route_outlined,
+      label: 'FRP隧道',
+      selectedIcon: Icons.alt_route,
+    ),
   ];
 
   @override
@@ -68,6 +92,22 @@ class _MainLayoutState extends State<MainLayout> {
         setState(() {
           _selectedProject = project;
           _selectedIndex = 1;
+          _rebuildDynamicPages();
+        });
+      },
+      onProjectUpdated: (project) {
+        setState(() {
+          if (_selectedProject?.id == project.id) {
+            _selectedProject = project;
+          }
+          _rebuildDynamicPages();
+        });
+      },
+      onProjectDeleted: (projectId) {
+        setState(() {
+          if (_selectedProject?.id == projectId) {
+            _selectedProject = null;
+          }
           _rebuildDynamicPages();
         });
       },
@@ -95,8 +135,10 @@ class _MainLayoutState extends State<MainLayout> {
       },
       title: 'Webshell管理',
       icon: Icons.terminal,
-      contentBuilder: (project, onSwitchProject) =>
-          WebshellManagementPage(project: project, onSwitchProject: onSwitchProject),
+      contentBuilder: (project, onSwitchProject) => WebshellManagementPage(
+        project: project,
+        onSwitchProject: onSwitchProject,
+      ),
     );
     _projectBoundary = RepaintBoundary(child: _projectPage);
     _webshellBoundary = RepaintBoundary(child: _webshellPage);
@@ -111,180 +153,197 @@ class _MainLayoutState extends State<MainLayout> {
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.sizeOf(context).width < 720;
     return Scaffold(
-          body: Stack(
-            children: [
-              // 右侧工作区（底层）
-              Positioned.fill(
-                left: !isMobile && !_sidebarHidden
-                    ? (_sidebarExpanded ? _sidebarWidth : _sidebarCollapsedWidth)
-                    : 0,
-                child: Container(
-                  color: AppColors.bgDark,
-                  child: Stack(
-                    children: [
-                      // 赛博网格背景：独立 layer，初次光栅化后永久缓存
-                      Positioned.fill(
-                        child: RepaintBoundary(
-                          child: CustomPaint(painter: CyberGridPainter()),
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: RepaintBoundary(
-                          child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // 顶部栏：独立 layer，标题变化不触发内容区重绘
-                            RepaintBoundary(
-                              child: Container(
-                                height: 64,
-                                padding: const EdgeInsets.symmetric(horizontal: 24),
-                                decoration: BoxDecoration(
-                                  color: AppColors.bgElevated,
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: AppColors.primary.withValues(alpha: 0.5),
-                                      width: 1,
+      body: Stack(
+        children: [
+          // 右侧工作区（底层）
+          Positioned.fill(
+            left: !isMobile && !_sidebarHidden
+                ? (_sidebarExpanded ? _sidebarWidth : _sidebarCollapsedWidth)
+                : 0,
+            child: Container(
+              color: AppColors.bgDark,
+              child: Stack(
+                children: [
+                  // 赛博网格背景：独立 layer，初次光栅化后永久缓存
+                  Positioned.fill(
+                    child: RepaintBoundary(
+                      child: CustomPaint(painter: CyberGridPainter()),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: RepaintBoundary(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // 顶部栏：独立 layer，标题变化不触发内容区重绘
+                          RepaintBoundary(
+                            child: Container(
+                              height: 64,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.bgElevated,
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                    width: 1,
+                                  ),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.06,
+                                    ),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    '>_ ',
+                                    style: AppTextStyles.terminal(
+                                      size: 14,
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.5,
+                                      ),
                                     ),
                                   ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.primary.withValues(alpha: 0.06),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 2),
+                                  Text(
+                                    _menuItems[_selectedIndex].label,
+                                    style: AppTextStyles.heading(
+                                      size: 18,
+                                      color: AppColors.primary,
                                     ),
-                                  ],
-                                ),
-                                child: Row(
-                                  children: [
-                                    const RepaintBoundary(child: _BlinkDot()),
-                                    Text(
-                                      '>_ ',
-                                      style: AppTextStyles.terminal(
-                                        size: 14,
-                                        color: AppColors.primary.withValues(alpha: 0.5),
-                                      ),
+                                  ),
+                                  const Spacer(),
+                                  IconButton(
+                                    icon: const Icon(Icons.search),
+                                    onPressed: () {},
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.notifications_outlined,
                                     ),
-                                    Text(
-                                      _menuItems[_selectedIndex].label,
-                                      style: AppTextStyles.heading(
-                                        size: 18,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    IconButton(
-                                      icon: const Icon(Icons.search),
-                                      onPressed: () {},
-                                      color: AppColors.textSecondary,
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.notifications_outlined),
-                                      onPressed: () {},
-                                      color: AppColors.textSecondary,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: AppColors.primary.withValues(alpha: 0.6),
-                                          width: 1.5,
+                                    onPressed: () {},
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: AppColors.primary.withValues(
+                                          alpha: 0.6,
                                         ),
-                                        color: AppColors.primary.withValues(alpha: 0.1),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: AppColors.primary.withValues(alpha: 0.2),
-                                            blurRadius: 8,
-                                          ),
-                                        ],
+                                        width: 1.5,
                                       ),
-                                      child: Center(
-                                        child: Text(
-                                          'R',
-                                          style: AppTextStyles.heading(
-                                            size: 14,
-                                            color: AppColors.primary,
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.primary.withValues(
+                                            alpha: 0.2,
                                           ),
+                                          blurRadius: 8,
+                                        ),
+                                      ],
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'R',
+                                        style: AppTextStyles.heading(
+                                          size: 14,
+                                          color: AppColors.primary,
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
-                            // 工作区内容：expand 给子页面紧约束 → relayout boundary
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: IndexedStack(
-                                  index: _selectedIndex,
-                                  sizing: StackFit.expand,
-                                  children: _pages,
-                                ),
+                          ),
+                          // 工作区内容：expand 给子页面紧约束 → relayout boundary
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: IndexedStack(
+                                index: _selectedIndex,
+                                sizing: StackFit.expand,
+                                children: _pages,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                    ],
                   ),
-                ),
+                ],
               ),
-
-              // 手机端：菜单展开时的遮罩
-              if (isMobile && !_sidebarHidden)
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _sidebarHidden = true),
-                    child: Container(
-                      color: Colors.black.withValues(alpha: 0.4),
-                    ),
-                  ),
-                ),
-
-              // 左侧菜单栏（上层，用位移动画实现侧滑）
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeInOut,
-                top: 0,
-                bottom: 0,
-                left: _sidebarHidden ? -_sidebarWidth : 0,
-                width: _sidebarExpanded ? _sidebarWidth : _sidebarCollapsedWidth,
-                child: RepaintBoundary(child: _buildSidebar()),
-              ),
-
-              // 桌面端：隐藏后的展开按钮
-              if (!isMobile && _sidebarHidden)
-                Positioned(
-                  left: 0,
-                  top: 16,
-                  child: SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      iconSize: 20,
-                      splashRadius: 20,
-                      onPressed: () => setState(() => _sidebarHidden = false),
-                      icon: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-                      tooltip: '展开菜单',
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
-        );
+
+          // 手机端：菜单展开时的遮罩
+          if (isMobile && !_sidebarHidden)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () => setState(() => _sidebarHidden = true),
+                child: Container(color: Colors.black.withValues(alpha: 0.4)),
+              ),
+            ),
+
+          // 左侧菜单栏（上层，用位移动画实现侧滑）
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            top: 0,
+            bottom: 0,
+            left: _sidebarHidden ? -_sidebarWidth : 0,
+            width: _sidebarExpanded ? _sidebarWidth : _sidebarCollapsedWidth,
+            child: RepaintBoundary(child: _buildSidebar()),
+          ),
+
+          // 桌面端：隐藏后的展开按钮
+          if (!isMobile && _sidebarHidden)
+            Positioned(
+              left: 0,
+              top: 16,
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  iconSize: 20,
+                  splashRadius: 20,
+                  onPressed: () => setState(() => _sidebarHidden = false),
+                  icon: const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.textSecondary,
+                  ),
+                  tooltip: '展开菜单',
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSidebar() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final t = ((constraints.maxWidth - _sidebarCollapsedWidth) /
-                (_sidebarWidth - _sidebarCollapsedWidth))
-            .clamp(0.0, 1.0);
+        final t =
+            ((constraints.maxWidth - _sidebarCollapsedWidth) /
+                    (_sidebarWidth - _sidebarCollapsedWidth))
+                .clamp(0.0, 1.0);
         return _buildSidebarContent(t);
       },
     );
@@ -293,6 +352,8 @@ class _MainLayoutState extends State<MainLayout> {
   Widget _buildSidebarContent(double t) {
     // Label elements fade in during the second half of expansion
     final labelOpacity = ((t - 0.3) / 0.5).clamp(0.0, 1.0);
+    final logoAreaHorizontalPadding = 8.0 + 8.0 * t;
+    final logoSize = 34.0 + 12.0 * t;
 
     return Container(
       decoration: BoxDecoration(
@@ -311,46 +372,46 @@ class _MainLayoutState extends State<MainLayout> {
           SizedBox(
             height: 64,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: logoAreaHorizontalPadding),
               child: Row(
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: logoSize,
+                    height: logoSize,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.2),
+                      color: Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppColors.primary,
-                        width: 1,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: const Padding(
+                      padding: EdgeInsets.all(2),
+                      child: Image(
+                        image: AssetImage('assets/icon/icon_square.png'),
+                        fit: BoxFit.contain,
                       ),
                     ),
-                    child: const Icon(
-                      Icons.grid_view_rounded,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
                   ),
-                  Expanded(
-                    child: Opacity(
-                      opacity: labelOpacity,
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Matrix',
-                              style: AppTextStyles.title(
-                                size: 20,
-                                color: AppColors.textPrimary,
+                  if (t > 0.1)
+                    Expanded(
+                      child: Opacity(
+                        opacity: labelOpacity,
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Matrix',
+                                style: AppTextStyles.title(
+                                  size: 20,
+                                  color: AppColors.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -360,21 +421,49 @@ class _MainLayoutState extends State<MainLayout> {
 
           // 菜单项
           Expanded(
-            child: ListView.builder(
+            child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              itemCount: _menuItems.length,
-              itemBuilder: (context, index) {
-                final item = _menuItems[index];
-                final isSelected = _selectedIndex == index;
-                return RepaintBoundary(
-                  child: SidebarMenuItem(
-                    item: item,
-                    isSelected: isSelected,
-                    expandProgress: t,
-                    onTap: () => _handleMenuTap(index),
+              child: Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeInOutCubic,
+                    top: _selectedIndex * _menuItemExtent,
+                    left: 0,
+                    right: 0,
+                    height: _menuItemExtent,
+                    child: IgnorePointer(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                );
-              },
+                  ListView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: _menuItems.length,
+                    itemExtent: _menuItemExtent,
+                    itemBuilder: (context, index) {
+                      final item = _menuItems[index];
+                      final isSelected = _selectedIndex == index;
+                      return RepaintBoundary(
+                        child: SidebarMenuItem(
+                          item: item,
+                          isSelected: isSelected,
+                          expandProgress: t,
+                          onTap: () => _handleMenuTap(index),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -385,7 +474,10 @@ class _MainLayoutState extends State<MainLayout> {
               onTap: () => setState(() => _sidebarExpanded = !_sidebarExpanded),
               borderRadius: BorderRadius.circular(8),
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 12,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
@@ -418,55 +510,6 @@ class _MainLayoutState extends State<MainLayout> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _BlinkDot extends StatefulWidget {
-  const _BlinkDot();
-
-  @override
-  State<_BlinkDot> createState() => _BlinkDotState();
-}
-
-class _BlinkDotState extends State<_BlinkDot> {
-  bool _on = true;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(milliseconds: 900), (_) {
-      if (mounted) setState(() => _on = !_on);
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: _on ? 1.0 : 0.3,
-      child: Container(
-        width: 8,
-        height: 8,
-        margin: const EdgeInsets.only(right: 10),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.primary,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.6),
-              blurRadius: 8,
-              spreadRadius: 1,
-            ),
-          ],
-        ),
       ),
     );
   }

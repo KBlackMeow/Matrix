@@ -6,11 +6,11 @@ import 'package:http/http.dart' as http;
 import 'services/exp_result.dart';
 
 enum Struts2VulnType {
-  s2032('S2-032 (CVE-2016-3081)', 'DMI 方法 OGNL 注入'),
-  s2045('S2-045 (CVE-2017-5638)', 'Content-Type OGNL 注入'),
-  s2053('S2-053', 'Freemarker 模板 OGNL 注入'),
-  s2057('S2-057 (CVE-2018-11776)', 'Namespace OGNL 注入'),
-  s2059('S2-059 (CVE-2019-0230)', '标签属性二次 OGNL 求值');
+  s2032('S2-032 (CVE-2016-3081, Struts 2.3.20-2.3.28)', 'DMI 方法 OGNL 注入'),
+  s2045('S2-045 (CVE-2017-5638, Struts 2.3.5-2.5.10)', 'Content-Type OGNL 注入'),
+  s2053('S2-053 (Struts 2.0.1-2.5.10)', 'Freemarker 模板 OGNL 注入'),
+  s2057('S2-057 (CVE-2018-11776, <= Struts 2.5.16)', 'Namespace OGNL 注入'),
+  s2059('S2-059 (CVE-2019-0230, Struts 2.0.0-2.5.20)', '标签属性二次 OGNL 求值');
 
   const Struts2VulnType(this.label, this.desc);
   final String label;

@@ -10,12 +10,16 @@ class ProjectManagementPage extends StatefulWidget {
   final Project? selectedProject;
   final void Function(Project project) onEnterWebshell;
   final void Function(Project project) onEnterExp;
+  final void Function(Project project)? onProjectUpdated;
+  final void Function(int projectId)? onProjectDeleted;
 
   const ProjectManagementPage({
     super.key,
     this.selectedProject,
     required this.onEnterWebshell,
     required this.onEnterExp,
+    this.onProjectUpdated,
+    this.onProjectDeleted,
   });
 
   @override
@@ -33,13 +37,14 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
     _loadProjects();
   }
 
-  Future<void> _loadProjects() async {
+  Future<List<Project>> _loadProjects() async {
     setState(() => _loading = true);
     final projects = await _db.getAllProjects();
     setState(() {
       _projects = projects;
       _loading = false;
     });
+    return projects;
   }
 
   Future<void> _showCreateDialog() async {
@@ -140,7 +145,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
         domain: domainController.text.trim(),
         description: descController.text.trim().isEmpty ? null : descController.text.trim(),
       );
-      _loadProjects();
+      await _loadProjects();
     }
   }
 
@@ -242,7 +247,11 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
         domain: domainController.text.trim(),
         description: descController.text.trim().isEmpty ? null : descController.text.trim(),
       ));
-      _loadProjects();
+      final projects = await _loadProjects();
+      final updated = projects.where((p) => p.id == project.id).firstOrNull;
+      if (updated != null) {
+        widget.onProjectUpdated?.call(updated);
+      }
     }
   }
 
@@ -275,7 +284,8 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
 
     if (result == true) {
       await _db.deleteProject(project.id);
-      _loadProjects();
+      await _loadProjects();
+      widget.onProjectDeleted?.call(project.id);
     }
   }
 

@@ -59,6 +59,7 @@ class ExpContent extends StatelessWidget {
                 icon: e.icon,
                 title: e.title,
                 subtitle: e.subtitle,
+                versionRequirement: e.versionRequirement,
                 tag: e.tag,
 
                 onTap: () => Navigator.of(
@@ -77,6 +78,7 @@ class _ExpEntryCard extends StatefulWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final String versionRequirement;
   final String tag;
   final VoidCallback? onTap;
 
@@ -84,6 +86,7 @@ class _ExpEntryCard extends StatefulWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.versionRequirement,
     required this.tag,
     required this.onTap,
   });
@@ -168,6 +171,16 @@ class _ExpEntryCardState extends State<_ExpEntryCard> {
                       style: AppTextStyles.caption(
                         size: 13,
                         color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '版本要求：${widget.versionRequirement}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption(
+                        size: 12,
+                        color: AppColors.cyan.withValues(alpha: 0.95),
                       ),
                     ),
                   ],

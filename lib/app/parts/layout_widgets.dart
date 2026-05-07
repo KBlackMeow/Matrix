@@ -56,11 +56,9 @@ class _SidebarMenuItemState extends State<SidebarMenuItem> {
               horizontal: horizontalPadding,
             ),
             decoration: BoxDecoration(
-              color: widget.isSelected
-                  ? AppColors.primary.withValues(alpha: 0.12)
-                  : _hovered
-                      ? AppColors.primary.withValues(alpha: 0.06)
-                      : Colors.transparent,
+              color: _hovered && !widget.isSelected
+                  ? AppColors.primary.withValues(alpha: 0.06)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(

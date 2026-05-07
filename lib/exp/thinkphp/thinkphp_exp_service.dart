@@ -472,21 +472,21 @@ extension ThinkphpVulnTypeExt on ThinkphpVulnType {
       case ThinkphpVulnType.tp2:
         return 'ThinkPHP 2.x · preg_replace /e RCE';
       case ThinkphpVulnType.tp50:
-        return 'ThinkPHP CVE-2018-20062 · 5.0 invokefunction RCE';
+        return 'ThinkPHP CVE-2018-20062（5.0.x）· invokefunction RCE';
       case ThinkphpVulnType.tp5010:
-        return 'ThinkPHP CVE-2018-20062 · 5.0.10 assert RCE';
+        return 'ThinkPHP CVE-2018-20062（5.0.10）· assert RCE';
       case ThinkphpVulnType.tp5022_5129:
-        return 'ThinkPHP CVE-2018-20062 · 5.0.22/5.1.29 invokefunction RCE';
+        return 'ThinkPHP CVE-2018-20062（5.0.22/5.1.29）· invokefunction RCE';
       case ThinkphpVulnType.tp5023:
-        return 'ThinkPHP CVE-2019-9082 · 5.0.23 captcha RCE';
+        return 'ThinkPHP CVE-2019-9082（5.0.23）· captcha RCE';
       case ThinkphpVulnType.tp5023Debug:
-        return 'ThinkPHP CVE-2019-9082 · 5.0.23 Debug RCE';
+        return 'ThinkPHP CVE-2019-9082（5.0.23）· Debug RCE';
       case ThinkphpVulnType.tp5024_5130:
-        return 'ThinkPHP CVE-2018-20062 · 5.0.24-5.1.30 template/write RCE';
+        return 'ThinkPHP CVE-2018-20062（5.0.24-5.1.30）· template/write RCE';
       case ThinkphpVulnType.tp5ViewDisplay:
-        return 'ThinkPHP CVE-2018-20062 · 5.x View/display RCE';
+        return 'ThinkPHP CVE-2018-20062（5.x）· View/display RCE';
       case ThinkphpVulnType.tp5MethodFilter:
-        return 'ThinkPHP CVE-2019-9082 · 5.x _method=filter RCE';
+        return 'ThinkPHP CVE-2019-9082（5.x）· _method=filter RCE';
       case ThinkphpVulnType.tp3:
         return 'ThinkPHP 3.x · RCE';
       case ThinkphpVulnType.tp3Module:

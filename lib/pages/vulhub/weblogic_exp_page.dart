@@ -119,9 +119,9 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
           vSecTitle('CVE 选择'),
           Row(
             children: [
-              _tabBtn('CVE-2017-10271', 0),
+              _tabBtn('CVE-2017-10271 (WebLogic < 10.3.6)', 0),
               const SizedBox(width: 6),
-              _tabBtn('CVE-2020-14882', 1),
+              _tabBtn('CVE-2020-14882 (WebLogic 12.2.1.3)', 1),
             ],
           ),
           const SizedBox(height: 8),

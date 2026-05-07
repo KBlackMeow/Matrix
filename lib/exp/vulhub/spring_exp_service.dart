@@ -5,11 +5,26 @@ import 'dart:math';
 import 'services/exp_result.dart';
 
 enum SpringVulnType {
-  springCloudFunction('CVE-2022-22963', 'Spring Cloud Function SpEL 注入'),
-  spring4Shell('CVE-2022-22965 (Spring4Shell)', 'ClassLoader 操控写 Webshell'),
-  springDataCommons('CVE-2018-1273', 'Spring Data Commons SpEL 注入'),
-  springDataRest('CVE-2017-8046', 'Spring Data REST PATCH SpEL 注入'),
-  springSecurityOauth('CVE-2016-4977', 'Spring Security OAuth SpEL 注入');
+  springCloudFunction(
+    'CVE-2022-22963 (Spring Cloud Function 3.1.6/3.2.2)',
+    'Spring Cloud Function SpEL 注入',
+  ),
+  spring4Shell(
+    'CVE-2022-22965 (Spring Framework 5.3.0-5.3.17)',
+    'ClassLoader 操控写 Webshell',
+  ),
+  springDataCommons(
+    'CVE-2018-1273 (Spring Data Commons <= 2.0.5)',
+    'Spring Data Commons SpEL 注入',
+  ),
+  springDataRest(
+    'CVE-2017-8046 (Spring Data REST 2.6.0-2.6.8)',
+    'Spring Data REST PATCH SpEL 注入',
+  ),
+  springSecurityOauth(
+    'CVE-2016-4977 (Spring Security OAuth 2.0.x)',
+    'Spring Security OAuth SpEL 注入',
+  );
 
   const SpringVulnType(this.label, this.desc);
   final String label;

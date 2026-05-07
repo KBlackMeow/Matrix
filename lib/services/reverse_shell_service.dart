@@ -106,10 +106,12 @@ class ReverseShellService {
 
   ServerSocket? _server;
   final _sessions = <String, ReverseShellSession>{};
+  final _changes = StreamController<void>.broadcast();
 
   // 当前监听绑定的地址与端口（用于避免在同一地址/端口上重复重启监听）
   String? _bindAddress;
   int? _bindPort;
+  bool _portOccupied = false;
 
   String lhost = '127.0.0.1';
   int lport = 4444;
@@ -150,6 +152,9 @@ class ReverseShellService {
   /// 会话结束时的回调（例如用于刷新会话列表 UI）
   void Function(ReverseShellSession session)? onSessionClosed;
 
+  /// 服务状态变化流（监听状态/会话列表变化时触发）
+  Stream<void> get changes => _changes.stream;
+
   Map<String, ReverseShellSession> get sessions => Map.unmodifiable(_sessions);
 
   /// 当前是否有监听 Socket 存活（可能与配置的 LHOST/LPORT 不同）
@@ -160,6 +165,7 @@ class ReverseShellService {
 
   /// 实际监听绑定的端口（可能为 null，表示尚未绑定）
   int? get bindPort => _bindPort;
+  bool get isPortOccupied => _portOccupied;
 
   /// 启动监听。重复调用会先关闭旧监听再重新绑定。
   Future<void> startListening({
@@ -175,7 +181,9 @@ class ReverseShellService {
     _server = await ServerSocket.bind(address, port);
     _bindAddress = address;
     _bindPort = port;
+    _portOccupied = false;
     _server!.listen(_handleConnection);
+    _notifyChanged();
   }
 
   Future<void> stopListening() async {
@@ -183,10 +191,42 @@ class ReverseShellService {
     _server = null;
     _bindAddress = null;
     _bindPort = null;
+    _portOccupied = false;
     for (final s in _sessions.values.toList()) {
       await s.close();
     }
     _sessions.clear();
+    _notifyChanged();
+  }
+
+  /// 刷新监听状态（用于 UI 与真实端口占用状态对齐）。
+  ///
+  /// 当服务自身未持有 server 句柄时，会通过尝试 bind 探测端口是否被占用。
+  Future<void> refreshListeningState({
+    String address = '0.0.0.0',
+    int? port,
+  }) async {
+    if (_server != null) {
+      if (_portOccupied) {
+        _portOccupied = false;
+        _notifyChanged();
+      }
+      return;
+    }
+    final targetPort = port ?? lport;
+    try {
+      final probe = await ServerSocket.bind(address, targetPort);
+      await probe.close();
+      if (_portOccupied) {
+        _portOccupied = false;
+        _notifyChanged();
+      }
+    } catch (_) {
+      _portOccupied = true;
+      _bindAddress = address;
+      _bindPort = targetPort;
+      _notifyChanged();
+    }
   }
 
   Future<void> _handleConnection(Socket socket) async {
@@ -194,6 +234,7 @@ class ReverseShellService {
     final session = ReverseShellSession(id, socket);
     _sessions[id] = session;
     onSession?.call(session);
+    _notifyChanged();
     // 等待会话结束（含无数据即断开的情况）
     try {
       await session.output.last;
@@ -203,7 +244,14 @@ class ReverseShellService {
       final removed = _sessions.remove(id);
       if (removed != null) {
         onSessionClosed?.call(removed);
+        _notifyChanged();
       }
+    }
+  }
+
+  void _notifyChanged() {
+    if (!_changes.isClosed) {
+      _changes.add(null);
     }
   }
 }

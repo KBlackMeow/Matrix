@@ -131,7 +131,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
             children: [
               _tabBtn('PHP 8.1.0-dev 后门', 0),
               const SizedBox(width: 8),
-              _tabBtn('CVE-2012-1823 CGI', 1),
+              _tabBtn('CVE-2012-1823 (PHP-CGI < 5.3.12 / < 5.4.2)', 1),
             ],
           ),
           const SizedBox(height: 8),

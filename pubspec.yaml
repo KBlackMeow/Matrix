@@ -86,6 +86,7 @@ flutter:
   assets:
     - data/
     - data/mem_shell/
+    - assets/icon/
     - assets/defaults/payloads/webshell/
     - data/shiro_keys.txt
     - data/shiro_payload_principal.b64

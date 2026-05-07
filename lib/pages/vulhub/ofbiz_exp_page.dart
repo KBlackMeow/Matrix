@@ -116,9 +116,9 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
           vSecTitle('漏洞检测'),
           Row(
             children: [
-              vBtn('检测 CVE-2023-51467', running ? null : _check51467),
+              vBtn('检测 CVE-2023-51467 (OFBiz 18.12.10)', running ? null : _check51467),
               const SizedBox(width: 8),
-              vBtn('检测 CVE-2024-38856', running ? null : _check38856),
+              vBtn('检测 CVE-2024-38856 (OFBiz 18.12.11)', running ? null : _check38856),
             ],
           ),
           const SizedBox(height: 16),
@@ -129,10 +129,10 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
             child: Row(
               children: [
                 const Radio<String>(value: 'CVE-2023-51467'),
-                const Text('CVE-2023-51467'),
+                const Text('CVE-2023-51467 (OFBiz 18.12.10)'),
                 const SizedBox(width: 12),
                 const Radio<String>(value: 'CVE-2024-38856'),
-                const Text('CVE-2024-38856'),
+                const Text('CVE-2024-38856 (OFBiz 18.12.11)'),
               ],
             ),
           ),
