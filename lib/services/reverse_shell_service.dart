@@ -167,6 +167,17 @@ class ReverseShellService {
   int? get bindPort => _bindPort;
   bool get isPortOccupied => _portOccupied;
 
+  bool _isAddressInUseError(Object error) {
+    if (error is SocketException) {
+      final code = error.osError?.errorCode;
+      // macOS: 48 (EADDRINUSE), Linux: 98 (EADDRINUSE), Windows: 10048 (WSAEADDRINUSE)
+      if (code == 48 || code == 98 || code == 10048) return true;
+      final msg = error.message.toLowerCase();
+      if (msg.contains('address already in use')) return true;
+    }
+    return false;
+  }
+
   /// 启动监听。重复调用会先关闭旧监听再重新绑定。
   Future<void> startListening({
     String address = '0.0.0.0',
@@ -178,12 +189,25 @@ class ReverseShellService {
     }
 
     await stopListening();
-    _server = await ServerSocket.bind(address, port);
-    _bindAddress = address;
-    _bindPort = port;
-    _portOccupied = false;
-    _server!.listen(_handleConnection);
-    _notifyChanged();
+    try {
+      _server = await ServerSocket.bind(address, port);
+      _bindAddress = address;
+      _bindPort = port;
+      _portOccupied = false;
+      _server!.listen(_handleConnection);
+      _notifyChanged();
+    } catch (e) {
+      _portOccupied = _isAddressInUseError(e);
+      if (_portOccupied) {
+        _bindAddress = address;
+        _bindPort = port;
+      } else {
+        _bindAddress = null;
+        _bindPort = null;
+      }
+      _notifyChanged();
+      rethrow;
+    }
   }
 
   Future<void> stopListening() async {
@@ -217,14 +241,24 @@ class ReverseShellService {
     try {
       final probe = await ServerSocket.bind(address, targetPort);
       await probe.close();
-      if (_portOccupied) {
+      if (_portOccupied || _bindAddress != null || _bindPort != null) {
         _portOccupied = false;
+        _bindAddress = null;
+        _bindPort = null;
         _notifyChanged();
       }
-    } catch (_) {
-      _portOccupied = true;
-      _bindAddress = address;
-      _bindPort = targetPort;
+    } catch (e) {
+      final occupied = _isAddressInUseError(e);
+      if (occupied) {
+        _portOccupied = true;
+        _bindAddress = address;
+        _bindPort = targetPort;
+      } else {
+        // 非端口占用错误（例如权限/沙箱/网络策略）不应被误判为占用。
+        _portOccupied = false;
+        _bindAddress = null;
+        _bindPort = null;
+      }
       _notifyChanged();
     }
   }
