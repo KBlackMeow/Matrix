@@ -85,7 +85,10 @@ flutter:
 
   assets:
     - data/
-    - assets/
+    - data/mem_shell/
+    - assets/icon/
+    - assets/defaults/payloads/webshell/
+    - assets/defaults/payloads/copy-fail/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
