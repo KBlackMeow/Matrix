@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:developer' as developer;
+
 import 'package:flutter/services.dart';
 
 import '../database/database_helper.dart';
@@ -6,7 +9,8 @@ import '../database/database_helper.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 7;
+  static const _kCurrentVersion = 8;
+  static const _binaryContentPrefix = '__MATRIX_BINARY_B64__:';
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
   // 命名规则：{语言}_{技术}_{传参方式}
@@ -94,6 +98,106 @@ class SeedService {
       tags: 'aspx,dotnet,process,cmd,powershell,windows',
       sinceVersion: 2,
     ),
+    // ── COPY-FAIL（二进制）─────────────────────────────────────────────────
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/copy-fail/copyfail-go-linux-386',
+      name: 'copyfail-go-linux-386',
+      type: 'other',
+      description: 'copy-fail Linux x86 (386) 二进制',
+      tags: 'copy-fail,linux,386,binary',
+      sinceVersion: 8,
+      isBinary: true,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/copy-fail/copyfail-go-linux-amd64',
+      name: 'copyfail-go-linux-amd64',
+      type: 'other',
+      description: 'copy-fail Linux x86_64 (amd64) 二进制',
+      tags: 'copy-fail,linux,amd64,binary',
+      sinceVersion: 8,
+      isBinary: true,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/copy-fail/copyfail-go-linux-arm64',
+      name: 'copyfail-go-linux-arm64',
+      type: 'other',
+      description: 'copy-fail Linux arm64 二进制',
+      tags: 'copy-fail,linux,arm64,binary',
+      sinceVersion: 8,
+      isBinary: true,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/copy-fail/copyfail-go-linux-armv5',
+      name: 'copyfail-go-linux-armv5',
+      type: 'other',
+      description: 'copy-fail Linux armv5 二进制',
+      tags: 'copy-fail,linux,armv5,binary',
+      sinceVersion: 8,
+      isBinary: true,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/copy-fail/copyfail-go-linux-armv6',
+      name: 'copyfail-go-linux-armv6',
+      type: 'other',
+      description: 'copy-fail Linux armv6 二进制',
+      tags: 'copy-fail,linux,armv6,binary',
+      sinceVersion: 8,
+      isBinary: true,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/copy-fail/copyfail-go-linux-armv7',
+      name: 'copyfail-go-linux-armv7',
+      type: 'other',
+      description: 'copy-fail Linux armv7 二进制',
+      tags: 'copy-fail,linux,armv7,binary',
+      sinceVersion: 8,
+      isBinary: true,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/copy-fail/copyfail-go-linux-loong64',
+      name: 'copyfail-go-linux-loong64',
+      type: 'other',
+      description: 'copy-fail Linux loong64 二进制',
+      tags: 'copy-fail,linux,loong64,binary',
+      sinceVersion: 8,
+      isBinary: true,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/copy-fail/copyfail-go-linux-mips64',
+      name: 'copyfail-go-linux-mips64',
+      type: 'other',
+      description: 'copy-fail Linux mips64 二进制',
+      tags: 'copy-fail,linux,mips64,binary',
+      sinceVersion: 8,
+      isBinary: true,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/copy-fail/copyfail-go-linux-mips64le',
+      name: 'copyfail-go-linux-mips64le',
+      type: 'other',
+      description: 'copy-fail Linux mips64le 二进制',
+      tags: 'copy-fail,linux,mips64le,binary',
+      sinceVersion: 8,
+      isBinary: true,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/copy-fail/copyfail-go-linux-ppc64le',
+      name: 'copyfail-go-linux-ppc64le',
+      type: 'other',
+      description: 'copy-fail Linux ppc64le 二进制',
+      tags: 'copy-fail,linux,ppc64le,binary',
+      sinceVersion: 8,
+      isBinary: true,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/copy-fail/copyfail-go-linux-riscv64',
+      name: 'copyfail-go-linux-riscv64',
+      type: 'other',
+      description: 'copy-fail Linux riscv64 二进制',
+      tags: 'copy-fail,linux,riscv64,binary',
+      sinceVersion: 8,
+      isBinary: true,
+    ),
   ];
 
   /// 需要更新内容的已有默认 payload（修复 bug 或改进实现）
@@ -129,7 +233,6 @@ class SeedService {
     final storedVersion = int.tryParse(stored ?? '0') ?? 0;
     if (storedVersion >= _kCurrentVersion) return;
 
-    var allSeeded = true;
     final existing = await db.getAllPayloads();
     final existingNames = existing.map((e) => e.name).toSet();
 
@@ -138,7 +241,7 @@ class SeedService {
       if (def.sinceVersion <= storedVersion) continue;
       if (existingNames.contains(def.name)) continue;
       try {
-        final content = await _loadPayloadContent(def.asset);
+        final content = await _loadPayloadContent(def);
         await db.createPayload(
           name: def.name,
           type: def.type,
@@ -148,14 +251,34 @@ class SeedService {
           tags: def.tags,
         );
         existingNames.add(def.name);
-      } catch (_) {
-        allSeeded = false;
-        // asset 缺失时跳过，不中断启动
+      } catch (e, st) {
+        // asset 缺失时跳过，不中断启动；记录日志便于排查
+        developer.log(
+          'Seed payload failed: ${def.name} (${def.asset})',
+          name: 'SeedService',
+          error: e,
+          stackTrace: st,
+        );
       }
     }
 
-    if (allSeeded) {
+    // 防卡死：即使某次执行出现异常，只要“当前应有条目”已经齐全，也推进版本号。
+    final latest = await db.getAllPayloads();
+    final latestNames = latest.map((e) => e.name).toSet();
+    final pending = _defaultPayloads.where((def) {
+      return def.sinceVersion <= _kCurrentVersion &&
+          def.sinceVersion > storedVersion &&
+          !latestNames.contains(def.name);
+    }).toList();
+
+    if (pending.isEmpty) {
       await db.setMetaValue(_kMetaKey, '$_kCurrentVersion');
+    } else {
+      final missing = pending.map((e) => e.name).join(', ');
+      developer.log(
+        'Seed version stays at $storedVersion, missing payloads: $missing',
+        name: 'SeedService',
+      );
     }
   }
 
@@ -190,7 +313,7 @@ class SeedService {
     final expectedContentByName = <String, String>{};
     for (final def in _defaultPayloads) {
       try {
-        expectedContentByName[def.name] = await _loadPayloadContent(def.asset);
+        expectedContentByName[def.name] = await _loadPayloadContent(def);
       } catch (_) {
         // 忽略缺失的 asset
       }
@@ -209,8 +332,11 @@ class SeedService {
     }
   }
 
-  static Future<String> _loadPayloadContent(String asset) async {
-    return rootBundle.loadString(asset);
+  static Future<String> _loadPayloadContent(_PayloadDef def) async {
+    if (!def.isBinary) return rootBundle.loadString(def.asset);
+    final bytes = await rootBundle.load(def.asset);
+    final data = bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes);
+    return _binaryContentPrefix + base64Encode(data);
   }
 }
 
@@ -223,6 +349,7 @@ class _PayloadDef {
 
   /// 该条目从哪个 seed version 开始引入（用于增量种子化）
   final int sinceVersion;
+  final bool isBinary;
 
   const _PayloadDef({
     required this.asset,
@@ -231,6 +358,7 @@ class _PayloadDef {
     required this.description,
     required this.tags,
     this.sinceVersion = 1,
+    this.isBinary = false,
   });
 }
 
