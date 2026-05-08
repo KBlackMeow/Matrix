@@ -22,6 +22,34 @@ class _SystemInfoTabState extends State<SystemInfoTab>
   bool _loading = true;
   bool _failed = false;
 
+  static const Map<String, List<String>> _fieldAliases = {
+    'os': ['OS'],
+    'phpVersion': ['PHP版本', 'PHP Version'],
+    'runUser': ['运行用户', 'Runtime user', 'USER'],
+    'serverIp': ['服务器IP', 'Server IP'],
+    'serverSoftware': ['服务器软件', 'Server software'],
+    'docRoot': ['文档根目录', 'Document root'],
+    'currentDir': ['当前目录', 'Current directory', 'PWD'],
+    'memoryLimit': ['内存限制', 'Memory limit'],
+    'maxExecutionTime': ['最大执行时间', 'Max execution time'],
+    'safeMode': ['Safe Mode'],
+    'host': ['主机名', 'Hostname', 'HOST'],
+    'userId': ['用户ID', 'User ID', 'ID'],
+    'kernelVersion': ['内核版本', 'Kernel version', 'KERNEL'],
+    'dotnetClr': ['.NET CLR 版本', '.NET CLR version', 'CLR'],
+    'disabledFunctions': ['禁用函数', 'Disabled functions'],
+    'loadedExtensions': ['已加载扩展', 'Loaded extensions'],
+  };
+
+  String? _valueOf(String field) {
+    final aliases = _fieldAliases[field] ?? const [];
+    for (final key in aliases) {
+      final val = _info[key];
+      if (val != null && val.isNotEmpty) return val;
+    }
+    return null;
+  }
+
   @override
   bool get wantKeepAlive => true;
 
@@ -132,11 +160,15 @@ class _SystemInfoTabState extends State<SystemInfoTab>
                       _InfoGrid(info: _info),
                       const SizedBox(height: 20),
                       // 禁用函数
-                      if (_info['禁用函数'] != null && _info['禁用函数'] != '无')
-                        _DisabledFunctionsCard(functions: _info['禁用函数']!),
+                      if (_valueOf('disabledFunctions') != null &&
+                          _valueOf('disabledFunctions') != '无' &&
+                          _valueOf('disabledFunctions') != 'N/A')
+                        _DisabledFunctionsCard(
+                          functions: _valueOf('disabledFunctions')!,
+                        ),
                       // 扩展列表
-                      if (_info['已加载扩展'] != null)
-                        _ExtensionsCard(extensions: _info['已加载扩展']!),
+                      if (_valueOf('loadedExtensions') != null)
+                        _ExtensionsCard(extensions: _valueOf('loadedExtensions')!),
                     ],
                   ),
                 ),
@@ -151,24 +183,90 @@ class _InfoGrid extends StatelessWidget {
 
   const _InfoGrid({required this.info});
 
-  static const _mainKeys = [
-    'OS',
-    'PHP版本',
-    '运行用户',
-    '服务器IP',
-    '服务器软件',
-    '文档根目录',
-    '当前目录',
-    '内存限制',
-    '最大执行时间',
-    'Safe Mode',
+  static const _mainFields = [
+    'os',
+    'phpVersion',
+    'runUser',
+    'serverIp',
+    'serverSoftware',
+    'docRoot',
+    'currentDir',
+    'memoryLimit',
+    'maxExecutionTime',
+    'safeMode',
+    'host',
+    'userId',
+    'kernelVersion',
+    'dotnetClr',
   ];
+
+  static const Map<String, List<String>> _fieldAliases = {
+    'os': ['OS'],
+    'phpVersion': ['PHP版本', 'PHP Version'],
+    'runUser': ['运行用户', 'Runtime user', 'USER'],
+    'serverIp': ['服务器IP', 'Server IP'],
+    'serverSoftware': ['服务器软件', 'Server software'],
+    'docRoot': ['文档根目录', 'Document root'],
+    'currentDir': ['当前目录', 'Current directory', 'PWD'],
+    'memoryLimit': ['内存限制', 'Memory limit'],
+    'maxExecutionTime': ['最大执行时间', 'Max execution time'],
+    'safeMode': ['Safe Mode'],
+    'host': ['主机名', 'Hostname', 'HOST'],
+    'userId': ['用户ID', 'User ID', 'ID'],
+    'kernelVersion': ['内核版本', 'Kernel version', 'KERNEL'],
+    'dotnetClr': ['.NET CLR 版本', '.NET CLR version', 'CLR'],
+  };
+
+  String? _valueOf(String field) {
+    final aliases = _fieldAliases[field] ?? const [];
+    for (final key in aliases) {
+      final val = info[key];
+      if (val != null && val.isNotEmpty) return val;
+    }
+    return null;
+  }
+
+  String _fieldLabel(String field) {
+    switch (field) {
+      case 'os':
+        return S.sysInfoFieldOs;
+      case 'phpVersion':
+        return S.sysInfoFieldPhpVersion;
+      case 'runUser':
+        return S.sysInfoFieldRunUser;
+      case 'serverIp':
+        return S.sysInfoFieldServerIp;
+      case 'serverSoftware':
+        return S.sysInfoFieldServerSoftware;
+      case 'docRoot':
+        return S.sysInfoFieldDocRoot;
+      case 'currentDir':
+        return S.sysInfoFieldCurrentDir;
+      case 'memoryLimit':
+        return S.sysInfoFieldMemoryLimit;
+      case 'maxExecutionTime':
+        return S.sysInfoFieldMaxExecutionTime;
+      case 'safeMode':
+        return S.sysInfoFieldSafeMode;
+      case 'host':
+        return S.sysInfoFieldHost;
+      case 'userId':
+        return S.sysInfoFieldUserId;
+      case 'kernelVersion':
+        return S.sysInfoFieldKernelVersion;
+      case 'dotnetClr':
+        return S.sysInfoFieldDotnetClr;
+      default:
+        return field;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final items = _mainKeys
-        .where((k) => info.containsKey(k))
-        .map((k) => MapEntry(k, info[k]!))
+    final items = _mainFields
+        .map((f) => MapEntry(_fieldLabel(f), _valueOf(f)))
+        .where((e) => e.value != null)
+        .map((e) => MapEntry(e.key, e.value!))
         .toList();
 
     return Container(

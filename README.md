@@ -46,21 +46,11 @@
 | Apache Struts2      | S2-032 / S2-045 / S2-053 / S2-057 / S2-059                      |
 | Spring Framework    | CVE-2022-22963 / CVE-2022-22965 / CVE-2018-1273 / CVE-2017-8046 |
 | Apache HTTP Server  | CVE-2021-41773                                                  |
-| Apache Druid        | CVE-2021-25646                                                  |
-| Apache OFBiz        | CVE-2023-51467 / CVE-2024-38856                                 |
-| Apache Solr         | CVE-2017-12629                                                  |
 | Drupal              | CVE-2018-7600                                                   |
-| Elasticsearch       | CVE-2015-1427                                                   |
-| Flask / Jinja2 SSTI | SSTI                                                            |
-| PHP                 | PHP 8.1.0-dev / CVE-2012-1823                                   |
 | Apache Tomcat       | CVE-2017-12615                                                  |
 | Oracle WebLogic     | CVE-2017-10271 / CVE-2020-14882                                 |
-| Supervisor          | CVE-2017-11610                                                  |
 | XXL-JOB             | 未授权 Executor RCE                                                |
 | Nacos               | CVE-2021-29441                                                  |
-| Bash Shellshock     | CVE-2014-6271                                                   |
-| SaltStack           | CVE-2020-16846                                                  |
-| Aria2               | 未授权 JSON-RPC                                                    |
 
 
 

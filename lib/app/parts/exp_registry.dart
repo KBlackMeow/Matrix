@@ -1,21 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../pages/thinkphp_exp_page.dart';
-import '../../pages/vulhub/aria2_exp_page.dart';
 import '../../pages/vulhub/drupal_exp_page.dart';
-import '../../pages/vulhub/druid_exp_page.dart';
-import '../../pages/vulhub/elasticsearch_exp_page.dart';
-import '../../pages/vulhub/flask_ssti_exp_page.dart';
 import '../../pages/vulhub/httpd_exp_page.dart';
 import '../../pages/vulhub/nacos_exp_page.dart';
-import '../../pages/vulhub/ofbiz_exp_page.dart';
 import '../../pages/vulhub/php_exp_page.dart';
-import '../../pages/vulhub/saltstack_exp_page.dart';
-import '../../pages/vulhub/shellshock_exp_page.dart';
-import '../../pages/vulhub/solr_exp_page.dart';
 import '../../pages/vulhub/spring_exp_page.dart';
 import '../../pages/vulhub/struts2_exp_page.dart';
-import '../../pages/vulhub/supervisor_exp_page.dart';
 import '../../pages/vulhub/tomcat_exp_page.dart';
 import '../../pages/vulhub/weblogic_exp_page.dart';
 import '../../pages/vulhub/xxljob_exp_page.dart';
@@ -94,52 +85,12 @@ List<ExpEntry> get expEntries => [
     page: const HttpdExpPage(),
   ),
   ExpEntry(
-    icon: Icons.data_object,
-    title: 'Apache Druid CVE-2021-25646',
-    subtitle: S.expSubtitleDruid,
-    versionRequirement: S.expVersionDruid,
-    tag: 'Java · Druid',
-    page: const DruidExpPage(),
-  ),
-  ExpEntry(
-    icon: Icons.business,
-    title: 'Apache OFBiz CVE-2023-51467 / CVE-2024-38856',
-    subtitle: S.expSubtitleOfbiz,
-    versionRequirement: S.expVersionOfbiz,
-    tag: 'Java · OFBiz',
-    page: const OFBizExpPage(),
-  ),
-  ExpEntry(
-    icon: Icons.search,
-    title: 'Apache Solr CVE-2017-12629',
-    subtitle: S.expSubtitleSolr,
-    versionRequirement: S.expVersionSolr,
-    tag: 'Java · Solr',
-    page: const SolrExpPage(),
-  ),
-  ExpEntry(
     icon: Icons.water_drop,
     title: 'Drupal CVE-2018-7600 (Drupalgeddon2)',
     subtitle: S.expSubtitleDrupal,
     versionRequirement: S.expVersionDrupal,
     tag: 'PHP · Drupal',
     page: const DrupalExpPage(),
-  ),
-  ExpEntry(
-    icon: Icons.manage_search,
-    title: 'Elasticsearch CVE-2015-1427',
-    subtitle: S.expSubtitleElastic,
-    versionRequirement: S.expVersionElastic,
-    tag: 'Java · ES',
-    page: const ElasticsearchExpPage(),
-  ),
-  ExpEntry(
-    icon: Icons.code,
-    title: 'Flask / Jinja2 SSTI',
-    subtitle: S.expSubtitleFlaskSsti,
-    versionRequirement: S.expVersionFlaskSsti,
-    tag: 'Python · Flask',
-    page: const FlaskSstiExpPage(),
   ),
   ExpEntry(
     icon: Icons.php,
@@ -166,14 +117,6 @@ List<ExpEntry> get expEntries => [
     page: const WebLogicExpPage(),
   ),
   ExpEntry(
-    icon: Icons.article,
-    title: 'Supervisor CVE-2017-11610',
-    subtitle: S.expSubtitleSupervisor,
-    versionRequirement: S.expVersionSupervisor,
-    tag: 'Python · Supervisor',
-    page: const SupervisorExpPage(),
-  ),
-  ExpEntry(
     icon: Icons.schedule,
     title: S.expTitleXxljob,
     subtitle: S.expSubtitleXxljob,
@@ -188,30 +131,6 @@ List<ExpEntry> get expEntries => [
     versionRequirement: S.expVersionNacos,
     tag: 'Java · Nacos',
     page: const NacosExpPage(),
-  ),
-  ExpEntry(
-    icon: Icons.terminal,
-    title: 'Bash Shellshock CVE-2014-6271',
-    subtitle: S.expSubtitleShellshock,
-    versionRequirement: S.expVersionShellshock,
-    tag: 'Shell · Bash',
-    page: const ShellshockExpPage(),
-  ),
-  ExpEntry(
-    icon: Icons.grain,
-    title: 'SaltStack CVE-2020-16846',
-    subtitle: S.expSubtitleSaltstack,
-    versionRequirement: S.expVersionSaltstack,
-    tag: 'Python · SaltStack',
-    page: const SaltstackExpPage(),
-  ),
-  ExpEntry(
-    icon: Icons.download,
-    title: S.expTitleAria2,
-    subtitle: S.expSubtitleAria2,
-    versionRequirement: S.expVersionAria2,
-    tag: 'C · Aria2',
-    page: const Aria2ExpPage(),
   ),
 ];
 

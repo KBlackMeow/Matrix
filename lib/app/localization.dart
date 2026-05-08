@@ -2157,6 +2157,160 @@ class S {
     }
   }
 
+  static String get sysInfoFieldOs {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '操作系统';
+      case AppLanguage.ja:
+        return 'OS';
+      case AppLanguage.en:
+        return 'OS';
+    }
+  }
+
+  static String get sysInfoFieldPhpVersion {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'PHP版本';
+      case AppLanguage.ja:
+        return 'PHP バージョン';
+      case AppLanguage.en:
+        return 'PHP version';
+    }
+  }
+
+  static String get sysInfoFieldRunUser {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '运行用户';
+      case AppLanguage.ja:
+        return '実行ユーザー';
+      case AppLanguage.en:
+        return 'Runtime user';
+    }
+  }
+
+  static String get sysInfoFieldServerIp {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '服务器IP';
+      case AppLanguage.ja:
+        return 'サーバーIP';
+      case AppLanguage.en:
+        return 'Server IP';
+    }
+  }
+
+  static String get sysInfoFieldServerSoftware {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '服务器软件';
+      case AppLanguage.ja:
+        return 'サーバーソフト';
+      case AppLanguage.en:
+        return 'Server software';
+    }
+  }
+
+  static String get sysInfoFieldDocRoot {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '文档根目录';
+      case AppLanguage.ja:
+        return 'ドキュメントルート';
+      case AppLanguage.en:
+        return 'Document root';
+    }
+  }
+
+  static String get sysInfoFieldCurrentDir {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '当前目录';
+      case AppLanguage.ja:
+        return '現在ディレクトリ';
+      case AppLanguage.en:
+        return 'Current directory';
+    }
+  }
+
+  static String get sysInfoFieldMemoryLimit {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '内存限制';
+      case AppLanguage.ja:
+        return 'メモリ制限';
+      case AppLanguage.en:
+        return 'Memory limit';
+    }
+  }
+
+  static String get sysInfoFieldMaxExecutionTime {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '最大执行时间';
+      case AppLanguage.ja:
+        return '最大実行時間';
+      case AppLanguage.en:
+        return 'Max execution time';
+    }
+  }
+
+  static String get sysInfoFieldSafeMode {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'Safe Mode';
+      case AppLanguage.ja:
+        return 'セーフモード';
+      case AppLanguage.en:
+        return 'Safe Mode';
+    }
+  }
+
+  static String get sysInfoFieldHost {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '主机名';
+      case AppLanguage.ja:
+        return 'ホスト名';
+      case AppLanguage.en:
+        return 'Hostname';
+    }
+  }
+
+  static String get sysInfoFieldUserId {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '用户ID';
+      case AppLanguage.ja:
+        return 'ユーザーID';
+      case AppLanguage.en:
+        return 'User ID';
+    }
+  }
+
+  static String get sysInfoFieldKernelVersion {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '内核版本';
+      case AppLanguage.ja:
+        return 'カーネルバージョン';
+      case AppLanguage.en:
+        return 'Kernel version';
+    }
+  }
+
+  static String get sysInfoFieldDotnetClr {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '.NET CLR 版本';
+      case AppLanguage.ja:
+        return '.NET CLR バージョン';
+      case AppLanguage.en:
+        return '.NET CLR version';
+    }
+  }
+
   static String get privEscTitle {
     switch (_lang) {
       case AppLanguage.zh:
@@ -4473,71 +4627,8 @@ class S {
   }
 
   // --- Vulhub page titles ---
-  static String get vulhubAria2Title {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Aria2 未授权 RPC → Cron 写入 RCE';
-      case AppLanguage.ja:
-        return 'Aria2 未認証 RPC → Cron 書き込み RCE';
-      case AppLanguage.en:
-        return 'Aria2 Unauthenticated RPC → Cron Write RCE';
-    }
-  }
 
-  static String get vulhubAria2CardTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Aria2 未授权 RPC';
-      case AppLanguage.ja:
-        return 'Aria2 未認証 RPC';
-      case AppLanguage.en:
-        return 'Aria2 Unauthenticated RPC';
-    }
-  }
-
-  static String get vulhubAria2CardSubtitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'JSON-RPC 接口未授权，通过 addUri 写入 /etc/cron.d/ 触发反弹 Shell';
-      case AppLanguage.ja:
-        return 'JSON-RPC 未認証。addUri で /etc/cron.d/ に書き込みリバースシェルを起動';
-      case AppLanguage.en:
-        return 'Unauthenticated JSON-RPC. Write /etc/cron.d/ via addUri to trigger a reverse shell';
-    }
-  }
-
-  static String get vulhubDruidTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Apache Druid CVE-2021-25646 嵌入式 JavaScript RCE';
-      case AppLanguage.ja:
-        return 'Apache Druid CVE-2021-25646 組み込み JavaScript RCE';
-      case AppLanguage.en:
-        return 'Apache Druid CVE-2021-25646 Embedded JavaScript RCE';
-    }
-  }
-
-  static String get vulhubDruidCardTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Apache Druid CVE-2021-25646';
-      case AppLanguage.ja:
-        return 'Apache Druid CVE-2021-25646';
-      case AppLanguage.en:
-        return 'Apache Druid CVE-2021-25646';
-    }
-  }
-
-  static String get vulhubDruidCardSubtitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Sampler 接口强制执行用户提供的 JavaScript 代码，影响 <= 0.20.0';
-      case AppLanguage.ja:
-        return 'Sampler インターフェースがユーザー提供の JavaScript を強制実行。<= 0.20.0 に影響';
-      case AppLanguage.en:
-        return 'Sampler interface forces execution of user-supplied JavaScript. Affects <= 0.20.0';
-    }
-  }
+  // (Druid EXP removed)
 
   static String get vulhubDrupalTitle {
     switch (_lang) {
@@ -4569,39 +4660,6 @@ class S {
         return 'Drupalgeddon2 — Form API #post_render コールバック PHP コード実行';
       case AppLanguage.en:
         return 'Drupalgeddon2 — Form API #post_render callback PHP code execution';
-    }
-  }
-
-  static String get vulhubElasticTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Elasticsearch CVE-2015-1427 Groovy 沙箱逃逸 RCE';
-      case AppLanguage.ja:
-        return 'Elasticsearch CVE-2015-1427 Groovy サンドボックス脱出 RCE';
-      case AppLanguage.en:
-        return 'Elasticsearch CVE-2015-1427 Groovy Sandbox Escape RCE';
-    }
-  }
-
-  static String get vulhubElasticCardTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Elasticsearch CVE-2015-1427';
-      case AppLanguage.ja:
-        return 'Elasticsearch CVE-2015-1427';
-      case AppLanguage.en:
-        return 'Elasticsearch CVE-2015-1427';
-    }
-  }
-
-  static String get vulhubElasticCardSubtitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Groovy 脚本引擎沙箱逃逸，任意命令执行（< 1.3.8 / < 1.4.3）';
-      case AppLanguage.ja:
-        return 'Groovy スクリプトエンジンのサンドボックス脱出。任意コマンド実行（< 1.3.8 / < 1.4.3）';
-      case AppLanguage.en:
-        return 'Groovy script engine sandbox escape. Arbitrary command execution (< 1.3.8 / < 1.4.3)';
     }
   }
 
@@ -4704,38 +4762,7 @@ class S {
     }
   }
 
-  static String get vulhubOfbizTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Apache OFBiz CVE-2023-51467 / CVE-2024-38856 Groovy RCE';
-      case AppLanguage.ja:
-        return 'Apache OFBiz CVE-2023-51467 / CVE-2024-38856 Groovy RCE';
-      case AppLanguage.en:
-        return 'Apache OFBiz CVE-2023-51467 / CVE-2024-38856 Groovy RCE';
-    }
-  }
-
-  static String get vulhubOfbizCardTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Apache OFBiz Groovy RCE';
-      case AppLanguage.ja:
-        return 'Apache OFBiz Groovy RCE';
-      case AppLanguage.en:
-        return 'Apache OFBiz Groovy RCE';
-    }
-  }
-
-  static String get vulhubOfbizCardSubtitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'CVE-2023-51467 无需认证 Groovy 注入 / CVE-2024-38856 Unicode 绕过';
-      case AppLanguage.ja:
-        return 'CVE-2023-51467 認証不要 Groovy インジェクション / CVE-2024-38856 Unicode バイパス';
-      case AppLanguage.en:
-        return 'CVE-2023-51467 unauthenticated Groovy injection / CVE-2024-38856 Unicode bypass';
-    }
-  }
+  // (OFBiz EXP removed)
 
   static String get vulhubPhpTitle {
     switch (_lang) {
@@ -4770,104 +4797,7 @@ class S {
     }
   }
 
-  static String get vulhubSaltstackTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'SaltStack CVE-2020-16846 SSH 模块命令注入 RCE';
-      case AppLanguage.ja:
-        return 'SaltStack CVE-2020-16846 SSH モジュールコマンドインジェクション RCE';
-      case AppLanguage.en:
-        return 'SaltStack CVE-2020-16846 SSH Module Command Injection RCE';
-    }
-  }
-
-  static String get vulhubSaltstackCardTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'SaltStack CVE-2020-16846';
-      case AppLanguage.ja:
-        return 'SaltStack CVE-2020-16846';
-      case AppLanguage.en:
-        return 'SaltStack CVE-2020-16846';
-    }
-  }
-
-  static String get vulhubSaltstackCardSubtitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'SSH 模块 ssh_priv 参数命令注入，通过 REST API 触发';
-      case AppLanguage.ja:
-        return 'SSH モジュール ssh_priv パラメーターコマンドインジェクション。REST API 経由で起動';
-      case AppLanguage.en:
-        return 'SSH module ssh_priv parameter command injection triggered via REST API';
-    }
-  }
-
-  static String get vulhubShellshockTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Bash Shellshock CVE-2014-6271 CGI 命令注入';
-      case AppLanguage.ja:
-        return 'Bash Shellshock CVE-2014-6271 CGI コマンドインジェクション';
-      case AppLanguage.en:
-        return 'Bash Shellshock CVE-2014-6271 CGI Command Injection';
-    }
-  }
-
-  static String get vulhubShellshockCardTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Bash Shellshock CVE-2014-6271';
-      case AppLanguage.ja:
-        return 'Bash Shellshock CVE-2014-6271';
-      case AppLanguage.en:
-        return 'Bash Shellshock CVE-2014-6271';
-    }
-  }
-
-  static String get vulhubShellshockCardSubtitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return '通过 User-Agent 环境变量注入触发 Bash 函数解析 RCE';
-      case AppLanguage.ja:
-        return 'User-Agent 環境変数インジェクションで Bash 関数解析 RCE を起動';
-      case AppLanguage.en:
-        return 'Bash function parsing RCE triggered via User-Agent environment variable injection';
-    }
-  }
-
-  static String get vulhubSolrTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Apache Solr CVE-2017-12629 RunExecutableListener RCE';
-      case AppLanguage.ja:
-        return 'Apache Solr CVE-2017-12629 RunExecutableListener RCE';
-      case AppLanguage.en:
-        return 'Apache Solr CVE-2017-12629 RunExecutableListener RCE';
-    }
-  }
-
-  static String get vulhubSolrCardTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Apache Solr CVE-2017-12629';
-      case AppLanguage.ja:
-        return 'Apache Solr CVE-2017-12629';
-      case AppLanguage.en:
-        return 'Apache Solr CVE-2017-12629';
-    }
-  }
-
-  static String get vulhubSolrCardSubtitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return '通过 Listener 配置 RunExecutableListener 执行任意命令（< 7.1.0）';
-      case AppLanguage.ja:
-        return 'Listener で RunExecutableListener を設定して任意コマンドを実行（< 7.1.0）';
-      case AppLanguage.en:
-        return 'Configure RunExecutableListener via Listener to execute arbitrary commands (< 7.1.0)';
-    }
-  }
+  // (SaltStack/Shellshock/Solr EXP removed)
 
   static String get vulhubSpringTitle {
     switch (_lang) {
@@ -4935,38 +4865,7 @@ class S {
     }
   }
 
-  static String get vulhubSupervisorTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Supervisor CVE-2017-11610 XML-RPC 方法链 RCE';
-      case AppLanguage.ja:
-        return 'Supervisor CVE-2017-11610 XML-RPC メソッドチェーン RCE';
-      case AppLanguage.en:
-        return 'Supervisor CVE-2017-11610 XML-RPC Method Chain RCE';
-    }
-  }
-
-  static String get vulhubSupervisorCardTitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'Supervisor CVE-2017-11610';
-      case AppLanguage.ja:
-        return 'Supervisor CVE-2017-11610';
-      case AppLanguage.en:
-        return 'Supervisor CVE-2017-11610';
-    }
-  }
-
-  static String get vulhubSupervisorCardSubtitle {
-    switch (_lang) {
-      case AppLanguage.zh:
-        return 'XML-RPC 未授权任意方法调用链 → os.system 执行命令 (3.3.2)';
-      case AppLanguage.ja:
-        return 'XML-RPC 未認証任意メソッドチェーン → os.system コマンド実行 (3.3.2)';
-      case AppLanguage.en:
-        return 'Unauthenticated XML-RPC arbitrary method chain → os.system command execution (3.3.2)';
-    }
-  }
+  // (Supervisor EXP removed)
 
   static String get vulhubTomcatTitle {
     switch (_lang) {
@@ -5812,23 +5711,6 @@ class S {
     }
   }
 
-  // Supervisor
-  static String get expSubtitleSupervisor {
-    switch (_lang) {
-      case AppLanguage.zh: return 'XML-RPC 未授权方法调用链 RCE (3.3.2)';
-      case AppLanguage.ja: return 'XML-RPC 未認証メソッド呼び出しチェーン RCE (3.3.2)';
-      case AppLanguage.en: return 'Unauthenticated XML-RPC method chain RCE (3.3.2)';
-    }
-  }
-
-  static String get expVersionSupervisor {
-    switch (_lang) {
-      case AppLanguage.zh: return 'Supervisor: <3.3.3 | 条件: XML-RPC 接口可访问';
-      case AppLanguage.ja: return 'Supervisor: <3.3.3 | 条件: XML-RPC エンドポイントに到達可能';
-      case AppLanguage.en: return 'Supervisor: <3.3.3 | Condition: XML-RPC endpoint reachable';
-    }
-  }
-
   // XXL-JOB
   static String get expTitleXxljob {
     switch (_lang) {
@@ -5871,62 +5753,6 @@ class S {
     }
   }
 
-  // Shellshock
-  static String get expSubtitleShellshock {
-    switch (_lang) {
-      case AppLanguage.zh: return '环境变量函数定义解析注入 CGI RCE';
-      case AppLanguage.ja: return '環境変数関数定義の解析を悪用する CGI RCE';
-      case AppLanguage.en: return 'Env-var function definition parsing injection CGI RCE';
-    }
-  }
+  // (Supervisor/Shellshock/SaltStack EXP removed)
 
-  static String get expVersionShellshock {
-    switch (_lang) {
-      case AppLanguage.zh: return 'Bash: <=4.3(补丁前) | 条件: CGI/环境变量注入可达';
-      case AppLanguage.ja: return 'Bash: <=4.3 (パッチ前) | 条件: CGI/環境変数注入到達可能';
-      case AppLanguage.en: return 'Bash: <=4.3 (pre-patch) | Condition: CGI/env-var injection reachable';
-    }
-  }
-
-  // SaltStack
-  static String get expSubtitleSaltstack {
-    switch (_lang) {
-      case AppLanguage.zh: return 'SSH 模块 ssh_priv 参数命令注入 RCE';
-      case AppLanguage.ja: return 'SSH モジュール ssh_priv 引数コマンドインジェクション RCE';
-      case AppLanguage.en: return 'SSH module ssh_priv argument command injection RCE';
-    }
-  }
-
-  static String get expVersionSaltstack {
-    switch (_lang) {
-      case AppLanguage.zh: return 'SaltStack: 按官方补丁区间核对 | 条件: Master API 未授权调用链';
-      case AppLanguage.ja: return 'SaltStack: 公式パッチ範囲を確認 | 条件: Master API 未認証連鎖';
-      case AppLanguage.en: return 'SaltStack: cross-check official patch range | Condition: Master API unauthenticated chain';
-    }
-  }
-
-  // Aria2
-  static String get expTitleAria2 {
-    switch (_lang) {
-      case AppLanguage.zh: return 'Aria2 未授权 RPC → Cron 写入 RCE';
-      case AppLanguage.ja: return 'Aria2 未認証 RPC → Cron 書き込み RCE';
-      case AppLanguage.en: return 'Aria2 unauthenticated RPC → Cron write RCE';
-    }
-  }
-
-  static String get expSubtitleAria2 {
-    switch (_lang) {
-      case AppLanguage.zh: return 'JSON-RPC 未授权，addUri 写入 /etc/cron.d/ 触发反弹 Shell';
-      case AppLanguage.ja: return 'JSON-RPC 未認証で addUri を悪用し /etc/cron.d/ に書き込みリバースシェル';
-      case AppLanguage.en: return 'Unauthenticated JSON-RPC; addUri writes /etc/cron.d/ to trigger reverse shell';
-    }
-  }
-
-  static String get expVersionAria2 {
-    switch (_lang) {
-      case AppLanguage.zh: return 'Aria2: 按官方版本公告核对 | 条件: 未授权 RPC + 可写 cron';
-      case AppLanguage.ja: return 'Aria2: 公式アドバイザリで確認 | 条件: 未認証 RPC + 書き込み可能 cron';
-      case AppLanguage.en: return 'Aria2: cross-check official advisory | Condition: unauthenticated RPC + writable cron';
-    }
-  }
 }
