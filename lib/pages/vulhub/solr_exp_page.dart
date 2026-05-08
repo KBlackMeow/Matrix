@@ -4,6 +4,7 @@ import '../../app/constants.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
+import '../../app/localization.dart';
 
 class SolrExpPage extends BaseVulhubExpPage {
   const SolrExpPage({super.key});
@@ -17,13 +18,13 @@ class _SolrPageState extends BaseVulhubExpPageState<SolrExpPage> {
   IconData get pageIcon => Icons.search;
 
   @override
-  String get appBarTitle => 'Apache Solr CVE-2017-12629 RunExecutableListener RCE';
+  String get appBarTitle => S.vulhubSolrTitle;
 
   @override
-  String get cardTitle => 'Apache Solr CVE-2017-12629';
+  String get cardTitle => S.vulhubSolrCardTitle;
 
   @override
-  String get cardSubtitle => '通过 Listener 配置 RunExecutableListener 执行任意命令（< 7.1.0）';
+  String get cardSubtitle => S.vulhubSolrCardSubtitle;
 
   final _urlCtrl = TextEditingController();
   final _coreCtrl = TextEditingController(text: 'demo');
@@ -31,23 +32,25 @@ class _SolrPageState extends BaseVulhubExpPageState<SolrExpPage> {
   final _timeoutCtrl = TextEditingController();
 
   SolrExpService _svc() => SolrExpService(
-        baseUrl: _urlCtrl.text.trim(),
-        coreName: _coreCtrl.text.trim().isEmpty ? 'demo' : _coreCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-      );
+    baseUrl: _urlCtrl.text.trim(),
+    coreName: _coreCtrl.text.trim().isEmpty ? 'demo' : _coreCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+  );
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => running = true);
     appendLog('[*] 检测 Solr 服务...');
     try {
       final r = await _svc().check();
-      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] Solr 不可访问或未检测到');
+      appendLog(
+        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] Solr 不可访问或未检测到',
+      );
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -55,7 +58,7 @@ class _SolrPageState extends BaseVulhubExpPageState<SolrExpPage> {
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -65,7 +68,7 @@ class _SolrPageState extends BaseVulhubExpPageState<SolrExpPage> {
       final out = await _svc().execRce(cmd);
       appendLog(out != null ? '[+] $out' : '[-] 执行失败');
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -86,22 +89,22 @@ class _SolrPageState extends BaseVulhubExpPageState<SolrExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle('目标配置'),
-          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          vSecTitle(S.sectionTargetConfig),
+          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(_coreCtrl, 'Core 名称', 'demo'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            '超时(s)',
+            S.fieldTimeout,
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 8),
           vBtn('检测 Solr', running ? null : _check),
           const SizedBox(height: 16),
-          vSecTitle('命令执行（无回显，结合 OOB 验证）'),
-          vTf(_cmdCtrl, '命令', 'id'),
+          vSecTitle(S.sectionCmdExecOob),
+          vTf(_cmdCtrl, S.fieldCommand, 'id'),
           const SizedBox(height: 8),
           vBtn('注入并触发', running ? null : _exec),
         ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/localization.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 
@@ -22,12 +23,18 @@ class ModeToggle extends StatelessWidget {
   final bool integrated;
   final VoidCallback onToggle;
 
-  const ModeToggle({super.key, required this.integrated, required this.onToggle});
+  const ModeToggle({
+    super.key,
+    required this.integrated,
+    required this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: integrated ? '切换到分离式（底部输入栏）' : '切换到一体式（模拟真实终端）',
+      message: integrated
+          ? S.tooltipSwitchToSeparate
+          : S.tooltipSwitchToIntegrated,
       child: InkWell(
         onTap: onToggle,
         borderRadius: BorderRadius.circular(6),
@@ -54,7 +61,7 @@ class ModeToggle extends StatelessWidget {
               ),
               const SizedBox(width: 5),
               Text(
-                integrated ? '一体式' : '分离式',
+                integrated ? S.modeIntegrated : S.modeSeparate,
                 style: AppTextStyles.caption(
                   size: 11,
                   color: integrated
@@ -133,22 +140,25 @@ class TabCompleter {
   /// 仅基于目标 PATH 扫描可执行文件，构建命令补全列表（无硬编码兜底）
   Future<List<String>> fetchAvailableCommands(String workingDir) async {
     try {
-      final result = await service.executeCommand(
-        'IFS=:; for d in \$PATH; do '
-        '[ -d "\$d" ] || continue; '
-        'for f in "\$d"/*; do '
-        '[ -f "\$f" ] && [ -x "\$f" ] && printf "%s\n" "\${f##*/}"; '
-        'done; '
-        'done',
-        workingDir: workingDir,
-      ).timeout(const Duration(seconds: 2));
-      final found = result
-          .split('\n')
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
+      final result = await service
+          .executeCommand(
+            'IFS=:; for d in \$PATH; do '
+            '[ -d "\$d" ] || continue; '
+            'for f in "\$d"/*; do '
+            '[ -f "\$f" ] && [ -x "\$f" ] && printf "%s\n" "\${f##*/}"; '
+            'done; '
+            'done',
+            workingDir: workingDir,
+          )
+          .timeout(const Duration(seconds: 2));
+      final found =
+          result
+              .split('\n')
+              .map((s) => s.trim())
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
       return found;
     } catch (_) {
       // 扫描失败时不使用任何本地硬编码命令兜底。
@@ -305,10 +315,9 @@ class TabCompleter {
     final isPathLike =
         token.contains('/') || token.startsWith('~') || token.startsWith('.');
     if (isCmd && !isPathLike) {
-      final cmdM = (await fetchAvailableCommands(cwd))
-          .where((c) => c.startsWith(token))
-          .map((c) => '$c ')
-          .toList();
+      final cmdM = (await fetchAvailableCommands(
+        cwd,
+      )).where((c) => c.startsWith(token)).map((c) => '$c ').toList();
       final fileM = (await _listDirLive(cwd))
           .where((e) => e.name.toLowerCase().startsWith(token.toLowerCase()))
           .map(_fmt)

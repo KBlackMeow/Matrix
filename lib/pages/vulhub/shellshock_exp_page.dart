@@ -4,6 +4,7 @@ import '../../app/constants.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
+import '../../app/localization.dart';
 
 class ShellshockExpPage extends BaseVulhubExpPage {
   const ShellshockExpPage({super.key});
@@ -16,24 +17,24 @@ class _ShellshockPageState extends BaseVulhubExpPageState<ShellshockExpPage> {
   @override
   IconData get pageIcon => Icons.terminal;
   @override
-  String get appBarTitle => 'Bash Shellshock CVE-2014-6271 CGI 命令注入';
+  String get appBarTitle => S.vulhubShellshockTitle;
   @override
-  String get cardTitle => 'Bash Shellshock CVE-2014-6271';
+  String get cardTitle => S.vulhubShellshockCardTitle;
   @override
-  String get cardSubtitle => '通过 User-Agent 环境变量注入触发 Bash 函数解析 RCE';
+  String get cardSubtitle => S.vulhubShellshockCardSubtitle;
 
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
 
   ShellshockExpService _svc() => ShellshockExpService(
-        baseUrl: _urlCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-      );
+    baseUrl: _urlCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+  );
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => running = true);
@@ -41,9 +42,11 @@ class _ShellshockPageState extends BaseVulhubExpPageState<ShellshockExpPage> {
     try {
       final svc = _svc();
       final r = await svc.check(onLog: (line) => appendLog(line));
-      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到 Shellshock');
+      appendLog(
+        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到 Shellshock',
+      );
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -51,7 +54,7 @@ class _ShellshockPageState extends BaseVulhubExpPageState<ShellshockExpPage> {
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -59,9 +62,13 @@ class _ShellshockPageState extends BaseVulhubExpPageState<ShellshockExpPage> {
     appendLog('[*] Shellshock 执行: $cmd');
     try {
       final out = await _svc().execRce(cmd, onLog: appendLog);
-      appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出（Shellshock 未触发或无回显）');
+      appendLog(
+        out != null && out.isNotEmpty
+            ? '[+] 输出:\n$out'
+            : '[-] 无输出（Shellshock 未触发或无回显）',
+      );
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -81,22 +88,22 @@ class _ShellshockPageState extends BaseVulhubExpPageState<ShellshockExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle('目标配置'),
-          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          vSecTitle(S.sectionTargetConfig),
+          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            '超时(s)',
+            S.fieldTimeout,
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 8),
-          vBtn('检测漏洞', running ? null : _check),
+          vBtn(S.btnDetectVuln, running ? null : _check),
           const SizedBox(height: 16),
-          vSecTitle('命令执行（通过 User-Agent 注入）'),
-          vTf(_cmdCtrl, '命令', 'id'),
+          vSecTitle(S.sectionCmdExecUserAgentInject),
+          vTf(_cmdCtrl, S.fieldCommand, 'id'),
           const SizedBox(height: 8),
-          vBtn('执行命令', running ? null : _exec),
+          vBtn(S.btnExecCmd, running ? null : _exec),
         ],
       ),
     );

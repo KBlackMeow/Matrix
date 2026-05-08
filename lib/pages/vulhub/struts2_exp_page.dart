@@ -13,6 +13,7 @@ import '../../theme/app_theme.dart';
 import '../webshell_interactive_page.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
+import '../../app/localization.dart';
 
 class Struts2ExpPage extends BaseVulhubExpPage {
   const Struts2ExpPage({super.key});
@@ -25,32 +26,40 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
   @override
   IconData get pageIcon => Icons.bolt;
   @override
-  String get appBarTitle => 'Apache Struts2 S2-032/045/053/057/059 RCE';
+  String get appBarTitle => S.vulhubStruts2Title;
   @override
-  String get cardTitle => 'Apache Struts2 RCE';
+  String get cardTitle => S.vulhubStruts2CardTitle;
   @override
-  String get cardSubtitle => 'S2-032 / S2-045 / S2-053 / S2-057 / S2-059 — OGNL 表达式注入';
+  String get cardSubtitle => S.vulhubStruts2CardSubtitle;
 
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
   final _pathCtrl = TextEditingController(text: 'struts2-showcase');
-  final _passwordCtrl = TextEditingController(text: AppConstants.defaultShellPassword);
+  final _passwordCtrl = TextEditingController(
+    text: AppConstants.defaultShellPassword,
+  );
 
   Struts2VulnType _selected = Struts2VulnType.s2045;
 
   Struts2ExpService _svc() => Struts2ExpService(
-        url: _urlCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-      );
+    url: _urlCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+  );
 
   Future<void> _check() async {
     final url = _urlCtrl.text.trim();
-    if (url.isEmpty) { appendLog('[!] 请输入目标 URL'); return; }
+    if (url.isEmpty) {
+      appendLog(S.expLogEnterTargetUrl);
+      return;
+    }
     setState(() => running = true);
     appendLog('[*] 检测 ${_selected.label}...');
     try {
-      final r = await _svc().checkSingle(_selected, path: _pathCtrl.text.trim());
+      final r = await _svc().checkSingle(
+        _selected,
+        path: _pathCtrl.text.trim(),
+      );
       if (r.vulnerable) {
         appendLog('[+] 存在漏洞: ${r.vulnName}');
         appendLog('[i] ${r.detail}');
@@ -58,7 +67,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
         appendLog('[-] 未检测到 ${r.vulnName}');
       }
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -66,7 +75,10 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
 
   Future<void> _checkAll() async {
     final url = _urlCtrl.text.trim();
-    if (url.isEmpty) { appendLog('[!] 请输入目标 URL'); return; }
+    if (url.isEmpty) {
+      appendLog(S.expLogEnterTargetUrl);
+      return;
+    }
     setState(() => running = true);
     appendLog('[*] 批量检测所有 Struts2 CVE...');
     try {
@@ -99,7 +111,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
         appendLog('[*] 已自动选择首个命中漏洞: ${firstHit.label}');
       }
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -107,19 +119,26 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
 
   Future<void> _execRce() async {
     final url = _urlCtrl.text.trim();
-    if (url.isEmpty) { appendLog('[!] 请输入目标 URL'); return; }
+    if (url.isEmpty) {
+      appendLog(S.expLogEnterTargetUrl);
+      return;
+    }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
     setState(() => running = true);
     appendLog('[*] 执行命令 (${_selected.label}): $cmd');
     try {
-      final out = await _svc().execRce(_selected, cmd, path: _pathCtrl.text.trim());
+      final out = await _svc().execRce(
+        _selected,
+        cmd,
+        path: _pathCtrl.text.trim(),
+      );
       if (out != null && out.isNotEmpty) {
         appendLog('[+] 输出:\n$out');
       } else {
         appendLog('[-] 无输出或执行失败');
       }
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -127,17 +146,27 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
 
   Future<void> _getShell() async {
     final url = _urlCtrl.text.trim();
-    if (url.isEmpty) { appendLog('[!] 请输入目标 URL'); return; }
+    if (url.isEmpty) {
+      appendLog(S.expLogEnterTargetUrl);
+      return;
+    }
     setState(() => running = true);
     appendLog('[*] GetShell (${_selected.label})...');
     try {
       final password = _passwordCtrl.text.trim().isEmpty
           ? AppConstants.defaultShellPassword
           : _passwordCtrl.text.trim();
-      var shellContent = await rootBundle.loadString('assets/defaults/payloads/webshell/jsp_behinder.jsp');
-      final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
+      var shellContent = await rootBundle.loadString(
+        'assets/defaults/payloads/webshell/jsp_behinder.jsp',
+      );
+      final key = md5
+          .convert(utf8.encode(password))
+          .toString()
+          .substring(0, 16);
       shellContent = shellContent.replaceFirst(
-          RegExp(r'String k="[0-9a-f]{16}"'), 'String k="$key"');
+        RegExp(r'String k="[0-9a-f]{16}"'),
+        'String k="$key"',
+      );
       final shellUrl = await _svc().getShell(
         _selected,
         shellContent,
@@ -148,7 +177,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
         await _openWebshellFromResult(shellUrl, password);
       }
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -198,18 +227,24 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgCard,
-        title: Text('选择项目',
-            style: AppTextStyles.heading(color: AppColors.primary)),
+        title: Text(
+          S.titleSelectProject,
+          style: AppTextStyles.heading(color: AppColors.primary),
+        ),
         content: SizedBox(
           width: 320,
           child: ListView.builder(
             shrinkWrap: true,
             itemCount: projects.length,
             itemBuilder: (_, i) => ListTile(
-              title: Text(projects[i].name,
-                  style: AppTextStyles.body(color: AppColors.textPrimary)),
-              subtitle: Text(projects[i].domain,
-                  style: AppTextStyles.caption(color: AppColors.textSecondary)),
+              title: Text(
+                projects[i].name,
+                style: AppTextStyles.body(color: AppColors.textPrimary),
+              ),
+              subtitle: Text(
+                projects[i].domain,
+                style: AppTextStyles.caption(color: AppColors.textSecondary),
+              ),
               onTap: () => Navigator.pop(ctx, projects[i]),
             ),
           ),
@@ -217,8 +252,10 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('跳过',
-                style: AppTextStyles.body(color: AppColors.textSecondary)),
+            child: Text(
+              '跳过',
+              style: AppTextStyles.body(color: AppColors.textSecondary),
+            ),
           ),
         ],
       ),
@@ -233,16 +270,20 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgCard,
-        title: Text('暂无项目',
-            style: AppTextStyles.heading(color: AppColors.primary)),
+        title: Text(
+          '暂无项目',
+          style: AppTextStyles.heading(color: AppColors.primary),
+        ),
         content: SizedBox(
           width: 360,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('请先创建一个项目以保存 Webshell',
-                  style: AppTextStyles.caption(color: AppColors.textSecondary)),
+              Text(
+                '请先创建一个项目以保存 Webshell',
+                style: AppTextStyles.caption(color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 16),
               TextField(
                 controller: nameCtrl,
@@ -251,13 +292,19 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
                 decoration: InputDecoration(
                   labelText: '项目名称',
                   hintText: '例如：目标站点',
-                  hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                  hintStyle: AppTextStyles.caption(
+                    size: 11,
+                    color: AppColors.textMuted,
+                  ),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                          color: AppColors.primary.withValues(alpha: 0.5))),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
+                  ),
                   focusedBorder: const OutlineInputBorder(
-                      borderSide: BorderSide(color: AppColors.primary)),
+                    borderSide: BorderSide(color: AppColors.primary),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -267,13 +314,19 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
                 decoration: InputDecoration(
                   labelText: '域名或ID *',
                   hintText: '例如：example.com',
-                  hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                  hintStyle: AppTextStyles.caption(
+                    size: 11,
+                    color: AppColors.textMuted,
+                  ),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                          color: AppColors.primary.withValues(alpha: 0.5))),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
+                  ),
                   focusedBorder: const OutlineInputBorder(
-                      borderSide: BorderSide(color: AppColors.primary)),
+                    borderSide: BorderSide(color: AppColors.primary),
+                  ),
                 ),
               ),
             ],
@@ -282,8 +335,10 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('取消',
-                style: AppTextStyles.body(color: AppColors.textSecondary)),
+            child: Text(
+              '取消',
+              style: AppTextStyles.body(color: AppColors.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () {
@@ -294,8 +349,10 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
               Navigator.pop(ctx, true);
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            child: Text('创建',
-                style: AppTextStyles.body(color: AppColors.bgDark)),
+            child: Text(
+              '创建',
+              style: AppTextStyles.body(color: AppColors.bgDark),
+            ),
           ),
         ],
       ),
@@ -303,8 +360,10 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
     if (ok == true &&
         nameCtrl.text.trim().isNotEmpty &&
         domainCtrl.text.trim().isNotEmpty) {
-      return db.createProject(nameCtrl.text.trim(),
-          domain: domainCtrl.text.trim());
+      return db.createProject(
+        nameCtrl.text.trim(),
+        domain: domainCtrl.text.trim(),
+      );
     }
     return null;
   }
@@ -325,23 +384,26 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle('目标配置'),
-          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          vSecTitle(S.sectionTargetConfig),
+          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
           const SizedBox(height: 8),
-          vTf(_timeoutCtrl, '超时(s)', '10', type: TextInputType.number),
+          vTf(_timeoutCtrl, S.fieldTimeout, '10', type: TextInputType.number),
           const SizedBox(height: 8),
           vTf(_pathCtrl, '路径 (005/007/052/053/057)', 'struts2-showcase'),
           const SizedBox(height: 16),
-          vSecTitle('漏洞选择'),
+          vSecTitle(S.sectionVulnSelect),
           DropdownButtonFormField<Struts2VulnType>(
             initialValue: _selected,
             isExpanded: true,
             dropdownColor: AppColors.bgElevated,
             style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
             items: Struts2VulnType.values
-                .map((t) => DropdownMenuItem(
+                .map(
+                  (t) => DropdownMenuItem(
                     value: t,
-                    child: Text(t.label, overflow: TextOverflow.ellipsis)))
+                    child: Text(t.label, overflow: TextOverflow.ellipsis),
+                  ),
+                )
                 .toList(),
             onChanged: running
                 ? null
@@ -359,21 +421,23 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
             decoration: vInputDec('CVE', ''),
           ),
           const SizedBox(height: 8),
-          Row(children: [
-            vBtn('检测', running ? null : _check),
-            const SizedBox(width: 8),
-            vBtn('检测全部', running ? null : _checkAll),
-          ]),
+          Row(
+            children: [
+              vBtn('检测', running ? null : _check),
+              const SizedBox(width: 8),
+              vBtn('检测全部', running ? null : _checkAll),
+            ],
+          ),
           const SizedBox(height: 16),
-          vSecTitle('命令执行'),
-          vTf(_cmdCtrl, '命令', 'id'),
+          vSecTitle(S.sectionCmdExec),
+          vTf(_cmdCtrl, S.fieldCommand, 'id'),
           const SizedBox(height: 8),
-          vBtn('执行命令', running ? null : _execRce),
+          vBtn(S.btnExecCmd, running ? null : _execRce),
           const SizedBox(height: 16),
-          vSecTitle('GetShell'),
+          vSecTitle(S.sectionGetShell),
           vTf(_passwordCtrl, '冰蝎密码', 'mAtrix_911'),
           const SizedBox(height: 8),
-          vBtn('GetShell', running ? null : _getShell),
+          vBtn(S.btnGetShell, running ? null : _getShell),
         ],
       ),
     );

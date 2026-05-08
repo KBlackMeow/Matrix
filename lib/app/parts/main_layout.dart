@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../app/localization.dart';
 import '../../models/project.dart';
 import '../../pages/frp_tunnel_page.dart';
 import '../../pages/payload_management_page.dart';
@@ -30,50 +31,42 @@ class _MainLayoutState extends State<MainLayout> {
   static const double _sidebarCollapsedWidth = 72.0;
   static const double _menuItemExtent = 56.0;
 
-  // 静态页面只创建一次；动态页面在 _selectedProject 变化时重建
-  // RepaintBoundary 让每个页面的 layer 在 IndexedStack 切换时被缓存，
-  // 再次切换回来时直接复用 GPU layer，不重新光栅化。
+  // 子页面用 RepaintBoundary 包裹以隔离重绘域；切换 IndexedStack 时复用 GPU layer。
+  // 每当 _selectedProject 或语言变化时，整体重建一次 _pages：
+  //   • 同 runtimeType + 同位置 → State 自动复用，不会丢失会话/输入；
+  //   • 而 const 单例的子页面树会被 Flutter 视为「未变化」从而跳过重建，导致语言切换后子页面文本不刷新。
   late ProjectManagementPage _projectPage;
   late ProjectScopedPage _webshellPage;
   late RepaintBoundary _projectBoundary;
   late RepaintBoundary _webshellBoundary;
-  static const List<Widget> _staticPages = [
-    RepaintBoundary(child: exp.ExpContent()),
-    RepaintBoundary(child: PayloadManagementPage()),
-    RepaintBoundary(child: ReverseShellDashboardPage()),
-    RepaintBoundary(child: FrpTunnelPage()),
-  ];
+  late List<Widget> _staticPages;
   late List<Widget> _pages;
 
   final List<MenuItem> _menuItems = [
     MenuItem(
       icon: Icons.folder_outlined,
-      label: '项目管理',
+      label: '',
       selectedIcon: Icons.folder,
     ),
     MenuItem(
       icon: Icons.terminal_outlined,
-      label: 'Webshell管理',
+      label: '',
       selectedIcon: Icons.terminal,
     ),
     MenuItem(
       icon: Icons.bug_report_outlined,
-      label: 'EXP管理',
+      label: '',
       selectedIcon: Icons.bug_report,
     ),
-    MenuItem(
-      icon: Icons.code_outlined,
-      label: 'Payload管理',
-      selectedIcon: Icons.code,
-    ),
+    MenuItem(icon: Icons.code_outlined, label: '', selectedIcon: Icons.code),
     MenuItem(
       icon: Icons.computer_outlined,
-      label: '完整终端',
+      label: '',
       selectedIcon: Icons.computer,
     ),
     MenuItem(
       icon: Icons.alt_route_outlined,
-      label: 'FRP隧道',
+      label: '',
       selectedIcon: Icons.alt_route,
     ),
   ];
@@ -82,6 +75,18 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     _rebuildDynamicPages();
+    AppLanguageController.notifier.addListener(_onLanguageChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLanguageController.notifier.removeListener(_onLanguageChanged);
+    super.dispose();
+  }
+
+  void _onLanguageChanged() {
+    if (!mounted) return;
+    setState(_rebuildDynamicPages);
   }
 
   void _rebuildDynamicPages() {
@@ -133,7 +138,7 @@ class _MainLayoutState extends State<MainLayout> {
           _rebuildDynamicPages();
         });
       },
-      title: 'Webshell管理',
+      title: S.titleWebshellManager,
       icon: Icons.terminal,
       contentBuilder: (project, onSwitchProject) => WebshellManagementPage(
         project: project,
@@ -142,11 +147,38 @@ class _MainLayoutState extends State<MainLayout> {
     );
     _projectBoundary = RepaintBoundary(child: _projectPage);
     _webshellBoundary = RepaintBoundary(child: _webshellPage);
+    // 注意：每次都 new 一份非 const 实例，确保语言变化时 Flutter 会下钻 build()
+    // （const 单例会被 widget 比对识为未变更，从而跳过子树重建）。
+    _staticPages = <Widget>[
+      RepaintBoundary(child: exp.ExpContent()),
+      RepaintBoundary(child: PayloadManagementPage()),
+      RepaintBoundary(child: ReverseShellDashboardPage()),
+      RepaintBoundary(child: FrpTunnelPage()),
+    ];
     _pages = [_projectBoundary, _webshellBoundary, ..._staticPages];
   }
 
   void _handleMenuTap(int index) {
     setState(() => _selectedIndex = index);
+  }
+
+  String _menuLabelForIndex(int index) {
+    switch (index) {
+      case 0:
+        return S.menuProject;
+      case 1:
+        return S.menuWebshell;
+      case 2:
+        return S.menuExp;
+      case 3:
+        return S.menuPayload;
+      case 4:
+        return S.menuTerminal;
+      case 5:
+        return S.menuFrp;
+      default:
+        return '';
+    }
   }
 
   @override
@@ -214,13 +246,35 @@ class _MainLayoutState extends State<MainLayout> {
                                     ),
                                   ),
                                   Text(
-                                    _menuItems[_selectedIndex].label,
+                                    _menuLabelForIndex(_selectedIndex),
                                     style: AppTextStyles.heading(
                                       size: 18,
                                       color: AppColors.primary,
                                     ),
                                   ),
                                   const Spacer(),
+                                  PopupMenuButton<AppLanguage>(
+                                    icon: const Icon(Icons.settings),
+                                    color: AppColors.bgElevated,
+                                    onSelected: (lang) {
+                                      // 真正的重建已由 _onLanguageChanged 监听处理。
+                                      AppLanguageController.setLanguage(lang);
+                                    },
+                                    itemBuilder: (context) => [
+                                      PopupMenuItem<AppLanguage>(
+                                        value: AppLanguage.zh,
+                                        child: Text(S.languageChinese),
+                                      ),
+                                      PopupMenuItem<AppLanguage>(
+                                        value: AppLanguage.ja,
+                                        child: Text(S.languageJapanese),
+                                      ),
+                                      PopupMenuItem<AppLanguage>(
+                                        value: AppLanguage.en,
+                                        child: Text(S.languageEnglish),
+                                      ),
+                                    ],
+                                  ),
                                   IconButton(
                                     icon: const Icon(Icons.search),
                                     onPressed: () {},
@@ -328,7 +382,7 @@ class _MainLayoutState extends State<MainLayout> {
                     Icons.chevron_right,
                     color: AppColors.textSecondary,
                   ),
-                  tooltip: '展开菜单',
+                  tooltip: S.sidebarExpandTooltip,
                 ),
               ),
             ),
@@ -372,7 +426,9 @@ class _MainLayoutState extends State<MainLayout> {
           SizedBox(
             height: 64,
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: logoAreaHorizontalPadding),
+              padding: EdgeInsets.symmetric(
+                horizontal: logoAreaHorizontalPadding,
+              ),
               child: Row(
                 children: [
                   Container(
@@ -458,6 +514,7 @@ class _MainLayoutState extends State<MainLayout> {
                           isSelected: isSelected,
                           expandProgress: t,
                           onTap: () => _handleMenuTap(index),
+                          overrideLabel: _menuLabelForIndex(index),
                         ),
                       );
                     },
@@ -495,7 +552,7 @@ class _MainLayoutState extends State<MainLayout> {
                         child: Padding(
                           padding: const EdgeInsets.only(left: 12),
                           child: Text(
-                            '收起',
+                            S.sidebarCollapse,
                             style: AppTextStyles.caption(
                               size: 14,
                               color: AppColors.textSecondary,

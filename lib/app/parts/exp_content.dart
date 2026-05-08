@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import '../localization.dart';
 import 'exp_registry.dart';
 
 class ExpContent extends StatelessWidget {
@@ -28,14 +29,14 @@ class ExpContent extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'EXP 管理',
+                      S.expManagementTitle,
                       style: AppTextStyles.heading(
                         size: 18,
                         color: AppColors.primary,
                       ),
                     ),
                     Text(
-                      '在这里集中管理各类漏洞利用模块，点击条目进入对应利用界面',
+                      S.expManagementHint,
                       style: AppTextStyles.caption(
                         size: 14,
                         color: AppColors.cyan,
@@ -175,7 +176,7 @@ class _ExpEntryCardState extends State<_ExpEntryCard> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '版本要求：${widget.versionRequirement}',
+                      S.expVersionRequirement(widget.versionRequirement),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.caption(

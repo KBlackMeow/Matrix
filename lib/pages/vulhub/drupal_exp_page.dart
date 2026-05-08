@@ -13,6 +13,7 @@ import '../../theme/app_theme.dart';
 import '../webshell_interactive_page.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
+import '../../app/localization.dart';
 
 class DrupalExpPage extends BaseVulhubExpPage {
   const DrupalExpPage({super.key});
@@ -26,13 +27,13 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
   IconData get pageIcon => Icons.water_drop;
 
   @override
-  String get appBarTitle => 'Drupal CVE-2018-7600 (Drupalgeddon2) Form API RCE';
+  String get appBarTitle => S.vulhubDrupalTitle;
 
   @override
-  String get cardTitle => 'Drupal CVE-2018-7600';
+  String get cardTitle => S.vulhubDrupalCardTitle;
 
   @override
-  String get cardSubtitle => 'Drupalgeddon2 — Form API #post_render 回调 PHP 代码执行';
+  String get cardSubtitle => S.vulhubDrupalCardSubtitle;
 
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
@@ -42,22 +43,24 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
   );
 
   DrupalExpService _svc() => DrupalExpService(
-        baseUrl: _urlCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-      );
+    baseUrl: _urlCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+  );
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => running = true);
     appendLog('[*] 检测 CVE-2018-7600 (Drupalgeddon2)...');
     try {
       final r = await _svc().check();
-      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到漏洞');
+      appendLog(
+        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : S.expLogNoVulnGeneric,
+      );
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -65,7 +68,7 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
 
   Future<void> _getShell() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => running = true);
@@ -74,11 +77,17 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
       final password = _passwordCtrl.text.trim().isEmpty
           ? AppConstants.defaultShellPassword
           : _passwordCtrl.text.trim();
-      var shellContent =
-          await rootBundle.loadString('assets/defaults/payloads/webshell/php_behinder.php');
-      final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
-      shellContent =
-          shellContent.replaceFirst(RegExp(r'\$key="[0-9a-f]{16}"'), '\$key="$key"');
+      var shellContent = await rootBundle.loadString(
+        'assets/defaults/payloads/webshell/php_behinder.php',
+      );
+      final key = md5
+          .convert(utf8.encode(password))
+          .toString()
+          .substring(0, 16);
+      shellContent = shellContent.replaceFirst(
+        RegExp(r'\$key="[0-9a-f]{16}"'),
+        '\$key="$key"',
+      );
       final shellUrl = await _svc().getShell(shellContent, password: password);
       if (shellUrl != null) {
         appendLog('[+] GetShell 成功: $shellUrl');
@@ -87,7 +96,7 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
         appendLog('[-] GetShell 失败');
       }
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -132,9 +141,7 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
     } catch (_) {}
     if (!mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => WebshellInteractivePage(webshell: ws),
-      ),
+      MaterialPageRoute(builder: (_) => WebshellInteractivePage(webshell: ws)),
     );
   }
 
@@ -155,15 +162,20 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgCard,
-        title: Text('暂无项目', style: AppTextStyles.heading(color: AppColors.primary)),
+        title: Text(
+          '暂无项目',
+          style: AppTextStyles.heading(color: AppColors.primary),
+        ),
         content: SizedBox(
           width: 360,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('请先创建一个项目以保存 Webshell',
-                  style: AppTextStyles.caption(color: AppColors.textSecondary)),
+              Text(
+                '请先创建一个项目以保存 Webshell',
+                style: AppTextStyles.caption(color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 16),
               TextField(
                 controller: nameCtrl,
@@ -172,10 +184,15 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
                 decoration: InputDecoration(
                   labelText: '项目名称',
                   hintText: '例如：目标站点',
-                  hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                  hintStyle: AppTextStyles.caption(
+                    size: 11,
+                    color: AppColors.textMuted,
+                  ),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -189,10 +206,15 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
                 decoration: InputDecoration(
                   labelText: '域名或ID',
                   hintText: '例如：example.com',
-                  hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                  hintStyle: AppTextStyles.caption(
+                    size: 11,
+                    color: AppColors.textMuted,
+                  ),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -205,15 +227,23 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('取消', style: AppTextStyles.body(color: AppColors.textSecondary)),
+            child: Text(
+              '取消',
+              style: AppTextStyles.body(color: AppColors.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () {
-              if (nameCtrl.text.trim().isEmpty || domainCtrl.text.trim().isEmpty) return;
+              if (nameCtrl.text.trim().isEmpty ||
+                  domainCtrl.text.trim().isEmpty)
+                return;
               Navigator.pop(ctx, true);
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            child: Text('创建', style: AppTextStyles.body(color: AppColors.bgDark)),
+            child: Text(
+              '创建',
+              style: AppTextStyles.body(color: AppColors.bgDark),
+            ),
           ),
         ],
       ),
@@ -221,14 +251,17 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
     if (ok == true &&
         nameCtrl.text.trim().isNotEmpty &&
         domainCtrl.text.trim().isNotEmpty) {
-      return db.createProject(nameCtrl.text.trim(), domain: domainCtrl.text.trim());
+      return db.createProject(
+        nameCtrl.text.trim(),
+        domain: domainCtrl.text.trim(),
+      );
     }
     return null;
   }
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -236,9 +269,11 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
     appendLog('[*] RCE 执行: $cmd');
     try {
       final out = await _svc().execRce(cmd);
-      appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败');
+      appendLog(
+        out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败',
+      );
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -259,27 +294,27 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle('目标配置'),
-          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          vSecTitle(S.sectionTargetConfig),
+          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            '超时(s)',
+            S.fieldTimeout,
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 8),
-          vBtn('检测漏洞', running ? null : _check),
+          vBtn(S.btnDetectVuln, running ? null : _check),
           const SizedBox(height: 16),
-          vSecTitle('命令执行'),
-          vTf(_cmdCtrl, '命令', 'id'),
+          vSecTitle(S.sectionCmdExec),
+          vTf(_cmdCtrl, S.fieldCommand, 'id'),
           const SizedBox(height: 8),
-          vBtn('执行命令', running ? null : _exec),
+          vBtn(S.btnExecCmd, running ? null : _exec),
           const SizedBox(height: 16),
-          vSecTitle('GetShell'),
+          vSecTitle(S.sectionGetShell),
           vTf(_passwordCtrl, 'Shell 密码', AppConstants.defaultShellPassword),
           const SizedBox(height: 8),
-          vBtn('GetShell', running ? null : _getShell),
+          vBtn(S.btnGetShell, running ? null : _getShell),
         ],
       ),
     );
@@ -295,7 +330,10 @@ class _ProjectPickerDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.bgCard,
-      title: Text('选择项目', style: AppTextStyles.heading(color: AppColors.primary)),
+      title: Text(
+        S.titleSelectProject,
+        style: AppTextStyles.heading(color: AppColors.primary),
+      ),
       content: SizedBox(
         width: 360,
         child: ListView.builder(
@@ -304,9 +342,25 @@ class _ProjectPickerDialog extends StatelessWidget {
           itemBuilder: (ctx, i) {
             final p = projects[i];
             return ListTile(
-              leading: const Icon(Icons.folder_outlined, color: AppColors.primary, size: 20),
-              title: Text(p.name, style: AppTextStyles.body(size: 13, color: AppColors.textPrimary)),
-              subtitle: Text(p.domain, style: AppTextStyles.caption(size: 11, color: AppColors.textMuted)),
+              leading: const Icon(
+                Icons.folder_outlined,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              title: Text(
+                p.name,
+                style: AppTextStyles.body(
+                  size: 13,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                p.domain,
+                style: AppTextStyles.caption(
+                  size: 11,
+                  color: AppColors.textMuted,
+                ),
+              ),
               onTap: () => Navigator.pop(context, p),
             );
           },
@@ -315,7 +369,10 @@ class _ProjectPickerDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('取消', style: AppTextStyles.body(color: AppColors.textSecondary)),
+          child: Text(
+            '取消',
+            style: AppTextStyles.body(color: AppColors.textSecondary),
+          ),
         ),
       ],
     );

@@ -4,6 +4,7 @@ import '../../app/constants.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
+import '../../app/localization.dart';
 
 class XxlJobExpPage extends BaseVulhubExpPage {
   const XxlJobExpPage({super.key});
@@ -16,33 +17,35 @@ class _XxlJobPageState extends BaseVulhubExpPageState<XxlJobExpPage> {
   @override
   IconData get pageIcon => Icons.schedule;
   @override
-  String get appBarTitle => 'XXL-JOB 未授权访问执行器 RCE';
+  String get appBarTitle => S.vulhubXxljobTitle;
   @override
-  String get cardTitle => 'XXL-JOB 未授权 RCE';
+  String get cardTitle => S.vulhubXxljobCardTitle;
   @override
-  String get cardSubtitle => '执行器接口未授权，通过 GLUE_SHELL 类型提交任意 Shell 命令 (2.2.0)';
+  String get cardSubtitle => S.vulhubXxljobCardSubtitle;
 
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
 
   XxlJobExpService _svc() => XxlJobExpService(
-        baseUrl: _urlCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-      );
+    baseUrl: _urlCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+  );
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => running = true);
     appendLog('[*] 检测 XXL-JOB 执行器未授权...');
     try {
       final r = await _svc().check();
-      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到或已修复');
+      appendLog(
+        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到或已修复',
+      );
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -50,7 +53,7 @@ class _XxlJobPageState extends BaseVulhubExpPageState<XxlJobExpPage> {
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -60,7 +63,7 @@ class _XxlJobPageState extends BaseVulhubExpPageState<XxlJobExpPage> {
       final out = await _svc().execRce(cmd);
       appendLog(out != null && out.isNotEmpty ? '[+] 响应:\n$out' : '[-] 无响应');
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -80,20 +83,20 @@ class _XxlJobPageState extends BaseVulhubExpPageState<XxlJobExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle('目标配置'),
+          vSecTitle(S.sectionTargetConfig),
           vTf(_urlCtrl, '执行器 URL', 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            '超时(s)',
+            S.fieldTimeout,
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 8),
           vBtn('检测未授权', running ? null : _check),
           const SizedBox(height: 16),
-          vSecTitle('命令执行（无回显，结合 OOB 验证）'),
-          vTf(_cmdCtrl, '命令', 'id'),
+          vSecTitle(S.sectionCmdExecOob),
+          vTf(_cmdCtrl, S.fieldCommand, 'id'),
           const SizedBox(height: 8),
           vBtn('提交命令', running ? null : _exec),
         ],

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../database/database_helper.dart';
 import '../models/project.dart';
 import '../theme/app_theme.dart';
+import '../app/localization.dart';
 
 /// 需要选择项目的页面包装器（信息收集、Webshell）
 class ProjectScopedPage extends StatefulWidget {
@@ -12,7 +13,8 @@ class ProjectScopedPage extends StatefulWidget {
   final VoidCallback onNavigateToProjectManagement;
   final String title;
   final IconData icon;
-  final Widget Function(Project project, VoidCallback onSwitchProject) contentBuilder;
+  final Widget Function(Project project, VoidCallback onSwitchProject)
+  contentBuilder;
 
   const ProjectScopedPage({
     super.key,
@@ -90,19 +92,22 @@ class _ProjectScopedPageState extends State<ProjectScopedPage> {
           ),
           const SizedBox(height: 24),
           Text(
-            '暂无项目',
-            style: AppTextStyles.heading(size: 18, color: AppColors.textPrimary),
+            S.noProjects,
+            style: AppTextStyles.heading(
+              size: 18,
+              color: AppColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
-            '请先创建项目后再使用此功能',
+            S.noProjectsHint,
             style: AppTextStyles.body(size: 14, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: widget.onNavigateToProjectManagement,
             icon: const Icon(Icons.add, size: 18),
-            label: const Text('去创建项目'),
+            label: Text(S.actionGoCreateProject),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.bgDark,
@@ -131,8 +136,11 @@ class _ProjectScopedPageState extends State<ProjectScopedPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '请选择项目',
-                  style: AppTextStyles.body(size: 16, color: AppColors.textPrimary),
+                  S.selectProject,
+                  style: AppTextStyles.body(
+                    size: 16,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ],
@@ -159,10 +167,7 @@ class _ProjectSelectCard extends StatefulWidget {
   final Project project;
   final VoidCallback onTap;
 
-  const _ProjectSelectCard({
-    required this.project,
-    required this.onTap,
-  });
+  const _ProjectSelectCard({required this.project, required this.onTap});
 
   @override
   State<_ProjectSelectCard> createState() => _ProjectSelectCardState();
@@ -189,12 +194,16 @@ class _ProjectSelectCardState extends State<_ProjectSelectCard> {
               color: _hovered ? AppColors.bgElevated : AppColors.bgCard,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _hovered ? AppColors.primary.withValues(alpha: 0.55) : AppColors.border,
+                color: _hovered
+                    ? AppColors.primary.withValues(alpha: 0.55)
+                    : AppColors.border,
                 width: _hovered ? 1.2 : 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: _hovered ? 0.14 : 0.0),
+                  color: AppColors.primary.withValues(
+                    alpha: _hovered ? 0.14 : 0.0,
+                  ),
                   blurRadius: 14,
                   spreadRadius: 0,
                 ),
@@ -208,9 +217,15 @@ class _ProjectSelectCardState extends State<_ProjectSelectCard> {
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
-                  child: const Icon(Icons.folder, color: AppColors.primary, size: 24),
+                  child: const Icon(
+                    Icons.folder,
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -219,17 +234,27 @@ class _ProjectSelectCardState extends State<_ProjectSelectCard> {
                     children: [
                       Text(
                         widget.project.name,
-                        style: AppTextStyles.heading(size: 16, color: AppColors.textPrimary),
+                        style: AppTextStyles.heading(
+                          size: 16,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         widget.project.domain,
-                        style: AppTextStyles.caption(size: 13, color: AppColors.primary),
+                        style: AppTextStyles.caption(
+                          size: 13,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.arrow_forward_ios, color: AppColors.textSecondary, size: 16),
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  color: AppColors.textSecondary,
+                  size: 16,
+                ),
               ],
             ),
           ),

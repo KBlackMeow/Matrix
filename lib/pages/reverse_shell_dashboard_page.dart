@@ -3,6 +3,7 @@ import 'dart:async';
 
 import '../services/reverse_shell_service.dart';
 import '../theme/app_theme.dart';
+import '../app/localization.dart';
 import 'reverse_shell_terminal_page.dart';
 
 /// 反弹 Shell 会话管理页面（主菜单「完整终端」）
@@ -14,8 +15,7 @@ class ReverseShellDashboardPage extends StatefulWidget {
       _ReverseShellDashboardPageState();
 }
 
-class _ReverseShellDashboardPageState
-    extends State<ReverseShellDashboardPage> {
+class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
   final _service = ReverseShellService();
   StreamSubscription<void>? _changesSub;
 
@@ -50,28 +50,28 @@ class _ReverseShellDashboardPageState
           decoration: BoxDecoration(
             color: AppColors.bgCard,
             borderRadius: BorderRadius.circular(12),
-            border:
-                Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
           ),
           child: Row(
             children: [
-              const Icon(Icons.computer,
-                  color: AppColors.primary, size: 32),
+              const Icon(Icons.computer, color: AppColors.primary, size: 32),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '完整终端 · 反弹 Shell 会话',
+                      S.terminalTitle,
                       style: AppTextStyles.heading(
-                          size: 18, color: AppColors.primary),
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       sessions.isEmpty
-                          ? '当前没有活跃的反弹 Shell 会话'
-                          : '活跃会话数：${sessions.length}',
+                          ? S.noActiveSessions
+                          : S.activeSessionCount(sessions.length),
                       style: AppTextStyles.caption(
                         size: 13,
                         color: AppColors.textSecondary,
@@ -87,11 +87,19 @@ class _ReverseShellDashboardPageState
                               final bindPort = _service.bindPort;
                               final listening = _service.isListening;
                               final occupied = _service.isPortOccupied;
-                              final text = listening && bindAddr != null && bindPort != null
-                                  ? '监听中：$bindAddr:$bindPort'
-                                  : occupied && bindAddr != null && bindPort != null
-                                  ? '端口占用：$bindAddr:$bindPort（可能已有监听）'
-                                  : '未监听（配置：${_service.lhost}:${_service.lport}）';
+                              final text =
+                                  listening &&
+                                      bindAddr != null &&
+                                      bindPort != null
+                                  ? S.listeningOn(bindAddr, bindPort)
+                                  : occupied &&
+                                        bindAddr != null &&
+                                        bindPort != null
+                                  ? S.portOccupiedOn(bindAddr, bindPort)
+                                  : S.notListening(
+                                      _service.lhost,
+                                      _service.lport,
+                                    );
                               return Text(
                                 text,
                                 style: AppTextStyles.caption(
@@ -104,30 +112,31 @@ class _ReverseShellDashboardPageState
                         ),
                         TextButton.icon(
                           onPressed: () async {
-                            final ipController =
-                                TextEditingController(text: _service.lhost);
-                            final portController =
-                                TextEditingController(
-                                    text: _service.lport.toString());
+                            final ipController = TextEditingController(
+                              text: _service.lhost,
+                            );
+                            final portController = TextEditingController(
+                              text: _service.lport.toString(),
+                            );
                             final ok = await showDialog<bool>(
                               context: context,
                               builder: (context) {
                                 return AlertDialog(
-                                  title: const Text('监听配置'),
+                                  title: Text(S.actionListenConfig),
                                   content: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       TextField(
                                         controller: ipController,
-                                        decoration: const InputDecoration(
-                                          labelText: '监听 IP（LHOST）',
+                                        decoration: InputDecoration(
+                                          labelText: S.fieldLhost,
                                         ),
                                       ),
                                       const SizedBox(height: 12),
                                       TextField(
                                         controller: portController,
-                                        decoration: const InputDecoration(
-                                          labelText: '监听端口（LPORT）',
+                                        decoration: InputDecoration(
+                                          labelText: S.fieldLport,
                                         ),
                                         keyboardType: TextInputType.number,
                                       ),
@@ -137,12 +146,12 @@ class _ReverseShellDashboardPageState
                                     TextButton(
                                       onPressed: () =>
                                           Navigator.of(context).pop(false),
-                                      child: const Text('取消'),
+                                      child: Text(S.btnCancel),
                                     ),
                                     FilledButton(
                                       onPressed: () =>
                                           Navigator.of(context).pop(true),
-                                      child: const Text('确定'),
+                                      child: Text(S.btnConfirm),
                                     ),
                                   ],
                                 );
@@ -150,8 +159,9 @@ class _ReverseShellDashboardPageState
                             );
                             if (ok == true) {
                               final ip = ipController.text.trim();
-                              final port =
-                                  int.tryParse(portController.text.trim());
+                              final port = int.tryParse(
+                                portController.text.trim(),
+                              );
                               if (ip.isNotEmpty && port != null) {
                                 setState(() {
                                   _service.lhost = ip;
@@ -163,10 +173,9 @@ class _ReverseShellDashboardPageState
                             }
                           },
                           icon: const Icon(Icons.settings, size: 16),
-                          label: const Text('监听配置'),
+                          label: Text(S.actionListenConfig),
                           style: TextButton.styleFrom(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             minimumSize: const Size(0, 32),
                           ),
                         ),
@@ -178,21 +187,19 @@ class _ReverseShellDashboardPageState
                               await _service.stopListening();
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('已关闭监听'),
-                                  ),
+                                  SnackBar(content: Text(S.btnStopListen)),
                                 );
                               }
                               setState(() {});
                               return;
                             }
                             if (_service.isPortOccupied) {
-                              await _service.refreshListeningState(port: _service.lport);
+                              await _service.refreshListeningState(
+                                port: _service.lport,
+                              );
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('端口处于占用状态，请先释放后再启动监听'),
-                                  ),
+                                  SnackBar(content: Text(S.snackPortOccupied)),
                                 );
                               }
                               setState(() {});
@@ -201,12 +208,17 @@ class _ReverseShellDashboardPageState
                             // 启动监听
                             try {
                               await _service.startListening(
-                                  port: _service.lport);
+                                port: _service.lport,
+                              );
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                        '已在 :${_service.lport} 启动监听（LHOST=${_service.lhost}）'),
+                                      S.snackListenStarted(
+                                        _service.lport,
+                                        _service.lhost,
+                                      ),
+                                    ),
                                   ),
                                 );
                               }
@@ -215,7 +227,7 @@ class _ReverseShellDashboardPageState
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('启动监听失败：$e'),
+                                    content: Text(S.snackListenFailed(e)),
                                   ),
                                 );
                               }
@@ -225,14 +237,16 @@ class _ReverseShellDashboardPageState
                             _service.isListening
                                 ? Icons.stop
                                 : (_service.isPortOccupied
-                                    ? Icons.sync_problem
-                                    : Icons.play_arrow),
+                                      ? Icons.sync_problem
+                                      : Icons.play_arrow),
                             size: 16,
                           ),
                           label: Text(
                             _service.isListening
-                                ? '关闭监听'
-                                : (_service.isPortOccupied ? '端口占用' : '启动监听'),
+                                ? S.btnStopListen
+                                : (_service.isPortOccupied
+                                      ? S.btnPortOccupied
+                                      : S.btnStartListen),
                           ),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(0, 32),
@@ -251,16 +265,17 @@ class _ReverseShellDashboardPageState
           child: sessions.isEmpty
               ? Center(
                   child: Text(
-                    '> 暂无会话，可在 Webshell 终端中点击「完整终端」发起反弹 Shell。',
+                    S.noSessionsHint,
                     style: AppTextStyles.terminal(
-                        size: 14, color: AppColors.textMuted),
+                      size: 14,
+                      color: AppColors.textMuted,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 )
               : ListView.separated(
                   itemCount: sessions.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final s = sessions[index];
                     return _SessionCard(session: s);
@@ -296,9 +311,9 @@ class _SessionCardState extends State<_SessionCard> {
           onTap: () {
             if (!s.isAlive) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('该会话已断开，无法打开终端'),
-                  duration: Duration(seconds: 2),
+                SnackBar(
+                  content: Text(S.snackSessionDisconnected),
+                  duration: const Duration(seconds: 2),
                 ),
               );
               return;
@@ -317,12 +332,16 @@ class _SessionCardState extends State<_SessionCard> {
               color: _hovered ? AppColors.bgElevated : AppColors.bgCard,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: _hovered ? AppColors.primary.withValues(alpha: 0.55) : AppColors.border,
+                color: _hovered
+                    ? AppColors.primary.withValues(alpha: 0.55)
+                    : AppColors.border,
                 width: _hovered ? 1.2 : 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: _hovered ? 0.14 : 0.0),
+                  color: AppColors.primary.withValues(
+                    alpha: _hovered ? 0.14 : 0.0,
+                  ),
                   blurRadius: 14,
                   spreadRadius: 0,
                 ),
@@ -338,7 +357,12 @@ class _SessionCardState extends State<_SessionCard> {
                     shape: BoxShape.circle,
                     color: s.isAlive ? AppColors.primary : AppColors.textMuted,
                     boxShadow: s.isAlive
-                        ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.6), blurRadius: 6)]
+                        ? [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.6),
+                              blurRadius: 6,
+                            ),
+                          ]
                         : null,
                   ),
                 ),
@@ -349,21 +373,33 @@ class _SessionCardState extends State<_SessionCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        s.label != null && s.label!.isNotEmpty ? '${s.label} (${s.id})' : s.id,
+                        s.label != null && s.label!.isNotEmpty
+                            ? '${s.label} (${s.id})'
+                            : s.id,
                         style: AppTextStyles.body(
                           size: 14,
-                          color: s.isAlive ? AppColors.textPrimary : AppColors.textMuted,
+                          color: s.isAlive
+                              ? AppColors.textPrimary
+                              : AppColors.textMuted,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (!s.isAlive)
-                        Text('已断开', style: AppTextStyles.caption(size: 11, color: AppColors.red)),
+                        Text(
+                          S.sessionDisconnected,
+                          style: AppTextStyles.caption(
+                            size: 11,
+                            color: AppColors.red,
+                          ),
+                        ),
                     ],
                   ),
                 ),
                 Icon(
                   Icons.chevron_right,
-                  color: s.isAlive ? AppColors.textSecondary : AppColors.textMuted,
+                  color: s.isAlive
+                      ? AppColors.textSecondary
+                      : AppColors.textMuted,
                   size: 18,
                 ),
               ],
@@ -374,4 +410,3 @@ class _SessionCardState extends State<_SessionCard> {
     );
   }
 }
-

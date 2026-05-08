@@ -5,6 +5,7 @@ import '../../exp/vulhub/misc_http_exp_service.dart';
 import '../../theme/app_theme.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
+import '../../app/localization.dart';
 
 class PhpExpPage extends BaseVulhubExpPage {
   const PhpExpPage({super.key});
@@ -18,13 +19,13 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
   IconData get pageIcon => Icons.php;
 
   @override
-  String get appBarTitle => 'PHP 8.1.0-dev 后门 / CVE-2012-1823 PHP-CGI RCE';
+  String get appBarTitle => S.vulhubPhpTitle;
 
   @override
-  String get cardTitle => 'PHP RCE 系列';
+  String get cardTitle => S.vulhubPhpCardTitle;
 
   @override
-  String get cardSubtitle => 'PHP 8.1.0-dev User-Agentt 后门 + CVE-2012-1823 PHP-CGI 参数注入';
+  String get cardSubtitle => S.vulhubPhpCardSubtitle;
 
   final _urlCtrl = TextEditingController();
   final _phpPathCtrl = TextEditingController(text: '/index.php');
@@ -33,22 +34,24 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
   int _tab = 0; // 0 = backdoor, 1 = cgi
 
   PhpBackdoorExpService _backdoorSvc() => PhpBackdoorExpService(
-        baseUrl: _urlCtrl.text.trim(),
-        phpPath:
-            _phpPathCtrl.text.trim().isEmpty ? '/index.php' : _phpPathCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-      );
+    baseUrl: _urlCtrl.text.trim(),
+    phpPath: _phpPathCtrl.text.trim().isEmpty
+        ? '/index.php'
+        : _phpPathCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+  );
 
   PhpCgiExpService _cgiSvc() => PhpCgiExpService(
-        baseUrl: _urlCtrl.text.trim(),
-        phpPath:
-            _phpPathCtrl.text.trim().isEmpty ? '/index.php' : _phpPathCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-      );
+    baseUrl: _urlCtrl.text.trim(),
+    phpPath: _phpPathCtrl.text.trim().isEmpty
+        ? '/index.php'
+        : _phpPathCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+  );
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => running = true);
@@ -56,17 +59,23 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
       appendLog('[*] 检测 PHP 8.1.0-dev User-Agentt 后门...');
       try {
         final r = await _backdoorSvc().check();
-        appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到后门');
+        appendLog(
+          r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到后门',
+        );
       } catch (e) {
-        appendLog('[!] 异常: $e');
+        appendLog(S.expLogException(e));
       }
     } else {
       appendLog('[*] 检测 CVE-2012-1823 PHP-CGI...');
       try {
         final r = await _cgiSvc().check();
-        appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到 PHP-CGI 漏洞');
+        appendLog(
+          r.vulnerable
+              ? '[+] ${r.vulnName}: ${r.detail}'
+              : '[-] 未检测到 PHP-CGI 漏洞',
+        );
       } catch (e) {
-        appendLog('[!] 异常: $e');
+        appendLog(S.expLogException(e));
       }
     }
     if (mounted) setState(() => running = false);
@@ -74,7 +83,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -85,7 +94,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
         final out = await _backdoorSvc().execRce(cmd);
         appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出');
       } catch (e) {
-        appendLog('[!] 异常: $e');
+        appendLog(S.expLogException(e));
       }
     } else {
       appendLog('[*] PHP-CGI 参数注入 执行: $cmd');
@@ -93,7 +102,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
         final out = await _cgiSvc().execRce(cmd);
         appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出');
       } catch (e) {
-        appendLog('[!] 异常: $e');
+        appendLog(S.expLogException(e));
       }
     }
     if (mounted) setState(() => running = false);
@@ -114,19 +123,19 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle('目标配置'),
-          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          vSecTitle(S.sectionTargetConfig),
+          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(_phpPathCtrl, 'PHP 文件路径', '/index.php'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            '超时(s)',
+            S.fieldTimeout,
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 16),
-          vSecTitle('漏洞类型'),
+          vSecTitle(S.sectionVulnType),
           Row(
             children: [
               _tabBtn('PHP 8.1.0-dev 后门', 0),
@@ -153,12 +162,12 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
             ),
           ),
           const SizedBox(height: 8),
-          vBtn('检测漏洞', running ? null : _check),
+          vBtn(S.btnDetectVuln, running ? null : _check),
           const SizedBox(height: 16),
-          vSecTitle('命令执行'),
-          vTf(_cmdCtrl, '命令', 'id'),
+          vSecTitle(S.sectionCmdExec),
+          vTf(_cmdCtrl, S.fieldCommand, 'id'),
           const SizedBox(height: 8),
-          vBtn('执行命令', running ? null : _exec),
+          vBtn(S.btnExecCmd, running ? null : _exec),
         ],
       ),
     );
@@ -169,11 +178,23 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: _tab == idx ? AppColors.primary.withValues(alpha: 0.2) : AppColors.bgDark,
+        color: _tab == idx
+            ? AppColors.primary.withValues(alpha: 0.2)
+            : AppColors.bgDark,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _tab == idx ? AppColors.primary.withValues(alpha: 0.6) : AppColors.border),
+        border: Border.all(
+          color: _tab == idx
+              ? AppColors.primary.withValues(alpha: 0.6)
+              : AppColors.border,
+        ),
       ),
-      child: Text(label, style: AppTextStyles.caption(size: 11, color: _tab == idx ? AppColors.primary : AppColors.textSecondary)),
+      child: Text(
+        label,
+        style: AppTextStyles.caption(
+          size: 11,
+          color: _tab == idx ? AppColors.primary : AppColors.textSecondary,
+        ),
+      ),
     ),
   );
 }

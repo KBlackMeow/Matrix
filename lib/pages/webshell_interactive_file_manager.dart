@@ -10,6 +10,7 @@ import '../database/database_helper.dart';
 import '../models/payload.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
+import '../app/localization.dart';
 
 // ─── 文件管理 Tab ──────────────────────────────────────────────────────────────
 
@@ -65,7 +66,7 @@ class _FileManagerTabState extends State<FileManagerTab>
       _currentPath = path;
       _files = files;
       _loading = false;
-      if (files.isEmpty) _errorMsg = '目录为空或无权访问';
+      if (files.isEmpty) _errorMsg = S.dirEmptyOrDenied;
       widget.service.currentDir = path;
     });
   }
@@ -119,8 +120,8 @@ class _FileManagerTabState extends State<FileManagerTab>
   Future<void> _uploadFile() async {
     if (!widget.service.supportsFileWrite) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('当前连接器不支持文件写入'),
+        SnackBar(
+          content: Text(S.snackWriteNotSupported),
           backgroundColor: AppColors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -128,7 +129,7 @@ class _FileManagerTabState extends State<FileManagerTab>
       return;
     }
     final file = await openFile(
-      acceptedTypeGroups: const [XTypeGroup(label: '所有文件')],
+      acceptedTypeGroups: [XTypeGroup(label: S.allFiles)],
     );
     if (file == null || !mounted) return;
     final bytes = await file.readAsBytes();
@@ -139,8 +140,8 @@ class _FileManagerTabState extends State<FileManagerTab>
   Future<void> _uploadPayloadFile() async {
     if (!widget.service.supportsFileWrite) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('当前连接器不支持文件写入'),
+        SnackBar(
+          content: Text(S.snackWriteNotSupported),
           backgroundColor: AppColors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -152,8 +153,8 @@ class _FileManagerTabState extends State<FileManagerTab>
     if (!mounted) return;
     if (payloads.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('暂无可上传的 Payload'),
+        SnackBar(
+          content: Text(S.snackNoPayloads),
           backgroundColor: AppColors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -171,7 +172,7 @@ class _FileManagerTabState extends State<FileManagerTab>
     if (bytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Payload 解码失败: ${selected.name}'),
+          content: Text(S.snackPayloadDecodeFailed(selected.name)),
           backgroundColor: AppColors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -252,20 +253,23 @@ class _FileManagerTabState extends State<FileManagerTab>
       transferred.dispose();
       if (e is _TransferCancelled) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('上传已取消', style: TextStyle(color: Colors.white)),
-            backgroundColor: Color(0xFF064D2E), // 暗绿色背景
+          SnackBar(
+            content: Text(
+              S.snackUploadCancelled,
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: const Color(0xFF064D2E),
             behavior: SnackBarBehavior.floating,
           ),
         );
       } else {
         debugPrint(
-          '[Matrix][上传] 异常 file=$fileName path=$remotePath size=${bytes.length} error=$e',
+          '[Matrix][upload] error file=$fileName path=$remotePath size=${bytes.length} error=$e',
         );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '上传失败: $e',
+              S.snackUploadFailed(e),
               style: const TextStyle(color: Colors.white),
             ),
             backgroundColor: AppColors.red,
@@ -296,19 +300,17 @@ class _FileManagerTabState extends State<FileManagerTab>
     transferred.dispose();
     if (!ok) {
       debugPrint(
-        '[Matrix][上传] 失败 file=$fileName path=$remotePath size=${bytes.length} '
+        '[Matrix][upload] failed file=$fileName path=$remotePath size=${bytes.length} '
         'usedBinaryPath=$usedBinaryPath',
       );
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          ok ? '已上传 $fileName' : '上传失败',
+          ok ? S.snackUploaded(fileName) : S.snackUploadFail,
           style: const TextStyle(color: Colors.white),
         ),
-        backgroundColor: ok
-            ? const Color(0xFF064D2E)
-            : AppColors.red, // 成功用暗绿，失败用红
+        backgroundColor: ok ? const Color(0xFF064D2E) : AppColors.red,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -338,7 +340,9 @@ class _FileManagerTabState extends State<FileManagerTab>
   Future<void> _downloadFile(FileEntry entry) async {
     if (_downloading) return;
     if (_downloadDir == null) {
-      final dir = await getDirectoryPath(confirmButtonText: '选择下载目录');
+      final dir = await getDirectoryPath(
+        confirmButtonText: S.selectDownloadDir,
+      );
       if (dir == null || !mounted) return;
       setState(() => _downloadDir = dir);
     }
@@ -389,10 +393,10 @@ class _FileManagerTabState extends State<FileManagerTab>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '已保存至 $localPath',
+            S.snackDownloadedTo(localPath),
             style: const TextStyle(color: Colors.white),
           ),
-          backgroundColor: const Color(0xFF064D2E), // 暗绿色背景
+          backgroundColor: const Color(0xFF064D2E),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -407,7 +411,7 @@ class _FileManagerTabState extends State<FileManagerTab>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '下载失败: $e',
+            S.snackDownloadFailed(e),
             style: const TextStyle(color: Colors.white),
           ),
           backgroundColor: AppColors.red,
@@ -422,23 +426,29 @@ class _FileManagerTabState extends State<FileManagerTab>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.bgCard,
-        title: const Text('确认删除', style: TextStyle(color: AppColors.red)),
+        title: Text(
+          S.titleConfirmDelete,
+          style: const TextStyle(color: AppColors.red),
+        ),
         content: Text(
-          '确定删除「${entry.name}」吗？此操作不可恢复。',
+          S.confirmDeleteFile(entry.name),
           style: const TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              '取消',
-              style: TextStyle(color: AppColors.textSecondary),
+            child: Text(
+              S.btnCancel,
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
-            child: const Text('删除', style: TextStyle(color: Colors.white)),
+            child: Text(
+              S.tooltipDelete,
+              style: const TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -450,12 +460,10 @@ class _FileManagerTabState extends State<FileManagerTab>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          ok ? '已删除 ${entry.name}' : '删除失败',
+          ok ? S.snackDeleted(entry.name) : S.snackDeleteFailed,
           style: const TextStyle(color: Colors.white),
         ),
-        backgroundColor: ok
-            ? const Color(0xFF064D2E) // 删除成功用暗绿色
-            : AppColors.red, // 失败仍用红色
+        backgroundColor: ok ? const Color(0xFF064D2E) : AppColors.red,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -482,7 +490,7 @@ class _FileManagerTabState extends State<FileManagerTab>
                     : () => _loadDirectory(_parent(_currentPath)),
                 icon: const Icon(Icons.arrow_upward, size: 16),
                 color: AppColors.textSecondary,
-                tooltip: '上级目录',
+                tooltip: S.tooltipParentDir,
               ),
               Expanded(
                 child: Container(
@@ -514,7 +522,7 @@ class _FileManagerTabState extends State<FileManagerTab>
                       : _uploadFile,
                   icon: const Icon(Icons.upload_file, size: 16),
                   color: AppColors.primary,
-                  tooltip: '上传文件',
+                  tooltip: S.tooltipUploadFile,
                 ),
               if (widget.service.supportsFileWrite)
                 IconButton(
@@ -523,13 +531,13 @@ class _FileManagerTabState extends State<FileManagerTab>
                       : _uploadPayloadFile,
                   icon: const Icon(Icons.inventory_2_outlined, size: 16),
                   color: AppColors.cyan,
-                  tooltip: '上传 Payload',
+                  tooltip: S.quickActionUpload,
                 ),
               IconButton(
                 onPressed: _loading ? null : () => _loadDirectory(_currentPath),
                 icon: const Icon(Icons.refresh, size: 16),
                 color: AppColors.textSecondary,
-                tooltip: '刷新',
+                tooltip: S.actionRefresh,
               ),
             ],
           ),
@@ -550,10 +558,10 @@ class _FileManagerTabState extends State<FileManagerTab>
               child: Row(
                 children: [
                   const SizedBox(width: 28),
-                  _colHeader('名称', flex: 5),
-                  if (w > 480) _colHeader('大小', width: 80),
-                  if (w > 560) _colHeader('权限', width: 60),
-                  if (w > 640) _colHeader('修改时间', width: 130),
+                  _colHeader(S.colName, flex: 5),
+                  if (w > 480) _colHeader(S.colSize, width: 80),
+                  if (w > 560) _colHeader(S.colPermissions, width: 60),
+                  if (w > 640) _colHeader(S.colModified, width: 130),
                   SizedBox(width: w > 480 ? 120 : 100),
                 ],
               ),
@@ -569,7 +577,7 @@ class _FileManagerTabState extends State<FileManagerTab>
               : _files.isEmpty
               ? Center(
                   child: Text(
-                    _errorMsg ?? '目录为空',
+                    _errorMsg ?? S.dirEmpty,
                     style: AppTextStyles.body(color: AppColors.textSecondary),
                   ),
                 )
@@ -718,28 +726,28 @@ class _FileRow extends StatelessWidget {
                         _iconBtn(
                           Icons.visibility_outlined,
                           AppColors.cyan,
-                          '查看',
+                          S.tooltipView,
                           onView!,
                         ),
                       if (onEdit != null)
                         _iconBtn(
                           Icons.edit_outlined,
                           AppColors.primary,
-                          '编辑',
+                          S.tooltipEdit,
                           onEdit!,
                         ),
                       if (onDownload != null)
                         _iconBtn(
                           Icons.download_outlined,
                           AppColors.primaryDim,
-                          '下载',
+                          S.tooltipDownload,
                           onDownload!,
                         ),
                       if (onDelete != null)
                         _iconBtn(
                           Icons.delete_outline,
                           AppColors.red,
-                          '删除',
+                          S.tooltipDelete,
                           onDelete!,
                         ),
                     ],
@@ -850,7 +858,7 @@ class _PayloadPickerDialog extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '选择 Payload 上传',
+                      S.titleSelectPayload,
                       style: AppTextStyles.heading(
                         size: 14,
                         color: AppColors.textPrimary,
@@ -864,7 +872,7 @@ class _PayloadPickerDialog extends StatelessWidget {
                       size: 18,
                       color: AppColors.textSecondary,
                     ),
-                    tooltip: '关闭',
+                    tooltip: S.tooltipClose,
                   ),
                 ],
               ),
@@ -899,7 +907,7 @@ class _PayloadPickerDialog extends StatelessWidget {
                     ),
                     subtitle: Text(
                       '${payload.type.toUpperCase()}'
-                      '${payload.isDefault ? ' · 内置' : ''}'
+                      '${payload.isDefault ? ' · ${S.payloadBuiltin}' : ''}'
                       '${isBinary ? ' · Binary' : ''}',
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.caption(
@@ -965,7 +973,7 @@ class _TransferProgressDialog extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        isUpload ? '上传中' : '下载中',
+                        isUpload ? S.uploading : S.downloading,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 14,
@@ -983,7 +991,7 @@ class _TransferProgressDialog extends StatelessWidget {
                           minimumSize: const Size(0, 0),
                         ),
                         child: Text(
-                          '取消',
+                          S.btnCancel,
                           style: AppTextStyles.caption(
                             color: AppColors.textSecondary,
                             size: 11,
@@ -1037,7 +1045,7 @@ class _TransferProgressDialog extends StatelessWidget {
                     )
                   else
                     Text(
-                      isUpload ? '正在上传...' : '正在接收数据，请稍候...',
+                      isUpload ? S.uploadingProgress : S.downloadingProgress,
                       style: AppTextStyles.caption(
                         color: AppColors.textSecondary,
                         size: 11,
@@ -1140,7 +1148,7 @@ class _FileViewDialogState extends State<_FileViewDialog> {
                         size: 16,
                         color: AppColors.textSecondary,
                       ),
-                      tooltip: '复制内容',
+                      tooltip: S.tooltipCopyContent,
                     ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
@@ -1232,16 +1240,16 @@ class _FileEditDialogState extends State<_FileEditDialog> {
       Navigator.pop(context);
       widget.onSaved();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('保存成功'),
+        SnackBar(
+          content: Text(S.snackSaveSuccess),
           backgroundColor: AppColors.bgCard,
           behavior: SnackBarBehavior.floating,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('保存失败'),
+        SnackBar(
+          content: Text(S.snackSaveFailure),
           backgroundColor: AppColors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -1282,9 +1290,9 @@ class _FileEditDialogState extends State<_FileEditDialog> {
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      '取消',
-                      style: TextStyle(color: AppColors.textSecondary),
+                    child: Text(
+                      S.btnCancel,
+                      style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1300,7 +1308,7 @@ class _FileEditDialogState extends State<_FileEditDialog> {
                             ),
                           )
                         : const Icon(Icons.save_outlined, size: 16),
-                    label: const Text('保存'),
+                    label: Text(S.btnSave),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.bgDark,

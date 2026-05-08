@@ -75,7 +75,10 @@ abstract class BaseVulhubExpPageState<T extends BaseVulhubExpPage>
                 appBarTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.heading(size: 14, color: AppColors.primary),
+                style: AppTextStyles.heading(
+                  size: 14,
+                  color: AppColors.primary,
+                ),
               ),
             ),
           ],

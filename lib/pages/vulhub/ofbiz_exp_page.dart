@@ -4,6 +4,7 @@ import '../../app/constants.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
+import '../../app/localization.dart';
 
 class OFBizExpPage extends BaseVulhubExpPage {
   const OFBizExpPage({super.key});
@@ -17,13 +18,13 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
   IconData get pageIcon => Icons.business;
 
   @override
-  String get appBarTitle => 'Apache OFBiz CVE-2023-51467 / CVE-2024-38856 Groovy RCE';
+  String get appBarTitle => S.vulhubOfbizTitle;
 
   @override
-  String get cardTitle => 'Apache OFBiz Groovy RCE';
+  String get cardTitle => S.vulhubOfbizCardTitle;
 
   @override
-  String get cardSubtitle => 'CVE-2023-51467 无需认证 Groovy 注入 / CVE-2024-38856 Unicode 绕过';
+  String get cardSubtitle => S.vulhubOfbizCardSubtitle;
 
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
@@ -31,22 +32,26 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
   String _execCve = 'CVE-2023-51467';
 
   OFBizExpService _svc() => OFBizExpService(
-        baseUrl: _urlCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-      );
+    baseUrl: _urlCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+  );
 
   Future<void> _check51467() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => running = true);
     appendLog('[*] 检测 CVE-2023-51467...');
     try {
       final r = await _svc().checkCve202351467();
-      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到 ${r.vulnName}');
+      appendLog(
+        r.vulnerable
+            ? '[+] ${r.vulnName}: ${r.detail}'
+            : '[-] 未检测到 ${r.vulnName}',
+      );
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -54,16 +59,20 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
 
   Future<void> _check38856() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => running = true);
     appendLog('[*] 检测 CVE-2024-38856...');
     try {
       final r = await _svc().checkCve202438856();
-      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到 ${r.vulnName}');
+      appendLog(
+        r.vulnerable
+            ? '[+] ${r.vulnName}: ${r.detail}'
+            : '[-] 未检测到 ${r.vulnName}',
+      );
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -71,7 +80,7 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -81,9 +90,11 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
       final out = _execCve == 'CVE-2024-38856'
           ? await _svc().execRce38856(cmd)
           : await _svc().execRce(cmd);
-      appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败');
+      appendLog(
+        out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败',
+      );
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -103,29 +114,37 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle('目标配置'),
-          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          vSecTitle(S.sectionTargetConfig),
+          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            '超时(s)',
+            S.fieldTimeout,
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 16),
-          vSecTitle('漏洞检测'),
+          vSecTitle(S.sectionVulnDetect),
           Row(
             children: [
-              vBtn('检测 CVE-2023-51467 (OFBiz 18.12.10)', running ? null : _check51467),
+              vBtn(
+                '检测 CVE-2023-51467 (OFBiz 18.12.10)',
+                running ? null : _check51467,
+              ),
               const SizedBox(width: 8),
-              vBtn('检测 CVE-2024-38856 (OFBiz 18.12.11)', running ? null : _check38856),
+              vBtn(
+                '检测 CVE-2024-38856 (OFBiz 18.12.11)',
+                running ? null : _check38856,
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          vSecTitle('Groovy RCE 执行'),
+          vSecTitle(S.sectionGroovyRce),
           RadioGroup<String>(
             groupValue: _execCve,
-            onChanged: (v) { if (!running && v != null) setState(() => _execCve = v); },
+            onChanged: (v) {
+              if (!running && v != null) setState(() => _execCve = v);
+            },
             child: Row(
               children: [
                 const Radio<String>(value: 'CVE-2023-51467'),
@@ -136,9 +155,9 @@ class _OFBizPageState extends BaseVulhubExpPageState<OFBizExpPage> {
               ],
             ),
           ),
-          vTf(_cmdCtrl, '命令', 'id'),
+          vTf(_cmdCtrl, S.fieldCommand, 'id'),
           const SizedBox(height: 8),
-          vBtn('执行命令', running ? null : _exec),
+          vBtn(S.btnExecCmd, running ? null : _exec),
         ],
       ),
     );

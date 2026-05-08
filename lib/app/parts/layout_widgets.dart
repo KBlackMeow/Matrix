@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import '../localization.dart';
 
 class MenuItem {
   final IconData icon;
@@ -19,6 +20,7 @@ class SidebarMenuItem extends StatefulWidget {
   final bool isSelected;
   final double expandProgress;
   final VoidCallback onTap;
+  final String? overrideLabel;
 
   const SidebarMenuItem({
     super.key,
@@ -26,6 +28,7 @@ class SidebarMenuItem extends StatefulWidget {
     required this.isSelected,
     required this.expandProgress,
     required this.onTap,
+    this.overrideLabel,
   });
 
   @override
@@ -74,7 +77,7 @@ class _SidebarMenuItemState extends State<SidebarMenuItem> {
                     child: Padding(
                       padding: const EdgeInsets.only(left: 12),
                       child: Text(
-                        widget.item.label,
+                        widget.overrideLabel ?? widget.item.label,
                         style: TextStyle(
                           color: widget.isSelected ? AppColors.primary : AppColors.textSecondary,
                           fontSize: 14,
@@ -129,12 +132,12 @@ class WorkspaceContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '> 欢迎使用 Matrix',
+                  S.workspaceWelcomeTitle,
                   style: AppTextStyles.terminal(size: 22, color: AppColors.primary),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '当前页面：$title · 开始您的工作吧',
+                  S.workspaceWelcomeSubtitle(title),
                   style: AppTextStyles.body(size: 14, color: AppColors.textSecondary),
                 ),
               ],
@@ -143,7 +146,7 @@ class WorkspaceContent extends StatelessWidget {
           const SizedBox(height: 24),
           // 快捷入口
           Text(
-            '快捷入口',
+            S.workspaceQuickActions,
             style: AppTextStyles.heading(size: 16, color: AppColors.primary),
           ),
           const SizedBox(height: 16),
@@ -151,19 +154,19 @@ class WorkspaceContent extends StatelessWidget {
             children: [
               _QuickActionCard(
                 icon: Icons.add_circle_outline,
-                label: '新建',
+                label: S.quickActionNew,
                 color: AppColors.primary,
               ),
               const SizedBox(width: 16),
               _QuickActionCard(
                 icon: Icons.upload_file,
-                label: '上传',
+                label: S.quickActionUpload,
                 color: AppColors.cyan,
               ),
               const SizedBox(width: 16),
               _QuickActionCard(
                 icon: Icons.folder_open,
-                label: '打开',
+                label: S.quickActionOpen,
                 color: AppColors.red,
               ),
             ],
@@ -171,7 +174,7 @@ class WorkspaceContent extends StatelessWidget {
           const SizedBox(height: 32),
           // 最近活动
           Text(
-            '最近活动',
+            S.workspaceRecentActivities,
             style: AppTextStyles.heading(size: 16, color: AppColors.primary),
           ),
           const SizedBox(height: 16),
@@ -215,11 +218,11 @@ class WorkspaceContent extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '项目文件 ${index + 1}',
+                              S.recentFileTitle(index + 1),
                               style: AppTextStyles.body(size: 14, color: AppColors.textPrimary),
                             ),
                             Text(
-                              '${2 + index} 小时前',
+                              S.recentHoursAgo(2 + index),
                               style: AppTextStyles.caption(color: AppColors.textSecondary),
                             ),
                           ],

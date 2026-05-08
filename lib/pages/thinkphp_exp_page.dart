@@ -2,7 +2,8 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle, Clipboard, ClipboardData;
+import 'package:flutter/services.dart'
+    show rootBundle, Clipboard, ClipboardData;
 
 import '../app/constants.dart';
 import '../database/database_helper.dart';
@@ -10,6 +11,7 @@ import '../exp/thinkphp/thinkphp_exp_service.dart';
 import '../models/project.dart';
 import '../models/webshell.dart';
 import '../theme/app_theme.dart';
+import '../app/localization.dart';
 import 'webshell_interactive_page.dart';
 
 /// ThinkPHP 漏洞利用页面（100% 复现 ThinkphpGUI）
@@ -32,7 +34,7 @@ class ThinkphpExpPage extends StatelessWidget {
             const Icon(Icons.code, color: AppColors.primary),
             const SizedBox(width: 8),
             Text(
-              'ThinkPHP CVE-2018-20062/CVE-2019-9082/CNVD-2022-86535',
+              S.thinkphpTitle,
               style: AppTextStyles.heading(size: 14, color: AppColors.primary),
             ),
           ],
@@ -77,7 +79,11 @@ class ThinkphpExpPage extends StatelessWidget {
                         width: 1,
                       ),
                     ),
-                    child: const Icon(Icons.php, color: AppColors.primary, size: 22),
+                    child: const Icon(
+                      Icons.php,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -85,7 +91,7 @@ class ThinkphpExpPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'ThinkPHP CVE-2018-20062/CVE-2019-9082/CNVD-2022-86535',
+                          S.thinkphpTitle,
                           style: AppTextStyles.heading(
                             size: 14,
                             color: AppColors.textPrimary,
@@ -93,7 +99,7 @@ class ThinkphpExpPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '支持漏洞检测、命令执行、GetShell，100% 复现 ThinkphpGUI',
+                          S.thinkphpSubtitle,
                           style: AppTextStyles.caption(
                             size: 12,
                             color: AppColors.textSecondary,
@@ -132,18 +138,23 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
 
   final _logNotifier = ValueNotifier<String>('');
   bool _running = false;
+
   /// 检测到的所有 RCE 漏洞（用于下拉选择）
   List<ThinkphpVulnType> _detectedRceVulns = [];
+
   /// 当前选中的 RCE 漏洞（用于执行命令 / GetShell）
   ThinkphpVulnType? _selectedRceVuln;
   ThinkphpVulnType _selectedCheckType = ThinkphpVulnType.tp5023;
 
   void _appendLog(String line) {
-    final existing = _logNotifier.value.isEmpty ? <String>[] : _logNotifier.value.split('\n');
+    final existing = _logNotifier.value.isEmpty
+        ? <String>[]
+        : _logNotifier.value.split('\n');
     existing.add(line);
     const maxLines = AppConstants.logBufferSize;
-    final trimmed =
-        existing.length > maxLines ? existing.sublist(existing.length - maxLines) : existing;
+    final trimmed = existing.length > maxLines
+        ? existing.sublist(existing.length - maxLines)
+        : existing;
     _logNotifier.value = trimmed.join('\n');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_logScrollController.hasClients) {
@@ -159,7 +170,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   Future<void> _handleCheckSingle(ThinkphpVulnType type) async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
-      _appendLog('[!] 请输入目标 URL');
+      _appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => _running = true);
@@ -168,7 +179,8 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       final svc = ThinkphpExpService(
         url: url,
         timeout: Duration(
-          seconds: int.tryParse(_timeoutController.text.trim()) ??
+          seconds:
+              int.tryParse(_timeoutController.text.trim()) ??
               AppConstants.defaultHttpTimeoutSeconds,
         ),
       );
@@ -189,7 +201,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
         _appendLog('[-] 未检测到 ${r.vulnName}');
       }
     } catch (e) {
-      _appendLog('[!] 异常: $e');
+      _appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => _running = false);
     }
@@ -198,7 +210,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   Future<void> _handleCheckAllRce() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
-      _appendLog('[!] 请输入目标 URL');
+      _appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => _running = true);
@@ -207,7 +219,8 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       final svc = ThinkphpExpService(
         url: url,
         timeout: Duration(
-          seconds: int.tryParse(_timeoutController.text.trim()) ??
+          seconds:
+              int.tryParse(_timeoutController.text.trim()) ??
               AppConstants.defaultHttpTimeoutSeconds,
         ),
       );
@@ -251,7 +264,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       }
       if (found.isEmpty) _appendLog('[!] 未发现 RCE 漏洞');
     } catch (e) {
-      _appendLog('[!] 异常: $e');
+      _appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => _running = false);
     }
@@ -261,21 +274,24 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     final url = _urlController.text.trim();
     final vuln = _selectedRceVuln;
     if (url.isEmpty) {
-      _appendLog('[!] 请输入目标 URL');
+      _appendLog(S.expLogEnterTargetUrl);
       return;
     }
     if (vuln == null) {
       _appendLog('[!] 请先检测并选择要利用的 RCE 漏洞');
       return;
     }
-    final cmd = _cmdController.text.trim().isEmpty ? 'id' : _cmdController.text.trim();
+    final cmd = _cmdController.text.trim().isEmpty
+        ? 'id'
+        : _cmdController.text.trim();
     setState(() => _running = true);
     _appendLog('[*] 执行命令 ($vuln.label): $cmd');
     try {
       final svc = ThinkphpExpService(
         url: url,
         timeout: Duration(
-          seconds: int.tryParse(_timeoutController.text.trim()) ??
+          seconds:
+              int.tryParse(_timeoutController.text.trim()) ??
               AppConstants.defaultHttpTimeoutSeconds,
         ),
       );
@@ -286,7 +302,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
         _appendLog('[-] 无输出或执行失败');
       }
     } catch (e) {
-      _appendLog('[!] 异常: $e');
+      _appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => _running = false);
     }
@@ -295,7 +311,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   Future<void> _handleGetShell() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
-      _appendLog('[!] 请输入目标 URL');
+      _appendLog(S.expLogEnterTargetUrl);
       return;
     }
     final vuln = _selectedRceVuln;
@@ -309,17 +325,30 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       final password = _passwordController.text.trim().isEmpty
           ? AppConstants.defaultShellPassword
           : _passwordController.text.trim();
-      var shellContent = await rootBundle.loadString('assets/defaults/payloads/webshell/php_behinder.php');
-      final key = md5.convert(utf8.encode(password)).toString().substring(0, 16);
-      shellContent = shellContent.replaceFirst(RegExp(r'\$key="[0-9a-f]{16}"'), '\$key="$key"');
+      var shellContent = await rootBundle.loadString(
+        'assets/defaults/payloads/webshell/php_behinder.php',
+      );
+      final key = md5
+          .convert(utf8.encode(password))
+          .toString()
+          .substring(0, 16);
+      shellContent = shellContent.replaceFirst(
+        RegExp(r'\$key="[0-9a-f]{16}"'),
+        '\$key="$key"',
+      );
       final svc = ThinkphpExpService(
         url: url,
         timeout: Duration(
-          seconds: int.tryParse(_timeoutController.text.trim()) ??
+          seconds:
+              int.tryParse(_timeoutController.text.trim()) ??
               AppConstants.defaultHttpTimeoutSeconds,
         ),
       );
-      final shellUrl = await svc.getShell(vuln, shellContent, password: password);
+      final shellUrl = await svc.getShell(
+        vuln,
+        shellContent,
+        password: password,
+      );
       if (shellUrl != null) {
         _appendLog('[+] GetShell 成功: $shellUrl');
         if (mounted) _openWebshellFromResult(context, shellUrl);
@@ -327,14 +356,17 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
         _appendLog('[-] GetShell 失败');
       }
     } catch (e) {
-      _appendLog('[!] 异常: $e');
+      _appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => _running = false);
     }
   }
 
   /// 解析 GetShell 结果并跳转到 Webshell 交互页
-  Future<void> _openWebshellFromResult(BuildContext context, String shellUrl) async {
+  Future<void> _openWebshellFromResult(
+    BuildContext context,
+    String shellUrl,
+  ) async {
     String url = shellUrl;
     String password = AppConstants.defaultShellPassword;
     final passIdx = shellUrl.indexOf(' Pass:');
@@ -373,14 +405,15 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     } catch (_) {}
     if (!mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => WebshellInteractivePage(webshell: ws),
-      ),
+      MaterialPageRoute(builder: (_) => WebshellInteractivePage(webshell: ws)),
     );
   }
 
   /// 弹出项目选择器；无项目时弹出创建对话框
-  Future<Project?> _showProjectPicker(BuildContext context, DatabaseHelper db) async {
+  Future<Project?> _showProjectPicker(
+    BuildContext context,
+    DatabaseHelper db,
+  ) async {
     final projects = await db.getAllProjects();
     if (projects.isEmpty) {
       return _showCreateProjectDialog(context, db);
@@ -392,7 +425,10 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   }
 
   /// 创建项目对话框
-  Future<Project?> _showCreateProjectDialog(BuildContext context, DatabaseHelper db) async {
+  Future<Project?> _showCreateProjectDialog(
+    BuildContext context,
+    DatabaseHelper db,
+  ) async {
     final nameController = TextEditingController();
     final domainController = TextEditingController();
 
@@ -400,7 +436,10 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgCard,
-        title: Text('暂无项目', style: AppTextStyles.heading(color: AppColors.primary)),
+        title: Text(
+          S.noProjectTitle,
+          style: AppTextStyles.heading(color: AppColors.primary),
+        ),
         content: SizedBox(
           width: 360,
           child: Column(
@@ -408,7 +447,7 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '请先创建一个项目以保存 Webshell',
+                S.hintCreateProjectForWebshell,
                 style: AppTextStyles.caption(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 16),
@@ -417,12 +456,17 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                 autofocus: true,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: '项目名称',
-                  hintText: '例如：目标站点',
-                  hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                  labelText: S.fieldProjectName,
+                  hintText: S.fieldProjectNameHint,
+                  hintStyle: AppTextStyles.caption(
+                    size: 11,
+                    color: AppColors.textMuted,
+                  ),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -434,12 +478,17 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                 controller: domainController,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: '域名或ID *',
-                  hintText: '例如：example.com',
-                  hintStyle: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+                  labelText: S.fieldDomainOrId,
+                  hintText: S.fieldDomainOrIdHint,
+                  hintStyle: AppTextStyles.caption(
+                    size: 11,
+                    color: AppColors.textMuted,
+                  ),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -452,15 +501,23 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('取消', style: AppTextStyles.body(color: AppColors.textSecondary)),
+            child: Text(
+              S.btnCancel,
+              style: AppTextStyles.body(color: AppColors.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () {
-              if (nameController.text.trim().isEmpty || domainController.text.trim().isEmpty) return;
+              if (nameController.text.trim().isEmpty ||
+                  domainController.text.trim().isEmpty)
+                return;
               Navigator.pop(ctx, true);
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            child: Text('创建', style: AppTextStyles.body(color: AppColors.bgDark)),
+            child: Text(
+              S.btnCreate,
+              style: AppTextStyles.body(color: AppColors.bgDark),
+            ),
           ),
         ],
       ),
@@ -508,25 +565,40 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                   color: AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(Icons.code, color: AppColors.primary, size: 18),
+                child: const Icon(
+                  Icons.code,
+                  color: AppColors.primary,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
               Text(
-                'ThinkPHP 漏洞利用',
-                style: AppTextStyles.heading(size: 14, color: AppColors.textPrimary),
+                S.thinkphpInnerTitle,
+                style: AppTextStyles.heading(
+                  size: 14,
+                  color: AppColors.textPrimary,
+                ),
               ),
               if (_selectedRceVuln != null) ...[
                 const SizedBox(width: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.cyan.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.cyan.withValues(alpha: 0.5)),
+                    border: Border.all(
+                      color: AppColors.cyan.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: Text(
-                    '当前: ${_selectedRceVuln!.label}',
-                    style: AppTextStyles.caption(size: 10, color: AppColors.cyan),
+                    S.thinkphpCurrentVuln(_selectedRceVuln!.label),
+                    style: AppTextStyles.caption(
+                      size: 10,
+                      color: AppColors.cyan,
+                    ),
                   ),
                 ),
               ],
@@ -544,11 +616,17 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _sectionTitle('目标配置'),
+                        _sectionTitle(S.sectionTargetConfig),
                         TextField(
                           controller: _urlController,
-                          style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
-                          decoration: _inputDecoration('目标 URL', 'http://localhost:8080'),
+                          style: AppTextStyles.body(
+                            size: 12,
+                            color: AppColors.textPrimary,
+                          ),
+                          decoration: _inputDecoration(
+                            S.fieldTargetUrl,
+                            'http://localhost:8080',
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Row(
@@ -556,8 +634,14 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                             Expanded(
                               child: TextField(
                                 controller: _timeoutController,
-                                style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
-                                decoration: _inputDecoration('超时(s)', '10'),
+                                style: AppTextStyles.body(
+                                  size: 12,
+                                  color: AppColors.textPrimary,
+                                ),
+                                decoration: _inputDecoration(
+                                  S.fieldTimeout,
+                                  '10',
+                                ),
                                 keyboardType: TextInputType.number,
                               ),
                             ),
@@ -566,23 +650,32 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                         const SizedBox(height: 8),
                         TextField(
                           controller: _passwordController,
-                          style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
+                          style: AppTextStyles.body(
+                            size: 12,
+                            color: AppColors.textPrimary,
+                          ),
                           decoration: _inputDecoration(
-                            'GetShell 密码',
+                            S.thinkphpGetShellPassword,
                             AppConstants.defaultShellPassword,
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _sectionTitle('漏洞检测'),
+                        _sectionTitle(S.thinkphpSectionDetect),
                         Row(
                           children: [
-                            _actionBtn('检测全部RCE', _handleCheckAllRce),
+                            _actionBtn(
+                              S.thinkphpCheckAllRce,
+                              _handleCheckAllRce,
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Text('单漏洞:', style: AppTextStyles.caption(size: 11)),
+                            Text(
+                              S.thinkphpSingleVuln,
+                              style: AppTextStyles.caption(size: 11),
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: DropdownButtonFormField<ThinkphpVulnType>(
@@ -590,44 +683,78 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                                 initialValue: _selectedCheckType,
                                 isExpanded: true,
                                 dropdownColor: AppColors.bgElevated,
-                                style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
+                                style: AppTextStyles.body(
+                                  size: 11,
+                                  color: AppColors.textPrimary,
+                                ),
                                 items: ThinkphpVulnType.values
-                                    .map((t) => DropdownMenuItem(
-                                          value: t,
-                                          child: Text(t.label, overflow: TextOverflow.ellipsis),
-                                        ))
+                                    .map(
+                                      (t) => DropdownMenuItem(
+                                        value: t,
+                                        child: Text(
+                                          t.label,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    )
                                     .toList(),
-                                onChanged: _running ? null : (t) => t != null ? setState(() => _selectedCheckType = t) : null,
+                                onChanged: _running
+                                    ? null
+                                    : (t) => t != null
+                                          ? setState(
+                                              () => _selectedCheckType = t,
+                                            )
+                                          : null,
                                 decoration: _inputDecoration('', ''),
                               ),
                             ),
                             const SizedBox(width: 8),
-                            _actionBtn('检测', () => _handleCheckSingle(_selectedCheckType)),
+                            _actionBtn(
+                              S.btnDetect,
+                              () => _handleCheckSingle(_selectedCheckType),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        _sectionTitle('RCE 利用'),
+                        _sectionTitle(S.thinkphpSectionRce),
                         if (_detectedRceVulns.isNotEmpty) ...[
                           Row(
                             children: [
-                              Text('利用漏洞:', style: AppTextStyles.caption(size: 11)),
+                              Text(
+                                S.thinkphpExploitVuln,
+                                style: AppTextStyles.caption(size: 11),
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: DropdownButtonFormField<ThinkphpVulnType>(
-                                  key: ValueKey('rce_${_selectedRceVuln?.name ?? "none"}'),
+                                  key: ValueKey(
+                                    'rce_${_selectedRceVuln?.name ?? "none"}',
+                                  ),
                                   initialValue: _selectedRceVuln,
                                   isExpanded: true,
                                   dropdownColor: AppColors.bgElevated,
-                                  style: AppTextStyles.body(size: 11, color: AppColors.textPrimary),
+                                  style: AppTextStyles.body(
+                                    size: 11,
+                                    color: AppColors.textPrimary,
+                                  ),
                                   items: _detectedRceVulns
-                                      .map((t) => DropdownMenuItem(
-                                            value: t,
-                                            child: Text(t.label, overflow: TextOverflow.ellipsis),
-                                          ))
+                                      .map(
+                                        (t) => DropdownMenuItem(
+                                          value: t,
+                                          child: Text(
+                                            t.label,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      )
                                       .toList(),
                                   onChanged: _running
                                       ? null
-                                      : (t) => t != null ? setState(() => _selectedRceVuln = t) : null,
+                                      : (t) => t != null
+                                            ? setState(
+                                                () => _selectedRceVuln = t,
+                                              )
+                                            : null,
                                   decoration: _inputDecoration('', ''),
                                 ),
                               ),
@@ -637,25 +764,27 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                         ],
                         TextField(
                           controller: _cmdController,
-                          style: AppTextStyles.body(size: 12, color: AppColors.textPrimary),
-                          decoration: _inputDecoration(
-                            '命令',
-                            'id',
+                          style: AppTextStyles.body(
+                            size: 12,
+                            color: AppColors.textPrimary,
                           ),
+                          decoration: _inputDecoration(S.fieldCommand, 'id'),
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
                             _actionBtn(
-                              '执行命令',
+                              S.btnExecCmd,
                               _handleExeRce,
                               enabled: _selectedRceVuln != null,
                             ),
                             const SizedBox(width: 8),
                             _actionBtn(
-                              'GetShell',
+                              S.btnGetShell,
                               _handleGetShell,
-                              enabled: _selectedRceVuln != null && _selectedRceVuln!.supportsGetShell,
+                              enabled:
+                                  _selectedRceVuln != null &&
+                                  _selectedRceVuln!.supportsGetShell,
                             ),
                           ],
                         ),
@@ -686,37 +815,56 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                                 margin: const EdgeInsets.only(right: 6),
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: _running ? AppColors.primary : AppColors.textMuted,
+                                  color: _running
+                                      ? AppColors.primary
+                                      : AppColors.textMuted,
                                 ),
                               ),
                               Text(
-                                _running ? '运行中' : '空闲',
+                                _running ? S.statusRunning : S.statusIdle,
                                 style: AppTextStyles.caption(
                                   size: 11,
-                                  color: _running ? AppColors.primary : AppColors.textSecondary,
+                                  color: _running
+                                      ? AppColors.primary
+                                      : AppColors.textSecondary,
                                 ),
                               ),
                               const Spacer(),
                               TextButton.icon(
-                                onPressed: log.isEmpty ? null : () async {
-                                  final messenger = ScaffoldMessenger.of(context);
-                                  await Clipboard.setData(ClipboardData(text: log));
-                                  if (!mounted) return;
-                                  messenger.showSnackBar(
-                                    const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
-                                  );
-                                },
+                                onPressed: log.isEmpty
+                                    ? null
+                                    : () async {
+                                        final messenger = ScaffoldMessenger.of(
+                                          context,
+                                        );
+                                        await Clipboard.setData(
+                                          ClipboardData(text: log),
+                                        );
+                                        if (!mounted) return;
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(S.snackCopied),
+                                            duration: const Duration(
+                                              seconds: 1,
+                                            ),
+                                          ),
+                                        );
+                                      },
                                 icon: const Icon(Icons.copy, size: 14),
-                                label: const Text('复制'),
+                                label: Text(S.actionCopy),
                                 style: TextButton.styleFrom(
                                   foregroundColor: AppColors.textSecondary,
                                   textStyle: const TextStyle(fontSize: 11),
                                 ),
                               ),
                               TextButton.icon(
-                                onPressed: log.isEmpty ? null : () { _logNotifier.value = ''; },
+                                onPressed: log.isEmpty
+                                    ? null
+                                    : () {
+                                        _logNotifier.value = '';
+                                      },
                                 icon: const Icon(Icons.clear_all, size: 14),
-                                label: const Text('清空'),
+                                label: Text(S.btnClear),
                                 style: TextButton.styleFrom(
                                   foregroundColor: AppColors.textSecondary,
                                   textStyle: const TextStyle(fontSize: 11),
@@ -731,7 +879,10 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
                               controller: _logScrollController,
                               child: SelectableText.rich(
                                 _buildLogRichText(log),
-                                style: AppTextStyles.terminal(size: 12, color: AppColors.textMuted),
+                                style: AppTextStyles.terminal(
+                                  size: 12,
+                                  color: AppColors.textMuted,
+                                ),
                               ),
                             ),
                           ),
@@ -762,7 +913,13 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
             ),
           ),
           const SizedBox(width: 8),
-          Text(title, style: AppTextStyles.heading(size: 12, color: AppColors.textSecondary)),
+          Text(
+            title,
+            style: AppTextStyles.heading(
+              size: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );
@@ -788,7 +945,11 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     );
   }
 
-  Widget _actionBtn(String label, VoidCallback onPressed, {bool enabled = true}) {
+  Widget _actionBtn(
+    String label,
+    VoidCallback onPressed, {
+    bool enabled = true,
+  }) {
     return SizedBox(
       height: 32,
       child: ElevatedButton(
@@ -805,27 +966,41 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   /// 根据日志前缀返回颜色，凸显关键信息
   Color _logLineColor(String line) {
     if (line.startsWith('[+]')) return AppColors.primary; // 成功 - 高亮绿
-    if (line.startsWith('[!]')) return AppColors.red;     // 错误/警告 - 红色
+    if (line.startsWith('[!]')) return AppColors.red; // 错误/警告 - 红色
     if (line.startsWith('[-]')) return AppColors.textMuted; // 失败 - 灰色
-    if (line.startsWith('[*]')) return AppColors.cyan;    // 进行中 - 青色
-    if (line.startsWith('[i]')) return AppColors.cyan.withValues(alpha: 0.9); // 信息 - 浅青
+    if (line.startsWith('[*]')) return AppColors.cyan; // 进行中 - 青色
+    if (line.startsWith('[i]'))
+      return AppColors.cyan.withValues(alpha: 0.9); // 信息 - 浅青
     return AppColors.textSecondary;
   }
 
   TextSpan _buildLogRichText(String log) {
     if (log.isEmpty) {
-      return TextSpan(text: '> 等待操作', style: TextStyle(color: AppColors.textMuted, fontFamily: 'Monaco'));
+      return TextSpan(
+        text: S.expWaiting,
+        style: TextStyle(color: AppColors.textMuted, fontFamily: 'Monaco'),
+      );
     }
     final lines = log.split('\n');
     final spans = <TextSpan>[];
-    final baseStyle = AppTextStyles.terminal(size: 12, color: AppColors.textSecondary);
+    final baseStyle = AppTextStyles.terminal(
+      size: 12,
+      color: AppColors.textSecondary,
+    );
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
       final color = _logLineColor(line);
-      spans.add(TextSpan(
-        text: line + (i < lines.length - 1 ? '\n' : ''),
-        style: baseStyle.copyWith(color: color, fontWeight: line.startsWith('[+]') || line.startsWith('[!]') ? FontWeight.w600 : null),
-      ));
+      spans.add(
+        TextSpan(
+          text: line + (i < lines.length - 1 ? '\n' : ''),
+          style: baseStyle.copyWith(
+            color: color,
+            fontWeight: line.startsWith('[+]') || line.startsWith('[!]')
+                ? FontWeight.w600
+                : null,
+          ),
+        ),
+      );
     }
     return TextSpan(children: spans);
   }
@@ -841,7 +1016,10 @@ class _ProjectPickerDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.bgCard,
-      title: Text('选择项目', style: AppTextStyles.heading(color: AppColors.primary)),
+      title: Text(
+        S.titleSelectProject,
+        style: AppTextStyles.heading(color: AppColors.primary),
+      ),
       content: SizedBox(
         width: 360,
         child: ListView.builder(
@@ -850,9 +1028,25 @@ class _ProjectPickerDialog extends StatelessWidget {
           itemBuilder: (ctx, i) {
             final p = projects[i];
             return ListTile(
-              leading: const Icon(Icons.folder_outlined, color: AppColors.primary, size: 20),
-              title: Text(p.name, style: AppTextStyles.body(size: 13, color: AppColors.textPrimary)),
-              subtitle: Text(p.domain, style: AppTextStyles.caption(size: 11, color: AppColors.textMuted)),
+              leading: const Icon(
+                Icons.folder_outlined,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              title: Text(
+                p.name,
+                style: AppTextStyles.body(
+                  size: 13,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                p.domain,
+                style: AppTextStyles.caption(
+                  size: 11,
+                  color: AppColors.textMuted,
+                ),
+              ),
               onTap: () => Navigator.pop(context, p),
             );
           },
@@ -861,7 +1055,10 @@ class _ProjectPickerDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('取消', style: AppTextStyles.body(color: AppColors.textSecondary)),
+          child: Text(
+            S.btnCancel,
+            style: AppTextStyles.body(color: AppColors.textSecondary),
+          ),
         ),
       ],
     );

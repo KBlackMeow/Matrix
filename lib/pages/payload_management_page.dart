@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import '../database/database_helper.dart';
 import '../models/payload.dart';
 import '../theme/app_theme.dart';
+import '../app/localization.dart';
 
 // ── 类型配色 / 图标 ──────────────────────────────────────────────────────────
 
@@ -84,28 +85,28 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
       final bytes = await file.readAsBytes();
       final content = utf8.decode(bytes, allowMalformed: true);
       final name = file.name;
-      final ext =
-          name.contains('.') ? name.split('.').last.toLowerCase() : 'txt';
+      final ext = name.contains('.')
+          ? name.split('.').last.toLowerCase()
+          : 'txt';
       final type = ['php', 'jsp', 'asp'].contains(ext) ? ext : 'other';
 
       await _db.createPayload(name: name, type: type, content: content);
       if (!mounted) return;
-      _showSnack('已导入 $name');
+      _showSnack(S.snackImported(name));
       await _load();
     } catch (e) {
       if (!mounted) return;
-      _showSnack('导入失败: $e', error: true);
+      _showSnack(S.snackImportFailed(e), error: true);
     }
   }
 
   Future<void> _downloadToFile(Payload payload) async {
     // 完全尊重 payload.name，不再自动补扩展名，让用户自行控制文件名
-    final suggestedName =
-        payload.name.isNotEmpty ? payload.name : 'payload_${payload.id}.txt';
+    final suggestedName = payload.name.isNotEmpty
+        ? payload.name
+        : 'payload_${payload.id}.txt';
 
-    final location = await getSaveLocation(
-      suggestedName: suggestedName,
-    );
+    final location = await getSaveLocation(suggestedName: suggestedName);
     if (location == null) return;
     try {
       final binary = _decodeBinaryPayload(payload);
@@ -115,22 +116,22 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
         await File(location.path).writeAsString(payload.content);
       }
       if (!mounted) return;
-      _showSnack('已保存到 ${location.path}');
+      _showSnack(S.snackSavedTo(location.path));
     } catch (e) {
       if (!mounted) return;
-      _showSnack('保存失败: $e', error: true);
+      _showSnack(S.snackSaveFailed(e), error: true);
     }
   }
 
   Future<void> _copyToClipboard(Payload payload) async {
     if (_isBinaryPayload(payload)) {
       if (!mounted) return;
-      _showSnack('二进制 payload 不支持直接复制文本', error: true);
+      _showSnack(S.snackBinaryCopyUnsupported, error: true);
       return;
     }
     await Clipboard.setData(ClipboardData(text: payload.content));
     if (!mounted) return;
-    _showSnack('已复制到剪贴板');
+    _showSnack(S.snackCopied);
   }
 
   Future<void> _copyAsBase64(Payload payload) async {
@@ -140,7 +141,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
         : base64Encode(utf8.encode(payload.content));
     await Clipboard.setData(ClipboardData(text: b64));
     if (!mounted) return;
-    _showSnack('已复制为 Base64');
+    _showSnack(S.snackCopiedBase64);
   }
 
   Future<void> _delete(Payload payload) async {
@@ -174,16 +175,20 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
   void _showSnack(String msg, {bool error = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg,
-            style: AppTextStyles.caption(
-                color: error ? AppColors.red : AppColors.primary)),
+        content: Text(
+          msg,
+          style: AppTextStyles.caption(
+            color: error ? AppColors.red : AppColors.primary,
+          ),
+        ),
         backgroundColor: AppColors.bgElevated,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(
-            color: (error ? AppColors.red : AppColors.primary)
-                .withValues(alpha: 0.4),
+            color: (error ? AppColors.red : AppColors.primary).withValues(
+              alpha: 0.4,
+            ),
           ),
         ),
       ),
@@ -216,24 +221,25 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.folder_outlined,
-                  size: 13, color: AppColors.textSecondary),
+              const Icon(
+                Icons.folder_outlined,
+                size: 13,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 5),
               Text(
-                '${_payloads.length} files',
-                style:
-                    AppTextStyles.caption(size: 11, color: AppColors.textSecondary),
+                S.payloadCount(_payloads.length),
+                style: AppTextStyles.caption(
+                  size: 11,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
         ),
         const Spacer(),
         // 刷新
-        _TbBtn(
-          icon: Icons.refresh,
-          tooltip: '刷新',
-          onPressed: _load,
-        ),
+        _TbBtn(icon: Icons.refresh, tooltip: S.actionRefresh, onPressed: _load),
         const SizedBox(width: 6),
         // 导入
         FilledButton.icon(
@@ -242,14 +248,15 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.bgDark,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           icon: const Icon(Icons.file_upload_outlined, size: 15),
-          label: Text('导入文件',
-              style: AppTextStyles.body(
-                  size: 13,
-                  color: AppColors.bgDark)),
+          label: Text(
+            S.quickActionUpload,
+            style: AppTextStyles.body(size: 13, color: AppColors.bgDark),
+          ),
         ),
       ],
     );
@@ -270,8 +277,10 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
               ),
             ),
             const SizedBox(height: 10),
-            Text('loading...',
-                style: AppTextStyles.caption(color: AppColors.textMuted)),
+            Text(
+              S.loading,
+              style: AppTextStyles.caption(color: AppColors.textMuted),
+            ),
           ],
         ),
       );
@@ -282,16 +291,23 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.terminal,
-                size: 40,
-                color: AppColors.primary.withValues(alpha: 0.25)),
+            Icon(
+              Icons.terminal,
+              size: 40,
+              color: AppColors.primary.withValues(alpha: 0.25),
+            ),
             const SizedBox(height: 12),
-            Text('no payloads found',
-                style: AppTextStyles.body(color: AppColors.textMuted)),
+            Text(
+              S.payloadNoneFound,
+              style: AppTextStyles.body(color: AppColors.textMuted),
+            ),
             const SizedBox(height: 4),
-            Text('import a file to get started',
-                style: AppTextStyles.caption(
-                    color: AppColors.textMuted.withValues(alpha: 0.6))),
+            Text(
+              S.payloadImportHint,
+              style: AppTextStyles.caption(
+                color: AppColors.textMuted.withValues(alpha: 0.6),
+              ),
+            ),
           ],
         ),
       );
@@ -321,8 +337,11 @@ class _TbBtn extends StatelessWidget {
   final String tooltip;
   final VoidCallback onPressed;
 
-  const _TbBtn(
-      {required this.icon, required this.tooltip, required this.onPressed});
+  const _TbBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -353,8 +372,11 @@ class _PayloadCard extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
-  const _PayloadCard(
-      {required this.payload, required this.onTap, required this.onDelete});
+  const _PayloadCard({
+    required this.payload,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   @override
   State<_PayloadCard> createState() => _PayloadCardState();
@@ -368,7 +390,9 @@ class _PayloadCardState extends State<_PayloadCard> {
     final color = _colorOf(widget.payload.type);
     final icon = _iconOf(widget.payload.type);
     final isBinary = _isBinaryPayload(widget.payload);
-    final lines = isBinary ? 0 : '\n'.allMatches(widget.payload.content).length + 1;
+    final lines = isBinary
+        ? 0
+        : '\n'.allMatches(widget.payload.content).length + 1;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -410,7 +434,8 @@ class _PayloadCardState extends State<_PayloadCard> {
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: _hovered ? 0.8 : 0.4),
                     borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(9)),
+                      top: Radius.circular(9),
+                    ),
                   ),
                 ),
               ),
@@ -421,10 +446,12 @@ class _PayloadCardState extends State<_PayloadCard> {
                   top: 6,
                   right: 6,
                   child: Tooltip(
-                    message: '内置默认，不可删除',
-                    child: Icon(Icons.lock_outline,
-                        size: 12,
-                        color: AppColors.textMuted.withValues(alpha: 0.5)),
+                    message: S.payloadBuiltinTooltip,
+                    child: Icon(
+                      Icons.lock_outline,
+                      size: 12,
+                      color: AppColors.textMuted.withValues(alpha: 0.5),
+                    ),
                   ),
                 )
               else if (_hovered)
@@ -440,11 +467,14 @@ class _PayloadCardState extends State<_PayloadCard> {
                         color: AppColors.bgDark,
                         shape: BoxShape.circle,
                         border: Border.all(
-                            color: AppColors.red.withValues(alpha: 0.5)),
+                          color: AppColors.red.withValues(alpha: 0.5),
+                        ),
                       ),
-                      child: Icon(Icons.close,
-                          size: 11,
-                          color: AppColors.red.withValues(alpha: 0.8)),
+                      child: Icon(
+                        Icons.close,
+                        size: 11,
+                        color: AppColors.red.withValues(alpha: 0.8),
+                      ),
                     ),
                   ),
                 ),
@@ -464,7 +494,8 @@ class _PayloadCardState extends State<_PayloadCard> {
                         color: color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                            color: color.withValues(alpha: 0.28)),
+                          color: color.withValues(alpha: 0.28),
+                        ),
                       ),
                       child: Icon(icon, size: 24, color: color),
                     ),
@@ -492,7 +523,9 @@ class _PayloadCardState extends State<_PayloadCard> {
                         Text(
                           isBinary ? 'BIN' : '$lines L',
                           style: AppTextStyles.caption(
-                              size: 9, color: AppColors.textMuted),
+                            size: 9,
+                            color: AppColors.textMuted,
+                          ),
                         ),
                       ],
                     ),
@@ -547,32 +580,42 @@ class _ConfirmDeleteDialog extends StatelessWidget {
       ),
       title: Row(
         children: [
-          Icon(Icons.warning_amber_outlined,
-              size: 18, color: AppColors.red.withValues(alpha: 0.8)),
+          Icon(
+            Icons.warning_amber_outlined,
+            size: 18,
+            color: AppColors.red.withValues(alpha: 0.8),
+          ),
           const SizedBox(width: 8),
-          Text('删除 Payload',
-              style: AppTextStyles.heading(size: 14, color: AppColors.red)),
+          Text(
+            S.titleDeletePayload,
+            style: AppTextStyles.heading(size: 14, color: AppColors.red),
+          ),
         ],
       ),
       content: Text(
-        '确定要删除 "$name" 吗？\n此操作不可撤销。',
+        S.confirmDeletePayload(name),
         style: AppTextStyles.body(size: 13, color: AppColors.textSecondary),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: Text('取消',
-              style: AppTextStyles.body(color: AppColors.textSecondary)),
+          child: Text(
+            S.btnCancel,
+            style: AppTextStyles.body(color: AppColors.textSecondary),
+          ),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, true),
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.red.withValues(alpha: 0.85),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
+            ),
           ),
-          child: Text('删除',
-              style: AppTextStyles.body(color: AppColors.bgDark)),
+          child: Text(
+            S.btnDelete,
+            style: AppTextStyles.body(color: AppColors.bgDark),
+          ),
         ),
       ],
     );
@@ -613,7 +656,9 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
   Widget build(BuildContext context) {
     final color = _colorOf(widget.payload.type);
     final isBinary = _isBinaryPayload(widget.payload);
-    final lines = isBinary ? const <String>[] : widget.payload.content.split('\n');
+    final lines = isBinary
+        ? const <String>[]
+        : widget.payload.content.split('\n');
     final binary = _decodeBinaryPayload(widget.payload);
 
     return Dialog(
@@ -635,9 +680,11 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
               decoration: BoxDecoration(
                 color: AppColors.bgElevated,
                 borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(13)),
+                  top: Radius.circular(13),
+                ),
                 border: const Border(
-                    bottom: BorderSide(color: AppColors.border)),
+                  bottom: BorderSide(color: AppColors.border),
+                ),
               ),
               child: Row(
                 children: [
@@ -649,8 +696,11 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                       color: color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Icon(_iconOf(widget.payload.type),
-                        size: 16, color: color),
+                    child: Icon(
+                      _iconOf(widget.payload.type),
+                      size: 16,
+                      color: color,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -658,7 +708,9 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                       widget.payload.name,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.body(
-                          size: 13, color: AppColors.textPrimary),
+                        size: 13,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
                   // 行数统计
@@ -667,33 +719,39 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                         ? '${binary?.length ?? 0} bytes'
                         : '${lines.length} lines',
                     style: AppTextStyles.caption(
-                        size: 11, color: AppColors.textMuted),
+                      size: 11,
+                      color: AppColors.textMuted,
+                    ),
                   ),
                   const SizedBox(width: 14),
                   // 操作按钮
                   if (!isBinary) ...[
                     _DialogBtn(
-                        icon: Icons.copy_outlined,
-                        label: '复制',
-                        onPressed: widget.onCopy),
+                      icon: Icons.copy_outlined,
+                      label: S.actionCopy,
+                      onPressed: widget.onCopy,
+                    ),
                     const SizedBox(width: 6),
                   ],
                   _DialogBtn(
-                      icon: Icons.code,
-                      label: '复制为Base64',
-                      onPressed: widget.onCopyBase64),
+                    icon: Icons.code,
+                    label: S.actionCopyBase64,
+                    onPressed: widget.onCopyBase64,
+                  ),
                   const SizedBox(width: 6),
                   _DialogBtn(
-                      icon: Icons.download_outlined,
-                      label: '下载',
-                      onPressed: widget.onDownload),
+                    icon: Icons.download_outlined,
+                    label: S.actionDownload,
+                    onPressed: widget.onDownload,
+                  ),
                   const SizedBox(width: 6),
                   if (!widget.payload.isDefault) ...[
                     _DialogBtn(
-                        icon: Icons.delete_outline,
-                        label: '删除',
-                        color: AppColors.red,
-                        onPressed: widget.onDelete),
+                      icon: Icons.delete_outline,
+                      label: S.btnDelete,
+                      color: AppColors.red,
+                      onPressed: widget.onDelete,
+                    ),
                     const SizedBox(width: 6),
                   ],
                   const SizedBox(width: 4),
@@ -702,8 +760,11 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                     borderRadius: BorderRadius.circular(4),
                     child: const Padding(
                       padding: EdgeInsets.all(4),
-                      child: Icon(Icons.close,
-                          size: 16, color: AppColors.textSecondary),
+                      child: Icon(
+                        Icons.close,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 ],
@@ -737,11 +798,11 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                               Container(
                                 width: 48,
                                 color: AppColors.bgElevated,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
                                   children: List.generate(
                                     lines.length,
                                     (i) => SizedBox(
@@ -749,21 +810,22 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                                       child: Text(
                                         '${i + 1}',
                                         style: AppTextStyles.caption(
-                                            size: 11,
-                                            color: AppColors.textMuted),
+                                          size: 11,
+                                          color: AppColors.textMuted,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                              Container(
-                                  width: 1,
-                                  color: AppColors.border),
+                              Container(width: 1, color: AppColors.border),
                               // 代码内容
                               Expanded(
                                 child: Padding(
                                   padding: const EdgeInsets.only(
-                                      left: 12, right: 12),
+                                    left: 12,
+                                    right: 12,
+                                  ),
                                   child: SelectableText(
                                     widget.payload.content,
                                     style: AppTextStyles.terminal(
@@ -777,7 +839,7 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                               Expanded(
                                 child: Center(
                                   child: Text(
-                                    'Binary payload detected.\nPreview disabled.',
+                                    S.binaryPreviewDisabled,
                                     textAlign: TextAlign.center,
                                     style: AppTextStyles.body(
                                       size: 12,
@@ -807,11 +869,12 @@ class _DialogBtn extends StatelessWidget {
   final Color? color;
   final VoidCallback onPressed;
 
-  const _DialogBtn(
-      {required this.icon,
-      required this.label,
-      required this.onPressed,
-      this.color});
+  const _DialogBtn({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -831,8 +894,7 @@ class _DialogBtn extends StatelessWidget {
           children: [
             Icon(icon, size: 13, color: c),
             const SizedBox(width: 4),
-            Text(label,
-                style: AppTextStyles.caption(size: 11, color: c)),
+            Text(label, style: AppTextStyles.caption(size: 11, color: c)),
           ],
         ),
       ),

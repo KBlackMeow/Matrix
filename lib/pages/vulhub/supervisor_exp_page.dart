@@ -4,6 +4,7 @@ import '../../app/constants.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
+import '../../app/localization.dart';
 
 class SupervisorExpPage extends BaseVulhubExpPage {
   const SupervisorExpPage({super.key});
@@ -16,24 +17,24 @@ class _SupervisorPageState extends BaseVulhubExpPageState<SupervisorExpPage> {
   @override
   IconData get pageIcon => Icons.settings_applications;
   @override
-  String get appBarTitle => 'Supervisor CVE-2017-11610 XML-RPC 方法链 RCE';
+  String get appBarTitle => S.vulhubSupervisorTitle;
   @override
-  String get cardTitle => 'Supervisor CVE-2017-11610';
+  String get cardTitle => S.vulhubSupervisorCardTitle;
   @override
-  String get cardSubtitle => 'XML-RPC 未授权任意方法调用链 → os.system 执行命令 (3.3.2)';
+  String get cardSubtitle => S.vulhubSupervisorCardSubtitle;
 
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
 
   SupervisorExpService _svc() => SupervisorExpService(
-        baseUrl: _urlCtrl.text.trim(),
-        timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
-      );
+    baseUrl: _urlCtrl.text.trim(),
+    timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
+  );
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     setState(() => running = true);
@@ -42,7 +43,7 @@ class _SupervisorPageState extends BaseVulhubExpPageState<SupervisorExpPage> {
       final r = await _svc().check();
       appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到端点');
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -50,7 +51,7 @@ class _SupervisorPageState extends BaseVulhubExpPageState<SupervisorExpPage> {
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog('[!] 请输入目标 URL');
+      appendLog(S.expLogEnterTargetUrl);
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -60,7 +61,7 @@ class _SupervisorPageState extends BaseVulhubExpPageState<SupervisorExpPage> {
       final out = await _svc().execRce(cmd);
       appendLog(out != null && out.isNotEmpty ? '[+] 响应:\n$out' : '[-] 无输出');
     } catch (e) {
-      appendLog('[!] 异常: $e');
+      appendLog(S.expLogException(e));
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -80,22 +81,22 @@ class _SupervisorPageState extends BaseVulhubExpPageState<SupervisorExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle('目标配置'),
-          vTf(_urlCtrl, '目标 URL', 'http://localhost:8080'),
+          vSecTitle(S.sectionTargetConfig),
+          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            '超时(s)',
+            S.fieldTimeout,
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 8),
           vBtn('检测 XML-RPC', running ? null : _check),
           const SizedBox(height: 16),
-          vSecTitle('命令执行（无回显，需 OOB）'),
-          vTf(_cmdCtrl, '命令', 'id'),
+          vSecTitle(S.sectionCmdExecOobNeeded),
+          vTf(_cmdCtrl, S.fieldCommand, 'id'),
           const SizedBox(height: 8),
-          vBtn('执行命令', running ? null : _exec),
+          vBtn(S.btnExecCmd, running ? null : _exec),
         ],
       ),
     );

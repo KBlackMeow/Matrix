@@ -2,6 +2,7 @@
 // Each page file imports this via a part or a direct import.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import '../../app/localization.dart';
 import '../../theme/app_theme.dart';
 
 Widget vulhubInfoCard(IconData icon, String title, String subtitle) =>
@@ -79,8 +80,8 @@ Color vulhubLogLineColor(String line) {
 TextSpan vulhubRichLog(String log) {
   if (log.isEmpty) {
     return TextSpan(
-      text: '> 等待操作',
-      style: TextStyle(color: AppColors.textMuted, fontFamily: 'Monaco'),
+      text: S.expWaiting,
+      style: const TextStyle(color: AppColors.textMuted, fontFamily: 'Monaco'),
     );
   }
   final lines = log.split('\n');
@@ -198,7 +199,7 @@ class _VulhubLogPanel extends StatelessWidget {
                 ),
               ),
               Text(
-                running ? '运行中' : '空闲',
+                running ? S.statusRunning : S.statusIdle,
                 style: AppTextStyles.caption(
                   size: 11,
                   color: running ? AppColors.primary : AppColors.textSecondary,
@@ -212,15 +213,15 @@ class _VulhubLogPanel extends StatelessWidget {
                         await Clipboard.setData(ClipboardData(text: log));
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('已复制'),
-                              duration: Duration(seconds: 1),
+                            SnackBar(
+                              content: Text(S.snackCopied),
+                              duration: const Duration(seconds: 1),
                             ),
                           );
                         }
                       },
                 icon: const Icon(Icons.copy, size: 14),
-                label: const Text('复制'),
+                label: Text(S.actionCopy),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
                   textStyle: const TextStyle(fontSize: 11),
@@ -229,7 +230,7 @@ class _VulhubLogPanel extends StatelessWidget {
               TextButton.icon(
                 onPressed: log.isEmpty ? null : onClearLog,
                 icon: const Icon(Icons.clear_all, size: 14),
-                label: const Text('清空'),
+                label: Text(S.btnClear),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
                   textStyle: const TextStyle(fontSize: 11),
@@ -331,7 +332,7 @@ Future<String?> showReverseShellModeDialog(BuildContext context) {
       String selected = 'script';
       return StatefulBuilder(
         builder: (ctx2, setInner) => AlertDialog(
-          title: const Text('选择完整终端方案'),
+          title: Text(S.titleSelectTerminalMode),
           content: RadioGroup<String>(
             groupValue: selected,
             onChanged: (v) {
@@ -339,29 +340,29 @@ Future<String?> showReverseShellModeDialog(BuildContext context) {
             },
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: const [
+              children: [
                 RadioListTile<String>(
                   value: 'script',
-                  title: Text('内置反弹 · script 模式'),
+                  title: Text(S.terminalModeScript),
                   subtitle: Text(
-                    '优先 script，失败回退 bash/sh',
-                    style: TextStyle(fontSize: 11),
+                    S.terminalModeScriptDesc,
+                    style: const TextStyle(fontSize: 11),
                   ),
                 ),
                 RadioListTile<String>(
                   value: 'bash',
-                  title: Text('内置反弹 · bash 模式'),
+                  title: Text(S.terminalModeBash),
                   subtitle: Text(
-                    '仅使用 bash/sh 反弹',
-                    style: TextStyle(fontSize: 11),
+                    S.terminalModeBashDesc,
+                    style: const TextStyle(fontSize: 11),
                   ),
                 ),
                 RadioListTile<String>(
                   value: 'socat',
-                  title: Text('socat 反弹（手动执行）'),
+                  title: Text(S.terminalModeSocat),
                   subtitle: Text(
-                    '目标上手动执行命令获得完整 TTY',
-                    style: TextStyle(fontSize: 11),
+                    S.terminalModeSocatDesc,
+                    style: const TextStyle(fontSize: 11),
                   ),
                 ),
               ],
@@ -370,11 +371,11 @@ Future<String?> showReverseShellModeDialog(BuildContext context) {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx2),
-              child: const Text('取消'),
+              child: Text(S.btnCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx2, selected),
-              child: const Text('确定'),
+              child: Text(S.btnConfirm),
             ),
           ],
         ),

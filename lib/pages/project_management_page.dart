@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../database/database_helper.dart';
 import '../models/project.dart';
 import '../theme/app_theme.dart';
+import '../app/localization.dart';
 
 /// 项目管理页面：创建、编辑、删除
 class ProjectManagementPage extends StatefulWidget {
@@ -57,7 +58,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.bgCard,
         title: Text(
-          '新建项目',
+          S.btnCreate,
           style: AppTextStyles.heading(color: AppColors.primary),
         ),
         content: SizedBox(
@@ -71,10 +72,12 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 autofocus: true,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: '项目名称',
+                  labelText: S.fieldProjectName,
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -86,12 +89,14 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 controller: domainController,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: '域名或ID *',
-                  hintText: '例如：example.com 或 target-001',
+                  labelText: S.fieldDomainOrId,
+                  hintText: S.hintDomainOrId,
                   hintStyle: const TextStyle(color: Color(0xFF6E7681)),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -104,10 +109,12 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 maxLines: 3,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: '描述（可选）',
+                  labelText: S.fieldDescription,
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -120,7 +127,10 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('取消', style: AppTextStyles.body(color: AppColors.textSecondary)),
+            child: Text(
+              S.btnCancel,
+              style: AppTextStyles.body(color: AppColors.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () {
@@ -131,7 +141,10 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
               Navigator.pop(context, true);
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            child: Text('创建', style: AppTextStyles.body(color: AppColors.bgDark)),
+            child: Text(
+              S.btnCreate,
+              style: AppTextStyles.body(color: AppColors.bgDark),
+            ),
           ),
         ],
       ),
@@ -143,7 +156,9 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
       await _db.createProject(
         nameController.text.trim(),
         domain: domainController.text.trim(),
-        description: descController.text.trim().isEmpty ? null : descController.text.trim(),
+        description: descController.text.trim().isEmpty
+            ? null
+            : descController.text.trim(),
       );
       await _loadProjects();
     }
@@ -152,14 +167,16 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
   Future<void> _showEditDialog(Project project) async {
     final nameController = TextEditingController(text: project.name);
     final domainController = TextEditingController(text: project.domain);
-    final descController = TextEditingController(text: project.description ?? '');
+    final descController = TextEditingController(
+      text: project.description ?? '',
+    );
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.bgCard,
         title: Text(
-          '编辑项目 #${project.id}',
+          S.titleEditProject(project.id),
           style: AppTextStyles.heading(color: AppColors.primary),
         ),
         content: SizedBox(
@@ -173,10 +190,12 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 autofocus: true,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: '项目名称',
+                  labelText: S.fieldProjectName,
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -188,12 +207,14 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 controller: domainController,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: '域名或ID *',
-                  hintText: '例如：example.com 或 target-001',
+                  labelText: S.fieldDomainOrId,
+                  hintText: S.hintDomainOrId,
                   hintStyle: const TextStyle(color: Color(0xFF6E7681)),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -206,10 +227,12 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 maxLines: 3,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: '描述（可选）',
+                  labelText: S.fieldDescription,
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: AppColors.primary),
@@ -222,7 +245,10 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消', style: TextStyle(color: AppColors.textSecondary)),
+            child: Text(
+              S.btnCancel,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () {
@@ -233,7 +259,10 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
               Navigator.pop(context, true);
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text('保存', style: TextStyle(color: Color(0xFF0D1117))),
+            child: Text(
+              S.btnSave,
+              style: const TextStyle(color: Color(0xFF0D1117)),
+            ),
           ),
         ],
       ),
@@ -242,11 +271,15 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
     if (result == true &&
         nameController.text.trim().isNotEmpty &&
         domainController.text.trim().isNotEmpty) {
-      await _db.updateProject(project.copyWith(
-        name: nameController.text.trim(),
-        domain: domainController.text.trim(),
-        description: descController.text.trim().isEmpty ? null : descController.text.trim(),
-      ));
+      await _db.updateProject(
+        project.copyWith(
+          name: nameController.text.trim(),
+          domain: domainController.text.trim(),
+          description: descController.text.trim().isEmpty
+              ? null
+              : descController.text.trim(),
+        ),
+      );
       final projects = await _loadProjects();
       final updated = projects.where((p) => p.id == project.id).firstOrNull;
       if (updated != null) {
@@ -260,23 +293,26 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.bgCard,
-        title: const Text(
-          '确认删除',
-          style: TextStyle(color: AppColors.red),
-        ),
+        title: Text(S.btnDelete, style: const TextStyle(color: AppColors.red)),
         content: Text(
-          '确定要删除项目「${project.name}」吗？将同时删除该项目的 Webshell 及信息收集数据，此操作不可恢复。',
+          S.confirmDeleteProject(project.name),
           style: const TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消', style: TextStyle(color: AppColors.textSecondary)),
+            child: Text(
+              S.btnCancel,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
-            child: const Text('删除', style: TextStyle(color: Colors.white)),
+            child: Text(
+              S.btnDelete,
+              style: const TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -299,19 +335,22 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
           Container(
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.border,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.cyan.withValues(alpha: 0.5)),
-        ),
-            child: const Row(
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.cyan.withValues(alpha: 0.5)),
+            ),
+            child: Row(
               children: [
-                Icon(Icons.info_outline, color: AppColors.cyan, size: 20),
-                SizedBox(width: 12),
+                const Icon(Icons.info_outline, color: AppColors.cyan, size: 20),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Web 模式：数据仅保存在内存中，刷新页面将丢失。请使用桌面版以持久化存储。',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    S.webModeWarning,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -323,7 +362,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
             FilledButton.icon(
               onPressed: _loading ? null : _showCreateDialog,
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('新建项目'),
+              label: Text(S.actionNewProject),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -334,7 +373,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
               onPressed: _loading ? null : _loadProjects,
               icon: const Icon(Icons.refresh),
               color: const Color(0xFF8B949E),
-              tooltip: '刷新',
+              tooltip: S.actionRefresh,
             ),
           ],
         ),
@@ -346,36 +385,39 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                   child: CircularProgressIndicator(color: AppColors.primary),
                 )
               : _projects.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.folder_off_outlined,
-                            size: 64,
-                            color: AppColors.textSecondary.withValues(alpha: 0.5),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            '暂无项目，点击「新建项目」开始',
-                            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                          ),
-                        ],
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.folder_off_outlined,
+                        size: 64,
+                        color: AppColors.textSecondary.withValues(alpha: 0.5),
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: _projects.length,
-                      itemBuilder: (context, index) {
-                        final project = _projects[index];
-                        return _ProjectCard(
-                          project: project,
-                          onEdit: () => _showEditDialog(project),
-                          onDelete: () => _showDeleteConfirm(project),
-                          onEnterWebshell: () => widget.onEnterWebshell(project),
-                          onEnterExp: () => widget.onEnterExp(project),
-                        );
-                      },
-                    ),
+                      const SizedBox(height: 16),
+                      Text(
+                        S.projectEmptyHint(S.actionNewProject),
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _projects.length,
+                  itemBuilder: (context, index) {
+                    final project = _projects[index];
+                    return _ProjectCard(
+                      project: project,
+                      onEdit: () => _showEditDialog(project),
+                      onDelete: () => _showDeleteConfirm(project),
+                      onEnterWebshell: () => widget.onEnterWebshell(project),
+                      onEnterExp: () => widget.onEnterExp(project),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -418,7 +460,9 @@ class _ProjectCardState extends State<_ProjectCard> {
           color: _hovered ? AppColors.bgElevated : AppColors.bgCard,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _hovered ? AppColors.primary.withValues(alpha: 0.55) : AppColors.border,
+            color: _hovered
+                ? AppColors.primary.withValues(alpha: 0.55)
+                : AppColors.border,
             width: _hovered ? 1.2 : 1,
           ),
           boxShadow: [
@@ -437,9 +481,15 @@ class _ProjectCardState extends State<_ProjectCard> {
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.5),
+                ),
               ),
-              child: const Icon(Icons.folder, color: AppColors.primary, size: 24),
+              child: const Icon(
+                Icons.folder,
+                color: AppColors.primary,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -450,46 +500,66 @@ class _ProjectCardState extends State<_ProjectCard> {
                     children: [
                       Text(
                         widget.project.name,
-                        style: AppTextStyles.heading(size: 16, color: AppColors.textPrimary),
+                        style: AppTextStyles.heading(
+                          size: 16,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.border,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           widget.project.domain,
-                          style: AppTextStyles.caption(color: AppColors.primary),
+                          style: AppTextStyles.caption(
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.border,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           'ID: ${widget.project.id}',
-                          style: AppTextStyles.caption(color: AppColors.textSecondary),
+                          style: AppTextStyles.caption(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  if (widget.project.description != null && widget.project.description!.isNotEmpty) ...[
+                  if (widget.project.description != null &&
+                      widget.project.description!.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       widget.project.description!,
-                      style: AppTextStyles.body(size: 13, color: AppColors.textSecondary),
+                      style: AppTextStyles.body(
+                        size: 13,
+                        color: AppColors.textSecondary,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                   const SizedBox(height: 4),
                   Text(
-                    '创建于 ${_formatDate(widget.project.createdAt)} · 更新于 ${_formatDate(widget.project.updatedAt)}',
+                    S.projectCreatedUpdated(
+                      _formatDate(widget.project.createdAt),
+                      _formatDate(widget.project.updatedAt),
+                    ),
                     style: AppTextStyles.caption(color: AppColors.textMuted),
                   ),
                 ],
@@ -507,9 +577,16 @@ class _ProjectCardState extends State<_ProjectCard> {
                   value: 'webshell',
                   child: Row(
                     children: [
-                      const Icon(Icons.terminal, color: AppColors.primary, size: 20),
+                      const Icon(
+                        Icons.terminal,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
-                      Text('进入Webshell', style: AppTextStyles.body(color: AppColors.textPrimary)),
+                      Text(
+                        S.menuEnterWebshell,
+                        style: AppTextStyles.body(color: AppColors.textPrimary),
+                      ),
                     ],
                   ),
                 ),
@@ -517,9 +594,16 @@ class _ProjectCardState extends State<_ProjectCard> {
                   value: 'exp',
                   child: Row(
                     children: [
-                      const Icon(Icons.bug_report, color: AppColors.primary, size: 20),
+                      const Icon(
+                        Icons.bug_report,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
-                      Text('进入EXP', style: AppTextStyles.body(color: AppColors.textPrimary)),
+                      Text(
+                        S.menuEnterExp,
+                        style: AppTextStyles.body(color: AppColors.textPrimary),
+                      ),
                     ],
                   ),
                 ),
@@ -529,13 +613,13 @@ class _ProjectCardState extends State<_ProjectCard> {
               onPressed: widget.onEdit,
               icon: const Icon(Icons.edit_outlined),
               color: AppColors.cyan,
-              tooltip: '编辑',
+              tooltip: S.tooltipEdit,
             ),
             IconButton(
               onPressed: widget.onDelete,
               icon: const Icon(Icons.delete_outline),
               color: AppColors.red,
-              tooltip: '删除',
+              tooltip: S.tooltipDelete,
             ),
           ],
         ),

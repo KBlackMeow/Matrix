@@ -8,6 +8,7 @@ import '../database/database_helper.dart';
 import '../models/project.dart';
 import '../models/webshell.dart';
 import '../theme/app_theme.dart';
+import '../app/localization.dart';
 import 'webshell_interactive_page.dart';
 
 /// Webshell 管理页面：创建、编辑、删除
@@ -71,11 +72,13 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
             final url = urlController.text.trim();
             final pass = passwordController.text;
             if (url.isEmpty || pass.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('请先填写地址和密码'),
-                behavior: SnackBarBehavior.floating,
-                duration: Duration(seconds: 2),
-              ));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(S.snackFillUrlAndPassword),
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
               return;
             }
             setDialogState(() {
@@ -83,9 +86,14 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
               detectResults = null;
             });
             final results = await _autoDetect(
-                url: url, password: pass, method: selectedMethod);
-            final first = results.firstWhere((r) => r.ok,
-                orElse: () => results.first);
+              url: url,
+              password: pass,
+              method: selectedMethod,
+            );
+            final first = results.firstWhere(
+              (r) => r.ok,
+              orElse: () => results.first,
+            );
             setDialogState(() {
               detecting = false;
               detectResults = results;
@@ -96,7 +104,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
           return AlertDialog(
             backgroundColor: AppColors.bgCard,
             title: Text(
-              '添加 Webshell',
+              S.actionAddWebshell,
               style: AppTextStyles.heading(color: AppColors.primary),
             ),
             content: SizedBox(
@@ -108,8 +116,8 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   children: [
                     _buildField(
                       controller: urlController,
-                      label: 'Webshell 地址 *',
-                      hint: 'http://example.com/shell.php',
+                      label: S.fieldWebshellUrl,
+                      hint: S.hintWebshellUrl,
                       autofocus: true,
                     ),
                     const SizedBox(height: 16),
@@ -118,13 +126,14 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                       obscureText: obscurePassword,
                       connectorType: selectedConnectorType,
                       onToggleObscure: () => setDialogState(
-                          () => obscurePassword = !obscurePassword),
+                        () => obscurePassword = !obscurePassword,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     _buildField(
                       controller: nameController,
-                      label: '备注名称（可选）',
-                      hint: '例如：后台管理 Shell',
+                      label: S.fieldWebshellName,
+                      hint: S.hintWebshellName,
                     ),
                     const SizedBox(height: 16),
                     _ConnectorRow(
@@ -148,15 +157,17 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                     Row(
                       children: [
                         Text(
-                          '请求方法：',
-                          style:
-                              AppTextStyles.body(color: AppColors.textSecondary),
+                          S.labelRequestMethod,
+                          style: AppTextStyles.body(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         _MethodToggle(
                           value: selectedMethod,
                           lockedMethod: ConnectorFactory.fixedMethod(
-                              selectedConnectorType),
+                            selectedConnectorType,
+                          ),
                           onChanged: (v) =>
                               setDialogState(() => selectedMethod = v),
                         ),
@@ -169,9 +180,10 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: Text('取消',
-                    style:
-                        AppTextStyles.body(color: AppColors.textSecondary)),
+                child: Text(
+                  S.btnCancel,
+                  style: AppTextStyles.body(color: AppColors.textSecondary),
+                ),
               ),
               FilledButton(
                 onPressed: () {
@@ -181,10 +193,13 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   }
                   Navigator.pop(context, true);
                 },
-                style:
-                    FilledButton.styleFrom(backgroundColor: AppColors.primary),
-                child: Text('添加',
-                    style: AppTextStyles.body(color: AppColors.bgDark)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
+                child: Text(
+                  S.btnAdd,
+                  style: AppTextStyles.body(color: AppColors.bgDark),
+                ),
               ),
             ],
           );
@@ -230,11 +245,13 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
             final url = urlController.text.trim();
             final pass = passwordController.text;
             if (url.isEmpty || pass.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('请先填写地址和密码'),
-                behavior: SnackBarBehavior.floating,
-                duration: Duration(seconds: 2),
-              ));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(S.snackFillUrlAndPassword),
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
               return;
             }
             setDialogState(() {
@@ -242,9 +259,14 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
               detectResults = null;
             });
             final results = await _autoDetect(
-                url: url, password: pass, method: selectedMethod);
-            final first = results.firstWhere((r) => r.ok,
-                orElse: () => results.first);
+              url: url,
+              password: pass,
+              method: selectedMethod,
+            );
+            final first = results.firstWhere(
+              (r) => r.ok,
+              orElse: () => results.first,
+            );
             setDialogState(() {
               detecting = false;
               detectResults = results;
@@ -255,7 +277,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
           return AlertDialog(
             backgroundColor: AppColors.bgCard,
             title: Text(
-              '编辑 Webshell',
+              S.titleEditWebshell,
               style: AppTextStyles.heading(color: AppColors.primary),
             ),
             content: SizedBox(
@@ -267,8 +289,8 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   children: [
                     _buildField(
                       controller: urlController,
-                      label: 'Webshell 地址 *',
-                      hint: 'http://example.com/shell.php',
+                      label: S.fieldWebshellUrl,
+                      hint: S.hintWebshellUrl,
                       autofocus: true,
                     ),
                     const SizedBox(height: 16),
@@ -277,13 +299,14 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                       obscureText: obscurePassword,
                       connectorType: selectedConnectorType,
                       onToggleObscure: () => setDialogState(
-                          () => obscurePassword = !obscurePassword),
+                        () => obscurePassword = !obscurePassword,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     _buildField(
                       controller: nameController,
-                      label: '备注名称（可选）',
-                      hint: '例如：后台管理 Shell',
+                      label: S.fieldWebshellName,
+                      hint: S.hintWebshellName,
                     ),
                     const SizedBox(height: 16),
                     _ConnectorRow(
@@ -302,15 +325,17 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                     Row(
                       children: [
                         Text(
-                          '请求方法：',
-                          style:
-                              AppTextStyles.body(color: AppColors.textSecondary),
+                          S.labelRequestMethod,
+                          style: AppTextStyles.body(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         _MethodToggle(
                           value: selectedMethod,
                           lockedMethod: ConnectorFactory.fixedMethod(
-                              selectedConnectorType),
+                            selectedConnectorType,
+                          ),
                           onChanged: (v) =>
                               setDialogState(() => selectedMethod = v),
                         ),
@@ -323,9 +348,10 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: Text('取消',
-                    style:
-                        AppTextStyles.body(color: AppColors.textSecondary)),
+                child: Text(
+                  S.btnCancel,
+                  style: AppTextStyles.body(color: AppColors.textSecondary),
+                ),
               ),
               FilledButton(
                 onPressed: () {
@@ -335,10 +361,13 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   }
                   Navigator.pop(context, true);
                 },
-                style:
-                    FilledButton.styleFrom(backgroundColor: AppColors.primary),
-                child: Text('保存',
-                    style: AppTextStyles.body(color: AppColors.bgDark)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
+                child: Text(
+                  S.btnSave,
+                  style: AppTextStyles.body(color: AppColors.bgDark),
+                ),
               ),
             ],
           );
@@ -353,14 +382,16 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
       final name = nameController.text.trim().isEmpty
           ? _deriveNameFromUrl(url)
           : nameController.text.trim();
-      await _db.updateWebshell(ws.copyWith(
-        name: name,
-        url: url,
-        password: passwordController.text,
-        type: ConnectorFactory.typeLabel(selectedConnectorType),
-        method: selectedMethod,
-        connectorType: selectedConnectorType,
-      ));
+      await _db.updateWebshell(
+        ws.copyWith(
+          name: name,
+          url: url,
+          password: passwordController.text,
+          type: ConnectorFactory.typeLabel(selectedConnectorType),
+          method: selectedMethod,
+          connectorType: selectedConnectorType,
+        ),
+      );
       _loadWebshells();
     }
   }
@@ -370,21 +401,26 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.bgCard,
-        title: const Text('确认删除', style: TextStyle(color: AppColors.red)),
+        title: Text(S.btnDelete, style: const TextStyle(color: AppColors.red)),
         content: Text(
-          '确定要删除「${ws.name}」吗？此操作不可恢复。',
+          S.confirmDeleteWebshell(ws.name),
           style: const TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消',
-                style: TextStyle(color: AppColors.textSecondary)),
+            child: Text(
+              S.btnCancel,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
-            child: const Text('删除', style: TextStyle(color: Colors.white)),
+            child: Text(
+              S.btnDelete,
+              style: const TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -429,10 +465,14 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   color: AppColors.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.5)),
+                    color: AppColors.primary.withValues(alpha: 0.5),
+                  ),
                 ),
-                child: const Icon(Icons.terminal,
-                    color: AppColors.primary, size: 22),
+                child: const Icon(
+                  Icons.terminal,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -440,25 +480,33 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Webshell管理 · ${widget.project.name}',
+                      S.webshellManagementTitle(widget.project.name),
                       style: AppTextStyles.heading(
-                          size: 15, color: AppColors.textPrimary),
+                        size: 15,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     Text(
                       widget.project.domain,
-                      style:
-                          AppTextStyles.caption(size: 13, color: AppColors.cyan),
+                      style: AppTextStyles.caption(
+                        size: 13,
+                        color: AppColors.cyan,
+                      ),
                     ),
                   ],
                 ),
               ),
               TextButton.icon(
                 onPressed: widget.onSwitchProject,
-                icon: const Icon(Icons.swap_horiz,
-                    size: 16, color: AppColors.textSecondary),
-                label: Text('切换项目',
-                    style:
-                        AppTextStyles.caption(color: AppColors.textSecondary)),
+                icon: const Icon(
+                  Icons.swap_horiz,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+                label: Text(
+                  S.btnSwitchProject,
+                  style: AppTextStyles.caption(color: AppColors.textSecondary),
+                ),
               ),
             ],
           ),
@@ -470,7 +518,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
             FilledButton.icon(
               onPressed: _loading ? null : _showCreateDialog,
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('添加 Webshell'),
+              label: Text(S.actionAddWebshell),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -481,12 +529,12 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
               onPressed: _loading ? null : _loadWebshells,
               icon: const Icon(Icons.refresh),
               color: AppColors.textSecondary,
-              tooltip: '刷新',
+              tooltip: S.actionRefresh,
             ),
             const Spacer(),
             if (!_loading)
               Text(
-                '共 ${_webshells.length} 条',
+                S.webshellCount(_webshells.length),
                 style: AppTextStyles.caption(color: AppColors.textMuted),
               ),
           ],
@@ -499,43 +547,42 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   child: CircularProgressIndicator(color: AppColors.primary),
                 )
               : _webshells.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.terminal_outlined,
-                            size: 64,
-                            color:
-                                AppColors.textSecondary.withValues(alpha: 0.4),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            '暂无 Webshell，点击「添加 Webshell」开始',
-                            style: AppTextStyles.body(
-                                color: AppColors.textSecondary),
-                          ),
-                        ],
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.terminal_outlined,
+                        size: 64,
+                        color: AppColors.textSecondary.withValues(alpha: 0.4),
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: _webshells.length,
-                      itemBuilder: (context, index) {
-                        final ws = _webshells[index];
-                        return _WebshellCard(
-                          webshell: ws,
-                          onEnter: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  WebshellInteractivePage(webshell: ws),
-                            ),
-                          ),
-                          onEdit: () => _showEditDialog(ws),
-                          onDelete: () => _showDeleteConfirm(ws),
-                        );
-                      },
-                    ),
+                      const SizedBox(height: 16),
+                      Text(
+                        S.webshellEmptyHint(S.actionAddWebshell),
+                        style: AppTextStyles.body(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _webshells.length,
+                  itemBuilder: (context, index) {
+                    final ws = _webshells[index];
+                    return _WebshellCard(
+                      webshell: ws,
+                      onEnter: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => WebshellInteractivePage(webshell: ws),
+                        ),
+                      ),
+                      onEdit: () => _showEditDialog(ws),
+                      onDelete: () => _showDeleteConfirm(ws),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -560,8 +607,9 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
         hintStyle: const TextStyle(color: AppColors.textMuted),
         labelStyle: const TextStyle(color: AppColors.textSecondary),
         enabledBorder: OutlineInputBorder(
-          borderSide:
-              BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+          borderSide: BorderSide(
+            color: AppColors.primary.withValues(alpha: 0.5),
+          ),
         ),
         focusedBorder: const OutlineInputBorder(
           borderSide: BorderSide(color: AppColors.primary),
@@ -611,179 +659,184 @@ class _WebshellCardState extends State<_WebshellCard> {
             color: _hovered ? AppColors.bgElevated : AppColors.bgCard,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: _hovered ? AppColors.primary.withValues(alpha: 0.55) : AppColors.border,
+              color: _hovered
+                  ? AppColors.primary.withValues(alpha: 0.55)
+                  : AppColors.border,
               width: _hovered ? 1.2 : 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: _hovered ? 0.14 : 0.0),
+                color: AppColors.primary.withValues(
+                  alpha: _hovered ? 0.14 : 0.0,
+                ),
                 blurRadius: 14,
                 spreadRadius: 0,
               ),
             ],
           ),
-        child: Row(
-          children: [
-            // 状态指示点
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: isOnline ? AppColors.primary : AppColors.textMuted,
-                shape: BoxShape.circle,
-                boxShadow: isOnline
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.5),
-                          blurRadius: 6,
-                        )
-                      ]
-                    : null,
-              ),
-            ),
-            const SizedBox(width: 14),
-            // 图标
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.3),
+          child: Row(
+            children: [
+              // 状态指示点
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: isOnline ? AppColors.primary : AppColors.textMuted,
+                  shape: BoxShape.circle,
+                  boxShadow: isOnline
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.5),
+                            blurRadius: 6,
+                          ),
+                        ]
+                      : null,
                 ),
               ),
-              child: const Icon(
-                Icons.terminal,
-                color: AppColors.primary,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 14),
-            // 信息
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          widget.webshell.name,
-                          style: AppTextStyles.body(
-                            size: 14,
-                            color: AppColors.textPrimary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _Tag(
-                        label:
-                            ConnectorFactory.shortLabel(widget.webshell.connectorType),
-                        color: widget.webshell.connectorType.startsWith('jsp')
-                            ? AppColors.amber
-                            : widget.webshell.connectorType.startsWith('asp')
-                                ? Colors.purple.shade300
-                                : AppColors.cyan,
-                      ),
-                      const SizedBox(width: 6),
-                      _Tag(
-                        label: widget.webshell.method,
-                        color: widget.webshell.method == 'POST'
-                            ? AppColors.cyan
-                            : AppColors.amber,
-                      ),
-                    ],
+              const SizedBox(width: 14),
+              // 图标
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.3),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          widget.webshell.url,
-                          style: AppTextStyles.caption(
-                            size: 12,
-                            color: AppColors.primary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      InkWell(
-                        onTap: () {
-                          Clipboard.setData(
-                            ClipboardData(text: widget.webshell.url),
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('已复制到剪贴板'),
-                              backgroundColor: AppColors.bgCard,
-                              behavior: SnackBarBehavior.floating,
-                              duration: const Duration(seconds: 1),
-                            ),
-                          );
-                        },
-                        child: const Icon(
-                          Icons.copy_outlined,
-                          size: 14,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (widget.webshell.password != null &&
-                      widget.webshell.password!.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      '密码: ${'•' * widget.webshell.password!.length.clamp(1, 12)}',
-                      style: AppTextStyles.caption(
-                        size: 11,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ],
+                ),
+                child: const Icon(
+                  Icons.terminal,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
               ),
-            ),
-            // 操作按钮
-            LayoutBuilder(
-              builder: (ctx, constraints) {
-                final screenW = MediaQuery.of(ctx).size.width;
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
+              const SizedBox(width: 14),
+              // 信息
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (screenW > 680) ...[
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            widget.webshell.name,
+                            style: AppTextStyles.body(
+                              size: 14,
+                              color: AppColors.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _Tag(
+                          label: ConnectorFactory.shortLabel(
+                            widget.webshell.connectorType,
+                          ),
+                          color: widget.webshell.connectorType.startsWith('jsp')
+                              ? AppColors.amber
+                              : widget.webshell.connectorType.startsWith('asp')
+                              ? Colors.purple.shade300
+                              : AppColors.cyan,
+                        ),
+                        const SizedBox(width: 6),
+                        _Tag(
+                          label: widget.webshell.method,
+                          color: widget.webshell.method == 'POST'
+                              ? AppColors.cyan
+                              : AppColors.amber,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.webshell.url,
+                            style: AppTextStyles.caption(
+                              size: 12,
+                              color: AppColors.primary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        InkWell(
+                          onTap: () {
+                            Clipboard.setData(
+                              ClipboardData(text: widget.webshell.url),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(S.snackCopied),
+                                backgroundColor: AppColors.bgCard,
+                                behavior: SnackBarBehavior.floating,
+                                duration: const Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                          child: const Icon(
+                            Icons.copy_outlined,
+                            size: 14,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (widget.webshell.password != null &&
+                        widget.webshell.password!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        _formatDate(widget.webshell.createdAt),
+                        '${S.webshellPasswordLabel}: ${'•' * widget.webshell.password!.length.clamp(1, 12)}',
                         style: AppTextStyles.caption(
                           size: 11,
                           color: AppColors.textMuted,
                         ),
                       ),
-                      const SizedBox(width: 8),
                     ],
-                    const SizedBox(width: 4),
-                    IconButton(
-                      onPressed: widget.onEdit,
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      color: AppColors.cyan,
-                      tooltip: '编辑',
-                      splashRadius: 18,
-                    ),
-                    IconButton(
-                      onPressed: widget.onDelete,
-                      icon: const Icon(Icons.delete_outline, size: 18),
-                      color: AppColors.red,
-                      tooltip: '删除',
-                      splashRadius: 18,
-                    ),
                   ],
-                );
-              },
-            ),
-          ],
-        ),
+                ),
+              ),
+              // 操作按钮
+              LayoutBuilder(
+                builder: (ctx, constraints) {
+                  final screenW = MediaQuery.of(ctx).size.width;
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (screenW > 680) ...[
+                        Text(
+                          _formatDate(widget.webshell.createdAt),
+                          style: AppTextStyles.caption(
+                            size: 11,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      const SizedBox(width: 4),
+                      IconButton(
+                        onPressed: widget.onEdit,
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        color: AppColors.cyan,
+                        tooltip: S.tooltipEdit,
+                        splashRadius: 18,
+                      ),
+                      IconButton(
+                        onPressed: widget.onDelete,
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        color: AppColors.red,
+                        tooltip: S.tooltipDelete,
+                        splashRadius: 18,
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -800,6 +853,7 @@ class _WebshellCardState extends State<_WebshellCard> {
 class _MethodToggle extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
+
   /// 非 null 时表示该连接器固定使用此方法，切换按钮置灰并展示说明
   final String? lockedMethod;
 
@@ -821,16 +875,15 @@ class _MethodToggle extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               margin: const EdgeInsets.only(right: 8),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
                 color: locked
                     ? (selected
-                        ? AppColors.textMuted.withValues(alpha: 0.15)
-                        : AppColors.bgElevated.withValues(alpha: 0.5))
+                          ? AppColors.textMuted.withValues(alpha: 0.15)
+                          : AppColors.bgElevated.withValues(alpha: 0.5))
                     : (selected
-                        ? AppColors.primary.withValues(alpha: 0.2)
-                        : AppColors.bgElevated),
+                          ? AppColors.primary.withValues(alpha: 0.2)
+                          : AppColors.bgElevated),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                   color: locked
@@ -844,11 +897,11 @@ class _MethodToggle extends StatelessWidget {
                   size: 13,
                   color: locked
                       ? (selected
-                          ? AppColors.textSecondary
-                          : AppColors.textMuted.withValues(alpha: 0.5))
+                            ? AppColors.textSecondary
+                            : AppColors.textMuted.withValues(alpha: 0.5))
                       : (selected
-                          ? AppColors.primary
-                          : AppColors.textSecondary),
+                            ? AppColors.primary
+                            : AppColors.textSecondary),
                 ),
               ),
             ),
@@ -857,13 +910,18 @@ class _MethodToggle extends StatelessWidget {
         if (locked)
           Row(
             children: [
-              const Icon(Icons.lock_outline, size: 13,
-                  color: AppColors.textMuted),
+              const Icon(
+                Icons.lock_outline,
+                size: 13,
+                color: AppColors.textMuted,
+              ),
               const SizedBox(width: 4),
               Text(
-                '由连接器固定',
+                S.connectorMethodFixed,
                 style: AppTextStyles.caption(
-                    size: 11, color: AppColors.textMuted),
+                  size: 11,
+                  color: AppColors.textMuted,
+                ),
               ),
             ],
           ),
@@ -889,10 +947,7 @@ class _Tag extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
-      child: Text(
-        label,
-        style: AppTextStyles.caption(size: 11, color: color),
-      ),
+      child: Text(label, style: AppTextStyles.caption(size: 11, color: color)),
     );
   }
 }
@@ -903,47 +958,50 @@ class _ConnectorTypeDropdown extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
 
-  const _ConnectorTypeDropdown({
-    required this.value,
-    required this.onChanged,
-  });
+  const _ConnectorTypeDropdown({required this.value, required this.onChanged});
 
-  static const _options = <(String, String)>[
-    ('php_eval',        'PHP Eval'),
-    ('php_b64rot13',    'PHP B64+ROT13'),
-    ('php_behinder',    'PHP 冰蝎 (Behinder)'),
-    ('php_passthru',    'PHP Passthru'),
-    ('jsp_classloader', 'JSP ClassLoader'),
-    ('jsp_behinder',    'JSP 冰蝎 (Behinder)'),
-    ('jsp_runtime',     'JSP Runtime'),
-    ('asp_wscript',     'ASP WScript'),
-    ('aspx_cmd',        'ASPX .NET'),
+  List<(String, String)> _connectorOptions() => [
+    ('php_eval', S.connectorUiLabel('php_eval')),
+    ('php_b64rot13', S.connectorUiLabel('php_b64rot13')),
+    ('php_behinder', S.connectorUiLabel('php_behinder')),
+    ('php_passthru', S.connectorUiLabel('php_passthru')),
+    ('jsp_classloader', S.connectorUiLabel('jsp_classloader')),
+    ('jsp_behinder', S.connectorUiLabel('jsp_behinder')),
+    ('jsp_runtime', S.connectorUiLabel('jsp_runtime')),
+    ('asp_wscript', S.connectorUiLabel('asp_wscript')),
+    ('aspx_cmd', S.connectorUiLabel('aspx_cmd')),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final bool hasValue = _options.any((o) => o.$1 == value);
-    final List<DropdownMenuItem<String>> items = _options.map((o) {
+    final bool hasValue = _connectorOptions().any((o) => o.$1 == value);
+    final List<DropdownMenuItem<String>> items = _connectorOptions().map((o) {
       return DropdownMenuItem<String>(
         value: o.$1,
-        child: Text(o.$2,
-            style: AppTextStyles.body(color: AppColors.textPrimary, size: 13)),
+        child: Text(
+          o.$2,
+          style: AppTextStyles.body(color: AppColors.textPrimary, size: 13),
+        ),
       );
     }).toList();
 
     if (!hasValue && value.isNotEmpty) {
-      items.add(DropdownMenuItem<String>(
-        value: value,
-        child: Text('未知: $value',
-            style: AppTextStyles.body(color: AppColors.red, size: 13)),
-      ));
+      items.add(
+        DropdownMenuItem<String>(
+          value: value,
+          child: Text(
+            S.unknownConnector(value),
+            style: AppTextStyles.body(color: AppColors.red, size: 13),
+          ),
+        ),
+      );
     }
 
     return DropdownButtonFormField<String>(
       isExpanded: true,
       value: value,
       decoration: InputDecoration(
-        labelText: '连接器类型',
+        labelText: S.fieldConnectorType,
         labelStyle: AppTextStyles.caption(color: AppColors.textSecondary),
         filled: true,
         fillColor: AppColors.bgCard,
@@ -955,8 +1013,10 @@ class _ConnectorTypeDropdown extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: AppColors.border),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
       ),
       dropdownColor: AppColors.bgCard,
       style: AppTextStyles.body(color: AppColors.textPrimary, size: 13),
@@ -986,15 +1046,16 @@ class _PasswordParamField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final defaultParam = ConnectorFactory.defaultParam(connectorType);
-    final isBehinder = connectorType == 'jsp_behinder' || connectorType == 'php_behinder';
+    final isBehinder =
+        connectorType == 'jsp_behinder' || connectorType == 'php_behinder';
     final hint = isBehinder
-        ? '默认 mAtrix_911，或 payload 中 k 的 16 位 hex'
-        : (defaultParam.isNotEmpty ? '参数名，默认: $defaultParam' : '');
+        ? S.hintPasswordKey
+        : (defaultParam.isNotEmpty ? S.hintParamName(defaultParam) : '');
 
-    final labelText = isBehinder ? '连接密码/密钥 *' : '参数名 *';
+    final labelText = isBehinder ? S.fieldPasswordKey : S.fieldParamName;
     final helperText = isBehinder
-        ? '连接密码（MD5 前 16 位为密钥）；或直接填 payload 中 String k="xxx" 的 hex 值'
-        : 'Payload 中接收命令的 HTTP 参数名（如 \$_POST["$defaultParam"]）';
+        ? S.helperPasswordKey
+        : S.helperParamName(defaultParam);
 
     return TextField(
       controller: controller,
@@ -1007,11 +1068,12 @@ class _PasswordParamField extends StatelessWidget {
         labelText: labelText,
         labelStyle: const TextStyle(color: AppColors.textSecondary),
         hintText: hint,
-        hintStyle: AppTextStyles.caption(
-            color: AppColors.textMuted, size: 12),
+        hintStyle: AppTextStyles.caption(color: AppColors.textMuted, size: 12),
         helperText: helperText,
-        helperStyle:
-            AppTextStyles.caption(color: AppColors.textMuted, size: 11),
+        helperStyle: AppTextStyles.caption(
+          color: AppColors.textMuted,
+          size: 11,
+        ),
         helperMaxLines: 2,
         enabledBorder: OutlineInputBorder(
           borderSide: BorderSide(
@@ -1019,8 +1081,9 @@ class _PasswordParamField extends StatelessWidget {
           ),
         ),
         disabledBorder: OutlineInputBorder(
-          borderSide:
-              BorderSide(color: AppColors.border.withValues(alpha: 0.3)),
+          borderSide: BorderSide(
+            color: AppColors.border.withValues(alpha: 0.3),
+          ),
         ),
         focusedBorder: const OutlineInputBorder(
           borderSide: BorderSide(color: AppColors.primary),
@@ -1061,10 +1124,7 @@ class _ConnectorRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: _ConnectorTypeDropdown(
-            value: value,
-            onChanged: onChanged,
-          ),
+          child: _ConnectorTypeDropdown(value: value, onChanged: onChanged),
         ),
         const SizedBox(width: 8),
         SizedBox(
@@ -1081,7 +1141,7 @@ class _ConnectorRow extends StatelessWidget {
                     ),
                   )
                 : const Icon(Icons.radar_rounded, size: 16),
-            label: Text(detecting ? '检测中' : '自动检测'),
+            label: Text(detecting ? S.statusChecking : S.btnAutoDetect),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
@@ -1128,13 +1188,12 @@ Future<List<_DetectResult>> _autoDetect({
       final pingTimeout = type == 'jsp_classloader'
           ? const Duration(seconds: 125)
           : const Duration(seconds: 6);
-      final ok =
-          await ConnectorFactory.create(ws).ping().timeout(pingTimeout);
-      return _DetectResult(type, ok, ok ? '有响应' : '无响应');
+      final ok = await ConnectorFactory.create(ws).ping().timeout(pingTimeout);
+      return _DetectResult(type, ok, ok ? S.detectPingOk : S.detectPingNo);
     } on TimeoutException {
-      return _DetectResult(type, false, '超时');
+      return _DetectResult(type, false, S.detectPingTimeout);
     } catch (_) {
-      return _DetectResult(type, false, '连接失败');
+      return _DetectResult(type, false, S.detectPingConnectFailed);
     }
   });
   return Future.wait(futures);
@@ -1174,52 +1233,51 @@ class _DetectResultPanel extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                working > 0
-                    ? '检测完成，已自动选择第一个有响应的类型'
-                    : '未检测到有响应的连接器，请检查地址与密码',
+                working > 0 ? S.detectSuccess : S.detectFailed,
                 style: AppTextStyles.caption(
                   size: 11,
-                  color:
-                      working > 0 ? AppColors.primary : AppColors.textMuted,
+                  color: working > 0 ? AppColors.primary : AppColors.textMuted,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          ...results.map((r) => Padding(
-                padding: const EdgeInsets.only(bottom: 5),
-                child: Row(
-                  children: [
-                    Icon(
-                      r.ok
-                          ? Icons.check_circle_rounded
-                          : Icons.radio_button_unchecked,
-                      size: 13,
+          ...results.map(
+            (r) => Padding(
+              padding: const EdgeInsets.only(bottom: 5),
+              child: Row(
+                children: [
+                  Icon(
+                    r.ok
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked,
+                    size: 13,
+                    color: r.ok ? AppColors.primary : AppColors.textMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 96,
+                    child: Text(
+                      ConnectorFactory.shortLabel(r.type),
+                      style: AppTextStyles.caption(
+                        size: 12,
+                        color: r.ok
+                            ? AppColors.textPrimary
+                            : AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    r.msg,
+                    style: AppTextStyles.caption(
+                      size: 11,
                       color: r.ok ? AppColors.primary : AppColors.textMuted,
                     ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 96,
-                      child: Text(
-                        ConnectorFactory.shortLabel(r.type),
-                        style: AppTextStyles.caption(
-                          size: 12,
-                          color: r.ok
-                              ? AppColors.textPrimary
-                              : AppColors.textMuted,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      r.msg,
-                      style: AppTextStyles.caption(
-                        size: 11,
-                        color: r.ok ? AppColors.primary : AppColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              )),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
