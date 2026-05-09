@@ -9,7 +9,7 @@ import '../database/database_helper.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 8;
+  static const _kCurrentVersion = 9;
   static const _binaryContentPrefix = '__MATRIX_BINARY_B64__:';
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
@@ -80,6 +80,14 @@ class SeedService {
           'JSP 冰蝎 3.0（Behinder），AES 加密，payload 只读 body 第一行，agent 读第二行取参',
       tags: 'jsp,behinder,aes,encrypt,冰蝎',
       sinceVersion: 5,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/webshell/jsp_behinder_mem.jsp',
+      name: 'jsp_behinder_mem.jsp',
+      type: 'jsp',
+      description: 'JSP 内存马注入（Behinder 兼容），动态注册 Servlet 并通过 AES 通信',
+      tags: 'jsp,behinder,memory-shell,servlet,aes,inject',
+      sinceVersion: 9,
     ),
     // ── ASP ──────────────────────────────────────────────────────────────
     _PayloadDef(
@@ -286,6 +294,26 @@ class SeedService {
   static Future<void> _applyPatches(DatabaseHelper db) async {
     var existingPayloads = await db.getAllPayloads();
 
+    // 0) 清理内置默认 payload 的重名重复项（历史数据兼容）
+    final defaultNames = _defaultPayloads.map((e) => e.name).toSet();
+    final grouped = <String, List<dynamic>>{};
+    for (final p in existingPayloads) {
+      if (!p.isDefault) continue;
+      if (!defaultNames.contains(p.name)) continue;
+      grouped.putIfAbsent(p.name, () => []).add(p);
+    }
+    for (final entry in grouped.entries) {
+      final items = entry.value;
+      if (items.length <= 1) continue;
+      items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      for (final dup in items.skip(1)) {
+        try {
+          await db.deletePayload(dup.id);
+        } catch (_) {}
+      }
+    }
+    existingPayloads = await db.getAllPayloads();
+
     // 1) 应用显式 Patch（重命名 / 内容修复）
     for (final patch in _patchPayloads) {
       for (final p in existingPayloads) {
@@ -335,7 +363,10 @@ class SeedService {
   static Future<String> _loadPayloadContent(_PayloadDef def) async {
     if (!def.isBinary) return rootBundle.loadString(def.asset);
     final bytes = await rootBundle.load(def.asset);
-    final data = bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes);
+    final data = bytes.buffer.asUint8List(
+      bytes.offsetInBytes,
+      bytes.lengthInBytes,
+    );
     return _binaryContentPrefix + base64Encode(data);
   }
 }

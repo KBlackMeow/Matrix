@@ -10,6 +10,7 @@ import '../database/database_helper.dart';
 import '../models/payload.dart';
 import '../theme/app_theme.dart';
 import '../app/localization.dart';
+import '../services/seed_service.dart';
 
 // ── 类型配色 / 图标 ──────────────────────────────────────────────────────────
 
@@ -71,6 +72,20 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
       _payloads = list;
       _loading = false;
     });
+  }
+
+  Future<void> _syncDefaultPayloads() async {
+    setState(() => _loading = true);
+    try {
+      await SeedService.seed(_db);
+      if (!mounted) return;
+      _showSnack('内置 Payload 已与 assets 同步');
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('同步失败: $e', error: true);
+      setState(() => _loading = false);
+    }
   }
 
   Future<void> _importFromFile() async {
@@ -238,6 +253,13 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
           ),
         ),
         const Spacer(),
+        // 同步内置 payload 与 assets
+        _TbBtn(
+          icon: Icons.sync,
+          tooltip: '同步内置 Payload',
+          onPressed: _syncDefaultPayloads,
+        ),
+        const SizedBox(width: 6),
         // 刷新
         _TbBtn(icon: Icons.refresh, tooltip: S.actionRefresh, onPressed: _load),
         const SizedBox(width: 6),
