@@ -49,7 +49,7 @@ class DatabaseHelperIo {
 
     return openDatabase(
       path,
-      version: 10,
+      version: 11,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -107,6 +107,9 @@ class DatabaseHelperIo {
 
     await db.execute(
       'CREATE INDEX idx_webshell_project ON webshells(project_id)',
+    );
+    await db.execute(
+      'CREATE UNIQUE INDEX idx_payloads_name_is_default_unique ON payloads(name, is_default)',
     );
 
     await db.execute('''
@@ -230,6 +233,20 @@ class DatabaseHelperIo {
           updated_at INTEGER NOT NULL
         )
       ''');
+    }
+    if (oldVersion < 11) {
+      // 先清理历史重复，避免创建唯一索引失败
+      await db.execute('''
+        DELETE FROM payloads
+        WHERE id NOT IN (
+          SELECT MAX(id)
+          FROM payloads
+          GROUP BY name, is_default
+        )
+      ''');
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_payloads_name_is_default_unique ON payloads(name, is_default)',
+      );
     }
   }
 

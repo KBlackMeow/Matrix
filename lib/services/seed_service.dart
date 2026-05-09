@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/services.dart';
 
 import '../database/database_helper.dart';
+import '../models/payload.dart';
 
 /// 内置默认数据种子化服务
 /// 版本号递增时自动补充新增的默认条目
@@ -296,7 +297,7 @@ class SeedService {
 
     // 0) 清理内置默认 payload 的重名重复项（历史数据兼容）
     final defaultNames = _defaultPayloads.map((e) => e.name).toSet();
-    final grouped = <String, List<dynamic>>{};
+    final grouped = <String, List<Payload>>{};
     for (final p in existingPayloads) {
       if (!p.isDefault) continue;
       if (!defaultNames.contains(p.name)) continue;
