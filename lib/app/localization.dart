@@ -147,7 +147,7 @@ class S {
       case AppLanguage.ja:
         return 'Webshell';
       case AppLanguage.en:
-        return 'Webshells';
+        return 'Webshell';
     }
   }
 
@@ -316,7 +316,7 @@ class S {
       case AppLanguage.ja:
         return 'Webshell を追加';
       case AppLanguage.en:
-        return 'Add webshell';
+        return 'Add Webshell';
     }
   }
 
@@ -1052,7 +1052,7 @@ class S {
       case AppLanguage.ja:
         return 'Webshell へ';
       case AppLanguage.en:
-        return 'Open Webshells';
+        return 'Open Webshell';
     }
   }
 
@@ -1067,6 +1067,17 @@ class S {
     }
   }
 
+  static String get dialogChooseProjectEntryTitle {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '选择进入方式';
+      case AppLanguage.ja:
+        return '開く方法を選択';
+      case AppLanguage.en:
+        return 'Choose where to open';
+    }
+  }
+
   static String confirmDeleteProject(String name) {
     switch (_lang) {
       case AppLanguage.zh:
@@ -1074,7 +1085,7 @@ class S {
       case AppLanguage.ja:
         return 'プロジェクト「$name」を削除してもよろしいですか？Webshell と収集データも削除されます。この操作は元に戻せません。';
       case AppLanguage.en:
-        return 'Delete project "$name"? This will also delete its Webshells and collected data. This action cannot be undone.';
+        return 'Delete project "$name"? This will also delete its Webshell and collected data. This action cannot be undone.';
     }
   }
 
@@ -1546,7 +1557,7 @@ class S {
     }
   }
 
-  // ── Webshell 管理 ─────────────────────────────────────────────────────────
+  // ── Webshell ─────────────────────────────────────────────────────────────
 
   static String get fieldWebshellUrl {
     switch (_lang) {
@@ -1639,11 +1650,11 @@ class S {
   static String webshellManagementTitle(String projectName) {
     switch (_lang) {
       case AppLanguage.zh:
-        return 'Webshell 管理 · $projectName';
+        return 'Webshell · $projectName';
       case AppLanguage.ja:
-        return 'Webshell 管理 · $projectName';
+        return 'Webshell · $projectName';
       case AppLanguage.en:
-        return 'Webshell manager · $projectName';
+        return 'Webshell · $projectName';
     }
   }
 
@@ -1676,7 +1687,7 @@ class S {
       case AppLanguage.ja:
         return 'Webshell がありません。「$addLabel」をクリックして開始';
       case AppLanguage.en:
-        return 'No Webshells yet. Click "$addLabel" to get started';
+        return 'No Webshell yet. Click "$addLabel" to get started';
     }
   }
 
@@ -2051,9 +2062,9 @@ class S {
       case AppLanguage.zh:
         return '上传到 Webshell 的 /tmp';
       case AppLanguage.ja:
-        return 'WebShell の /tmp にアップロード';
+        return 'Webshell の /tmp にアップロード';
       case AppLanguage.en:
-        return 'Upload to webshell /tmp';
+        return 'Upload to Webshell /tmp';
     }
   }
 
@@ -2062,20 +2073,20 @@ class S {
       case AppLanguage.zh:
         return '选择 Webshell（上传到 /tmp）';
       case AppLanguage.ja:
-        return 'WebShell を選択（/tmp にアップロード）';
+        return 'Webshell を選択（/tmp にアップロード）';
       case AppLanguage.en:
-        return 'Select webshell (upload to /tmp)';
+        return 'Select Webshell (upload to /tmp)';
     }
   }
 
   static String get snackNoWebshellsAnyProject {
     switch (_lang) {
       case AppLanguage.zh:
-        return '没有任何项目下保存 Webshell，请先在 Webshell 管理中添加';
+        return '没有任何项目下保存 Webshell，请先在 Webshell 中添加';
       case AppLanguage.ja:
-        return 'WebShell がありません。先に WebShell 管理で追加してください';
+        return 'Webshell がありません。先に Webshell で追加してください';
       case AppLanguage.en:
-        return 'No webshells found. Add one under Webshell management first';
+        return 'No Webshell found. Add one under Webshell first';
     }
   }
 
@@ -3304,11 +3315,11 @@ class S {
   static String get titleWebshellManager {
     switch (_lang) {
       case AppLanguage.zh:
-        return 'Webshell 管理';
+        return 'Webshell';
       case AppLanguage.ja:
-        return 'Webshell 管理';
+        return 'Webshell';
       case AppLanguage.en:
-        return 'Webshell manager';
+        return 'Webshell';
     }
   }
 

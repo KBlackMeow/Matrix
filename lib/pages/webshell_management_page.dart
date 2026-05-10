@@ -11,7 +11,7 @@ import '../theme/app_theme.dart';
 import '../app/localization.dart';
 import 'webshell_interactive_page.dart';
 
-/// Webshell 管理页面：创建、编辑、删除
+/// Webshell 页面：创建、编辑、删除
 class WebshellManagementPage extends StatefulWidget {
   final Project project;
   final VoidCallback onSwitchProject;

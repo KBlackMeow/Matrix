@@ -446,182 +446,269 @@ class _ProjectCard extends StatefulWidget {
 class _ProjectCardState extends State<_ProjectCard> {
   bool _hovered = false;
 
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOut,
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: _hovered ? AppColors.bgElevated : AppColors.bgCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _hovered
-                ? AppColors.primary.withValues(alpha: 0.55)
-                : AppColors.border,
-            width: _hovered ? 1.2 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: _hovered ? 0.14 : 0.0),
-              blurRadius: 14,
-              spreadRadius: 0,
+  Future<void> _showChooseEntryDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: Text(
+          S.dialogChooseProjectEntryTitle,
+          style: AppTextStyles.heading(color: AppColors.primary),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              widget.project.name,
+              style: AppTextStyles.body(size: 14, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.project.domain,
+              style: AppTextStyles.caption(size: 12, color: AppColors.cyan),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                widget.onEnterWebshell();
+              },
+              icon: const Icon(Icons.terminal, size: 20),
+              label: Text(S.menuEnterWebshell),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.bgDark,
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                widget.onEnterExp();
+              },
+              icon: const Icon(Icons.bug_report, size: 20),
+              label: Text(S.menuEnterExp),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary.withValues(alpha: 0.85),
+                foregroundColor: AppColors.bgDark,
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
             ),
           ],
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.5),
-                ),
-              ),
-              child: const Icon(
-                Icons.folder,
-                color: AppColors.primary,
-                size: 24,
-              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              S.btnCancel,
+              style: AppTextStyles.body(color: AppColors.textSecondary),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: _showChooseEntryDialog,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: _hovered ? AppColors.bgElevated : AppColors.bgCard,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _hovered
+                  ? AppColors.primary.withValues(alpha: 0.55)
+                  : AppColors.border,
+              width: _hovered ? 1.2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: _hovered ? 0.14 : 0.0),
+                blurRadius: 14,
+                spreadRadius: 0,
+              ),
+            ],
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        widget.project.name,
-                        style: AppTextStyles.heading(
-                          size: 16,
-                          color: AppColors.textPrimary,
-                        ),
+                Center(
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.5),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.border,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          widget.project.domain,
-                          style: AppTextStyles.caption(
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.border,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'ID: ${widget.project.id}',
-                          style: AppTextStyles.caption(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
+                    child: const Icon(
+                      Icons.folder,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
                   ),
-                  if (widget.project.description != null &&
-                      widget.project.description!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.project.description!,
-                      style: AppTextStyles.body(
-                        size: 13,
-                        color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: SizedBox.expand(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.max,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  widget.project.name,
+                                  style: AppTextStyles.heading(
+                                    size: 16,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.border,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  widget.project.domain,
+                                  style: AppTextStyles.caption(
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.border,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'ID: ${widget.project.id}',
+                                  style: AppTextStyles.caption(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (widget.project.description != null &&
+                              widget.project.description!.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.project.description!,
+                              style: AppTextStyles.body(
+                                size: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          Text(
+                            S.projectCreatedUpdated(
+                              _formatDate(widget.project.createdAt),
+                              _formatDate(widget.project.updatedAt),
+                            ),
+                            style: AppTextStyles.caption(color: AppColors.textMuted),
+                          ),
+                        ],
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+                  color: AppColors.bgCard,
+                  onSelected: (value) {
+                    if (value == 'webshell') widget.onEnterWebshell();
+                    if (value == 'exp') widget.onEnterExp();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'webshell',
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.terminal,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            S.menuEnterWebshell,
+                            style: AppTextStyles.body(color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'exp',
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.bug_report,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            S.menuEnterExp,
+                            style: AppTextStyles.body(color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
-                  const SizedBox(height: 4),
-                  Text(
-                    S.projectCreatedUpdated(
-                      _formatDate(widget.project.createdAt),
-                      _formatDate(widget.project.updatedAt),
-                    ),
-                    style: AppTextStyles.caption(color: AppColors.textMuted),
-                  ),
-                ],
-              ),
-            ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
-              color: AppColors.bgCard,
-              onSelected: (value) {
-                if (value == 'webshell') widget.onEnterWebshell();
-                if (value == 'exp') widget.onEnterExp();
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'webshell',
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.terminal,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        S.menuEnterWebshell,
-                        style: AppTextStyles.body(color: AppColors.textPrimary),
-                      ),
-                    ],
-                  ),
                 ),
-                PopupMenuItem(
-                  value: 'exp',
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.bug_report,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        S.menuEnterExp,
-                        style: AppTextStyles.body(color: AppColors.textPrimary),
-                      ),
-                    ],
-                  ),
+                IconButton(
+                  onPressed: widget.onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  color: AppColors.cyan,
+                  tooltip: S.tooltipEdit,
+                ),
+                IconButton(
+                  onPressed: widget.onDelete,
+                  icon: const Icon(Icons.delete_outline),
+                  color: AppColors.red,
+                  tooltip: S.tooltipDelete,
                 ),
               ],
             ),
-            IconButton(
-              onPressed: widget.onEdit,
-              icon: const Icon(Icons.edit_outlined),
-              color: AppColors.cyan,
-              tooltip: S.tooltipEdit,
-            ),
-            IconButton(
-              onPressed: widget.onDelete,
-              icon: const Icon(Icons.delete_outline),
-              color: AppColors.red,
-              tooltip: S.tooltipDelete,
-            ),
-          ],
+          ),
+        ),
         ),
       ),
     );
