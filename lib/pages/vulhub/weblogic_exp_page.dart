@@ -8,7 +8,9 @@ import 'base_vulhub_exp_page.dart';
 import '../../app/localization.dart';
 
 class WebLogicExpPage extends BaseVulhubExpPage {
-  const WebLogicExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const WebLogicExpPage({super.key, this.initialTargetUrl});
 
   @override
   State<WebLogicExpPage> createState() => _WebLogicPageState();
@@ -27,11 +29,17 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
   @override
   String get cardSubtitle => S.vulhubWeblogicCardSubtitle;
 
-  final _urlCtrl = TextEditingController();
+  late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
   // 0=CVE-2017-10271  1=CVE-2020-14882
   int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlCtrl = TextEditingController(text: widget.initialTargetUrl ?? '');
+  }
 
   WebLogicExpService _svc() => WebLogicExpService(
     baseUrl: _urlCtrl.text.trim(),

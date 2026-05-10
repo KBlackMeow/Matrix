@@ -7,7 +7,9 @@ import 'base_vulhub_exp_page.dart';
 import '../../app/localization.dart';
 
 class TomcatExpPage extends BaseVulhubExpPage {
-  const TomcatExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const TomcatExpPage({super.key, this.initialTargetUrl});
 
   @override
   State<TomcatExpPage> createState() => _TomcatPageState();
@@ -26,9 +28,15 @@ class _TomcatPageState extends BaseVulhubExpPageState<TomcatExpPage> {
   @override
   String get cardSubtitle => S.vulhubTomcatCardSubtitle;
 
-  final _urlCtrl = TextEditingController();
+  late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _urlCtrl = TextEditingController(text: widget.initialTargetUrl ?? '');
+  }
 
   TomcatExpService _svc() => TomcatExpService(
     baseUrl: _urlCtrl.text.trim(),

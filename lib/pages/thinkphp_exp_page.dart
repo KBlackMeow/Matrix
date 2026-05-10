@@ -16,7 +16,9 @@ import 'webshell_interactive_page.dart';
 
 /// ThinkPHP 漏洞利用页面（100% 复现 ThinkphpGUI）
 class ThinkphpExpPage extends StatelessWidget {
-  const ThinkphpExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const ThinkphpExpPage({super.key, this.initialTargetUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +114,9 @@ class ThinkphpExpPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Expanded(child: _ThinkphpExpCard()),
+            Expanded(
+              child: _ThinkphpExpCard(initialTargetUrl: initialTargetUrl),
+            ),
           ],
         ),
       ),
@@ -121,14 +125,16 @@ class ThinkphpExpPage extends StatelessWidget {
 }
 
 class _ThinkphpExpCard extends StatefulWidget {
-  const _ThinkphpExpCard();
+  final String? initialTargetUrl;
+
+  const _ThinkphpExpCard({this.initialTargetUrl});
 
   @override
   State<_ThinkphpExpCard> createState() => _ThinkphpExpCardState();
 }
 
 class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
-  final _urlController = TextEditingController();
+  late final TextEditingController _urlController;
   final _cmdController = TextEditingController();
   final _timeoutController = TextEditingController();
   final _passwordController = TextEditingController(
@@ -145,6 +151,12 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
   /// 当前选中的 RCE 漏洞（用于执行命令 / GetShell）
   ThinkphpVulnType? _selectedRceVuln;
   ThinkphpVulnType _selectedCheckType = ThinkphpVulnType.tp5023;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlController = TextEditingController(text: widget.initialTargetUrl ?? '');
+  }
 
   void _appendLog(String line) {
     final existing = _logNotifier.value.isEmpty

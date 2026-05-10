@@ -971,22 +971,22 @@ class S {
   static String get fieldDomainOrId {
     switch (_lang) {
       case AppLanguage.zh:
-        return '域名或ID *';
+        return '目标 URL *';
       case AppLanguage.ja:
-        return 'ドメインまたはID *';
+        return 'ターゲット URL *';
       case AppLanguage.en:
-        return 'Domain or ID *';
+        return 'Target URL *';
     }
   }
 
   static String get hintDomainOrId {
     switch (_lang) {
       case AppLanguage.zh:
-        return '例如：example.com 或 target-001';
+        return '例如：https://target.example 或 http://192.168.1.1:8080';
       case AppLanguage.ja:
-        return '例：example.com または target-001';
+        return '例：https://target.example または http://192.168.1.1:8080';
       case AppLanguage.en:
-        return 'e.g. example.com or target-001';
+        return 'e.g. https://target.example or http://192.168.1.1:8080';
     }
   }
 
@@ -1644,6 +1644,17 @@ class S {
         return 'Webshell 管理 · $projectName';
       case AppLanguage.en:
         return 'Webshell manager · $projectName';
+    }
+  }
+
+  static String expManagementScopedTitle(String projectName) {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'EXP · $projectName';
+      case AppLanguage.ja:
+        return 'EXP · $projectName';
+      case AppLanguage.en:
+        return 'Exploits · $projectName';
     }
   }
 

@@ -8,7 +8,9 @@ import 'base_vulhub_exp_page.dart';
 import '../../app/localization.dart';
 
 class PhpExpPage extends BaseVulhubExpPage {
-  const PhpExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const PhpExpPage({super.key, this.initialTargetUrl});
 
   @override
   State<PhpExpPage> createState() => _PhpPageState();
@@ -27,11 +29,17 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
   @override
   String get cardSubtitle => S.vulhubPhpCardSubtitle;
 
-  final _urlCtrl = TextEditingController();
+  late final TextEditingController _urlCtrl;
   final _phpPathCtrl = TextEditingController(text: '/index.php');
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
   int _tab = 0; // 0 = backdoor, 1 = cgi
+
+  @override
+  void initState() {
+    super.initState();
+    _urlCtrl = TextEditingController(text: widget.initialTargetUrl ?? '');
+  }
 
   PhpBackdoorExpService _backdoorSvc() => PhpBackdoorExpService(
     baseUrl: _urlCtrl.text.trim(),

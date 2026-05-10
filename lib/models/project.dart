@@ -2,7 +2,7 @@
 class Project {
   final int id;
   final String name;
-  /// 域名或 ID，必填
+  /// 目标 URL（站点根地址），必填
   final String domain;
   final String? description;
   final DateTime createdAt;

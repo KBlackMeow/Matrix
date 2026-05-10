@@ -16,7 +16,9 @@ import 'base_vulhub_exp_page.dart';
 import '../../app/localization.dart';
 
 class DrupalExpPage extends BaseVulhubExpPage {
-  const DrupalExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const DrupalExpPage({super.key, this.initialTargetUrl});
 
   @override
   State<DrupalExpPage> createState() => _DrupalPageState();
@@ -35,7 +37,7 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
   @override
   String get cardSubtitle => S.vulhubDrupalCardSubtitle;
 
-  final _urlCtrl = TextEditingController();
+  late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController(
@@ -46,6 +48,12 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
     baseUrl: _urlCtrl.text.trim(),
     timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _urlCtrl = TextEditingController(text: widget.initialTargetUrl ?? '');
+  }
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {

@@ -16,7 +16,9 @@ import 'webshell_interactive_page.dart';
 
 /// 禅道 Repo RCE + 冰蝎 WebShell 写入页面
 class ZentaoExpPage extends StatelessWidget {
-  const ZentaoExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const ZentaoExpPage({super.key, this.initialTargetUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +114,9 @@ class ZentaoExpPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Expanded(child: _ZentaoExpCard()),
+            Expanded(
+              child: _ZentaoExpCard(initialTargetUrl: initialTargetUrl),
+            ),
           ],
         ),
       ),
@@ -121,14 +125,16 @@ class ZentaoExpPage extends StatelessWidget {
 }
 
 class _ZentaoExpCard extends StatefulWidget {
-  const _ZentaoExpCard();
+  final String? initialTargetUrl;
+
+  const _ZentaoExpCard({this.initialTargetUrl});
 
   @override
   State<_ZentaoExpCard> createState() => _ZentaoExpCardState();
 }
 
 class _ZentaoExpCardState extends State<_ZentaoExpCard> {
-  final _urlController = TextEditingController();
+  late final TextEditingController _urlController;
   final _timeoutController = TextEditingController(text: '10');
   final _passwordController = TextEditingController(
     text: AppConstants.defaultShellPassword,
@@ -137,6 +143,12 @@ class _ZentaoExpCardState extends State<_ZentaoExpCard> {
 
   final _logNotifier = ValueNotifier<String>('');
   bool _running = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlController = TextEditingController(text: widget.initialTargetUrl ?? '');
+  }
 
   void _appendLog(String line) {
     final existing = _logNotifier.value.isEmpty

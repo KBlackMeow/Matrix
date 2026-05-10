@@ -14,7 +14,9 @@ import '../../pages/webshell_interactive_page.dart';
 import '../../theme/app_theme.dart';
 
 class ShiroExpPage extends StatelessWidget {
-  const ShiroExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const ShiroExpPage({super.key, this.initialTargetUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +108,9 @@ class ShiroExpPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Expanded(child: _ShiroExpCard()),
+            Expanded(
+              child: _ShiroExpCard(initialTargetUrl: initialTargetUrl),
+            ),
           ],
         ),
       ),
@@ -115,14 +119,16 @@ class ShiroExpPage extends StatelessWidget {
 }
 
 class _ShiroExpCard extends StatefulWidget {
-  const _ShiroExpCard();
+  final String? initialTargetUrl;
+
+  const _ShiroExpCard({this.initialTargetUrl});
 
   @override
   State<_ShiroExpCard> createState() => _ShiroExpCardState();
 }
 
 class _ShiroExpCardState extends State<_ShiroExpCard> {
-  final _urlController = TextEditingController();
+  late final TextEditingController _urlController;
   final _cookieNameController = TextEditingController();
   final _timeoutController = TextEditingController();
   final _keyController = TextEditingController();
@@ -138,6 +144,12 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
   String _method = 'GET';
 
   String? get _currentKey => _keyController.text.trim().isNotEmpty ? _keyController.text.trim() : null;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlController = TextEditingController(text: widget.initialTargetUrl ?? '');
+  }
 
   @override
   void dispose() {

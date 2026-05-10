@@ -16,7 +16,9 @@ import 'base_vulhub_exp_page.dart';
 import '../../app/localization.dart';
 
 class Struts2ExpPage extends BaseVulhubExpPage {
-  const Struts2ExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const Struts2ExpPage({super.key, this.initialTargetUrl});
 
   @override
   State<Struts2ExpPage> createState() => _Struts2PageState();
@@ -32,7 +34,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
   @override
   String get cardSubtitle => S.vulhubStruts2CardSubtitle;
 
-  final _urlCtrl = TextEditingController();
+  late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
   final _pathCtrl = TextEditingController(text: 'struts2-showcase');
@@ -41,6 +43,12 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
   );
 
   Struts2VulnType _selected = Struts2VulnType.s2045;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlCtrl = TextEditingController(text: widget.initialTargetUrl ?? '');
+  }
 
   Struts2ExpService _svc() => Struts2ExpService(
     url: _urlCtrl.text.trim(),

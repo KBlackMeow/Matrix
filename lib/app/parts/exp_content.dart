@@ -1,20 +1,29 @@
 import 'package:flutter/material.dart';
 
+import '../../models/project.dart';
 import '../../theme/app_theme.dart';
 import '../localization.dart';
 import 'exp_registry.dart';
 
 class ExpContent extends StatelessWidget {
-  const ExpContent({super.key});
+  final Project project;
+  final VoidCallback onSwitchProject;
+
+  const ExpContent({
+    super.key,
+    required this.project,
+    required this.onSwitchProject,
+  });
 
   @override
   Widget build(BuildContext context) {
     final entries = visibleExpEntries();
+    final defaultTargetUrl = project.domain.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.bgCard,
             borderRadius: BorderRadius.circular(12),
@@ -22,33 +31,72 @@ class ExpContent extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Icon(Icons.bug_report, color: AppColors.primary, size: 32),
-              const SizedBox(width: 16),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.bug_report,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      S.expManagementTitle,
+                      S.expManagementScopedTitle(project.name),
                       style: AppTextStyles.heading(
-                        size: 18,
-                        color: AppColors.primary,
+                        size: 15,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     Text(
-                      S.expManagementHint,
+                      project.domain,
                       style: AppTextStyles.caption(
-                        size: 14,
+                        size: 13,
                         color: AppColors.cyan,
                       ),
                     ),
                   ],
                 ),
               ),
+              TextButton.icon(
+                onPressed: onSwitchProject,
+                icon: const Icon(
+                  Icons.swap_horiz,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+                label: Text(
+                  S.btnSwitchProject,
+                  style: AppTextStyles.caption(color: AppColors.textSecondary),
+                ),
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              S.expManagementHint,
+              style: AppTextStyles.caption(
+                size: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.only(bottom: 16),
@@ -63,9 +111,11 @@ class ExpContent extends StatelessWidget {
                 versionRequirement: e.versionRequirement,
                 tag: e.tag,
 
-                onTap: () => Navigator.of(
-                  context,
-                ).push(MaterialPageRoute(builder: (_) => e.page)),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => e.pageBuilder(defaultTargetUrl),
+                  ),
+                ),
               );
             },
           ),

@@ -21,16 +21,16 @@ class ExpEntry {
   final String versionRequirement;
   final String tag;
   final bool enabled;
-  final Widget page;
+  final Widget Function(String defaultTargetUrl) pageBuilder;
 
-  const ExpEntry({
+  ExpEntry({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.versionRequirement,
     required this.tag,
     this.enabled = true,
-    required this.page,
+    required this.pageBuilder,
   });
 }
 
@@ -42,7 +42,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitleShiro,
     versionRequirement: S.expVersionShiro,
     tag: 'Java · ${S.expTagGeneric}',
-    page: const shiro.ShiroExpPage(),
+    pageBuilder: (url) => shiro.ShiroExpPage(initialTargetUrl: url),
   ),
   ExpEntry(
     icon: Icons.php,
@@ -50,7 +50,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitleThinkphp,
     versionRequirement: S.expVersionThinkphp,
     tag: 'PHP · ${S.expTagGeneric}',
-    page: const ThinkphpExpPage(),
+    pageBuilder: (url) => ThinkphpExpPage(initialTargetUrl: url),
   ),
   ExpEntry(
     icon: Icons.storage,
@@ -58,7 +58,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitleZentao,
     versionRequirement: S.expVersionZentao,
     tag: 'PHP · ${S.expTagZentao}',
-    page: const ZentaoExpPage(),
+    pageBuilder: (url) => ZentaoExpPage(initialTargetUrl: url),
   ),
   ExpEntry(
     icon: Icons.bolt,
@@ -66,7 +66,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitleStruts2,
     versionRequirement: S.expVersionStruts2,
     tag: 'Java · Struts2',
-    page: const Struts2ExpPage(),
+    pageBuilder: (url) => Struts2ExpPage(initialTargetUrl: url),
   ),
   ExpEntry(
     icon: Icons.local_florist,
@@ -74,7 +74,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitleSpring,
     versionRequirement: S.expVersionSpring,
     tag: 'Java · Spring',
-    page: const SpringExpPage(),
+    pageBuilder: (url) => SpringExpPage(initialTargetUrl: url),
   ),
   ExpEntry(
     icon: Icons.http,
@@ -82,7 +82,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitleHttpd,
     versionRequirement: S.expVersionHttpd,
     tag: 'C · Apache',
-    page: const HttpdExpPage(),
+    pageBuilder: (url) => HttpdExpPage(initialTargetUrl: url),
   ),
   ExpEntry(
     icon: Icons.water_drop,
@@ -90,7 +90,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitleDrupal,
     versionRequirement: S.expVersionDrupal,
     tag: 'PHP · Drupal',
-    page: const DrupalExpPage(),
+    pageBuilder: (url) => DrupalExpPage(initialTargetUrl: url),
   ),
   ExpEntry(
     icon: Icons.php,
@@ -98,7 +98,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitlePhp,
     versionRequirement: S.expVersionPhp,
     tag: 'PHP · ${S.expTagGeneric}',
-    page: const PhpExpPage(),
+    pageBuilder: (url) => PhpExpPage(initialTargetUrl: url),
   ),
   ExpEntry(
     icon: Icons.cloud_upload,
@@ -106,7 +106,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitleTomcat,
     versionRequirement: S.expVersionTomcat,
     tag: 'Java · Tomcat',
-    page: const TomcatExpPage(),
+    pageBuilder: (url) => TomcatExpPage(initialTargetUrl: url),
   ),
   ExpEntry(
     icon: Icons.dns,
@@ -114,7 +114,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitleWeblogic,
     versionRequirement: S.expVersionWeblogic,
     tag: 'Java · WebLogic',
-    page: const WebLogicExpPage(),
+    pageBuilder: (url) => WebLogicExpPage(initialTargetUrl: url),
   ),
   ExpEntry(
     icon: Icons.schedule,
@@ -122,7 +122,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitleXxljob,
     versionRequirement: S.expVersionXxljob,
     tag: 'Java · XXL-JOB',
-    page: const XxlJobExpPage(),
+    pageBuilder: (url) => XxlJobExpPage(initialTargetUrl: url),
   ),
   ExpEntry(
     icon: Icons.cloud,
@@ -130,7 +130,7 @@ List<ExpEntry> get expEntries => [
     subtitle: S.expSubtitleNacos,
     versionRequirement: S.expVersionNacos,
     tag: 'Java · Nacos',
-    page: const NacosExpPage(),
+    pageBuilder: (url) => NacosExpPage(initialTargetUrl: url),
   ),
 ];
 

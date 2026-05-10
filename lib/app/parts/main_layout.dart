@@ -39,8 +39,10 @@ class _MainLayoutState extends State<MainLayout> {
   //   • 而 const 单例的子页面树会被 Flutter 视为「未变化」从而跳过重建，导致语言切换后子页面文本不刷新。
   late ProjectManagementPage _projectPage;
   late ProjectScopedPage _webshellPage;
+  late ProjectScopedPage _expPage;
   late RepaintBoundary _projectBoundary;
   late RepaintBoundary _webshellBoundary;
+  late RepaintBoundary _expBoundary;
   late List<Widget> _staticPages;
   late List<Widget> _pages;
 
@@ -100,7 +102,13 @@ class _MainLayoutState extends State<MainLayout> {
   void _rebuildDynamicPages() {
     _projectPage = ProjectManagementPage(
       selectedProject: _selectedProject,
-      onEnterExp: (_) => setState(() => _selectedIndex = 2),
+      onEnterExp: (project) {
+        setState(() {
+          _selectedProject = project;
+          _selectedIndex = 2;
+          _rebuildDynamicPages();
+        });
+      },
       onEnterWebshell: (project) {
         setState(() {
           _selectedProject = project;
@@ -155,10 +163,39 @@ class _MainLayoutState extends State<MainLayout> {
     );
     _projectBoundary = RepaintBoundary(child: _projectPage);
     _webshellBoundary = RepaintBoundary(child: _webshellPage);
+    _expPage = ProjectScopedPage(
+      selectedProject: _selectedProject,
+      onSelectProject: (p) {
+        setState(() {
+          _selectedProject = p;
+          _rebuildDynamicPages();
+        });
+      },
+      onClearProject: () {
+        setState(() {
+          _selectedProject = null;
+          _rebuildDynamicPages();
+        });
+      },
+      onNavigateToProjectManagement: () {
+        setState(() {
+          _selectedIndex = 0;
+          _selectedProject = null;
+          _rebuildDynamicPages();
+        });
+      },
+      title: S.menuExp,
+      icon: Icons.bug_report,
+      contentBuilder: (project, onSwitchProject) => exp.ExpContent(
+        project: project,
+        onSwitchProject: onSwitchProject,
+      ),
+    );
+    _expBoundary = RepaintBoundary(child: _expPage);
     // 注意：每次都 new 一份非 const 实例，确保语言变化时 Flutter 会下钻 build()
     // （const 单例会被 widget 比对识为未变更，从而跳过子树重建）。
     _staticPages = <Widget>[
-      RepaintBoundary(child: exp.ExpContent()),
+      _expBoundary,
       RepaintBoundary(child: PayloadManagementPage()),
       RepaintBoundary(child: ReverseShellDashboardPage()),
       RepaintBoundary(child: FrpTunnelPage()),

@@ -7,7 +7,9 @@ import 'base_vulhub_exp_page.dart';
 import '../../app/localization.dart';
 
 class XxlJobExpPage extends BaseVulhubExpPage {
-  const XxlJobExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const XxlJobExpPage({super.key, this.initialTargetUrl});
 
   @override
   State<XxlJobExpPage> createState() => _XxlJobPageState();
@@ -23,7 +25,7 @@ class _XxlJobPageState extends BaseVulhubExpPageState<XxlJobExpPage> {
   @override
   String get cardSubtitle => S.vulhubXxljobCardSubtitle;
 
-  final _urlCtrl = TextEditingController();
+  late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
 
@@ -31,6 +33,12 @@ class _XxlJobPageState extends BaseVulhubExpPageState<XxlJobExpPage> {
     baseUrl: _urlCtrl.text.trim(),
     timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _urlCtrl = TextEditingController(text: widget.initialTargetUrl ?? '');
+  }
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {

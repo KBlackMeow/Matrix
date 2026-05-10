@@ -14,7 +14,10 @@ import 'base_vulhub_exp_page.dart';
 import '../../app/localization.dart';
 
 class SpringExpPage extends BaseVulhubExpPage {
-  const SpringExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const SpringExpPage({super.key, this.initialTargetUrl});
+
   @override
   State<SpringExpPage> createState() => _SpringPageState();
 }
@@ -29,7 +32,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   @override
   String get cardSubtitle => S.vulhubSpringCardSubtitle;
 
-  final _urlCtrl = TextEditingController();
+  late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
   final _timeoutCtrl = TextEditingController();
   final _credCtrl = TextEditingController();
@@ -38,6 +41,12 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   );
 
   SpringVulnType _selected = SpringVulnType.springCloudFunction;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlCtrl = TextEditingController(text: widget.initialTargetUrl ?? '');
+  }
 
   SpringExpService _svc() => SpringExpService(
     url: _urlCtrl.text.trim(),

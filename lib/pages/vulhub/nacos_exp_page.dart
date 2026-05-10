@@ -7,7 +7,9 @@ import 'base_vulhub_exp_page.dart';
 import '../../app/localization.dart';
 
 class NacosExpPage extends BaseVulhubExpPage {
-  const NacosExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const NacosExpPage({super.key, this.initialTargetUrl});
 
   @override
   State<NacosExpPage> createState() => _NacosPageState();
@@ -26,7 +28,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
   @override
   String get cardSubtitle => S.vulhubNacosCardSubtitle;
 
-  final _urlCtrl = TextEditingController();
+  late final TextEditingController _urlCtrl;
   final _userCtrl = TextEditingController(text: 'attacker');
   final _passCtrl = TextEditingController(text: 'password123');
   final _timeoutCtrl = TextEditingController();
@@ -39,6 +41,12 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
     baseUrl: _urlCtrl.text.trim(),
     timeout: Duration(seconds: timeoutFrom(_timeoutCtrl)),
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _urlCtrl = TextEditingController(text: widget.initialTargetUrl ?? '');
+  }
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {

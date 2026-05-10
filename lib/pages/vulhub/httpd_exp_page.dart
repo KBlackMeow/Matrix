@@ -9,7 +9,9 @@ import 'base_vulhub_exp_page.dart';
 import '../reverse_shell_terminal_page.dart';
 
 class HttpdExpPage extends BaseVulhubExpPage {
-  const HttpdExpPage({super.key});
+  final String? initialTargetUrl;
+
+  const HttpdExpPage({super.key, this.initialTargetUrl});
 
   @override
   State<HttpdExpPage> createState() => _HttpdPageState();
@@ -28,7 +30,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
   @override
   String get cardSubtitle => S.vulhubHttpdCardSubtitle;
 
-  final _urlCtrl = TextEditingController();
+  late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
   final _fileCtrl = TextEditingController(text: '/etc/passwd');
   final _lhostCtrl = TextEditingController();
@@ -39,6 +41,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
   @override
   void initState() {
     super.initState();
+    _urlCtrl = TextEditingController(text: widget.initialTargetUrl ?? '');
     _rs.loadConfig().then((_) {
       if (!mounted) return;
       _lhostCtrl.text = _rs.lhost;
