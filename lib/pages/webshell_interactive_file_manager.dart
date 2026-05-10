@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +10,7 @@ import '../models/payload.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 import '../app/localization.dart';
+import '../widgets/upload_success_dialog.dart';
 
 // ─── 文件管理 Tab ──────────────────────────────────────────────────────────────
 
@@ -119,13 +119,7 @@ class _FileManagerTabState extends State<FileManagerTab>
 
   Future<void> _uploadFile() async {
     if (!widget.service.supportsFileWrite) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(S.snackWriteNotSupported),
-          backgroundColor: AppColors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      await showUploadFailureDialog(context, S.snackWriteNotSupported);
       return;
     }
     final file = await openFile(
@@ -139,26 +133,14 @@ class _FileManagerTabState extends State<FileManagerTab>
 
   Future<void> _uploadPayloadFile() async {
     if (!widget.service.supportsFileWrite) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(S.snackWriteNotSupported),
-          backgroundColor: AppColors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      await showUploadFailureDialog(context, S.snackWriteNotSupported);
       return;
     }
 
     final payloads = await _db.getAllPayloads();
     if (!mounted) return;
     if (payloads.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(S.snackNoPayloads),
-          backgroundColor: AppColors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      await showUploadFailureDialog(context, S.snackNoPayloads);
       return;
     }
 
@@ -170,12 +152,9 @@ class _FileManagerTabState extends State<FileManagerTab>
 
     final bytes = _payloadBytes(selected);
     if (bytes == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(S.snackPayloadDecodeFailed(selected.name)),
-          backgroundColor: AppColors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
+      await showUploadFailureDialog(
+        context,
+        S.snackPayloadDecodeFailed(selected.name),
       );
       return;
     }
@@ -252,30 +231,12 @@ class _FileManagerTabState extends State<FileManagerTab>
       }
       transferred.dispose();
       if (e is _TransferCancelled) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              S.snackUploadCancelled,
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: const Color(0xFF064D2E),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        await showUploadCancelledDialog(context);
       } else {
         debugPrint(
           '[Matrix][upload] error file=$fileName path=$remotePath size=${bytes.length} error=$e',
         );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              S.snackUploadFailed(e),
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: AppColors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        await showUploadFailureDialog(context, S.snackUploadFailed(e));
       }
       return;
     }
@@ -298,25 +259,16 @@ class _FileManagerTabState extends State<FileManagerTab>
       Navigator.of(context).pop();
     }
     transferred.dispose();
-    if (!ok) {
+    if (ok) {
+      await showUploadSuccessDialog(context, S.snackUploaded(fileName));
+      _loadDirectory(_currentPath);
+      widget.onInvalidateCompleterDir(_parent(remotePath));
+    } else {
       debugPrint(
         '[Matrix][upload] failed file=$fileName path=$remotePath size=${bytes.length} '
         'usedBinaryPath=$usedBinaryPath',
       );
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok ? S.snackUploaded(fileName) : S.snackUploadFail,
-          style: const TextStyle(color: Colors.white),
-        ),
-        backgroundColor: ok ? const Color(0xFF064D2E) : AppColors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    if (ok) {
-      _loadDirectory(_currentPath);
-      widget.onInvalidateCompleterDir(_parent(remotePath));
+      await showUploadFailureDialog(context, S.snackUploadFail);
     }
   }
 

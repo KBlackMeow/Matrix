@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -8,8 +7,11 @@ import 'package:flutter/services.dart';
 
 import '../database/database_helper.dart';
 import '../models/payload.dart';
+import '../models/webshell.dart';
+import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 import '../app/localization.dart';
+import '../widgets/upload_success_dialog.dart';
 
 // ── 类型配色 / 图标 ──────────────────────────────────────────────────────────
 
@@ -38,6 +40,34 @@ Uint8List? _decodeBinaryPayload(Payload payload) {
     return Uint8List.fromList(base64Decode(encoded));
   } catch (_) {
     return null;
+  }
+}
+
+Uint8List? _payloadBytes(Payload payload) {
+  if (payload.content.startsWith(_binaryContentPrefix)) {
+    return _decodeBinaryPayload(payload);
+  }
+  return Uint8List.fromList(utf8.encode(payload.content));
+}
+
+String _safeRemoteBaseName(String name) {
+  final n = name.trim().replaceAll('\\', '/');
+  if (n.isEmpty) return 'payload.txt';
+  final parts = n.split('/').where((s) => s.isNotEmpty).toList();
+  return parts.isEmpty ? 'payload.txt' : parts.last;
+}
+
+bool _bytesLookBinary(List<int> bytes) {
+  if (bytes.isEmpty) return false;
+  final sampleLen = bytes.length > 4096 ? 4096 : bytes.length;
+  for (var i = 0; i < sampleLen; i++) {
+    if (bytes[i] == 0) return true;
+  }
+  try {
+    utf8.decode(bytes, allowMalformed: false);
+    return false;
+  } catch (_) {
+    return true;
   }
 }
 
@@ -153,6 +183,150 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
     if (confirmed != true) return;
     await _db.deletePayload(payload.id);
     await _load();
+  }
+
+  Future<void> _uploadPayloadToWebshellTmp(Payload payload) async {
+    final projects = await _db.getAllProjects();
+    final entries = <_WebshellPickEntry>[];
+    for (final p in projects) {
+      final shells = await _db.getWebshellsByProject(p.id);
+      for (final w in shells) {
+        entries.add(_WebshellPickEntry(webshell: w, projectName: p.name));
+      }
+    }
+    if (!mounted) return;
+    if (entries.isEmpty) {
+      await showUploadFailureDialog(context, S.snackNoWebshellsAnyProject);
+      return;
+    }
+
+    final picked = await showDialog<Webshell>(
+      context: context,
+      builder: (_) => _WebshellPickerDialog(entries: entries),
+    );
+    if (picked == null || !mounted) return;
+
+    final bytes = _payloadBytes(payload);
+    if (bytes == null) {
+      await showUploadFailureDialog(
+        context,
+        S.snackPayloadDecodeFailed(payload.name),
+      );
+      return;
+    }
+
+    final service = WebshellService(picked);
+    if (!service.supportsFileWrite) {
+      await showUploadFailureDialog(context, S.snackWriteNotSupported);
+      return;
+    }
+
+    final remoteName = _safeRemoteBaseName(payload.name);
+    final remotePath = '/tmp/$remoteName';
+
+    await _uploadBytesToRemoteTmp(service, remoteName, remotePath, bytes);
+  }
+
+  Future<void> _uploadBytesToRemoteTmp(
+    WebshellService service,
+    String fileName,
+    String remotePath,
+    Uint8List bytes,
+  ) async {
+    var uploadCancelled = false;
+    var ok = false;
+    var usedBinaryPath = false;
+    var progressShown = false;
+    ValueNotifier<int>? transferred;
+
+    try {
+      final looksBinary = _bytesLookBinary(bytes);
+      final useBinaryPath = looksBinary || bytes.length > 100 * 1024;
+      if (!useBinaryPath) {
+        final content = utf8.decode(bytes);
+        ok = await service.writeFile(remotePath, content);
+      } else {
+        usedBinaryPath = true;
+        final progress = ValueNotifier<int>(0);
+        transferred = progress;
+        if (!mounted) return;
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => _PayloadUploadProgressDialog(
+            fileName: fileName,
+            fileSize: bytes.length,
+            transferred: progress,
+            onCancel: () {
+              uploadCancelled = true;
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
+            },
+          ),
+        );
+        progressShown = true;
+        ok = await service.writeFileBinaryWithProgress(
+          remotePath,
+          bytes,
+          (sent, _) {
+            if (!mounted) return;
+            if (uploadCancelled) {
+              throw _PayloadUploadCancelled();
+            }
+            progress.value = sent;
+          },
+        );
+      }
+    } catch (e) {
+      if (!mounted) {
+        transferred?.dispose();
+        return;
+      }
+      if (progressShown && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      transferred?.dispose();
+      if (e is _PayloadUploadCancelled) {
+        await showUploadCancelledDialog(context);
+      } else {
+        debugPrint(
+          '[Matrix][payload_upload] error file=$fileName path=$remotePath '
+          'size=${bytes.length} error=$e',
+        );
+        await showUploadFailureDialog(context, S.snackUploadFailed(e));
+      }
+      return;
+    }
+
+    if (!ok && !usedBinaryPath) {
+      try {
+        final content = utf8.decode(bytes);
+        ok = await service.writeFile(remotePath, content);
+      } catch (_) {}
+    }
+
+    if (!mounted) {
+      transferred?.dispose();
+      return;
+    }
+    if (progressShown && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+    transferred?.dispose();
+
+    if (ok) {
+      await showUploadSuccessDialog(
+        context,
+        S.snackPayloadUploadedToRemote(remotePath),
+      );
+    } else {
+      debugPrint(
+        '[Matrix][payload_upload] failed file=$fileName path=$remotePath '
+        'size=${bytes.length} usedBinaryPath=$usedBinaryPath',
+      );
+      await showUploadFailureDialog(context, S.snackUploadFail);
+    }
   }
 
   void _showDetail(Payload payload) {
@@ -325,6 +499,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
         payload: _payloads[i],
         onTap: () => _showDetail(_payloads[i]),
         onDelete: () => _delete(_payloads[i]),
+        onUploadToWebshellTmp: () => _uploadPayloadToWebshellTmp(_payloads[i]),
       ),
     );
   }
@@ -371,11 +546,13 @@ class _PayloadCard extends StatefulWidget {
   final Payload payload;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback onUploadToWebshellTmp;
 
   const _PayloadCard({
     required this.payload,
     required this.onTap,
     required this.onDelete,
+    required this.onUploadToWebshellTmp,
   });
 
   @override
@@ -514,7 +691,7 @@ class _PayloadCardState extends State<_PayloadCard> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // 类型标签 + 行数
+                    // 类型标签 + 行数 + 上传到 /tmp
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -525,6 +702,21 @@ class _PayloadCardState extends State<_PayloadCard> {
                           style: AppTextStyles.caption(
                             size: 9,
                             color: AppColors.textMuted,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Tooltip(
+                          message: S.tooltipPayloadUploadToWebshellTmp,
+                          child: GestureDetector(
+                            onTap: () => widget.onUploadToWebshellTmp(),
+                            child: Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: Icon(
+                                Icons.cloud_upload_outlined,
+                                size: 14,
+                                color: color.withValues(alpha: 0.85),
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -896,6 +1088,243 @@ class _DialogBtn extends StatelessWidget {
             const SizedBox(width: 4),
             Text(label, style: AppTextStyles.caption(size: 11, color: c)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PayloadUploadCancelled implements Exception {}
+
+class _WebshellPickEntry {
+  final Webshell webshell;
+  final String projectName;
+
+  const _WebshellPickEntry({
+    required this.webshell,
+    required this.projectName,
+  });
+}
+
+class _WebshellPickerDialog extends StatelessWidget {
+  final List<_WebshellPickEntry> entries;
+
+  const _WebshellPickerDialog({required this.entries});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: SizedBox(
+        width: 520,
+        height: 480,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: const BoxDecoration(
+                color: AppColors.bgElevated,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
+                border: Border(bottom: BorderSide(color: AppColors.border)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.terminal,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      S.titleSelectWebshellForPayload,
+                      style: AppTextStyles.heading(
+                        size: 14,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 18,
+                      color: AppColors.textSecondary,
+                    ),
+                    tooltip: S.tooltipClose,
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: entries.length,
+                separatorBuilder: (_, _) =>
+                    const Divider(height: 1, color: AppColors.border),
+                itemBuilder: (context, index) {
+                  final e = entries[index];
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(
+                      Icons.link,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    title: Text(
+                      e.webshell.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body(
+                        size: 13,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      '${e.projectName} · ${e.webshell.url}',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                      style: AppTextStyles.caption(
+                        size: 11,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    onTap: () => Navigator.pop(context, e.webshell),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PayloadUploadProgressDialog extends StatelessWidget {
+  final String fileName;
+  final int fileSize;
+  final ValueNotifier<int> transferred;
+  final VoidCallback onCancel;
+
+  const _PayloadUploadProgressDialog({
+    required this.fileName,
+    required this.fileSize,
+    required this.transferred,
+    required this.onCancel,
+  });
+
+  static String _fmtSize(int bytes) {
+    if (bytes <= 0) return '—';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: SizedBox(
+          width: 360,
+          child: ValueListenableBuilder<int>(
+            valueListenable: transferred,
+            builder: (_, sent, _) {
+              final double? progress =
+                  fileSize > 0 ? (sent / fileSize).clamp(0.0, 1.0) : null;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.upload_file,
+                        color: AppColors.primary,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        S.uploading,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: onCancel,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          minimumSize: const Size(0, 0),
+                        ),
+                        child: Text(
+                          S.btnCancel,
+                          style: AppTextStyles.caption(
+                            color: AppColors.textSecondary,
+                            size: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    fileName,
+                    style: AppTextStyles.terminal(
+                      size: 12,
+                      color: AppColors.cyan,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: AppColors.bgDark,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${_fmtSize(sent)} / ${_fmtSize(fileSize)}',
+                        style: AppTextStyles.caption(
+                          color: AppColors.textSecondary,
+                          size: 11,
+                        ),
+                      ),
+                      Text(
+                        '${((progress ?? 0) * 100).round()}%',
+                        style: AppTextStyles.caption(
+                          color: AppColors.primary,
+                          size: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

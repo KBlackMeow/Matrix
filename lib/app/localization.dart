@@ -2034,6 +2034,73 @@ class S {
     }
   }
 
+  /// Payload 管理卡片：上传到所选 Webshell 的 /tmp
+  static String get tooltipPayloadUploadToWebshellTmp {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '上传到 Webshell 的 /tmp';
+      case AppLanguage.ja:
+        return 'WebShell の /tmp にアップロード';
+      case AppLanguage.en:
+        return 'Upload to webshell /tmp';
+    }
+  }
+
+  static String get titleSelectWebshellForPayload {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '选择 Webshell（上传到 /tmp）';
+      case AppLanguage.ja:
+        return 'WebShell を選択（/tmp にアップロード）';
+      case AppLanguage.en:
+        return 'Select webshell (upload to /tmp)';
+    }
+  }
+
+  static String get snackNoWebshellsAnyProject {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '没有任何项目下保存 Webshell，请先在 Webshell 管理中添加';
+      case AppLanguage.ja:
+        return 'WebShell がありません。先に WebShell 管理で追加してください';
+      case AppLanguage.en:
+        return 'No webshells found. Add one under Webshell management first';
+    }
+  }
+
+  static String snackPayloadUploadedToRemote(String remotePath) {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '已上传至 $remotePath';
+      case AppLanguage.ja:
+        return '$remotePath にアップロードしました';
+      case AppLanguage.en:
+        return 'Uploaded to $remotePath';
+    }
+  }
+
+  static String get dialogUploadSuccessTitle {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '上传成功';
+      case AppLanguage.ja:
+        return 'アップロード完了';
+      case AppLanguage.en:
+        return 'Upload successful';
+    }
+  }
+
+  static String get dialogUploadFailureTitle {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '上传失败';
+      case AppLanguage.ja:
+        return 'アップロード失敗';
+      case AppLanguage.en:
+        return 'Upload failed';
+    }
+  }
+
   static String get uploading {
     switch (_lang) {
       case AppLanguage.zh:
