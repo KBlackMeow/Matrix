@@ -9,8 +9,8 @@ class PayloadDao {
     this._databaseProvider, {
     required Future<Directory> Function() payloadsDirProvider,
     required String Function(int id, String name) hashedFileName,
-  })  : _payloadsDirProvider = payloadsDirProvider,
-        _hashedFileName = hashedFileName;
+  }) : _payloadsDirProvider = payloadsDirProvider,
+       _hashedFileName = hashedFileName;
 
   final Future<Database> Function() _databaseProvider;
   final Future<Directory> Function() _payloadsDirProvider;
@@ -65,7 +65,10 @@ class PayloadDao {
 
   Future<List<Payload>> getAllPayloads() async {
     final db = await _databaseProvider();
-    final maps = await db.query('payloads', orderBy: 'is_default DESC, updated_at DESC');
+    final maps = await db.query(
+      'payloads',
+      orderBy: 'is_default DESC, updated_at DESC',
+    );
     final result = <Payload>[];
     for (final m in maps) {
       final filePath = (m['file_path'] as String?) ?? '';
@@ -87,8 +90,12 @@ class PayloadDao {
           isDefault: (m['is_default'] as int? ?? 0) == 1,
           description: m['description'] as String?,
           tags: m['tags'] as String?,
-          createdAt: DateTime.fromMillisecondsSinceEpoch(m['created_at'] as int),
-          updatedAt: DateTime.fromMillisecondsSinceEpoch(m['updated_at'] as int),
+          createdAt: DateTime.fromMillisecondsSinceEpoch(
+            m['created_at'] as int,
+          ),
+          updatedAt: DateTime.fromMillisecondsSinceEpoch(
+            m['updated_at'] as int,
+          ),
         ),
       );
     }

@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../app/localization.dart';
 import '../../models/project.dart';
@@ -27,6 +28,7 @@ class _MainLayoutState extends State<MainLayout> {
   Project? _selectedProject;
   bool _sidebarExpanded = true;
   bool _sidebarHidden = false;
+  String? _packageVersionLabel;
   static const double _sidebarWidth = 220.0;
   static const double _sidebarCollapsedWidth = 72.0;
   static const double _menuItemExtent = 56.0;
@@ -76,6 +78,12 @@ class _MainLayoutState extends State<MainLayout> {
     super.initState();
     _rebuildDynamicPages();
     AppLanguageController.notifier.addListener(_onLanguageChanged);
+    PackageInfo.fromPlatform().then((info) {
+      if (!mounted) return;
+      setState(() {
+        _packageVersionLabel = info.version;
+      });
+    });
   }
 
   @override
@@ -523,6 +531,26 @@ class _MainLayoutState extends State<MainLayout> {
               ),
             ),
           ),
+
+          if (t > 0.15 && _packageVersionLabel != null)
+            Opacity(
+              opacity: labelOpacity,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'v$_packageVersionLabel',
+                    style: AppTextStyles.caption(
+                      size: 11,
+                      color:
+                          AppColors.textSecondary.withValues(alpha: 0.72),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // 折叠按钮 — 箭头随动画旋转，文字渐显
           Padding(

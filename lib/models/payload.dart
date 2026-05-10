@@ -5,8 +5,10 @@ class Payload {
   final String type; // php / jsp / asp / other
   /// 脚本内容（IO 端从文件读取，Web 端存内存）
   final String content;
+
   /// 本地文件路径（Web 端为空字符串）
   final String filePath;
+
   /// true = 内置默认 payload，不可删除
   final bool isDefault;
   final String? description;
