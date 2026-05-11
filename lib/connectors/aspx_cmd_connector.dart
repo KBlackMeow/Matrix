@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
 import 'asp_wscript_connector.dart';
 import 'shell_connector.dart';
@@ -22,6 +23,55 @@ class AspxCmdConnector extends AspWscriptConnector {
         ConnectorCapability.fileRead,
         ConnectorCapability.fileWrite,
       };
+
+  @override
+  Future<List<FileEntry>> listDirectory(String path) async {
+    // 纯 cmd 方案：先切目录，再按名称列表逐个提取属性/时间/大小。
+    final raw = await sendRawCommand(
+      'cd /d "$path" 2>nul && '
+      'for /f "delims=" %I in (\'dir /b /a 2^>nul\') do '
+      '@if /i not "%I"=="." if /i not "%I"==".." '
+      '(if exist "%I\\*" '
+      '(for %J in ("%I") do @echo D^|0^|%~tJ^|%~aJ^|%~nxJ) '
+      'else (for %J in ("%I") do @echo F^|%~zJ^|%~tJ^|%~aJ^|%~nxJ))',
+    );
+    final entries = <FileEntry>[
+      const FileEntry(
+        name: '..',
+        isDirectory: true,
+        size: 0,
+        permissions: '',
+        modified: '',
+      ),
+    ];
+    final seen = <String>{};
+    for (final line in raw.split(RegExp(r'\r?\n'))) {
+      final t = line.trim();
+      if (t.isEmpty || t.startsWith('[')) continue;
+      final parts = t.split('|');
+      if (parts.length < 5) continue;
+      final kind = parts[0].trim();
+      final size = int.tryParse(parts[1].trim()) ?? 0;
+      final modified = parts[2].trim();
+      final perms = parts[3].trim();
+      final name = parts.sublist(4).join('|').trim();
+      if (name.isEmpty || name == '.' || name == '..') continue;
+      final key = name.toLowerCase();
+      if (!seen.add(key)) continue;
+      entries.add(FileEntry(
+        name: name,
+        isDirectory: kind == 'D',
+        size: kind == 'D' ? 0 : size,
+        permissions: _formatWindowsAttrs(perms, kind == 'D'),
+        modified: modified,
+      ));
+    }
+    entries.sublist(1).sort((a, b) {
+      if (a.isDirectory != b.isDirectory) return a.isDirectory ? -1 : 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return entries;
+  }
 
   @override
   Future<String> sendRawCommand(String cmd) async {
@@ -64,14 +114,15 @@ class AspxCmdConnector extends AspWscriptConnector {
 
   @override
   Future<String> readFile(String path) async {
-    // PowerShell: 读取文件字节 → Base64
-    final ps =
-        '[Convert]::ToBase64String([IO.File]::ReadAllBytes(\'$path\'))';
-    final raw =
-        await sendRawCommand('powershell -NoProfile -Command "$ps"');
+    // 纯 cmd + certutil：避免 PowerShell 启动开销
+    final raw = await sendRawCommand(
+      'certutil -encode "$path" "%TEMP%\\__mx_enc.tmp" && '
+      'type "%TEMP%\\__mx_enc.tmp" && '
+      'del "%TEMP%\\__mx_enc.tmp"',
+    );
     if (raw.isEmpty || raw.startsWith('[')) return '[文件不存在或无权读取]';
     try {
-      return decodeWithFallback(base64.decode(raw.trim()));
+      return decodeWithFallback(base64.decode(_extractCertutilBase64(raw)));
     } catch (_) {
       return '[读取失败：编码错误]';
     }
@@ -79,37 +130,89 @@ class AspxCmdConnector extends AspWscriptConnector {
 
   @override
   Future<bool> writeFile(String path, String content) async {
-    final b64 = base64.encode(utf8.encode(content));
-    // PowerShell: Base64 → 写入文件
-    final ps =
-        '[IO.File]::WriteAllBytes(\'$path\', [Convert]::FromBase64String(\'$b64\'))';
-    final r = await sendRawCommand(
-        'powershell -NoProfile -Command "$ps" && echo 1');
-    return r.trim().contains('1');
+    final bytes = Uint8List.fromList(utf8.encode(content));
+    return _writeBinaryChunked(path, bytes);
   }
 
   @override
   Future<Uint8List> readFileBinary(String path) async {
-    final ps = '[Convert]::ToBase64String([IO.File]::ReadAllBytes(\'$path\'))';
-    final raw = await sendRawCommand('powershell -NoProfile -Command "$ps"');
+    final raw = await sendRawCommand(
+      'certutil -encode "$path" "%TEMP%\\__mx_enc.tmp" && '
+      'type "%TEMP%\\__mx_enc.tmp" && '
+      'del "%TEMP%\\__mx_enc.tmp"',
+    );
     if (raw.isEmpty || raw.startsWith('[')) throw Exception('无法读取文件: $raw');
-    return base64.decode(raw.trim());
+    return base64.decode(_extractCertutilBase64(raw));
   }
 
   @override
   Future<bool> writeFileBinary(String path, Uint8List bytes) async {
-    final b64 = base64.encode(bytes);
-    final ps =
-        '[IO.File]::WriteAllBytes(\'$path\', [Convert]::FromBase64String(\'$b64\'))';
-    final r = await sendRawCommand(
-        'powershell -NoProfile -Command "$ps" && echo 1');
-    return r.trim().contains('1');
+    return _writeBinaryChunked(path, bytes);
+  }
+
+
+  static const _kWinUploadChunkSize = 2048; // keep cmd length safe
+
+  @override
+  Future<bool> writeFileBinaryWithProgress(
+    String path,
+    Uint8List bytes,
+    void Function(int sent, int total) onProgress,
+  ) async {
+    return _writeBinaryChunked(path, bytes, onProgress: onProgress);
+  }
+
+  Future<bool> _writeBinaryChunked(
+    String path,
+    Uint8List bytes, {
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    final total = bytes.length;
+    onProgress?.call(0, total);
+    if (total == 0) {
+      final r = await sendRawCommand('type nul > "$path" && echo 1');
+      onProgress?.call(0, 0);
+      return r.trim().contains('1');
+    }
+
+    int offset = 0;
+    var first = true;
+    while (offset < total) {
+      final end = (offset + _kWinUploadChunkSize).clamp(0, total);
+      final chunk = bytes.sublist(offset, end);
+      final b64 = base64.encode(chunk);
+      // IIS 进程通常对 C:\Windows\Temp 有写权限，%TEMP% 可能未设置。
+      // 第一块：certutil 直接解码到目标路径，避免 copy 创建新文件时"拒绝访问"。
+      // 后续块：解码到临时文件，再用 copy /b 追加到已存在的目标文件。
+      const tmp = r'C:\Windows\Temp';
+      final cmd = first
+          ? 'del /f "$path" 2>nul & '
+              'echo $b64 > "$tmp\\__mx_b64.tmp" && '
+              'certutil -decode "$tmp\\__mx_b64.tmp" "$path" && '
+              'del "$tmp\\__mx_b64.tmp" && echo 1'
+          : 'del /f "$tmp\\__mx_bin.tmp" 2>nul & '
+              'echo $b64 > "$tmp\\__mx_b64.tmp" && '
+              'certutil -decode "$tmp\\__mx_b64.tmp" "$tmp\\__mx_bin.tmp" && '
+              'copy /b "$path"+"$tmp\\__mx_bin.tmp" "$path" && '
+              'del "$tmp\\__mx_b64.tmp" 2>nul & del "$tmp\\__mx_bin.tmp" 2>nul & echo 1';
+      final r = await sendRawCommand(cmd);
+      if (r.contains('ACCESS_DENIED') ||
+          r.contains('拒绝访问') ||
+          r.contains('Access is denied')) {
+        throw Exception('目标路径写入被拒绝（IIS 进程无写权限）：$path');
+      }
+      if (!r.trim().contains('1')) return false;
+      offset = end;
+      first = false;
+      onProgress?.call(offset, total);
+    }
+    return true;
   }
 
   @override
   Future<Map<String, String>> getSystemInfo() async {
     const sep = '###MATRIX_SEP###';
-    // 额外获取 .NET CLR 版本
+    // 纯 cmd 快速模式：避免每次启动 powershell 导致系统信息加载缓慢。
     final cmd = [
       'echo ${sep}OS${sep}',
       'ver',
@@ -119,17 +222,22 @@ class AspxCmdConnector extends AspWscriptConnector {
       'cd',
       'echo ${sep}HOST${sep}',
       'hostname',
-      'echo ${sep}CLR${sep}',
-      r'powershell -NoProfile -Command "[System.Environment]::Version.ToString()"',
     ].join(' & ');
     const keyMap = {
       'OS': 'OS',
       'USER': '运行用户',
       'PWD': '当前目录',
       'HOST': '主机名',
-      'CLR': '.NET CLR 版本',
     };
-    return AspxCmdConnector._parseSep(await sendRawCommand(cmd), sep, keyMap);
+    final info = AspxCmdConnector._parseSep(
+      await sendRawCommand(cmd).timeout(const Duration(seconds: 12)),
+      sep,
+      keyMap,
+    );
+    // 避免显示 IIS 工作目录（如 inetsrv）造成误导，统一展示连接器当前目录。
+    info['当前目录'] = currentDir;
+    info['.NET CLR 版本'] = 'N/A (fast mode)';
+    return info;
   }
 
   static Map<String, String> _parseSep(
@@ -156,5 +264,35 @@ class AspxCmdConnector extends AspWscriptConnector {
       result[label] = buf.toString().trim();
     }
     return result;
+  }
+
+  /// 将 `%~a` 结果（如 `d-----` / `-a----`）压缩为更易读的 Windows 属性简写。
+  static String _formatWindowsAttrs(String raw, bool isDir) {
+    final s = raw.trim().toLowerCase();
+    final flags = <String>[];
+    if (isDir || s.contains('d')) flags.add('D');
+    if (s.contains('r')) flags.add('R');
+    if (s.contains('h')) flags.add('H');
+    if (s.contains('s')) flags.add('S');
+    if (s.contains('a')) flags.add('A');
+    return flags.isEmpty ? '-' : flags.join(' ');
+  }
+
+  static String _extractCertutilBase64(String raw) {
+    final lines = raw.split(RegExp(r'\r?\n')).map((l) => l.trim()).toList();
+    var inside = false;
+    final buf = StringBuffer();
+    for (final line in lines) {
+      if (line.startsWith('-----BEGIN')) {
+        inside = true;
+        continue;
+      }
+      if (line.startsWith('-----END')) break;
+      if (!inside || line.isEmpty) continue;
+      // 仅保留 Base64 字符，避免 Input Length / 其他提示文本污染。
+      final cleaned = line.replaceAll(RegExp(r'[^A-Za-z0-9+/=]'), '');
+      if (cleaned.isNotEmpty) buf.write(cleaned);
+    }
+    return buf.toString();
   }
 }

@@ -47,10 +47,17 @@ class _FileManagerTabState extends State<FileManagerTab>
   @override
   void initState() {
     super.initState();
+    if (widget.service.isWindowsTarget) {
+      _currentPath = r'C:\';
+    }
     _initPath();
   }
 
   Future<void> _initPath() async {
+    if (widget.service.isWindowsTarget) {
+      if (mounted) _loadDirectory(r'C:\');
+      return;
+    }
     final dir = await widget.service.getCurrentDir();
     if (mounted) _loadDirectory(dir);
   }
@@ -72,6 +79,35 @@ class _FileManagerTabState extends State<FileManagerTab>
   }
 
   String _parent(String path) {
+    if (_isWindowsPath(path)) {
+      final p = path.replaceAll('/', r'\').trim();
+
+      // UNC: \\server\share\dir\sub
+      if (p.startsWith(r'\\')) {
+        final parts = p.split(r'\').where((s) => s.isNotEmpty).toList();
+        if (parts.length <= 2) {
+          // 已到 UNC 根：\\server\share
+          return parts.length == 2 ? '\\\\${parts[0]}\\${parts[1]}' : path;
+        }
+        parts.removeLast();
+        return '\\\\${parts.join('\\')}';
+      }
+
+      // Drive: C:\dir\sub
+      final drive = RegExp(r'^[a-zA-Z]:').stringMatch(p);
+      if (drive != null) {
+        var rest = p.substring(drive.length).replaceFirst(RegExp(r'^[\\]+'), '');
+        if (rest.isEmpty) return '$drive\\';
+        final parts = rest.split(r'\').where((s) => s.isNotEmpty).toList();
+        if (parts.isEmpty) return '$drive\\';
+        parts.removeLast();
+        if (parts.isEmpty) return '$drive\\';
+        return '$drive\\${parts.join(r'\')}';
+      }
+
+      return path;
+    }
+
     final norm = path.replaceAll('\\', '/');
     final parts = norm.split('/').where((s) => s.isNotEmpty).toList();
     if (parts.isEmpty) return '/';
@@ -82,9 +118,22 @@ class _FileManagerTabState extends State<FileManagerTab>
 
   String _join(String dir, String name) {
     if (name == '..') return _parent(dir);
+    if (_isWindowsPath(dir)) {
+      var base = dir.replaceAll('/', r'\').trim();
+      if (base.endsWith(r'\')) {
+        base = base.substring(0, base.length - 1);
+      }
+      if (RegExp(r'^[a-zA-Z]:$').hasMatch(base)) {
+        return '$base\\$name';
+      }
+      return '$base\\$name';
+    }
     final norm = dir.replaceAll('\\', '/').trimRight();
     return norm.endsWith('/') ? '$norm$name' : '$norm/$name';
   }
+
+  bool _isWindowsPath(String path) =>
+      RegExp(r'^[a-zA-Z]:[\\/]|^[a-zA-Z]:$|^\\\\').hasMatch(path.trim());
 
   Future<void> _viewFile(FileEntry entry) async {
     final path = _join(_currentPath, entry.name);
@@ -183,9 +232,11 @@ class _FileManagerTabState extends State<FileManagerTab>
     bool usedBinaryPath = false;
     bool progressShown = false;
     try {
-      // 若检测为文本文件且体积较小，则走文本写入；大文件一律走分块上传，避免单次请求超限。
+      // Windows 目标（ASP/ASPX）强制走二进制分块上传，避免 cmd 单条命令长度限制。
+      // 其他目标：文本小文件走文本写入；大文件或二进制走分块上传。
       final looksBinary = _isBinary(bytes);
-      final useBinaryPath = looksBinary || bytes.length > 100 * 1024;
+      final useBinaryPath =
+          widget.service.isWindowsTarget || looksBinary || bytes.length > 100 * 1024;
       if (!useBinaryPath) {
         setState(() => _uploading = true);
         final content = utf8.decode(bytes);
@@ -240,11 +291,10 @@ class _FileManagerTabState extends State<FileManagerTab>
       }
       return;
     }
-    // 若二进制路径失败且是“看起来像文本”的文件，尝试自动回退到文本写入。
+    // 若文本路径失败且文件看起来是文本，尝试回退到二进制写入（更稳，避免命令长度限制）。
     if (!ok && !usedBinaryPath) {
       try {
-        final content = utf8.decode(bytes);
-        ok = await widget.service.writeFile(remotePath, content);
+        ok = await widget.service.writeFileBinary(remotePath, bytes);
       } catch (_) {
         // ignore, 保持原有失败提示
       }
@@ -373,6 +423,66 @@ class _FileManagerTabState extends State<FileManagerTab>
     }
   }
 
+  Future<void> _detectWritableDirs() async {
+    setState(() => _loading = true);
+    final dirs = await widget.service.detectWritableDirs();
+    if (!mounted) return;
+    setState(() => _loading = false);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: Row(
+          children: [
+            const Icon(Icons.manage_search, color: AppColors.amber, size: 18),
+            const SizedBox(width: 8),
+            const Text('可写目录', style: TextStyle(color: AppColors.textPrimary)),
+          ],
+        ),
+        content: dirs.isEmpty
+            ? const Text('未检测到可写目录', style: TextStyle(color: AppColors.textSecondary))
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('找到 ${dirs.length} 个可写目录，点击跳转：',
+                      style: AppTextStyles.caption(color: AppColors.textMuted, size: 12)),
+                  const SizedBox(height: 8),
+                  ...dirs.map(
+                    (d) => InkWell(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _loadDirectory(d);
+                      },
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.folder_open, color: AppColors.primary, size: 14),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(d,
+                                  style: AppTextStyles.terminal(
+                                      color: AppColors.primary, size: 12)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(S.btnClose),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _deleteFile(FileEntry entry) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -484,6 +594,13 @@ class _FileManagerTabState extends State<FileManagerTab>
                   icon: const Icon(Icons.inventory_2_outlined, size: 16),
                   color: AppColors.cyan,
                   tooltip: S.quickActionUpload,
+                ),
+              if (widget.service.isWindowsTarget)
+                IconButton(
+                  onPressed: _loading ? null : _detectWritableDirs,
+                  icon: const Icon(Icons.manage_search, size: 16),
+                  color: AppColors.amber,
+                  tooltip: '检测可写目录',
                 ),
               IconButton(
                 onPressed: _loading ? null : () => _loadDirectory(_currentPath),

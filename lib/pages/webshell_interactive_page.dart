@@ -34,11 +34,16 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
   bool _isChecking = true;
   String? _lastPingError;
 
+  /// 提权检查为 Linux/bash 场景；Windows（ASP/ASPX）连接器下隐藏。
+  bool get _showPrivEscTab =>
+      !widget.webshell.connectorType.startsWith('asp');
+
   @override
   void initState() {
     super.initState();
     _service = WebshellService(widget.webshell);
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController =
+        TabController(length: _showPrivEscTab ? 4 : 3, vsync: this);
     _completer = TabCompleter(_service);
     _checkConnection();
   }
@@ -191,10 +196,11 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                             skipTraversal: _tabController.index != 2,
                             child: SystemInfoTab(service: _service),
                           ),
-                          FocusScope(
-                            skipTraversal: _tabController.index != 3,
-                            child: PrivEscTab(service: _service),
-                          ),
+                          if (_showPrivEscTab)
+                            FocusScope(
+                              skipTraversal: _tabController.index != 3,
+                              child: PrivEscTab(service: _service),
+                            ),
                         ],
                       );
                     },
@@ -353,10 +359,11 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
             icon: const Icon(Icons.dns_outlined, size: 15),
             text: S.tabSysInfo,
           ),
-          Tab(
-            icon: const Icon(Icons.shield_outlined, size: 15),
-            text: S.sectionPrivEsc,
-          ),
+          if (_showPrivEscTab)
+            Tab(
+              icon: const Icon(Icons.shield_outlined, size: 15),
+              text: S.sectionPrivEsc,
+            ),
         ],
       ),
     );
@@ -382,6 +389,7 @@ class _TerminalTabState extends State<_TerminalTab>
   final List<String> _history = [];
   int _historyIndex = -1;
   bool _executing = false;
+  bool _isWindowsShell = false;
 
   /// false = 分离式（输出区 + 底部输入栏）
   /// true  = 一体式（输入嵌入输出流末尾，模拟真实终端）
@@ -407,8 +415,16 @@ class _TerminalTabState extends State<_TerminalTab>
   }
 
   Future<void> _initDir() async {
-    final dir = await widget.service.getCurrentDir();
+    final dir = widget.service.isWindowsTarget
+        ? r'C:\'
+        : await widget.service.getCurrentDir();
+    final lower = dir.trim().toLowerCase();
+    final isWinPath = RegExp(r'^[a-z]:[\\/]').hasMatch(lower) ||
+        lower.startsWith(r'\\');
+    final isWindowsConnector =
+        widget.service.webshell.connectorType.startsWith('asp');
     if (mounted) setState(() => _currentDir = dir);
+    _isWindowsShell = isWinPath || isWindowsConnector;
     // 并发预热：目录列表、环境变量、HOME、可用命令（同时发出）
     _completer.warmDir(dir);
     _completer.fetchEnvVars();
@@ -449,7 +465,11 @@ class _TerminalTabState extends State<_TerminalTab>
     // cd 命令追加 marker+pwd，单次请求同时获取新目录，不再额外发网络请求
     const cwdMarker = '__MATRIX_CWD__';
     final isCd = cmd == 'cd' || cmd.startsWith('cd ') || cmd.startsWith('cd\t');
-    final sendCmd = isCd ? "$cmd 2>&1; echo '$cwdMarker'; pwd" : cmd;
+    final sendCmd = isCd
+        ? _isWindowsShell
+            ? '$cmd 2>&1 & echo $cwdMarker & cd'
+            : "$cmd 2>&1; echo '$cwdMarker'; pwd"
+        : cmd;
 
     final execResult = await widget.service.executeCommand(
       sendCmd,
@@ -459,11 +479,11 @@ class _TerminalTabState extends State<_TerminalTab>
     // 解析 cd 后的新目录
     String output = execResult;
     if (isCd) {
-      const sep = '$cwdMarker\n';
-      final idx = execResult.lastIndexOf(sep);
-      if (idx >= 0) {
-        output = execResult.substring(0, idx).trim();
-        final newDir = execResult.substring(idx + sep.length).trim();
+      final lines = execResult.split(RegExp(r'\r?\n'));
+      final markerIdx = lines.lastIndexWhere((line) => line.trim() == cwdMarker);
+      if (markerIdx >= 0) {
+        output = lines.take(markerIdx).join('\n').trim();
+        final newDir = lines.skip(markerIdx + 1).join('\n').trim();
         if (newDir.isNotEmpty && mounted) {
           final prevDir = _currentDir;
           setState(() => _currentDir = newDir);
@@ -1003,7 +1023,6 @@ class _TerminalTabState extends State<_TerminalTab>
   // 两种模式共用的 TextField（样式/逻辑完全一致）
   Widget _buildInputField() {
     return Focus(
-      focusNode: _inputFocus,
       onKeyEvent: (node, event) {
         if (_executing) {
           return KeyEventResult.ignored;

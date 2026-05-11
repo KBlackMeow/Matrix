@@ -24,6 +24,7 @@ class WebshellService {
   bool get supportsFileRead  => _connector.supportsFileRead;
   bool get supportsFileWrite => _connector.supportsFileWrite;
   bool get isProbeOnly       => _connector.isProbeOnly;
+  bool get isWindowsTarget => webshell.connectorType.startsWith('asp');
 
   String get currentDir => _connector.currentDir;
   set currentDir(String v) => _connector.currentDir = v;
@@ -68,6 +69,38 @@ class WebshellService {
       _connector.listNamesForCompletion(path);
 
   Future<String> getHomeDir() => _connector.getHomeDir();
+
+  /// Windows 目标：检测哪些目录有写权限，返回可写路径列表。
+  Future<List<String>> detectWritableDirs() async {
+    if (!isWindowsTarget) return [];
+    const candidates = [
+      r'C:\Windows\Temp',
+      r'C:\inetpub\wwwroot',
+      r'C:\inetpub\temp',
+      r'C:\inetpub\logs',
+      r'C:\Users\Public',
+      r'C:\Windows\System32\spool\drivers\color',
+    ];
+    final writable = <String>[];
+    for (final dir in candidates) {
+      final probe = r'__mx_probe.tmp';
+      final full = '$dir\\$probe';
+      final r = await _connector.executeCommand(
+        'echo 1 > "$full" && del "$full" && echo OK',
+      );
+      if (r.trim().contains('OK')) writable.add(dir);
+    }
+    // 当前文件管理目录也检测一下
+    final cur = _connector.currentDir;
+    if (!candidates.contains(cur)) {
+      final full = '$cur\\__mx_probe.tmp';
+      final r = await _connector.executeCommand(
+        'echo 1 > "$full" && del "$full" && echo OK',
+      );
+      if (r.trim().contains('OK')) writable.add(cur);
+    }
+    return writable;
+  }
 
   Future<List<String>> listEnvVarNames() => _connector.listEnvVarNames();
 

@@ -14,7 +14,10 @@ import 'shell_exec_connector.dart';
 /// Windows 命令执行型。
 /// 特殊之处：ASP 使用 Server.HTMLEncode 对输出 HTML 编码，需要解码。
 class AspWscriptConnector extends ShellExecConnector {
-  AspWscriptConnector(super.webshell);
+  AspWscriptConnector(super.webshell) {
+    // Windows 目标默认目录使用 C:\，避免回落到 Unix 风格根路径。
+    currentDir = r'C:\';
+  }
 
   @override
   Set<ConnectorCapability> get capabilities => const {
@@ -80,8 +83,16 @@ class AspWscriptConnector extends ShellExecConnector {
 
   @override
   Future<String> executeCommand(String cmd, {String workingDir = ''}) async {
-    final cd = (workingDir.isNotEmpty && workingDir.startsWith('/'))
-        ? 'cd ${ShellExecConnector.sq(workingDir)} && '
+    // Windows 路径常见形式：
+    // - C:\Users\foo
+    // - \\server\share
+    // - /c/Users/foo（部分上层逻辑可能传入）
+    final isWindowsLikePath = RegExp(r'^[a-zA-Z]:[\\/]|^\\\\').hasMatch(
+          workingDir,
+        ) ||
+        workingDir.startsWith('/');
+    final cd = (workingDir.isNotEmpty && isWindowsLikePath)
+        ? 'cd /d "$workingDir" && '
         : '';
     // 走 cmd.exe，不能使用 Linux 的 bash -c 包裹
     return sendRawCommand('$cd$cmd 2>&1');
@@ -200,8 +211,14 @@ class AspWscriptConnector extends ShellExecConnector {
     const keyMap = {
       'OS': 'OS', 'USER': '运行用户', 'PWD': '当前目录', 'HOST': '主机名',
     };
-    return ShellExecConnector.parseSepOutput(
-        await sendRawCommand(cmd), sep, keyMap);
+    final info = ShellExecConnector.parseSepOutput(
+      await sendRawCommand(cmd),
+      sep,
+      keyMap,
+    );
+    // 对 IIS 目标，cd 常返回 w3wp 工作目录（如 inetsrv），此处展示连接器实际使用目录。
+    info['当前目录'] = currentDir;
+    return info;
   }
 
   @override
