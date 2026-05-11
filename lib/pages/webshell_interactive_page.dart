@@ -417,6 +417,7 @@ class _TerminalTabState extends State<_TerminalTab>
   }
 
   Future<void> _execute(String raw) async {
+    if (_executing) return;
     final cmd = raw.trim();
     if (cmd.isEmpty) return;
 
@@ -1002,7 +1003,11 @@ class _TerminalTabState extends State<_TerminalTab>
   // 两种模式共用的 TextField（样式/逻辑完全一致）
   Widget _buildInputField() {
     return Focus(
+      focusNode: _inputFocus,
       onKeyEvent: (node, event) {
+        if (_executing) {
+          return KeyEventResult.ignored;
+        }
         if (event is KeyDownEvent) {
           if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
             _navigateHistory(true);
@@ -1023,7 +1028,8 @@ class _TerminalTabState extends State<_TerminalTab>
         controller: _inputController,
         focusNode: _inputFocus,
         autofocus: true,
-        enabled: !_executing,
+        // 保持输入控件激活，避免在回车按下期间 disable 导致键盘状态异常。
+        readOnly: _executing,
         style: const TextStyle(
           color: AppColors.textPrimary,
           fontFamily: 'Monaco',
@@ -1043,10 +1049,8 @@ class _TerminalTabState extends State<_TerminalTab>
           }
         },
         onSubmitted: (v) {
+          if (_executing) return;
           _execute(v);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _inputFocus.requestFocus();
-          });
         },
       ),
     );

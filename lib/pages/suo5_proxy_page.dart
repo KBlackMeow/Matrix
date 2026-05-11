@@ -84,6 +84,26 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
       await _service.stopProfile(p.id);
       return;
     }
+    final conflict = _profiles.where(
+      (other) =>
+          other.id != p.id &&
+          other.listenHost == p.listenHost &&
+          other.listenPort == p.listenPort,
+    );
+    if (conflict.isNotEmpty) {
+      if (!mounted) return;
+      final occupiedBy = conflict.first.name;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '端口冲突: ${p.listenHost}:${p.listenPort} 已被配置 "$occupiedBy" 占用',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
     if (p.targetUrl.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -144,10 +164,27 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
     final url = urlController.text.trim();
     if (url.isEmpty) return;
     final port = int.tryParse(portController.text.trim()) ?? 0;
+    final host = hostController.text.trim().isEmpty
+        ? '127.0.0.1'
+        : hostController.text.trim();
     if (port < 1 || port > 65535) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(S.suo5InvalidPort)),
+      );
+      return;
+    }
+    if (_hasPortConflict(editingId: null, host: host, port: port)) {
+      final occupiedBy = _profiles
+          .firstWhere((p) => p.listenHost == host && p.listenPort == port)
+          .name;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('端口冲突: $host:$port 已被配置 "$occupiedBy" 占用'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
       );
       return;
     }
@@ -166,9 +203,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
       projectId: widget.project.id,
       name: name,
       targetUrl: url,
-      listenHost: hostController.text.trim().isEmpty
-          ? '127.0.0.1'
-          : hostController.text.trim(),
+      listenHost: host,
       listenPort: port,
     );
     await _loadProfiles();
@@ -181,6 +216,16 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
       if (!used.contains(port)) return port.toString();
     }
     return '1080';
+  }
+
+  bool _hasPortConflict({
+    required int? editingId,
+    required String host,
+    required int port,
+  }) {
+    return _profiles.any(
+      (p) => p.id != editingId && p.listenHost == host && p.listenPort == port,
+    );
   }
 
   Future<void> _showEditDialog(Suo5Profile p) async {
@@ -206,10 +251,32 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
     final url = urlController.text.trim();
     if (url.isEmpty) return;
     final port = int.tryParse(portController.text.trim()) ?? 0;
+    final host = hostController.text.trim().isEmpty
+        ? '127.0.0.1'
+        : hostController.text.trim();
     if (port < 1 || port > 65535) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(S.suo5InvalidPort)),
+      );
+      return;
+    }
+    if (_hasPortConflict(editingId: p.id, host: host, port: port)) {
+      final occupiedBy = _profiles
+          .firstWhere(
+            (other) =>
+                other.id != p.id &&
+                other.listenHost == host &&
+                other.listenPort == port,
+          )
+          .name;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('端口冲突: $host:$port 已被配置 "$occupiedBy" 占用'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
       );
       return;
     }
@@ -227,9 +294,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
     await _db.updateSuo5Profile(p.copyWith(
       name: name,
       targetUrl: url,
-      listenHost: hostController.text.trim().isEmpty
-          ? '127.0.0.1'
-          : hostController.text.trim(),
+      listenHost: host,
       listenPort: port,
     ));
     // 同步会话 label，让聚合日志使用新名字

@@ -49,6 +49,7 @@ class Suo5Session {
   final http.Client _http = http.Client();
   final Set<_Suo5Tunnel> _tunnels = {};
   String _sessionId = '';
+  final Map<String, String> _cookies = {};
   Suo5Config? _currentConfig;
   Suo5Config? get currentConfig => _currentConfig;
   Timer? _heartbeatTimer;
@@ -65,6 +66,7 @@ class Suo5Session {
     _logs.clear();
     _currentConfig = config;
     _sessionId = '';
+    _cookies.clear();
     _uploadBytes = 0;
     _downloadBytes = 0;
     _activeConnections = 0;
@@ -93,6 +95,7 @@ class Suo5Session {
     await _server?.close();
     _server = null;
     _sessionId = '';
+    _cookies.clear();
     _currentConfig = null;
     _activeConnections = 0;
     if (_status != Suo5Status.error) {
@@ -109,14 +112,22 @@ class Suo5Session {
   Future<void> probe(Suo5Config config) => _handshake(config, keepAlive: false);
 
   Future<void> _handshake(Suo5Config config, {bool keepAlive = true}) async {
+    final lowerUrl = config.targetUrl.toLowerCase();
+    // payload 模式兼容性：
+    //   PHP   → 只支持 half/classic，classic 受 nginx 缓冲拦截，强制用 half
+    //   ASPX  → 只支持 half/classic，但 classic 用线程池即时返回，推荐 classic
+    //   JSP   → 支持 full/half/classic，保留自动探测
+    final isPhp = lowerUrl.contains('.php');
+    final isAspx = lowerUrl.contains('.aspx');
     final startedAt = DateTime.now();
     final marker = _randomString(24 + Random.secure().nextInt(64));
+    // a=0x00 → 经典探测（PHP 立即返回两帧，不 sleep），a=0x01 → 流式探测（PHP sleep 2s）
     final payload = _buildBody(
       {
         'ac': Uint8List.fromList([0x01]),
         'id': utf8.encode(_randomString(8)),
         'dt': utf8.encode(marker),
-        'a': Uint8List.fromList([0x01]),
+        'a': Uint8List.fromList([0x00]),
       },
       modeByteOverride: 0x00,
       includeSid: false,
@@ -137,7 +148,18 @@ class Suo5Session {
     _sessionId = sid;
     final ms = DateTime.now().difference(startedAt).inMilliseconds;
     final detected = ms < 3000 ? 'full' : (ms < 5000 ? 'half' : 'classic');
-    if (detected == 'classic') {
+    if (isPhp) {
+      // PHP 强制 half 模式：X-Accel-Buffering: no 保证响应不被 nginx 缓冲
+      _mode = 'half';
+      _modeByte = 0x02;
+      _log('检测到 PHP payload，使用 half 模式');
+    } else if (isAspx) {
+      // ASPX 强制 classic 模式：IIS 线程池让响应即时返回，无 nginx 缓冲问题；
+      // ASPX 不实现 mode=0x01(full)，避免自动探测误判
+      _mode = 'classic';
+      _modeByte = 0x03;
+      _log('检测到 ASPX payload，使用 classic 模式');
+    } else if (detected == 'classic') {
       _mode = 'classic';
       _modeByte = 0x03;
     } else if (detected == 'full') {
@@ -255,13 +277,21 @@ class Suo5Session {
     Object? lastErr;
     for (var i = 0; i < 3; i++) {
       try {
+        final headers = <String, String>{
+          'Content-Type': 'application/octet-stream',
+          if (_cookies.isNotEmpty) 'Cookie': _cookieHeader,
+        };
         final resp = await _http
             .post(
               Uri.parse(url),
-              headers: const {'Content-Type': 'application/octet-stream'},
+              headers: headers,
               body: body,
             )
             .timeout(const Duration(seconds: 15));
+        final setCookie = resp.headers['set-cookie'];
+        if (setCookie != null && setCookie.isNotEmpty) {
+          _captureCookiesFromSetCookie(setCookie);
+        }
         if (resp.statusCode != 200) {
           throw Exception('远端状态码异常 ${resp.statusCode}');
         }
@@ -276,13 +306,26 @@ class Suo5Session {
     throw Exception('请求失败(重试3次): $lastErr');
   }
 
-  Future<HttpClientResponse> _openReceiveStream(String url, List<int> body) async {
+  Future<HttpClientResponse> _openReceiveStream(
+    String url,
+    List<int> body, {
+    void Function(HttpClient)? onClient,
+  }) async {
     final uri = Uri.parse(url);
     final client = HttpClient()..badCertificateCallback = (cert, host, port) => true;
+    onClient?.call(client);
     final req = await client.postUrl(uri).timeout(const Duration(seconds: 15));
     req.headers.set(HttpHeaders.contentTypeHeader, 'application/octet-stream');
+    req.headers.set('X-Accel-Buffering', 'no');
+    if (_cookies.isNotEmpty) {
+      req.headers.set(HttpHeaders.cookieHeader, _cookieHeader);
+    }
     req.add(body);
     final resp = await req.close();
+    for (final c in resp.cookies) {
+      if (c.value.isEmpty) continue;
+      _cookies[c.name] = c.value;
+    }
     if (resp.statusCode != 200) {
       client.close(force: true);
       throw Exception('远端状态码异常 ${resp.statusCode}');
@@ -291,7 +334,25 @@ class Suo5Session {
   }
 
   Future<_FullDuplexChannel> _openFullDuplexChannel(String url, List<int> firstBody) {
-    return _FullDuplexChannel.open(url, firstBody);
+    return _FullDuplexChannel.open(
+      url,
+      firstBody,
+      cookieHeader: _cookies.isEmpty ? null : _cookieHeader,
+    );
+  }
+
+  String get _cookieHeader =>
+      _cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+
+  void _captureCookiesFromSetCookie(String setCookieHeader) {
+    final matches = RegExp(r'(^|,\s*)([^=;,\s]+)=([^;,\s]+)', caseSensitive: false)
+        .allMatches(setCookieHeader);
+    for (final m in matches) {
+      final key = m.group(2);
+      final value = m.group(3);
+      if (key == null || key.isEmpty || value == null || value.isEmpty) continue;
+      _cookies[key] = value;
+    }
   }
 
   List<Map<String, Uint8List>> _parseFrames(List<int> bytes) {
@@ -722,7 +783,11 @@ class _FullDuplexChannel {
 
   Stream<List<int>> get bodyStream => _bodyStreamController.stream;
 
-  static Future<_FullDuplexChannel> open(String url, List<int> firstBody) async {
+  static Future<_FullDuplexChannel> open(
+    String url,
+    List<int> firstBody, {
+    String? cookieHeader,
+  }) async {
     final uri = Uri.parse(url);
     final host = uri.host;
     final port = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
@@ -762,6 +827,7 @@ class _FullDuplexChannel {
       ..write('Accept: */*\r\n')
       ..write('Connection: keep-alive\r\n')
       ..write('Content-Type: application/octet-stream\r\n')
+      ..write(cookieHeader != null ? 'Cookie: $cookieHeader\r\n' : '')
       ..write('Transfer-Encoding: chunked\r\n')
       ..write('\r\n');
     socket.add(ascii.encode(headers.toString()));
@@ -902,7 +968,8 @@ class _Suo5Tunnel {
   final int modeByte;
   final Socket socket;
   final Future<List<int>> Function(String url, List<int> body) post;
-  final Future<HttpClientResponse> Function(String url, List<int> body)
+  final Future<HttpClientResponse> Function(
+          String url, List<int> body, {void Function(HttpClient)? onClient})
       openReceiveStream;
   final Future<_FullDuplexChannel> Function(String url, List<int> firstBody)
       openFullDuplexChannel;
@@ -916,6 +983,7 @@ class _Suo5Tunnel {
   Timer? _pollTimer;
   Future<void> _queue = Future<void>.value();
   StreamSubscription<List<int>>? _recvSub;
+  HttpClient? _recvHttpClient;
   final _frameParser = _FrameStreamParser();
   _FullDuplexChannel? _fullChannel;
 
@@ -940,6 +1008,7 @@ class _Suo5Tunnel {
           if (ac != null && ac.isNotEmpty && ac[0] == 0x03) {
             final s = f['s'];
             if (s != null && s.isNotEmpty && s[0] == 0x00) {
+              if (_closed) return false;
               onLog('隧道建立成功 id=$id -> $address');
               return true;
             }
@@ -971,12 +1040,12 @@ class _Suo5Tunnel {
           await close(sendDelete: true);
         }, cancelOnError: true);
         final connected = await ready.future.timeout(const Duration(seconds: 15));
-        if (!connected) return false;
+        if (!connected || _closed) return false;
         onLog('隧道建立成功 id=$id -> $address');
         return true;
       }
 
-      final resp = await openReceiveStream(targetUrl, body);
+      final resp = await openReceiveStream(targetUrl, body, onClient: (c) => _recvHttpClient = c);
       final ready = Completer<bool>();
       _recvSub = resp.listen((chunk) {
         final frames = _frameParser.feed(chunk);
@@ -997,7 +1066,7 @@ class _Suo5Tunnel {
         await close(sendDelete: true);
       }, cancelOnError: true);
       final connected = await ready.future.timeout(const Duration(seconds: 15));
-      if (!connected) return false;
+      if (!connected || _closed) return false;
       onLog('隧道建立成功 id=$id -> $address');
       return true;
     } catch (e) {
@@ -1041,6 +1110,8 @@ class _Suo5Tunnel {
     _pollTimer?.cancel();
     await _recvSub?.cancel();
     _recvSub = null;
+    _recvHttpClient?.close(force: true);
+    _recvHttpClient = null;
     final fullCh = _fullChannel;
     if (sendDelete) {
       try {
