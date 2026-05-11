@@ -72,11 +72,14 @@ void main() {
 
       final payloads = await db.getAllPayloads();
       expect(payloads, isNotEmpty);
-      expect(payloads.length, equals(9));
+      expect(payloads.length, equals(24));
       expect(payloads.map((p) => p.name), contains('php_eval_post.php'));
       expect(payloads.map((p) => p.name), contains('jsp_behinder.jsp'));
       expect(payloads.map((p) => p.name), contains('aspx_cmd_post.aspx'));
-      expect(await db.getMetaValue('seed_version'), equals('7'));
+      expect(payloads.map((p) => p.name), contains('suo5.php'));
+      expect(payloads.map((p) => p.name), contains('suo5.jsp'));
+      expect(payloads.map((p) => p.name), contains('suo5.aspx'));
+      expect(await db.getMetaValue('seed_version'), equals('10'));
     });
 
     test('seed is idempotent and does not create duplicate payloads', () async {

@@ -10,6 +10,7 @@ import '../../pages/payload_management_page.dart';
 import '../../pages/project_management_page.dart';
 import '../../pages/project_scoped_page.dart';
 import '../../pages/reverse_shell_dashboard_page.dart';
+import '../../pages/suo5_proxy_page.dart';
 import '../../pages/webshell_management_page.dart';
 import '../../theme/app_theme.dart';
 import 'exp_content.dart' as exp;
@@ -40,9 +41,11 @@ class _MainLayoutState extends State<MainLayout> {
   late ProjectManagementPage _projectPage;
   late ProjectScopedPage _webshellPage;
   late ProjectScopedPage _expPage;
+  late ProjectScopedPage _suo5Page;
   late RepaintBoundary _projectBoundary;
   late RepaintBoundary _webshellBoundary;
   late RepaintBoundary _expBoundary;
+  late RepaintBoundary _suo5Boundary;
   late List<Widget> _staticPages;
   late List<Widget> _pages;
 
@@ -72,6 +75,11 @@ class _MainLayoutState extends State<MainLayout> {
       icon: Icons.alt_route_outlined,
       label: '',
       selectedIcon: Icons.alt_route,
+    ),
+    MenuItem(
+      icon: Icons.sync_alt_outlined,
+      label: '',
+      selectedIcon: Icons.sync_alt,
     ),
   ];
 
@@ -113,6 +121,13 @@ class _MainLayoutState extends State<MainLayout> {
         setState(() {
           _selectedProject = project;
           _selectedIndex = 1;
+          _rebuildDynamicPages();
+        });
+      },
+      onEnterSuo5: (project) {
+        setState(() {
+          _selectedProject = project;
+          _selectedIndex = 6;
           _rebuildDynamicPages();
         });
       },
@@ -192,6 +207,35 @@ class _MainLayoutState extends State<MainLayout> {
       ),
     );
     _expBoundary = RepaintBoundary(child: _expPage);
+    _suo5Page = ProjectScopedPage(
+      selectedProject: _selectedProject,
+      onSelectProject: (p) {
+        setState(() {
+          _selectedProject = p;
+          _rebuildDynamicPages();
+        });
+      },
+      onClearProject: () {
+        setState(() {
+          _selectedProject = null;
+          _rebuildDynamicPages();
+        });
+      },
+      onNavigateToProjectManagement: () {
+        setState(() {
+          _selectedIndex = 0;
+          _selectedProject = null;
+          _rebuildDynamicPages();
+        });
+      },
+      title: S.titleSuo5Manager,
+      icon: Icons.sync_alt,
+      contentBuilder: (project, onSwitchProject) => Suo5ProxyPage(
+        project: project,
+        onSwitchProject: onSwitchProject,
+      ),
+    );
+    _suo5Boundary = RepaintBoundary(child: _suo5Page);
     // 注意：每次都 new 一份非 const 实例，确保语言变化时 Flutter 会下钻 build()
     // （const 单例会被 widget 比对识为未变更，从而跳过子树重建）。
     _staticPages = <Widget>[
@@ -199,6 +243,7 @@ class _MainLayoutState extends State<MainLayout> {
       RepaintBoundary(child: PayloadManagementPage()),
       RepaintBoundary(child: ReverseShellDashboardPage()),
       RepaintBoundary(child: FrpTunnelPage()),
+      _suo5Boundary,
     ];
     _pages = [_projectBoundary, _webshellBoundary, ..._staticPages];
   }
@@ -221,6 +266,8 @@ class _MainLayoutState extends State<MainLayout> {
         return S.menuTerminal;
       case 5:
         return S.menuFrp;
+      case 6:
+        return S.menuSuo5;
       default:
         return '';
     }

@@ -195,6 +195,17 @@ class S {
     }
   }
 
+  static String get menuSuo5 {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'suo5代理';
+      case AppLanguage.ja:
+        return 'suo5 プロキシ';
+      case AppLanguage.en:
+        return 'suo5 Proxy';
+    }
+  }
+
   static String get sidebarCollapse {
     switch (_lang) {
       case AppLanguage.zh:
@@ -5843,5 +5854,393 @@ class S {
   }
 
   // (Supervisor/Shellshock/SaltStack EXP removed)
+
+  // --- suo5 proxy management ---
+
+  static String get menuEnterSuo5 {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '进入 suo5 代理';
+      case AppLanguage.ja:
+        return 'suo5 プロキシへ';
+      case AppLanguage.en:
+        return 'Open suo5 Proxy';
+    }
+  }
+
+  static String get titleSuo5Manager {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'suo5 代理';
+      case AppLanguage.ja:
+        return 'suo5 プロキシ';
+      case AppLanguage.en:
+        return 'suo5 Proxy';
+    }
+  }
+
+  static String suo5ManagementTitle(String projectName) {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'suo5 · $projectName';
+      case AppLanguage.ja:
+        return 'suo5 · $projectName';
+      case AppLanguage.en:
+        return 'suo5 · $projectName';
+    }
+  }
+
+  static String get actionAddSuo5 {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '添加 suo5 代理';
+      case AppLanguage.ja:
+        return 'suo5 プロキシを追加';
+      case AppLanguage.en:
+        return 'Add suo5 Proxy';
+    }
+  }
+
+  static String get suo5NewConfigTitle {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '新建 suo5 代理';
+      case AppLanguage.ja:
+        return '新規 suo5 プロキシ';
+      case AppLanguage.en:
+        return 'New suo5 Proxy';
+    }
+  }
+
+  static String get suo5EditConfigTitle {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '编辑 suo5 代理';
+      case AppLanguage.ja:
+        return 'suo5 プロキシを編集';
+      case AppLanguage.en:
+        return 'Edit suo5 Proxy';
+    }
+  }
+
+  static String get suo5ConfigName {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '配置名称';
+      case AppLanguage.ja:
+        return '設定名';
+      case AppLanguage.en:
+        return 'Profile name';
+    }
+  }
+
+  static String get suo5ConfigNameHint {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '便于识别的名称';
+      case AppLanguage.ja:
+        return '識別しやすい名前';
+      case AppLanguage.en:
+        return 'A friendly name';
+    }
+  }
+
+  static String get suo5TargetUrl {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'suo5 URL';
+      case AppLanguage.ja:
+        return 'suo5 URL';
+      case AppLanguage.en:
+        return 'suo5 URL';
+    }
+  }
+
+  static String get suo5TargetUrlHint {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'https://target/path/suo5.php';
+      case AppLanguage.ja:
+        return 'https://target/path/suo5.php';
+      case AppLanguage.en:
+        return 'https://target/path/suo5.php';
+    }
+  }
+
+  static String get suo5ListenHost {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '监听地址';
+      case AppLanguage.ja:
+        return 'リッスンアドレス';
+      case AppLanguage.en:
+        return 'Listen host';
+    }
+  }
+
+  static String get suo5ListenPort {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '监听端口';
+      case AppLanguage.ja:
+        return 'リッスンポート';
+      case AppLanguage.en:
+        return 'Listen port';
+    }
+  }
+
+  static String suo5Count(int n) {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '共 $n 条';
+      case AppLanguage.ja:
+        return '計 $n 件';
+      case AppLanguage.en:
+        return '$n total';
+    }
+  }
+
+  static String suo5EmptyHint(String addLabel) {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '暂无 suo5 代理，点击「$addLabel」开始';
+      case AppLanguage.ja:
+        return 'suo5 プロキシがありません。「$addLabel」をクリックして開始';
+      case AppLanguage.en:
+        return 'No suo5 proxy yet. Click "$addLabel" to get started';
+    }
+  }
+
+  static String confirmDeleteSuo5(String name) {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '确定要删除「$name」吗？此操作不可恢复。';
+      case AppLanguage.ja:
+        return '「$name」を削除してもよろしいですか？この操作は元に戻せません。';
+      case AppLanguage.en:
+        return 'Delete "$name"? This action cannot be undone.';
+    }
+  }
+
+  static String get suo5StatusRunning {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '运行中';
+      case AppLanguage.ja:
+        return '実行中';
+      case AppLanguage.en:
+        return 'Running';
+    }
+  }
+
+  static String get suo5StatusConnecting {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '连接中';
+      case AppLanguage.ja:
+        return '接続中';
+      case AppLanguage.en:
+        return 'Connecting';
+    }
+  }
+
+  static String get suo5StatusError {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '错误';
+      case AppLanguage.ja:
+        return 'エラー';
+      case AppLanguage.en:
+        return 'Error';
+    }
+  }
+
+  static String get suo5StatusIdle {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '空闲';
+      case AppLanguage.ja:
+        return '待機中';
+      case AppLanguage.en:
+        return 'Idle';
+    }
+  }
+
+  static String get suo5InvalidUrl {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'URL 必须是 http/https';
+      case AppLanguage.ja:
+        return 'URL は http/https である必要があります';
+      case AppLanguage.en:
+        return 'URL must be http/https';
+    }
+  }
+
+  static String get suo5InvalidPort {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '监听端口不合法';
+      case AppLanguage.ja:
+        return 'リッスンポートが無効です';
+      case AppLanguage.en:
+        return 'Listen port is invalid';
+    }
+  }
+
+  static String get suo5MissingUrl {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '请填写 suo5 URL';
+      case AppLanguage.ja:
+        return 'suo5 URL を入力してください';
+      case AppLanguage.en:
+        return 'Please enter the suo5 URL';
+    }
+  }
+
+  static String get suo5RunningNoEdit {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '运行中不可编辑';
+      case AppLanguage.ja:
+        return '実行中は編集できません';
+      case AppLanguage.en:
+        return 'Cannot edit while running';
+    }
+  }
+
+  static String get suo5StatActiveConn {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '连接数';
+      case AppLanguage.ja:
+        return '接続数';
+      case AppLanguage.en:
+        return 'Conns';
+    }
+  }
+
+  static String get suo5StatUpload {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '上传';
+      case AppLanguage.ja:
+        return 'アップロード';
+      case AppLanguage.en:
+        return 'Upload';
+    }
+  }
+
+  static String get suo5StatDownload {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '下载';
+      case AppLanguage.ja:
+        return 'ダウンロード';
+      case AppLanguage.en:
+        return 'Download';
+    }
+  }
+
+  static String get suo5RunLog {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '运行日志';
+      case AppLanguage.ja:
+        return '実行ログ';
+      case AppLanguage.en:
+        return 'Run log';
+    }
+  }
+
+  static String get suo5NoLogs {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '> 尚无日志';
+      case AppLanguage.ja:
+        return '> ログなし';
+      case AppLanguage.en:
+        return '> No logs yet';
+    }
+  }
+
+  static String get suo5LogCopiedSnack {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '日志已复制';
+      case AppLanguage.ja:
+        return 'ログをコピーしました';
+      case AppLanguage.en:
+        return 'Logs copied';
+    }
+  }
+
+  static String get suo5HandshakeOk {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '握手成功';
+      case AppLanguage.ja:
+        return 'ハンドシェイク成功';
+      case AppLanguage.en:
+        return 'Handshake OK';
+    }
+  }
+
+  static String suo5HandshakeFailed(Object e) {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '握手失败: $e';
+      case AppLanguage.ja:
+        return 'ハンドシェイク失敗: $e';
+      case AppLanguage.en:
+        return 'Handshake failed: $e';
+    }
+  }
+
+  static String get suo5BtnProbe {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '测试握手';
+      case AppLanguage.ja:
+        return 'ハンドシェイク確認';
+      case AppLanguage.en:
+        return 'Probe';
+    }
+  }
+
+  static String get suo5MappingLabel {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '本地监听';
+      case AppLanguage.ja:
+        return 'ローカルリッスン';
+      case AppLanguage.en:
+        return 'Local listen';
+    }
+  }
+
+  static String suo5ActiveBanner(String name, String statusLabel) {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '$statusLabel · $name';
+      case AppLanguage.ja:
+        return '$statusLabel · $name';
+      case AppLanguage.en:
+        return '$statusLabel · $name';
+    }
+  }
+
+  /// 顶部头条："运行中 X / Y" 形式的汇总
+  static String suo5HeaderRunningSummary(int running, int total) {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '运行中 $running / $total';
+      case AppLanguage.ja:
+        return '実行中 $running / $total';
+      case AppLanguage.en:
+        return 'Running $running / $total';
+    }
+  }
 
 }

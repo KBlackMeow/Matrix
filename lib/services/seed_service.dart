@@ -10,7 +10,7 @@ import '../models/payload.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 9;
+  static const _kCurrentVersion = 10;
   static const _binaryContentPrefix = '__MATRIX_BINARY_B64__:';
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
@@ -106,6 +106,31 @@ class SeedService {
       description: 'ASPX .NET Process 命令执行，GET/POST 参数 cmd，纯文本输出，支持 PowerShell',
       tags: 'aspx,dotnet,process,cmd,powershell,windows',
       sinceVersion: 2,
+    ),
+    // ── SUO5 代理载荷 ──────────────────────────────────────────────────────
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/suo5/suo5.php',
+      name: 'suo5.php',
+      type: 'php',
+      description: 'SUO5 PHP 代理 payload，用于将 HTTP 隧道转发为 SOCKS5 连接',
+      tags: 'suo5,php,proxy,tunnel,socks5',
+      sinceVersion: 10,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/suo5/suo5.jsp',
+      name: 'suo5.jsp',
+      type: 'jsp',
+      description: 'SUO5 JSP 代理 payload，用于在 Java 环境建立 HTTP-to-SOCKS5 隧道',
+      tags: 'suo5,jsp,proxy,tunnel,socks5',
+      sinceVersion: 10,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/suo5/suo5.aspx',
+      name: 'suo5.aspx',
+      type: 'aspx',
+      description: 'SUO5 ASPX 代理 payload，用于在 .NET 环境建立 HTTP-to-SOCKS5 隧道',
+      tags: 'suo5,aspx,proxy,tunnel,socks5,dotnet',
+      sinceVersion: 10,
     ),
     // ── COPY-FAIL（二进制）─────────────────────────────────────────────────
     _PayloadDef(

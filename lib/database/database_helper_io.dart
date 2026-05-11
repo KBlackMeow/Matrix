@@ -11,11 +11,13 @@ import 'io/project_dao.dart';
 import 'io/payload_dao.dart';
 import 'io/webshell_dao.dart';
 import 'io/frp_profile_dao.dart';
+import 'io/suo5_profile_dao.dart';
 import 'io/meta_dao.dart';
 import '../models/project.dart';
 import '../models/webshell.dart';
 import '../models/payload.dart';
 import '../models/frp_profile.dart';
+import '../models/suo5_profile.dart';
 import '../services/frp_client_service.dart';
 
 /// 桌面/移动端 SQLite 实现
@@ -35,6 +37,7 @@ class DatabaseHelperIo {
         hashedFileName: _hashedFileName,
       );
   late final FrpProfileDao _frpProfileDao = FrpProfileDao(() => database);
+  late final Suo5ProfileDao _suo5ProfileDao = Suo5ProfileDao(() => database);
   late final MetaDao _metaDao = MetaDao(() => database);
 
   Future<Database> get database async {
@@ -49,7 +52,7 @@ class DatabaseHelperIo {
 
     return openDatabase(
       path,
-      version: 11,
+      version: 12,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -130,6 +133,23 @@ class DatabaseHelperIo {
         updated_at INTEGER NOT NULL
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE suo5_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        target_url TEXT NOT NULL,
+        listen_host TEXT NOT NULL DEFAULT '127.0.0.1',
+        listen_port INTEGER NOT NULL DEFAULT 1080,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects (id)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_suo5_project ON suo5_profiles(project_id)',
+    );
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -246,6 +266,24 @@ class DatabaseHelperIo {
       ''');
       await db.execute(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_payloads_name_is_default_unique ON payloads(name, is_default)',
+      );
+    }
+    if (oldVersion < 12) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS suo5_profiles (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          target_url TEXT NOT NULL,
+          listen_host TEXT NOT NULL DEFAULT '127.0.0.1',
+          listen_port INTEGER NOT NULL DEFAULT 1080,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects (id)
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_suo5_project ON suo5_profiles(project_id)',
       );
     }
   }
@@ -433,6 +471,32 @@ class DatabaseHelperIo {
   Future<int> deleteFrpProfile(int id) async {
     return _frpProfileDao.deleteFrpProfile(id);
   }
+
+  // ── Suo5 Profiles ────────────────────────────────────────────────────────────
+
+  Future<Suo5Profile> createSuo5Profile({
+    required int projectId,
+    required String name,
+    required String targetUrl,
+    required String listenHost,
+    required int listenPort,
+  }) =>
+      _suo5ProfileDao.createSuo5Profile(
+        projectId: projectId,
+        name: name,
+        targetUrl: targetUrl,
+        listenHost: listenHost,
+        listenPort: listenPort,
+      );
+
+  Future<List<Suo5Profile>> getSuo5ProfilesByProject(int projectId) =>
+      _suo5ProfileDao.getSuo5ProfilesByProject(projectId);
+
+  Future<Suo5Profile?> updateSuo5Profile(Suo5Profile profile) =>
+      _suo5ProfileDao.updateSuo5Profile(profile);
+
+  Future<int> deleteSuo5Profile(int id) =>
+      _suo5ProfileDao.deleteSuo5Profile(id);
 }
 
 final _io = DatabaseHelperIo();
@@ -564,3 +628,27 @@ Future<FrpProfile?> updateFrpProfile({
     );
 
 Future<int> deleteFrpProfile(int id) => _io.deleteFrpProfile(id);
+
+// Suo5 Profiles 顶层方法
+Future<Suo5Profile> createSuo5Profile({
+  required int projectId,
+  required String name,
+  required String targetUrl,
+  required String listenHost,
+  required int listenPort,
+}) =>
+    _io.createSuo5Profile(
+      projectId: projectId,
+      name: name,
+      targetUrl: targetUrl,
+      listenHost: listenHost,
+      listenPort: listenPort,
+    );
+
+Future<List<Suo5Profile>> getSuo5ProfilesByProject(int projectId) =>
+    _io.getSuo5ProfilesByProject(projectId);
+
+Future<Suo5Profile?> updateSuo5Profile(Suo5Profile profile) =>
+    _io.updateSuo5Profile(profile);
+
+Future<int> deleteSuo5Profile(int id) => _io.deleteSuo5Profile(id);

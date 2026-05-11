@@ -2,6 +2,7 @@ import '../models/project.dart';
 import '../models/webshell.dart';
 import '../models/payload.dart';
 import '../models/frp_profile.dart';
+import '../models/suo5_profile.dart';
 import '../services/frp_client_service.dart';
 import 'database_helper_stub.dart'
     if (dart.library.io) 'database_helper_io.dart' as impl;
@@ -165,4 +166,29 @@ class DatabaseHelper {
       );
 
   Future<int> deleteFrpProfile(int id) => impl.deleteFrpProfile(id);
+
+  // Suo5 Profiles
+
+  Future<Suo5Profile> createSuo5Profile({
+    required int projectId,
+    required String name,
+    required String targetUrl,
+    required String listenHost,
+    required int listenPort,
+  }) =>
+      impl.createSuo5Profile(
+        projectId: projectId,
+        name: name,
+        targetUrl: targetUrl,
+        listenHost: listenHost,
+        listenPort: listenPort,
+      );
+
+  Future<List<Suo5Profile>> getSuo5ProfilesByProject(int projectId) =>
+      impl.getSuo5ProfilesByProject(projectId);
+
+  Future<Suo5Profile?> updateSuo5Profile(Suo5Profile profile) =>
+      impl.updateSuo5Profile(profile);
+
+  Future<int> deleteSuo5Profile(int id) => impl.deleteSuo5Profile(id);
 }

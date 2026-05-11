@@ -11,6 +11,7 @@ class ProjectManagementPage extends StatefulWidget {
   final Project? selectedProject;
   final void Function(Project project) onEnterWebshell;
   final void Function(Project project) onEnterExp;
+  final void Function(Project project) onEnterSuo5;
   final void Function(Project project)? onProjectUpdated;
   final void Function(int projectId)? onProjectDeleted;
 
@@ -19,6 +20,7 @@ class ProjectManagementPage extends StatefulWidget {
     this.selectedProject,
     required this.onEnterWebshell,
     required this.onEnterExp,
+    required this.onEnterSuo5,
     this.onProjectUpdated,
     this.onProjectDeleted,
   });
@@ -415,6 +417,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                       onDelete: () => _showDeleteConfirm(project),
                       onEnterWebshell: () => widget.onEnterWebshell(project),
                       onEnterExp: () => widget.onEnterExp(project),
+                      onEnterSuo5: () => widget.onEnterSuo5(project),
                     );
                   },
                 ),
@@ -430,6 +433,7 @@ class _ProjectCard extends StatefulWidget {
   final VoidCallback onDelete;
   final VoidCallback onEnterWebshell;
   final VoidCallback onEnterExp;
+  final VoidCallback onEnterSuo5;
 
   const _ProjectCard({
     required this.project,
@@ -437,6 +441,7 @@ class _ProjectCard extends StatefulWidget {
     required this.onDelete,
     required this.onEnterWebshell,
     required this.onEnterExp,
+    required this.onEnterSuo5,
   });
 
   @override
@@ -493,6 +498,21 @@ class _ProjectCardState extends State<_ProjectCard> {
               label: Text(S.menuEnterExp),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary.withValues(alpha: 0.85),
+                foregroundColor: AppColors.bgDark,
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                widget.onEnterSuo5();
+              },
+              icon: const Icon(Icons.sync_alt, size: 20),
+              label: Text(S.menuEnterSuo5),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary.withValues(alpha: 0.7),
                 foregroundColor: AppColors.bgDark,
                 alignment: Alignment.centerLeft,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -655,6 +675,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                   onSelected: (value) {
                     if (value == 'webshell') widget.onEnterWebshell();
                     if (value == 'exp') widget.onEnterExp();
+                    if (value == 'suo5') widget.onEnterSuo5();
                   },
                   itemBuilder: (context) => [
                     PopupMenuItem(
@@ -686,6 +707,23 @@ class _ProjectCardState extends State<_ProjectCard> {
                           const SizedBox(width: 12),
                           Text(
                             S.menuEnterExp,
+                            style: AppTextStyles.body(color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'suo5',
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.sync_alt,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            S.menuEnterSuo5,
                             style: AppTextStyles.body(color: AppColors.textPrimary),
                           ),
                         ],
