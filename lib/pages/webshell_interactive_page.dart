@@ -589,13 +589,15 @@ class _TerminalTabState extends State<_TerminalTab>
                   onTap: () => setState(() => _entries.clear()),
                 ),
               const SizedBox(width: 6),
-              // 完整终端（反弹 Shell）按钮
-              _toolbarBtn(
-                icon: Icons.open_in_new,
-                tooltip: S.tooltipFullTerminal,
-                onTap: _showReverseShellDialog,
-              ),
-              const SizedBox(width: 6),
+              if (!widget.service.webshell.connectorType.startsWith('asp')) ...[
+                // 完整终端（反弹 Shell）按钮
+                _toolbarBtn(
+                  icon: Icons.open_in_new,
+                  tooltip: S.tooltipFullTerminal,
+                  onTap: _showReverseShellDialog,
+                ),
+                const SizedBox(width: 6),
+              ],
               // 模式切换按钮
               ModeToggle(
                 integrated: _integratedMode,

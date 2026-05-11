@@ -27,7 +27,7 @@ class AspWscriptConnector extends ShellExecConnector {
       };
 
   String get _param =>
-      webshell.password?.isNotEmpty == true ? webshell.password! : 'cmd';
+      webshell.password?.isNotEmpty == true ? webshell.password! : 'mAtrix_911';
 
   @override
   Future<String> sendRawCommand(String cmd) async {
@@ -71,13 +71,30 @@ class AspWscriptConnector extends ShellExecConnector {
     return _htmlDecode(s.trim());
   }
 
-  static String _htmlDecode(String s) => s
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&amp;', '&')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#39;', "'")
-      .replaceAll('&nbsp;', ' ');
+  static String _htmlDecode(String s) {
+    final named = s
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&nbsp;', ' ');
+    return named.replaceAllMapped(
+      RegExp(r'&#(x[0-9a-fA-F]+|\d+);'),
+      (match) {
+        final entity = match.group(1)!;
+        final codePoint = entity.startsWith('x') || entity.startsWith('X')
+            ? int.tryParse(entity.substring(1), radix: 16)
+            : int.tryParse(entity);
+        if (codePoint == null) return match.group(0)!;
+        try {
+          return String.fromCharCode(codePoint);
+        } catch (_) {
+          return match.group(0)!;
+        }
+      },
+    );
+  }
 
   // ── Windows 专用覆盖 ──────────────────────────────────────────────────────
 
@@ -107,40 +124,63 @@ class AspWscriptConnector extends ShellExecConnector {
 
   @override
   Future<List<FileEntry>> listDirectory(String path) async {
-    final raw = await sendRawCommand('dir "$path" /a 2>&1');
-    return _parseDirOutput(raw);
-  }
-
-  static List<FileEntry> _parseDirOutput(String raw) {
-    final entries = <FileEntry>[];
-    for (final line in raw.split('\n')) {
-      final l = line.trim();
-      final match = RegExp(
-              r'(\d{2}/\d{2}/\d{4})\s+(\d{2}:\d{2}\s+[AP]M)\s+(<DIR>|\S+)\s+(.+)')
-          .firstMatch(l);
-      if (match == null) continue;
-      final dateStr = '${match.group(1)} ${match.group(2)}';
-      final sizeOrDir = match.group(3)!;
-      final name = match.group(4)!.trim();
-      if (name == '.') continue;
-      final isDir = sizeOrDir == '<DIR>';
-      final size =
-          isDir ? 0 : int.tryParse(sizeOrDir.replaceAll(',', '')) ?? 0;
+    // Use cmd metadata expansion instead of parsing localized `dir` output.
+    final raw = await sendRawCommand(
+      'cd /d "$path" 2>nul && '
+      'for /f "delims=" %I in (\'dir /b /a 2^>nul\') do '
+      '@if /i not "%I"=="." if /i not "%I"==".." '
+      '(if exist "%I\\*" '
+      '(for %J in ("%I") do @echo D^|0^|%~tJ^|%~aJ^|%~nxJ) '
+      'else (for %J in ("%I") do @echo F^|%~zJ^|%~tJ^|%~aJ^|%~nxJ))',
+    );
+    final entries = <FileEntry>[
+      const FileEntry(
+        name: '..',
+        isDirectory: true,
+        size: 0,
+        permissions: '',
+        modified: '',
+      ),
+    ];
+    final seen = <String>{};
+    for (final line in raw.split(RegExp(r'\r?\n'))) {
+      final t = line.trim();
+      if (t.isEmpty || t.startsWith('[')) continue;
+      final parts = t.split('|');
+      if (parts.length < 5) continue;
+      final kind = parts[0].trim();
+      final size = int.tryParse(parts[1].trim()) ?? 0;
+      final modified = parts[2].trim();
+      final attrs = parts[3].trim();
+      final name = parts.sublist(4).join('|').trim();
+      if (name.isEmpty || name == '.' || name == '..') continue;
+      final key = name.toLowerCase();
+      if (!seen.add(key)) continue;
+      final isDir = kind == 'D' || attrs.toLowerCase().contains('d');
       entries.add(FileEntry(
         name: name,
         isDirectory: isDir,
-        size: size,
-        permissions: '',
-        modified: dateStr,
+        size: isDir ? 0 : size,
+        permissions: _formatWindowsAttrs(attrs, isDir),
+        modified: modified,
       ));
     }
-    entries.sort((a, b) {
-      if (a.name == '..') return -1;
-      if (b.name == '..') return 1;
+    entries.sublist(1).sort((a, b) {
       if (a.isDirectory != b.isDirectory) return a.isDirectory ? -1 : 1;
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
     return entries;
+  }
+
+  static String _formatWindowsAttrs(String raw, bool isDir) {
+    final s = raw.trim().toLowerCase();
+    final flags = <String>[];
+    if (isDir || s.contains('d')) flags.add('D');
+    if (s.contains('r')) flags.add('R');
+    if (s.contains('h')) flags.add('H');
+    if (s.contains('s')) flags.add('S');
+    if (s.contains('a')) flags.add('A');
+    return flags.isEmpty ? '-' : flags.join(' ');
   }
 
   @override
@@ -166,11 +206,8 @@ class AspWscriptConnector extends ShellExecConnector {
 
   @override
   Future<bool> writeFile(String path, String content) async {
-    final b64 = base64.encode(utf8.encode(content));
-    // 写临时 base64 文件再 certutil 解码
-    final r = await sendRawCommand(
-        'echo $b64 > "%TEMP%\\__mx_dec.tmp" && certutil -decode "%TEMP%\\__mx_dec.tmp" "$path" && del "%TEMP%\\__mx_dec.tmp" && echo 1');
-    return r.trim().contains('1');
+    final bytes = Uint8List.fromList(utf8.encode(content));
+    return _writeBinaryChunked(path, bytes);
   }
 
   @override
@@ -187,10 +224,64 @@ class AspWscriptConnector extends ShellExecConnector {
 
   @override
   Future<bool> writeFileBinary(String path, Uint8List bytes) async {
-    final b64 = base64.encode(bytes);
-    final r = await sendRawCommand(
-        'echo $b64 > "%TEMP%\\__mx_dec.tmp" && certutil -decode "%TEMP%\\__mx_dec.tmp" "$path" && del "%TEMP%\\__mx_dec.tmp" && echo 1');
-    return r.trim().contains('1');
+    return _writeBinaryChunked(path, bytes);
+  }
+
+  static const _kWinUploadChunkSize = 2048;
+  static const _kUploadOkTag = '__MX_UPLOAD_OK__';
+
+  @override
+  Future<bool> writeFileBinaryWithProgress(
+    String path,
+    Uint8List bytes,
+    void Function(int sent, int total) onProgress,
+  ) async {
+    return _writeBinaryChunked(path, bytes, onProgress: onProgress);
+  }
+
+  Future<bool> _writeBinaryChunked(
+    String path,
+    Uint8List bytes, {
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    final total = bytes.length;
+    onProgress?.call(0, total);
+    if (total == 0) {
+      final r = await sendRawCommand('type nul > "$path" && echo $_kUploadOkTag');
+      onProgress?.call(0, 0);
+      return r.contains(_kUploadOkTag);
+    }
+
+    int offset = 0;
+    var first = true;
+    const tmp = r'C:\Windows\Temp';
+    while (offset < total) {
+      final end = (offset + _kWinUploadChunkSize).clamp(0, total);
+      final chunk = bytes.sublist(offset, end);
+      final b64 = base64.encode(chunk);
+      final cmd = first
+          ? 'del /f "$path" 2>nul & del /f "$tmp\\__mx_b64.tmp" 2>nul & '
+              'echo $b64 > "$tmp\\__mx_b64.tmp" && '
+              'certutil -decode "$tmp\\__mx_b64.tmp" "$path" && '
+              'del /f "$tmp\\__mx_b64.tmp" 2>nul && echo $_kUploadOkTag'
+          : 'del /f "$tmp\\__mx_bin.tmp" 2>nul & del /f "$tmp\\__mx_new.tmp" 2>nul & del /f "$tmp\\__mx_b64.tmp" 2>nul & '
+              'echo $b64 > "$tmp\\__mx_b64.tmp" && '
+              'certutil -decode "$tmp\\__mx_b64.tmp" "$tmp\\__mx_bin.tmp" && '
+              'copy /b "$path"+"$tmp\\__mx_bin.tmp" "$tmp\\__mx_new.tmp" >nul && '
+              'move /y "$tmp\\__mx_new.tmp" "$path" >nul && '
+              'del /f "$tmp\\__mx_b64.tmp" 2>nul & del /f "$tmp\\__mx_bin.tmp" 2>nul & echo $_kUploadOkTag';
+      final r = await sendRawCommand(cmd);
+      if (r.contains('ACCESS_DENIED') ||
+          r.contains('拒绝访问') ||
+          r.contains('Access is denied')) {
+        throw Exception('目标路径写入被拒绝（IIS 进程无写权限）：$path');
+      }
+      if (!r.contains(_kUploadOkTag)) return false;
+      offset = end;
+      first = false;
+      onProgress?.call(offset, total);
+    }
+    return true;
   }
 
   @override
