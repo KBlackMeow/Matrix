@@ -10,14 +10,12 @@
 
 Multi-protocol connectors covering mainstream Webshell types:
 
-
 | Type | Connector |
 | ---- | --------- |
 | PHP  | eval, passthru, base64+rot13 obfuscation, Behinder 3.0 (AES) |
 | JSP  | Behinder 3.0, Runtime exec, ClassLoader bytecode loader |
 | ASP  | WScript.Shell |
 | ASPX | .NET Process |
-
 
 Interactive capabilities:
 
@@ -37,27 +35,26 @@ Interactive capabilities:
 
 ### Vulnerability Exploits (EXP)
 
-
 | Framework / Component | Vulnerability |
 | --------------------- | ------------- |
-| Apache Shiro        | CVE-2016-4437                                                   |
-| ThinkPHP            | CVE-2018-20062 / CVE-2019-9082 / CNVD-2022-86535                |
-| Zentao              | CVE-2024-24216                                                  |
-| Apache Struts2      | S2-032 / S2-045 / S2-053 / S2-057 / S2-059                      |
-| Spring Framework    | CVE-2022-22963 / CVE-2022-22965 / CVE-2018-1273 / CVE-2017-8046 |
-| Apache HTTP Server  | CVE-2021-41773                                                  |
-| Drupal              | CVE-2018-7600                                                   |
-| Apache Tomcat       | CVE-2017-12615                                                  |
-| Oracle WebLogic     | CVE-2017-10271 / CVE-2020-14882                                 |
-| XXL-JOB             | Unauthenticated Executor RCE                                     |
-| Nacos               | CVE-2021-29441                                                  |
-
-
-
+| Apache Shiro | CVE-2016-4437 |
+| ThinkPHP | CVE-2018-20062 / CVE-2019-9082 / CNVD-2022-86535 |
+| Zentao | CVE-2024-24216 |
+| Apache Struts2 | S2-032 / S2-045 / S2-053 / S2-057 / S2-059 |
+| Spring Framework | CVE-2022-22963 / CVE-2022-22965 / CVE-2018-1273 / CVE-2017-8046 |
+| Apache HTTP Server | CVE-2021-41773 |
+| Drupal | CVE-2018-7600 |
+| Apache Tomcat | CVE-2017-12615 |
+| Oracle WebLogic | CVE-2017-10271 / CVE-2020-14882 |
+| XXL-JOB | Unauthenticated Executor RCE |
+| Nacos | CVE-2021-29441 |
 
 ### Intranet Tunneling
 
-Built-in FRP client
+Reverse access and SOCKS-style bridging from the desktop client:
+
+- Built-in FRP client
+- **SUO5** proxy: deploy PHP / JSP / ASPX tunnel stubs from the payload library and expose a **local SOCKS5** port; per-project profiles, concurrent tunnels, connectivity probe, and traffic stats
 
 ---
 
