@@ -6,35 +6,34 @@ import 'package:flutter/services.dart';
 import '../app/localization.dart';
 import '../database/database_helper.dart';
 import '../models/project.dart';
-import '../models/suo5_profile.dart';
-import '../services/suo5_client_service.dart';
+import '../models/suo6_profile.dart';
+import '../services/suo6_client_service.dart';
 import '../theme/app_theme.dart';
 
-/// suo5 代理管理页（项目维度）：创建 / 编辑 / 删除 / 启动 / 停止，支持多条同时运行
-class Suo5ProxyPage extends StatefulWidget {
+class Suo6ProxyPage extends StatefulWidget {
   static final _refreshBus = StreamController<void>.broadcast();
   static void notifyRefresh() => _refreshBus.add(null);
 
   final Project project;
   final VoidCallback onSwitchProject;
 
-  const Suo5ProxyPage({
+  const Suo6ProxyPage({
     super.key,
     required this.project,
     required this.onSwitchProject,
   });
 
   @override
-  State<Suo5ProxyPage> createState() => _Suo5ProxyPageState();
+  State<Suo6ProxyPage> createState() => _Suo6ProxyPageState();
 }
 
-class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
+class _Suo6ProxyPageState extends State<Suo6ProxyPage> {
   final DatabaseHelper _db = DatabaseHelper();
-  final Suo5ClientService _service = Suo5ClientService();
+  final Suo6ClientService _service = Suo6ClientService();
   final ScrollController _logScroll = ScrollController();
   StreamSubscription<void>? _refreshSub;
 
-  List<Suo5Profile> _profiles = [];
+  List<Suo6Profile> _profiles = [];
   bool _loading = true;
 
   @override
@@ -45,14 +44,14 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
       setState(() {});
       _scrollLogsToBottom();
     };
-    _refreshSub = Suo5ProxyPage._refreshBus.stream.listen((_) {
+    _refreshSub = Suo6ProxyPage._refreshBus.stream.listen((_) {
       if (mounted) _loadProfiles();
     });
     _loadProfiles();
   }
 
   @override
-  void didUpdateWidget(covariant Suo5ProxyPage oldWidget) {
+  void didUpdateWidget(covariant Suo6ProxyPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.project.id != widget.project.id) {
       _loadProfiles();
@@ -69,7 +68,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
 
   Future<void> _loadProfiles() async {
     setState(() => _loading = true);
-    final list = await _db.getSuo5ProfilesByProject(widget.project.id);
+    final list = await _db.getSuo6ProfilesByProject(widget.project.id);
     if (!mounted) return;
     setState(() {
       _profiles = list;
@@ -87,7 +86,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
     }
   }
 
-  Future<void> _startOrStopProfile(Suo5Profile p) async {
+  Future<void> _startOrStopProfile(Suo6Profile p) async {
     if (_service.isRunning(p.id)) {
       await _service.stopProfile(p.id);
       return;
@@ -116,38 +115,14 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(S.suo5MissingUrl),
+          content: Text(S.suo6MissingUrl),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
         ),
       );
       return;
     }
-    // 端口冲突等启动错误会以 SOCKS5 服务错误形式写入该会话的日志，UI 自动反映
     await _service.startProfile(p.id, p.toConfig(), label: p.name);
-  }
-
-  Future<void> _probeProfile(Suo5Profile p) async {
-    try {
-      await _service.probe(p.toConfig(), label: p.name);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(S.suo5HandshakeOk),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(S.suo5HandshakeFailed(e)),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
   }
 
   Future<void> _showCreateDialog() async {
@@ -158,8 +133,8 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => _Suo5EditorDialog(
-        title: S.suo5NewConfigTitle,
+      builder: (context) => _Suo6EditorDialog(
+        title: S.suo6NewConfigTitle,
         urlController: urlController,
         nameController: nameController,
         hostController: hostController,
@@ -178,7 +153,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
     if (port < 1 || port > 65535) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.suo5InvalidPort)),
+        SnackBar(content: Text(S.suo6InvalidPort)),
       );
       return;
     }
@@ -200,14 +175,14 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.suo5InvalidUrl)),
+        SnackBar(content: Text(S.suo6InvalidUrl)),
       );
       return;
     }
     final name = nameController.text.trim().isEmpty
         ? _deriveNameFromUrl(url)
         : nameController.text.trim();
-    await _db.createSuo5Profile(
+    await _db.createSuo6Profile(
       projectId: widget.project.id,
       name: name,
       targetUrl: url,
@@ -217,13 +192,12 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
     await _loadProfiles();
   }
 
-  /// 建议一个未被其他 profile 占用的本地端口（仅在本项目范围内推断）
   String _suggestPort() {
     final used = _profiles.map((p) => p.listenPort).toSet();
-    for (var port = 1080; port <= 1099; port++) {
+    for (var port = 1081; port <= 1099; port++) {
       if (!used.contains(port)) return port.toString();
     }
-    return '1080';
+    return '1081';
   }
 
   bool _hasPortConflict({
@@ -236,7 +210,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
     );
   }
 
-  Future<void> _showEditDialog(Suo5Profile p) async {
+  Future<void> _showEditDialog(Suo6Profile p) async {
     final urlController = TextEditingController(text: p.targetUrl);
     final nameController = TextEditingController(text: p.name);
     final hostController = TextEditingController(text: p.listenHost);
@@ -245,8 +219,8 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => _Suo5EditorDialog(
-        title: S.suo5EditConfigTitle,
+      builder: (context) => _Suo6EditorDialog(
+        title: S.suo6EditConfigTitle,
         urlController: urlController,
         nameController: nameController,
         hostController: hostController,
@@ -265,7 +239,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
     if (port < 1 || port > 65535) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.suo5InvalidPort)),
+        SnackBar(content: Text(S.suo6InvalidPort)),
       );
       return;
     }
@@ -292,25 +266,24 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.suo5InvalidUrl)),
+        SnackBar(content: Text(S.suo6InvalidUrl)),
       );
       return;
     }
     final name = nameController.text.trim().isEmpty
         ? _deriveNameFromUrl(url)
         : nameController.text.trim();
-    await _db.updateSuo5Profile(p.copyWith(
+    await _db.updateSuo6Profile(p.copyWith(
       name: name,
       targetUrl: url,
       listenHost: host,
       listenPort: port,
     ));
-    // 同步会话 label，让聚合日志使用新名字
     _service.sessionFor(p.id)?.label = name;
     await _loadProfiles();
   }
 
-  Future<void> _confirmDelete(Suo5Profile p) async {
+  Future<void> _confirmDelete(Suo6Profile p) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -320,7 +293,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
           style: const TextStyle(color: AppColors.red),
         ),
         content: Text(
-          S.confirmDeleteSuo5(p.name),
+          S.confirmDeleteSuo6(p.name),
           style: const TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
@@ -344,7 +317,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
     );
     if (ok != true) return;
     await _service.removeProfile(p.id);
-    await _db.deleteSuo5Profile(p.id);
+    await _db.deleteSuo6Profile(p.id);
     await _loadProfiles();
   }
 
@@ -405,7 +378,9 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
 
   Widget _buildProjectHeader() {
     final running = _service.runningCount;
-    final connecting = _service.connectingCount;
+    final connecting = _service.sessions.values
+        .where((s) => s.status == Suo6Status.connecting)
+        .length;
     final total = _profiles.length;
     final hasActive = running + connecting > 0;
     final accent = hasActive ? AppColors.primary : AppColors.textMuted;
@@ -427,7 +402,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: accent.withValues(alpha: 0.5)),
             ),
-            child: Icon(Icons.sync_alt, color: accent, size: 22),
+            child: Icon(Icons.cable, color: accent, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -435,14 +410,14 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  S.suo5ManagementTitle(widget.project.name),
+                  S.suo6ManagementTitle(widget.project.name),
                   style: AppTextStyles.heading(
                     size: 15,
                     color: AppColors.textPrimary,
                   ),
                 ),
                 Text(
-                  S.suo5HeaderRunningSummary(running, total),
+                  S.suo6HeaderRunningSummary(running, total),
                   style: AppTextStyles.caption(size: 13, color: accent),
                 ),
                 if (hasActive) ...[
@@ -452,21 +427,21 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
                     runSpacing: 4,
                     children: [
                       Text(
-                        '${S.suo5StatActiveConn}: ${_service.totalActiveConnections}',
+                        '${S.suo6StatActiveConn}: ${_service.totalActiveConn}',
                         style: AppTextStyles.caption(
                           size: 11,
                           color: AppColors.textMuted,
                         ),
                       ),
                       Text(
-                        '${S.suo5StatUpload}: ${_fmtBytes(_service.totalUploadBytes)}',
+                        '${S.suo6StatUpload}: ${_fmtBytes(_service.totalUpload)}',
                         style: AppTextStyles.caption(
                           size: 11,
                           color: AppColors.textMuted,
                         ),
                       ),
                       Text(
-                        '${S.suo5StatDownload}: ${_fmtBytes(_service.totalDownloadBytes)}',
+                        '${S.suo6StatDownload}: ${_fmtBytes(_service.totalDownload)}',
                         style: AppTextStyles.caption(
                           size: 11,
                           color: AppColors.textMuted,
@@ -501,7 +476,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
         FilledButton.icon(
           onPressed: _loading ? null : _showCreateDialog,
           icon: const Icon(Icons.add, size: 18),
-          label: Text(S.actionAddSuo5),
+          label: Text(S.actionAddSuo6),
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.bgDark,
@@ -517,7 +492,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
         const Spacer(),
         if (!_loading)
           Text(
-            S.suo5Count(_profiles.length),
+            S.suo6Count(_profiles.length),
             style: AppTextStyles.caption(color: AppColors.textMuted),
           ),
       ],
@@ -536,13 +511,13 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.sync_alt_outlined,
+              Icons.cable_outlined,
               size: 64,
               color: AppColors.textSecondary.withValues(alpha: 0.4),
             ),
             const SizedBox(height: 16),
             Text(
-              S.suo5EmptyHint(S.actionAddSuo5),
+              S.suo6EmptyHint(S.actionAddSuo6),
               style: AppTextStyles.body(color: AppColors.textSecondary),
             ),
           ],
@@ -554,12 +529,11 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
       itemBuilder: (context, index) {
         final p = _profiles[index];
         final session = _service.sessionFor(p.id);
-        return _Suo5Card(
+        return _Suo6Card(
           profile: p,
           session: session,
           fmtBytes: _fmtBytes,
           onStartStop: () => _startOrStopProfile(p),
-          onProbe: () => _probeProfile(p),
           onEdit: () => _showEditDialog(p),
           onDelete: () => _confirmDelete(p),
         );
@@ -584,7 +558,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
               const Icon(Icons.terminal, size: 14, color: AppColors.textMuted),
               const SizedBox(width: 6),
               Text(
-                S.suo5RunLog,
+                S.suo6RunLog,
                 style: AppTextStyles.caption(
                   size: 12,
                   color: AppColors.textMuted,
@@ -599,7 +573,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(S.suo5LogCopiedSnack),
+                        content: Text(S.suo6LogCopiedSnack),
                         duration: const Duration(seconds: 2),
                       ),
                     );
@@ -634,7 +608,7 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
             child: lines.isEmpty
                 ? Center(
                     child: Text(
-                      S.suo5NoLogs,
+                      S.suo6NoLogs,
                       style: AppTextStyles.terminal(
                         size: 13,
                         color: AppColors.textMuted,
@@ -653,7 +627,8 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
                           line.contains('Error');
                       final isOk = line.contains('成功') ||
                           line.contains('建立') ||
-                          line.contains('success');
+                          line.contains('success') ||
+                          line.contains('listening');
                       final color = isError
                           ? AppColors.red
                           : isOk
@@ -672,64 +647,60 @@ class _Suo5ProxyPageState extends State<Suo5ProxyPage> {
   }
 }
 
-// ─── 单条配置卡片：启动/停止/握手/编辑/删除 ─────────────────────────────────────
+// ─── Card ────────────────────────────────────────────────────────────────────
 
-class _Suo5Card extends StatefulWidget {
-  final Suo5Profile profile;
-
-  /// 该 profile 对应的会话；为空时视为未启动
-  final Suo5Session? session;
+class _Suo6Card extends StatefulWidget {
+  final Suo6Profile profile;
+  final Suo6Session? session;
   final String Function(int bytes) fmtBytes;
   final VoidCallback onStartStop;
-  final VoidCallback onProbe;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  const _Suo5Card({
+  const _Suo6Card({
     required this.profile,
     required this.session,
     required this.fmtBytes,
     required this.onStartStop,
-    required this.onProbe,
     required this.onEdit,
     required this.onDelete,
   });
 
   @override
-  State<_Suo5Card> createState() => _Suo5CardState();
+  State<_Suo6Card> createState() => _Suo6CardState();
 }
 
-class _Suo5CardState extends State<_Suo5Card> {
+class _Suo6CardState extends State<_Suo6Card> {
   bool _hovered = false;
 
-  Suo5Status get _status => widget.session?.status ?? Suo5Status.idle;
+  Suo6Status get _status => widget.session?.status ?? Suo6Status.idle;
 
   bool get _running =>
-      _status == Suo5Status.running || _status == Suo5Status.connecting;
+      _status == Suo6Status.running || _status == Suo6Status.connecting;
 
   Color get _statusColor {
     switch (_status) {
-      case Suo5Status.running:
+      case Suo6Status.running:
         return AppColors.primary;
-      case Suo5Status.connecting:
+      case Suo6Status.connecting:
         return Colors.orange;
-      case Suo5Status.error:
+      case Suo6Status.error:
         return AppColors.red;
-      case Suo5Status.idle:
+      case Suo6Status.idle:
         return AppColors.textMuted;
     }
   }
 
   String get _statusLabel {
     switch (_status) {
-      case Suo5Status.running:
-        return S.suo5StatusRunning;
-      case Suo5Status.connecting:
-        return S.suo5StatusConnecting;
-      case Suo5Status.error:
-        return S.suo5StatusError;
-      case Suo5Status.idle:
-        return S.suo5StatusIdle;
+      case Suo6Status.running:
+        return S.suo6StatusRunning;
+      case Suo6Status.connecting:
+        return S.suo6StatusConnecting;
+      case Suo6Status.error:
+        return S.suo6StatusError;
+      case Suo6Status.idle:
+        return S.suo6StatusIdle;
     }
   }
 
@@ -738,7 +709,7 @@ class _Suo5CardState extends State<_Suo5Card> {
     final p = widget.profile;
     final s = widget.session;
     final running = _running;
-    final connecting = _status == Suo5Status.connecting;
+    final connecting = _status == Suo6Status.connecting;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -801,7 +772,7 @@ class _Suo5CardState extends State<_Suo5Card> {
                     ),
                   ),
                   child: const Icon(
-                    Icons.sync_alt,
+                    Icons.cable,
                     color: AppColors.primary,
                     size: 20,
                   ),
@@ -880,21 +851,21 @@ class _Suo5CardState extends State<_Suo5Card> {
                           runSpacing: 2,
                           children: [
                             Text(
-                              '${S.suo5StatActiveConn}: ${s.activeConnections}',
+                              '${S.suo6StatActiveConn}: ${s.activeConnections}',
                               style: AppTextStyles.caption(
                                 size: 11,
                                 color: AppColors.textMuted,
                               ),
                             ),
                             Text(
-                              '${S.suo5StatUpload}: ${widget.fmtBytes(s.uploadBytes)}',
+                              '${S.suo6StatUpload}: ${widget.fmtBytes(s.uploadBytes)}',
                               style: AppTextStyles.caption(
                                 size: 11,
                                 color: AppColors.textMuted,
                               ),
                             ),
                             Text(
-                              '${S.suo5StatDownload}: ${widget.fmtBytes(s.downloadBytes)}',
+                              '${S.suo6StatDownload}: ${widget.fmtBytes(s.downloadBytes)}',
                               style: AppTextStyles.caption(
                                 size: 11,
                                 color: AppColors.textMuted,
@@ -933,29 +904,6 @@ class _Suo5CardState extends State<_Suo5Card> {
                     style: AppTextStyles.caption(
                       size: 12,
                       color: running ? AppColors.red : AppColors.primary,
-                    ),
-                  ),
-                ),
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: running ? null : widget.onProbe,
-                  icon: const Icon(
-                    Icons.wifi_tethering,
-                    size: 16,
-                    color: AppColors.cyan,
-                  ),
-                  label: Text(
-                    S.suo5BtnProbe,
-                    style: AppTextStyles.caption(
-                      size: 12,
-                      color: AppColors.cyan,
                     ),
                   ),
                 ),
@@ -1034,9 +982,9 @@ class _Tag extends StatelessWidget {
   }
 }
 
-// ─── 创建/编辑弹窗 ───────────────────────────────────────────────────────────
+// ─── 创建/编辑弹窗 ────────────────────────────────────────────────────────────
 
-class _Suo5EditorDialog extends StatelessWidget {
+class _Suo6EditorDialog extends StatelessWidget {
   final String title;
   final String submitLabel;
   final TextEditingController urlController;
@@ -1045,7 +993,7 @@ class _Suo5EditorDialog extends StatelessWidget {
   final TextEditingController portController;
   final bool locked;
 
-  const _Suo5EditorDialog({
+  const _Suo6EditorDialog({
     required this.title,
     required this.submitLabel,
     required this.urlController,
@@ -1069,7 +1017,7 @@ class _Suo5EditorDialog extends StatelessWidget {
           ),
           if (locked)
             Text(
-              S.suo5RunningNoEdit,
+              S.suo6RunningNoEdit,
               style: AppTextStyles.caption(
                 size: 10,
                 color: Colors.orange,
@@ -1086,16 +1034,16 @@ class _Suo5EditorDialog extends StatelessWidget {
             children: [
               _field(
                 controller: urlController,
-                label: S.suo5TargetUrl,
-                hint: S.suo5TargetUrlHint,
+                label: S.suo6TargetUrl,
+                hint: S.suo6TargetUrlHint,
                 autofocus: true,
                 enabled: !locked,
               ),
               const SizedBox(height: 16),
               _field(
                 controller: nameController,
-                label: S.suo5ConfigName,
-                hint: S.suo5ConfigNameHint,
+                label: S.suo6ConfigName,
+                hint: S.suo6ConfigNameHint,
                 enabled: !locked,
               ),
               const SizedBox(height: 16),
@@ -1105,7 +1053,7 @@ class _Suo5EditorDialog extends StatelessWidget {
                     flex: 3,
                     child: _field(
                       controller: hostController,
-                      label: S.suo5ListenHost,
+                      label: S.suo6ListenHost,
                       hint: '127.0.0.1',
                       enabled: !locked,
                     ),
@@ -1114,8 +1062,8 @@ class _Suo5EditorDialog extends StatelessWidget {
                   Expanded(
                     child: _field(
                       controller: portController,
-                      label: S.suo5ListenPort,
-                      hint: '1080',
+                      label: S.suo6ListenPort,
+                      hint: '1081',
                       enabled: !locked,
                       keyboardType: TextInputType.number,
                     ),

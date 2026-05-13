@@ -12,12 +12,14 @@ import 'io/payload_dao.dart';
 import 'io/webshell_dao.dart';
 import 'io/frp_profile_dao.dart';
 import 'io/suo5_profile_dao.dart';
+import 'io/suo6_profile_dao.dart';
 import 'io/meta_dao.dart';
 import '../models/project.dart';
 import '../models/webshell.dart';
 import '../models/payload.dart';
 import '../models/frp_profile.dart';
 import '../models/suo5_profile.dart';
+import '../models/suo6_profile.dart';
 import '../services/frp_client_service.dart';
 
 /// 桌面/移动端 SQLite 实现
@@ -38,6 +40,7 @@ class DatabaseHelperIo {
       );
   late final FrpProfileDao _frpProfileDao = FrpProfileDao(() => database);
   late final Suo5ProfileDao _suo5ProfileDao = Suo5ProfileDao(() => database);
+  late final Suo6ProfileDao _suo6ProfileDao = Suo6ProfileDao(() => database);
   late final MetaDao _metaDao = MetaDao(() => database);
 
   Future<Database> get database async {
@@ -52,7 +55,7 @@ class DatabaseHelperIo {
 
     return openDatabase(
       path,
-      version: 12,
+      version: 13,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -149,6 +152,23 @@ class DatabaseHelperIo {
     ''');
     await db.execute(
       'CREATE INDEX idx_suo5_project ON suo5_profiles(project_id)',
+    );
+
+    await db.execute('''
+      CREATE TABLE suo6_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        target_url TEXT NOT NULL,
+        listen_host TEXT NOT NULL DEFAULT '127.0.0.1',
+        listen_port INTEGER NOT NULL DEFAULT 1080,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects (id)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_suo6_project ON suo6_profiles(project_id)',
     );
   }
 
@@ -284,6 +304,24 @@ class DatabaseHelperIo {
       ''');
       await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_suo5_project ON suo5_profiles(project_id)',
+      );
+    }
+    if (oldVersion < 13) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS suo6_profiles (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          target_url TEXT NOT NULL,
+          listen_host TEXT NOT NULL DEFAULT '127.0.0.1',
+          listen_port INTEGER NOT NULL DEFAULT 1080,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects (id)
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_suo6_project ON suo6_profiles(project_id)',
       );
     }
   }
@@ -497,6 +535,32 @@ class DatabaseHelperIo {
 
   Future<int> deleteSuo5Profile(int id) =>
       _suo5ProfileDao.deleteSuo5Profile(id);
+
+  // ── Suo6 Profiles ────────────────────────────────────────────────────────────
+
+  Future<Suo6Profile> createSuo6Profile({
+    required int projectId,
+    required String name,
+    required String targetUrl,
+    required String listenHost,
+    required int listenPort,
+  }) =>
+      _suo6ProfileDao.createSuo6Profile(
+        projectId: projectId,
+        name: name,
+        targetUrl: targetUrl,
+        listenHost: listenHost,
+        listenPort: listenPort,
+      );
+
+  Future<List<Suo6Profile>> getSuo6ProfilesByProject(int projectId) =>
+      _suo6ProfileDao.getSuo6ProfilesByProject(projectId);
+
+  Future<Suo6Profile?> updateSuo6Profile(Suo6Profile profile) =>
+      _suo6ProfileDao.updateSuo6Profile(profile);
+
+  Future<int> deleteSuo6Profile(int id) =>
+      _suo6ProfileDao.deleteSuo6Profile(id);
 }
 
 final _io = DatabaseHelperIo();
@@ -652,3 +716,27 @@ Future<Suo5Profile?> updateSuo5Profile(Suo5Profile profile) =>
     _io.updateSuo5Profile(profile);
 
 Future<int> deleteSuo5Profile(int id) => _io.deleteSuo5Profile(id);
+
+// Suo6 Profiles 顶层方法
+Future<Suo6Profile> createSuo6Profile({
+  required int projectId,
+  required String name,
+  required String targetUrl,
+  required String listenHost,
+  required int listenPort,
+}) =>
+    _io.createSuo6Profile(
+      projectId: projectId,
+      name: name,
+      targetUrl: targetUrl,
+      listenHost: listenHost,
+      listenPort: listenPort,
+    );
+
+Future<List<Suo6Profile>> getSuo6ProfilesByProject(int projectId) =>
+    _io.getSuo6ProfilesByProject(projectId);
+
+Future<Suo6Profile?> updateSuo6Profile(Suo6Profile profile) =>
+    _io.updateSuo6Profile(profile);
+
+Future<int> deleteSuo6Profile(int id) => _io.deleteSuo6Profile(id);

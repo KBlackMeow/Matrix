@@ -497,7 +497,7 @@ class _ProjectCardState extends State<_ProjectCard> {
               icon: const Icon(Icons.bug_report, size: 20),
               label: Text(S.menuEnterExp),
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary.withValues(alpha: 0.85),
+                backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
                 alignment: Alignment.centerLeft,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -512,7 +512,7 @@ class _ProjectCardState extends State<_ProjectCard> {
               icon: const Icon(Icons.sync_alt, size: 20),
               label: Text(S.menuEnterSuo5),
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary.withValues(alpha: 0.7),
+                backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
                 alignment: Alignment.centerLeft,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

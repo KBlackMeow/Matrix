@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 
+import '../database/database_helper.dart';
 import '../models/webshell.dart';
 import '../services/reverse_shell_service.dart';
 import '../services/webshell_service.dart';
@@ -9,6 +10,8 @@ import '../theme/app_theme.dart';
 import '../utils/matrix_console_log.dart';
 import '../app/localization.dart';
 import 'reverse_shell_terminal_page.dart';
+import 'suo5_proxy_page.dart';
+import 'suo6_proxy_page.dart';
 import 'webshell_interactive_file_manager.dart';
 import 'webshell_interactive_system_priv_esc.dart';
 import 'webshell_interactive_terminal_shared.dart';
@@ -308,9 +311,451 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
             ),
           ),
           const SizedBox(width: 4),
+          if (_service.canInjectSuo5)
+            IconButton(
+              onPressed: _isChecking ? null : _showInjectSuo5Dialog,
+              icon: const Icon(Icons.cable_outlined, size: 17),
+              color: AppColors.cyan,
+              tooltip: '注入 suo5 内存马',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+          if (_service.canInjectSuo6)
+            IconButton(
+              onPressed: _isChecking ? null : _showInjectSuo6Dialog,
+              icon: const Icon(Icons.cable, size: 17),
+              color: AppColors.primary,
+              tooltip: '注入 suo6 内存马（二进制多路复用）',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+          const SizedBox(width: 4),
           _methodBadge(widget.webshell.method),
           const SizedBox(width: 8),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showInjectSuo5Dialog() async {
+    final pathCtrl = TextEditingController(text: '/suo5_tunnel');
+    final nameCtrl = TextEditingController(text: 's5_mem');
+    bool injecting = false;
+    String? result;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          backgroundColor: AppColors.bgCard,
+          title: Text(
+            '注入 suo5 内存马',
+            style: AppTextStyles.heading(color: AppColors.cyan),
+          ),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '通过冰蝎通道向目标注入 suo5 Filter 内存马。\n注入成功后可用该路径创建 suo5 代理。',
+                  style: AppTextStyles.caption(
+                    size: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _dialogField(nameCtrl, 'Filter 名称', 's5_mem', enabled: !injecting),
+                const SizedBox(height: 12),
+                _dialogField(pathCtrl, '监听路径 (URL Pattern)', '/suo5_tunnel', enabled: !injecting),
+                if (result != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: (result!.startsWith('OK'))
+                          ? AppColors.primary.withValues(alpha: 0.1)
+                          : AppColors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: (result!.startsWith('OK'))
+                            ? AppColors.primary.withValues(alpha: 0.5)
+                            : AppColors.red.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Text(
+                      result!,
+                      style: AppTextStyles.terminal(
+                        size: 12,
+                        color: result!.startsWith('OK')
+                            ? AppColors.primary
+                            : AppColors.red,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: injecting ? null : () => Navigator.pop(ctx),
+              child: Text(
+                result != null && result!.startsWith('OK') ? S.btnClose : S.btnCancel,
+                style: AppTextStyles.body(color: AppColors.textSecondary),
+              ),
+            ),
+            if (result == null || !result!.startsWith('OK'))
+              FilledButton(
+                onPressed: injecting
+                    ? null
+                    : () async {
+                        final path = pathCtrl.text.trim();
+                        final name = nameCtrl.text.trim();
+                        if (path.isEmpty) return;
+                        setState(() { injecting = true; result = null; });
+                        final r = await _service.injectSuo5MemShell(
+                          filterName: name.isEmpty ? 's5_mem' : name,
+                          urlPath: path,
+                        );
+                        setState(() { injecting = false; result = r; });
+                        if (r.startsWith('OK') && ctx.mounted) {
+                          _onInjectSuccess(ctx, path);
+                        }
+                      },
+                style: FilledButton.styleFrom(backgroundColor: AppColors.cyan),
+                child: injecting
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        '注入',
+                        style: AppTextStyles.body(color: AppColors.bgDark),
+                      ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onInjectSuccess(BuildContext dialogCtx, String urlPath) {
+    Navigator.pop(dialogCtx);
+    final baseUri = Uri.tryParse(widget.webshell.url);
+    if (baseUri == null) return;
+    final suo5Url = baseUri.replace(path: urlPath).toString();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: Text(
+          '注入成功',
+          style: AppTextStyles.heading(color: AppColors.primary),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'suo5 Filter 已注入，目标路径：',
+              style: AppTextStyles.body(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            SelectableText(
+              suo5Url,
+              style: AppTextStyles.terminal(
+                size: 13,
+                color: AppColors.cyan,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '在「suo5 代理」页面以该 URL 创建代理配置即可使用。',
+              style: AppTextStyles.caption(
+                size: 12,
+                color: AppColors.textMuted,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(S.btnClose, style: AppTextStyles.body(color: AppColors.textSecondary)),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _createSuo5Profile(suo5Url, urlPath);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            child: Text(
+              '自动创建代理配置',
+              style: AppTextStyles.body(color: AppColors.bgDark),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 在本项目内为 [listenHost] 选择首个未被 suo5 / suo6 任一配置占用的本地端口。
+  Future<int> _pickLocalListenPort(int projectId, String listenHost) async {
+    final db = DatabaseHelper();
+    final suo5 = await db.getSuo5ProfilesByProject(projectId);
+    final suo6 = await db.getSuo6ProfilesByProject(projectId);
+    final used = <int>{
+      for (final p in suo5)
+        if (p.listenHost == listenHost) p.listenPort,
+      for (final p in suo6)
+        if (p.listenHost == listenHost) p.listenPort,
+    };
+    for (var port = 1080; port <= 65535; port++) {
+      if (!used.contains(port)) return port;
+    }
+    return 1080;
+  }
+
+  Future<void> _createSuo5Profile(String targetUrl, String path) async {
+    try {
+      final db = DatabaseHelper();
+      final pathName = path.replaceAll('/', '_').replaceAll('*', '').trim();
+      const listenHost = '127.0.0.1';
+      final listenPort =
+          await _pickLocalListenPort(widget.webshell.projectId, listenHost);
+      await db.createSuo5Profile(
+        projectId: widget.webshell.projectId,
+        name: '${widget.webshell.name}$pathName',
+        targetUrl: targetUrl,
+        listenHost: listenHost,
+        listenPort: listenPort,
+      );
+      Suo5ProxyPage.notifyRefresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('suo5 代理配置已创建，请前往「suo5 代理」页面启动'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('创建代理配置失败: $e'),
+          backgroundColor: AppColors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _createSuo6Profile(String targetUrl, String path) async {
+    try {
+      final db = DatabaseHelper();
+      final pathName = path.replaceAll('/', '_').replaceAll('*', '').trim();
+      const listenHost = '127.0.0.1';
+      final listenPort =
+          await _pickLocalListenPort(widget.webshell.projectId, listenHost);
+      await db.createSuo6Profile(
+        projectId: widget.webshell.projectId,
+        name: '${widget.webshell.name}$pathName',
+        targetUrl: targetUrl,
+        listenHost: listenHost,
+        listenPort: listenPort,
+      );
+      Suo6ProxyPage.notifyRefresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('suo6 代理配置已创建，请前往「suo6 代理」页面启动'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('创建代理配置失败: $e'),
+          backgroundColor: AppColors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  // ── Suo6 inject ──────────────────────────────────────────────────────────
+
+  Future<void> _showInjectSuo6Dialog() async {
+    final nameCtrl = TextEditingController(text: 'suo6');
+    final pathCtrl = TextEditingController(text: '/s6');
+    bool injecting = false;
+    String? result;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          backgroundColor: AppColors.bgCard,
+          title: Text(
+            '注入 suo6 内存马',
+            style: AppTextStyles.heading(color: AppColors.primary),
+          ),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '注入后通过该路径建立二进制多路复用隧道，速度优于 suo5。',
+                  style: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
+                ),
+                const SizedBox(height: 12),
+                _dialogField(nameCtrl, 'Filter 名称', 'suo6', enabled: !injecting),
+                const SizedBox(height: 8),
+                _dialogField(pathCtrl, '监听路径 (URL Pattern)', '/s6', enabled: !injecting),
+                if (result != null) ...[
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    result!,
+                    style: AppTextStyles.terminal(
+                      size: 12,
+                      color: result!.startsWith('OK')
+                          ? AppColors.primary
+                          : AppColors.red,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: injecting ? null : () => Navigator.pop(ctx),
+              child: Text(S.btnClose, style: AppTextStyles.body(color: AppColors.textSecondary)),
+            ),
+            FilledButton(
+              onPressed: injecting
+                  ? null
+                  : () async {
+                      final name = nameCtrl.text.trim();
+                      final path = pathCtrl.text.trim();
+                      setState(() { injecting = true; result = null; });
+                      final r = await _service.injectSuo6MemShell(
+                        filterName: name.isEmpty ? 'suo6' : name,
+                        urlPath: path.isEmpty ? '/s6' : path,
+                      );
+                      setState(() { injecting = false; result = r; });
+                      if (r.startsWith('OK') && ctx.mounted) {
+                        _onInjectSuo6Success(ctx, path.isEmpty ? '/s6' : path);
+                      }
+                    },
+              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+              child: injecting
+                  ? const SizedBox(
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text('注入', style: AppTextStyles.body(color: AppColors.bgDark)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onInjectSuo6Success(BuildContext dialogCtx, String urlPath) {
+    Navigator.pop(dialogCtx);
+    final baseUri = Uri.tryParse(widget.webshell.url);
+    if (baseUri == null) return;
+    final suo6Url = baseUri.replace(path: urlPath).toString();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: Text('注入成功', style: AppTextStyles.heading(color: AppColors.primary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'suo6 Filter 已注入，目标路径：',
+              style: AppTextStyles.body(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            SelectableText(
+              suo6Url,
+              style: AppTextStyles.terminal(size: 13, color: AppColors.primary),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '在「suo6 代理」页面以该 URL 创建代理配置即可使用。',
+              style: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(S.btnClose, style: AppTextStyles.body(color: AppColors.textSecondary)),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _createSuo6Profile(suo6Url, urlPath);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            child: Text(
+              '自动创建代理配置',
+              style: AppTextStyles.body(color: AppColors.bgDark),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _dialogField(
+    TextEditingController ctrl,
+    String label,
+    String hint, {
+    bool enabled = true,
+  }) {
+    return TextField(
+      controller: ctrl,
+      enabled: enabled,
+      style: const TextStyle(
+        color: AppColors.textPrimary,
+        fontFamily: 'monospace',
+        fontSize: 13,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        hintStyle: const TextStyle(color: AppColors.textMuted),
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: AppColors.cyan.withValues(alpha: 0.5)),
+        ),
+        focusedBorder: const OutlineInputBorder(
+          borderSide: BorderSide(color: AppColors.cyan),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.3)),
+        ),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       ),
     );
   }

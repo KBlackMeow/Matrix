@@ -10,7 +10,7 @@ import '../models/payload.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 10;
+  static const _kCurrentVersion = 11;
   static const _binaryContentPrefix = '__MATRIX_BINARY_B64__:';
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
@@ -131,6 +131,31 @@ class SeedService {
       description: 'SUO5 ASPX 代理 payload，用于在 .NET 环境建立 HTTP-to-SOCKS5 隧道',
       tags: 'suo5,aspx,proxy,tunnel,socks5,dotnet',
       sinceVersion: 10,
+    ),
+    // ── SUO6 代理载荷（多路复用二进制隧道）────────────────────────────────
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/suo6/suo6.php',
+      name: 'suo6.php',
+      type: 'php',
+      description: 'SUO6 PHP 代理 payload，单条 HTTP 连接多路复用 SOCKS5 流，XOR 加密',
+      tags: 'suo6,php,proxy,tunnel,socks5,multiplex',
+      sinceVersion: 11,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/suo6/suo6.jsp',
+      name: 'suo6.jsp',
+      type: 'jsp',
+      description: 'SUO6 JSP 代理 payload，单条 HTTP 连接多路复用 SOCKS5 流，XOR 加密',
+      tags: 'suo6,jsp,proxy,tunnel,socks5,multiplex',
+      sinceVersion: 11,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/suo6/suo6.aspx',
+      name: 'suo6.aspx',
+      type: 'aspx',
+      description: 'SUO6 ASPX 代理 payload，单条 HTTP 连接多路复用 SOCKS5 流，XOR 加密',
+      tags: 'suo6,aspx,proxy,tunnel,socks5,multiplex,dotnet',
+      sinceVersion: 11,
     ),
     // ── COPY-FAIL（二进制）─────────────────────────────────────────────────
     _PayloadDef(

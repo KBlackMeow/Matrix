@@ -3,6 +3,7 @@ import '../models/webshell.dart';
 import '../models/payload.dart';
 import '../models/frp_profile.dart';
 import '../models/suo5_profile.dart';
+import '../models/suo6_profile.dart';
 import '../services/frp_client_service.dart';
 import 'database_helper_web.dart';
 
@@ -203,4 +204,50 @@ Future<int> deleteSuo5Profile(int id) async {
   final before = _suo5Profiles.length;
   _suo5Profiles.removeWhere((p) => p.id == id);
   return before - _suo5Profiles.length;
+}
+
+// Suo6 Profiles（Web 无持久化，仅会话内有效）
+final _suo6Profiles = <Suo6Profile>[];
+int _suo6ProfileIdSeq = 1;
+
+Future<Suo6Profile> createSuo6Profile({
+  required int projectId,
+  required String name,
+  required String targetUrl,
+  required String listenHost,
+  required int listenPort,
+}) async {
+  final now = DateTime.now();
+  final profile = Suo6Profile(
+    id: _suo6ProfileIdSeq++,
+    projectId: projectId,
+    name: name,
+    targetUrl: targetUrl,
+    listenHost: listenHost,
+    listenPort: listenPort,
+    createdAt: now,
+    updatedAt: now,
+  );
+  _suo6Profiles.add(profile);
+  return profile;
+}
+
+Future<List<Suo6Profile>> getSuo6ProfilesByProject(int projectId) async {
+  final list = _suo6Profiles.where((p) => p.projectId == projectId).toList()
+    ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  return List.unmodifiable(list);
+}
+
+Future<Suo6Profile?> updateSuo6Profile(Suo6Profile profile) async {
+  final i = _suo6Profiles.indexWhere((p) => p.id == profile.id);
+  if (i < 0) return null;
+  final updated = profile.copyWith(updatedAt: DateTime.now());
+  _suo6Profiles[i] = updated;
+  return updated;
+}
+
+Future<int> deleteSuo6Profile(int id) async {
+  final before = _suo6Profiles.length;
+  _suo6Profiles.removeWhere((p) => p.id == id);
+  return before - _suo6Profiles.length;
 }

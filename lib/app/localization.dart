@@ -6243,4 +6243,123 @@ class S {
     }
   }
 
+  // --- suo6 proxy management ---
+
+  static String get menuSuo6 {
+    switch (_lang) {
+      case AppLanguage.zh: return 'suo6代理';
+      case AppLanguage.ja: return 'suo6 プロキシ';
+      case AppLanguage.en: return 'suo6 Proxy';
+    }
+  }
+
+  static String get titleSuo6Manager {
+    switch (_lang) {
+      case AppLanguage.zh: return 'suo6 代理';
+      case AppLanguage.ja: return 'suo6 プロキシ';
+      case AppLanguage.en: return 'suo6 Proxy';
+    }
+  }
+
+  static String suo6ManagementTitle(String projectName) {
+    switch (_lang) {
+      case AppLanguage.zh: return 'suo6 · $projectName';
+      case AppLanguage.ja: return 'suo6 · $projectName';
+      case AppLanguage.en: return 'suo6 · $projectName';
+    }
+  }
+
+  static String get actionAddSuo6 {
+    switch (_lang) {
+      case AppLanguage.zh: return '添加 suo6 代理';
+      case AppLanguage.ja: return 'suo6 プロキシを追加';
+      case AppLanguage.en: return 'Add suo6 Proxy';
+    }
+  }
+
+  static String get suo6NewConfigTitle {
+    switch (_lang) {
+      case AppLanguage.zh: return '新建 suo6 代理';
+      case AppLanguage.ja: return '新規 suo6 プロキシ';
+      case AppLanguage.en: return 'New suo6 Proxy';
+    }
+  }
+
+  static String get suo6EditConfigTitle {
+    switch (_lang) {
+      case AppLanguage.zh: return '编辑 suo6 代理';
+      case AppLanguage.ja: return 'suo6 プロキシを編集';
+      case AppLanguage.en: return 'Edit suo6 Proxy';
+    }
+  }
+
+  static String get suo6TargetUrl {
+    switch (_lang) {
+      case AppLanguage.zh: return 'suo6 URL';
+      case AppLanguage.ja: return 'suo6 URL';
+      case AppLanguage.en: return 'suo6 URL';
+    }
+  }
+
+  static String get suo6TargetUrlHint {
+    switch (_lang) {
+      case AppLanguage.zh: return 'https://target/s6';
+      case AppLanguage.ja: return 'https://target/s6';
+      case AppLanguage.en: return 'https://target/s6';
+    }
+  }
+
+  static String suo6Count(int n) {
+    switch (_lang) {
+      case AppLanguage.zh: return '共 $n 条配置';
+      case AppLanguage.ja: return '合計 $n 件';
+      case AppLanguage.en: return '$n config${n == 1 ? '' : 's'}';
+    }
+  }
+
+  static String suo6EmptyHint(String addLabel) {
+    switch (_lang) {
+      case AppLanguage.zh: return '暂无 suo6 代理，点击「$addLabel」开始';
+      case AppLanguage.ja: return 'suo6 プロキシがありません。「$addLabel」をクリックして開始';
+      case AppLanguage.en: return 'No suo6 proxy yet. Click "$addLabel" to get started';
+    }
+  }
+
+  static String confirmDeleteSuo6(String name) {
+    switch (_lang) {
+      case AppLanguage.zh: return '确定删除配置「$name」？';
+      case AppLanguage.ja: return '設定「$name」を削除しますか？';
+      case AppLanguage.en: return 'Delete config "$name"?';
+    }
+  }
+
+  static String get suo6MissingUrl {
+    switch (_lang) {
+      case AppLanguage.zh: return '请填写 suo6 URL';
+      case AppLanguage.ja: return 'suo6 URL を入力してください';
+      case AppLanguage.en: return 'Please enter the suo6 URL';
+    }
+  }
+
+  static String get suo6InvalidUrl => suo5InvalidUrl;
+  static String get suo6InvalidPort => suo5InvalidPort;
+  static String get suo6ConfigName => suo5ConfigName;
+  static String get suo6ConfigNameHint => suo5ConfigNameHint;
+  static String get suo6ListenHost => suo5ListenHost;
+  static String get suo6ListenPort => suo5ListenPort;
+  static String get suo6RunningNoEdit => suo5RunningNoEdit;
+  static String get suo6StatActiveConn => suo5StatActiveConn;
+  static String get suo6StatUpload => suo5StatUpload;
+  static String get suo6StatDownload => suo5StatDownload;
+  static String get suo6RunLog => suo5RunLog;
+  static String get suo6NoLogs => suo5NoLogs;
+  static String get suo6LogCopiedSnack => suo5LogCopiedSnack;
+  static String get suo6StatusRunning => suo5StatusRunning;
+  static String get suo6StatusConnecting => suo5StatusConnecting;
+  static String get suo6StatusError => suo5StatusError;
+  static String get suo6StatusIdle => suo5StatusIdle;
+
+  static String suo6HeaderRunningSummary(int running, int total) =>
+      suo5HeaderRunningSummary(running, total);
+
 }

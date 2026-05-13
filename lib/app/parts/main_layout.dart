@@ -11,6 +11,7 @@ import '../../pages/project_management_page.dart';
 import '../../pages/project_scoped_page.dart';
 import '../../pages/reverse_shell_dashboard_page.dart';
 import '../../pages/suo5_proxy_page.dart';
+import '../../pages/suo6_proxy_page.dart';
 import '../../pages/webshell_management_page.dart';
 import '../../theme/app_theme.dart';
 import 'exp_content.dart' as exp;
@@ -42,10 +43,12 @@ class _MainLayoutState extends State<MainLayout> {
   late ProjectScopedPage _webshellPage;
   late ProjectScopedPage _expPage;
   late ProjectScopedPage _suo5Page;
+  late ProjectScopedPage _suo6Page;
   late RepaintBoundary _projectBoundary;
   late RepaintBoundary _webshellBoundary;
   late RepaintBoundary _expBoundary;
   late RepaintBoundary _suo5Boundary;
+  late RepaintBoundary _suo6Boundary;
   late List<Widget> _staticPages;
   late List<Widget> _pages;
 
@@ -80,6 +83,11 @@ class _MainLayoutState extends State<MainLayout> {
       icon: Icons.sync_alt_outlined,
       label: '',
       selectedIcon: Icons.sync_alt,
+    ),
+    MenuItem(
+      icon: Icons.cable_outlined,
+      label: '',
+      selectedIcon: Icons.cable,
     ),
   ];
 
@@ -236,6 +244,35 @@ class _MainLayoutState extends State<MainLayout> {
       ),
     );
     _suo5Boundary = RepaintBoundary(child: _suo5Page);
+    _suo6Page = ProjectScopedPage(
+      selectedProject: _selectedProject,
+      onSelectProject: (p) {
+        setState(() {
+          _selectedProject = p;
+          _rebuildDynamicPages();
+        });
+      },
+      onClearProject: () {
+        setState(() {
+          _selectedProject = null;
+          _rebuildDynamicPages();
+        });
+      },
+      onNavigateToProjectManagement: () {
+        setState(() {
+          _selectedIndex = 0;
+          _selectedProject = null;
+          _rebuildDynamicPages();
+        });
+      },
+      title: S.titleSuo6Manager,
+      icon: Icons.cable,
+      contentBuilder: (project, onSwitchProject) => Suo6ProxyPage(
+        project: project,
+        onSwitchProject: onSwitchProject,
+      ),
+    );
+    _suo6Boundary = RepaintBoundary(child: _suo6Page);
     // 注意：每次都 new 一份非 const 实例，确保语言变化时 Flutter 会下钻 build()
     // （const 单例会被 widget 比对识为未变更，从而跳过子树重建）。
     _staticPages = <Widget>[
@@ -244,12 +281,15 @@ class _MainLayoutState extends State<MainLayout> {
       RepaintBoundary(child: ReverseShellDashboardPage()),
       RepaintBoundary(child: FrpTunnelPage()),
       _suo5Boundary,
+      _suo6Boundary,
     ];
     _pages = [_projectBoundary, _webshellBoundary, ..._staticPages];
   }
 
   void _handleMenuTap(int index) {
     setState(() => _selectedIndex = index);
+    if (index == 6) Suo5ProxyPage.notifyRefresh();
+    if (index == 7) Suo6ProxyPage.notifyRefresh();
   }
 
   String _menuLabelForIndex(int index) {
@@ -268,6 +308,8 @@ class _MainLayoutState extends State<MainLayout> {
         return S.menuFrp;
       case 6:
         return S.menuSuo5;
+      case 7:
+        return S.menuSuo6;
       default:
         return '';
     }

@@ -29,6 +29,9 @@ class Suo5Session {
 
   String label;
 
+  final _rng = Random.secure();
+  Timer? _uiThrottle;
+
   Suo5Status _status = Suo5Status.idle;
   Suo5Status get status => _status;
 
@@ -86,6 +89,8 @@ class Suo5Session {
   }
 
   Future<void> stop() async {
+    _uiThrottle?.cancel();
+    _uiThrottle = null;
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
     for (final t in _tunnels.toList()) {
@@ -207,6 +212,10 @@ class Suo5Session {
       } else if (atyp == 0x03) {
         final len = (await reader.read(1))[0];
         host = utf8.decode(await reader.read(len), allowMalformed: true);
+      } else if (atyp == 0x04) {
+        // IPv6: 16 bytes → forward as bracketed literal so the server can connect.
+        final ip = await reader.read(16);
+        host = '[${InternetAddress.fromRawAddress(ip, type: InternetAddressType.IPv6).address}]';
       } else {
         socket.add([0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0]);
         await socket.flush();
@@ -234,7 +243,7 @@ class Suo5Session {
         onTraffic: (up, down) {
           _uploadBytes += up;
           _downloadBytes += down;
-          onChanged?.call();
+          _scheduleUiUpdate();
         },
       );
       _tunnels.add(tunnel);
@@ -359,26 +368,32 @@ class Suo5Session {
     final out = <Map<String, Uint8List>>[];
     var offset = 0;
     while (offset + 8 <= bytes.length) {
-      final headB64 = ascii.decode(bytes.sublist(offset, offset + 8));
-      offset += 8;
-      final head = base64Url.decode(base64Url.normalize(headB64));
+      // Decode 8 base64url chars → 6 header bytes without a sublist copy.
+      Uint8List head;
+      try {
+        head = base64Url.decode(
+          base64Url.normalize(String.fromCharCodes(bytes, offset, offset + 8)));
+      } catch (_) {
+        break;
+      }
       if (head.length != 6) break;
       final obs0 = head[0];
       final obs1 = head[1];
-      final l0 = head[2] ^ obs0;
-      final l1 = head[3] ^ obs1;
-      final l2 = head[4] ^ obs0;
-      final l3 = head[5] ^ obs1;
-      final encLen = (l0 << 24) | (l1 << 16) | (l2 << 8) | l3;
+      final encLen = ((head[2] ^ obs0) << 24) | ((head[3] ^ obs1) << 16) |
+                     ((head[4] ^ obs0) << 8)  |  (head[5] ^ obs1);
+      offset += 8;
       if (encLen < 0 || offset + encLen > bytes.length) break;
-      final encData = ascii.decode(bytes.sublist(offset, offset + encLen));
-      offset += encLen;
-      final raw = Uint8List.fromList(
-        base64Url.decode(base64Url.normalize(encData)),
-      );
-      for (var i = 0; i < raw.length; i++) {
-        raw[i] = raw[i] ^ (i.isEven ? obs0 : obs1);
+      Uint8List raw;
+      try {
+        raw = Uint8List.fromList(base64Url.decode(
+          base64Url.normalize(String.fromCharCodes(bytes, offset, offset + encLen))));
+      } catch (_) {
+        break;
       }
+      offset += encLen;
+      var i = 0;
+      while (i + 1 < raw.length) { raw[i] ^= obs0; raw[i + 1] ^= obs1; i += 2; }
+      if (i < raw.length) raw[i] ^= obs0;
       out.add(_unmarshal(raw));
     }
     return out;
@@ -392,28 +407,37 @@ class Suo5Session {
     final m = <String, List<int>>{
       ...data,
       'm': [modeByteOverride ?? _modeByte],
-      '_': _randBytes(8 + Random.secure().nextInt(24)),
+      '_': _randBytes(8 + _rng.nextInt(24)),
     };
     if (includeSid && _sessionId.isNotEmpty) {
       m['sid'] = utf8.encode(_sessionId);
     }
+    // _marshal returns a freshly allocated Uint8List — XOR it in-place.
     final payload = _marshal(m);
-    final obs = _randBytes(2);
-    final xoredData = Uint8List.fromList(payload);
-    for (var i = 0; i < xoredData.length; i++) {
-      xoredData[i] ^= obs[i % 2];
+    final o0 = _rng.nextInt(256);
+    final o1 = _rng.nextInt(256);
+    var i = 0;
+    while (i + 1 < payload.length) {
+      payload[i] ^= o0;
+      payload[i + 1] ^= o1;
+      i += 2;
     }
-    final dataB64 = ascii.encode(base64UrlEncode(xoredData).replaceAll('=', ''));
-    final lenBytes = ByteData(4)..setUint32(0, dataB64.length, Endian.big);
-    final xoredLen = Uint8List(4);
-    for (var i = 0; i < 4; i++) {
-      xoredLen[i] = lenBytes.getUint8(i) ^ obs[i % 2];
-    }
-    final header = Uint8List.fromList([...obs, ...xoredLen]);
-    final headerB64 = ascii.encode(
-      base64UrlEncode(header).replaceAll('=', ''),
-    );
-    return [...headerB64, ...dataB64];
+    if (i < payload.length) payload[i] ^= o0;
+    final dataStr = base64UrlEncode(payload).replaceAll('=', '');
+    final dLen = dataStr.length;
+    // Build 6-byte header: [o0, o1, xored_len×4] → 8 base64url chars
+    final hdr = Uint8List(6)
+      ..[0] = o0
+      ..[1] = o1
+      ..[2] = ((dLen >> 24) & 0xff) ^ o0
+      ..[3] = ((dLen >> 16) & 0xff) ^ o1
+      ..[4] = ((dLen >> 8) & 0xff) ^ o0
+      ..[5] = (dLen & 0xff) ^ o1;
+    final hdrStr = base64UrlEncode(hdr).replaceAll('=', '');
+    final bb = BytesBuilder(copy: false);
+    bb.add(ascii.encode(hdrStr));
+    bb.add(ascii.encode(dataStr));
+    return bb.toBytes();
   }
 
   Uint8List _marshal(Map<String, List<int>> m) {
@@ -432,29 +456,33 @@ class Suo5Session {
     final out = <String, Uint8List>{};
     var i = 0;
     while (i + 1 < bytes.length) {
-      final kLen = bytes[i];
-      i += 1;
+      final kLen = bytes[i++];
       if (i + kLen + 4 > bytes.length) break;
-      final key = utf8.decode(bytes.sublist(i, i + kLen), allowMalformed: true);
+      final key = utf8.decode(Uint8List.sublistView(bytes, i, i + kLen), allowMalformed: true);
       i += kLen;
       final vLen = ByteData.sublistView(bytes, i, i + 4).getUint32(0, Endian.big);
       i += 4;
       if (i + vLen > bytes.length) break;
-      out[key] = Uint8List.fromList(bytes.sublist(i, i + vLen));
+      // sublistView avoids a copy — callers treat values as read-only.
+      out[key] = Uint8List.sublistView(bytes, i, i + vLen);
       i += vLen;
     }
     return out;
   }
 
-  List<int> _randBytes(int n) {
-    final r = Random.secure();
-    return List<int>.generate(n, (_) => r.nextInt(256));
-  }
+  List<int> _randBytes(int n) => List<int>.generate(n, (_) => _rng.nextInt(256));
 
   String _randomString(int len) {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final r = Random.secure();
-    return List.generate(len, (_) => chars[r.nextInt(chars.length)]).join();
+    return List.generate(len, (_) => chars[_rng.nextInt(chars.length)]).join();
+  }
+
+  /// Coalesces traffic-driven UI updates to at most ~60 fps.
+  void _scheduleUiUpdate() {
+    _uiThrottle ??= Timer(const Duration(milliseconds: 16), () {
+      _uiThrottle = null;
+      onChanged?.call();
+    });
   }
 
   void _setStatus(Suo5Status s) {
@@ -707,44 +735,92 @@ class _SocketReader {
   }
 }
 
+/// Growable byte buffer with O(1) front-removal via a start-index pointer.
+/// Replaces List + removeRange(0,n) (O(remaining)) with a read-offset approach.
+class _Buf {
+  static const _minCap = 8192;
+  Uint8List _data;
+  int _start = 0;
+  int _end = 0;
+
+  _Buf([int capacity = _minCap]) : _data = Uint8List(capacity < _minCap ? _minCap : capacity);
+
+  int get length => _end - _start;
+  int operator [](int i) => _data[_start + i];
+
+  void add(List<int> chunk) {
+    _reserve(chunk.length);
+    final src = chunk;
+    if (src is Uint8List) {
+      _data.setRange(_end, _end + src.length, src);
+    } else {
+      for (var i = 0; i < src.length; i++) { _data[_end + i] = src[i]; }
+    }
+    _end += chunk.length;
+  }
+
+  /// Discard the first [n] bytes in O(1); compacts lazily.
+  void consume(int n) {
+    _start += n;
+    if (_start > _minCap && _start * 2 > _data.length) _compact();
+  }
+
+  /// Zero-copy view of bytes [from, to) — valid only until the next mutation.
+  Uint8List view(int from, int to) => Uint8List.sublistView(_data, _start + from, _start + to);
+
+  void _compact() {
+    final len = _end - _start;
+    _data.setRange(0, len, _data, _start);
+    _start = 0;
+    _end = len;
+  }
+
+  void _reserve(int extra) {
+    final needed = _end + extra;
+    if (needed <= _data.length) return;
+    if (_end - _start + extra <= _data.length) { _compact(); return; }
+    var cap = _data.length;
+    while (cap < _end - _start + extra) { cap <<= 1; }
+    final next = Uint8List(cap);
+    next.setRange(0, _end - _start, _data, _start);
+    _data = next;
+    _end -= _start;
+    _start = 0;
+  }
+}
+
 class _FrameStreamParser {
-  final List<int> _buf = [];
+  final _Buf _buf = _Buf();
 
   List<Map<String, Uint8List>> feed(List<int> chunk) {
-    _buf.addAll(chunk);
+    _buf.add(chunk);
     final out = <Map<String, Uint8List>>[];
     while (_buf.length >= 8) {
-      final headB64 = ascii.decode(_buf.sublist(0, 8), allowInvalid: true);
       Uint8List head;
       try {
-        head = Uint8List.fromList(base64Url.decode(base64Url.normalize(headB64)));
+        head = base64Url.decode(
+          base64Url.normalize(String.fromCharCodes(_buf.view(0, 8))));
       } catch (_) {
         break;
       }
       if (head.length != 6) break;
       final obs0 = head[0];
       final obs1 = head[1];
-      final l0 = head[2] ^ obs0;
-      final l1 = head[3] ^ obs1;
-      final l2 = head[4] ^ obs0;
-      final l3 = head[5] ^ obs1;
-      final encLen = (l0 << 24) | (l1 << 16) | (l2 << 8) | l3;
+      final encLen = ((head[2] ^ obs0) << 24) | ((head[3] ^ obs1) << 16) |
+                     ((head[4] ^ obs0) << 8)  |  (head[5] ^ obs1);
       if (_buf.length < 8 + encLen) break;
-      final encData = ascii.decode(
-        _buf.sublist(8, 8 + encLen),
-        allowInvalid: true,
-      );
       Uint8List raw;
       try {
-        raw = Uint8List.fromList(base64Url.decode(base64Url.normalize(encData)));
+        raw = Uint8List.fromList(base64Url.decode(
+          base64Url.normalize(String.fromCharCodes(_buf.view(8, 8 + encLen)))));
       } catch (_) {
         break;
       }
-      for (var i = 0; i < raw.length; i++) {
-        raw[i] = raw[i] ^ (i.isEven ? obs0 : obs1);
-      }
+      var i = 0;
+      while (i + 1 < raw.length) { raw[i] ^= obs0; raw[i + 1] ^= obs1; i += 2; }
+      if (i < raw.length) raw[i] ^= obs0;
       out.add(_unmarshalLocal(raw));
-      _buf.removeRange(0, 8 + encLen);
+      _buf.consume(8 + encLen);
     }
     return out;
   }
@@ -753,15 +829,14 @@ class _FrameStreamParser {
     final out = <String, Uint8List>{};
     var i = 0;
     while (i + 1 < bytes.length) {
-      final kLen = bytes[i];
-      i += 1;
+      final kLen = bytes[i++];
       if (i + kLen + 4 > bytes.length) break;
-      final key = utf8.decode(bytes.sublist(i, i + kLen), allowMalformed: true);
+      final key = utf8.decode(Uint8List.sublistView(bytes, i, i + kLen), allowMalformed: true);
       i += kLen;
       final vLen = ByteData.sublistView(bytes, i, i + 4).getUint32(0, Endian.big);
       i += 4;
       if (i + vLen > bytes.length) break;
-      out[key] = Uint8List.fromList(bytes.sublist(i, i + vLen));
+      out[key] = Uint8List.sublistView(bytes, i, i + vLen);
       i += vLen;
     }
     return out;
@@ -908,41 +983,37 @@ class _FullDuplexChannel {
 }
 
 class _ChunkedBodyDecoder {
-  final List<int> _buf = [];
+  final _Buf _buf = _Buf();
   int? _need;
   bool _done = false;
 
   List<Uint8List> feed(List<int> data) {
     if (_done) return const [];
-    _buf.addAll(data);
+    _buf.add(data);
     final out = <Uint8List>[];
     while (true) {
       if (_need == null) {
-        final lineEnd = _findCrlf(_buf, 0);
+        final lineEnd = _findCrlf();
         if (lineEnd < 0) break;
-        final line = ascii.decode(_buf.sublist(0, lineEnd), allowInvalid: true);
-        final hex = line.split(';').first.trim();
-        final n = int.tryParse(hex, radix: 16);
+        final line = String.fromCharCodes(_buf.view(0, lineEnd));
+        final n = int.tryParse(line.split(';').first.trim(), radix: 16);
         if (n == null) break;
-        _buf.removeRange(0, lineEnd + 2);
+        _buf.consume(lineEnd + 2);
         _need = n;
-        if (n == 0) {
-          _done = true;
-          break;
-        }
+        if (n == 0) { _done = true; break; }
       }
       final n = _need!;
       if (_buf.length < n + 2) break;
-      out.add(Uint8List.fromList(_buf.sublist(0, n)));
-      _buf.removeRange(0, n + 2); // data + \r\n
+      out.add(Uint8List.fromList(_buf.view(0, n)));
+      _buf.consume(n + 2);
       _need = null;
     }
     return out;
   }
 
-  static int _findCrlf(List<int> b, int start) {
-    for (var i = start; i + 1 < b.length; i++) {
-      if (b[i] == 13 && b[i + 1] == 10) return i;
+  int _findCrlf() {
+    for (var i = 0; i + 1 < _buf.length; i++) {
+      if (_buf[i] == 13 && _buf[i + 1] == 10) return i;
     }
     return -1;
   }
@@ -986,6 +1057,7 @@ class _Suo5Tunnel {
   HttpClient? _recvHttpClient;
   final _frameParser = _FrameStreamParser();
   _FullDuplexChannel? _fullChannel;
+  final _bridgeDone = Completer<void>();
 
   Future<bool> connect(String address) async {
     final pos = address.lastIndexOf(':');
@@ -1081,8 +1153,12 @@ class _Suo5Tunnel {
     if (ac[0] == 0x01) {
       final data = f['dt'] ?? Uint8List(0);
       if (data.isNotEmpty && !_closed) {
-        socket.add(data);
-        onTraffic(0, data.length);
+        try {
+          socket.add(data);
+          onTraffic(0, data.length);
+        } catch (_) {
+          unawaited(close(sendDelete: false));
+        }
       }
     } else if (ac[0] == 0x02) {
       unawaited(close(sendDelete: false));
@@ -1091,13 +1167,13 @@ class _Suo5Tunnel {
 
   Future<void> bridge() async {
     if (modeByte == 0x03) {
-      _pollTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      // 50ms poll keeps downstream latency below one round-trip in classic mode.
+      _pollTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
         _enqueueSend(Uint8List(0));
       });
     }
-    while (!_closed) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
+    // Wait on a Completer instead of spin-looping; close() signals it.
+    await _bridgeDone.future;
   }
 
   void feedClientData(Uint8List data) {
@@ -1107,6 +1183,7 @@ class _Suo5Tunnel {
   Future<void> close({required bool sendDelete}) async {
     if (_closed) return;
     _closed = true;
+    if (!_bridgeDone.isCompleted) _bridgeDone.complete();
     _pollTimer?.cancel();
     await _recvSub?.cancel();
     _recvSub = null;
