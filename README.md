@@ -53,8 +53,10 @@ Interactive capabilities:
 
 Reverse access and SOCKS-style bridging from the desktop client:
 
-- Built-in FRP client
-- **SUO5** proxy: deploy PHP / JSP / ASPX tunnel stubs from the payload library and expose a **local SOCKS5** port; per-project profiles, concurrent tunnels, connectivity probe, and traffic stats
+- Built-in **FRP** client
+- **SUO5 & SUO6 SOCKS proxies** — one screen manages both protocols: **per-project profiles**, **multiple concurrent** local listeners, **handshake probe**, **traffic counters**, and **run logs**
+  - **SUO5** — classic HTTP(S) tunnel: ship **PHP / JSP / ASPX** stubs from the payload library to the target, then bind a **local SOCKS5** port that forwards framed traffic through the script
+  - **SUO6** — **binary multiplexed** tunnel aimed mainly at **JSP** (JSP connectors default here for new SOCKS profiles). On **Behinder JSP** you can **inject a Filter memory shell** or deploy **`suo6.jsp`** from the library; **one-click tunnel** from the webshell UI tries **memory injection** first when supported, otherwise uploads the stub. **PHP** and **ASPX command** paths still use **SUO5** for one-click setup
 
 ---
 
