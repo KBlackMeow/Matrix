@@ -16,7 +16,11 @@ class DatabaseHelperWeb {
 
   DatabaseHelperWeb._internal();
 
-  Future<Project> createProject(String name, {required String domain, String? description}) async {
+  Future<Project> createProject(
+    String name, {
+    required String domain,
+    String? description,
+  }) async {
     final now = DateTime.now();
     final project = Project(
       id: _nextId++,
@@ -84,9 +88,7 @@ class DatabaseHelperWeb {
   }
 
   Future<List<Webshell>> getWebshellsByProject(int projectId) async {
-    return _webshells
-        .where((w) => w.projectId == projectId)
-        .toList()
+    return _webshells.where((w) => w.projectId == projectId).toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
@@ -148,5 +150,4 @@ class DatabaseHelperWeb {
     _payloads.removeWhere((p) => p.id == id);
     return len - _payloads.length;
   }
-
 }

@@ -9,8 +9,11 @@ import 'database_helper_web.dart';
 
 final _web = DatabaseHelperWeb();
 
-Future<Project> createProject(String name, {required String domain, String? description}) =>
-    _web.createProject(name, domain: domain, description: description);
+Future<Project> createProject(
+  String name, {
+  required String domain,
+  String? description,
+}) => _web.createProject(name, domain: domain, description: description);
 
 Future<List<Project>> getAllProjects() => _web.getAllProjects();
 
@@ -28,16 +31,15 @@ Future<Webshell> createWebshell(
   String method = 'POST',
   String type = 'php',
   String connectorType = 'php_eval',
-}) =>
-    _web.createWebshell(
-      projectId,
-      name: name,
-      url: url,
-      password: password,
-      method: method,
-      type: type,
-      connectorType: connectorType,
-    );
+}) => _web.createWebshell(
+  projectId,
+  name: name,
+  url: url,
+  password: password,
+  method: method,
+  type: type,
+  connectorType: connectorType,
+);
 
 Future<List<Webshell>> getWebshellsByProject(int projectId) =>
     _web.getWebshellsByProject(projectId);
@@ -59,15 +61,14 @@ Future<Payload> createPayload({
   bool isDefault = false,
   String? description,
   String? tags,
-}) =>
-    _web.createPayload(
-      name: name,
-      type: type,
-      content: content,
-      isDefault: isDefault,
-      description: description,
-      tags: tags,
-    );
+}) => _web.createPayload(
+  name: name,
+  type: type,
+  content: content,
+  isDefault: isDefault,
+  description: description,
+  tags: tags,
+);
 
 Future<List<Payload>> getAllPayloads() => _web.getAllPayloads();
 

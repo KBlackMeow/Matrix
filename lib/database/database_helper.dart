@@ -6,7 +6,8 @@ import '../models/suo5_profile.dart';
 import '../models/suo6_profile.dart';
 import '../services/frp_client_service.dart';
 import 'database_helper_stub.dart'
-    if (dart.library.io) 'database_helper_io.dart' as impl;
+    if (dart.library.io) 'database_helper_io.dart'
+    as impl;
 
 /// 数据库助手：Web 使用内存存储，桌面/移动端使用 SQLite
 class DatabaseHelper {
@@ -16,7 +17,11 @@ class DatabaseHelper {
 
   DatabaseHelper._internal();
 
-  Future<Project> createProject(String name, {required String domain, String? description}) async {
+  Future<Project> createProject(
+    String name, {
+    required String domain,
+    String? description,
+  }) async {
     return impl.createProject(name, domain: domain, description: description);
   }
 
@@ -120,20 +125,19 @@ class DatabaseHelper {
     required String version,
     required bool useTcpMux,
     required FrpAuthMode authMode,
-  }) =>
-      impl.createFrpProfile(
-        name: name,
-        serverAddr: serverAddr,
-        serverPort: serverPort,
-        token: token,
-        proxyName: proxyName,
-        remotePort: remotePort,
-        localAddr: localAddr,
-        localPort: localPort,
-        version: version,
-        useTcpMux: useTcpMux,
-        authMode: authMode,
-      );
+  }) => impl.createFrpProfile(
+    name: name,
+    serverAddr: serverAddr,
+    serverPort: serverPort,
+    token: token,
+    proxyName: proxyName,
+    remotePort: remotePort,
+    localAddr: localAddr,
+    localPort: localPort,
+    version: version,
+    useTcpMux: useTcpMux,
+    authMode: authMode,
+  );
 
   Future<List<FrpProfile>> getAllFrpProfiles() => impl.getAllFrpProfiles();
 
@@ -150,21 +154,20 @@ class DatabaseHelper {
     required String version,
     required bool useTcpMux,
     required FrpAuthMode authMode,
-  }) =>
-      impl.updateFrpProfile(
-        id: id,
-        name: name,
-        serverAddr: serverAddr,
-        serverPort: serverPort,
-        token: token,
-        proxyName: proxyName,
-        remotePort: remotePort,
-        localAddr: localAddr,
-        localPort: localPort,
-        version: version,
-        useTcpMux: useTcpMux,
-        authMode: authMode,
-      );
+  }) => impl.updateFrpProfile(
+    id: id,
+    name: name,
+    serverAddr: serverAddr,
+    serverPort: serverPort,
+    token: token,
+    proxyName: proxyName,
+    remotePort: remotePort,
+    localAddr: localAddr,
+    localPort: localPort,
+    version: version,
+    useTcpMux: useTcpMux,
+    authMode: authMode,
+  );
 
   Future<int> deleteFrpProfile(int id) => impl.deleteFrpProfile(id);
 
@@ -176,14 +179,13 @@ class DatabaseHelper {
     required String targetUrl,
     required String listenHost,
     required int listenPort,
-  }) =>
-      impl.createSuo5Profile(
-        projectId: projectId,
-        name: name,
-        targetUrl: targetUrl,
-        listenHost: listenHost,
-        listenPort: listenPort,
-      );
+  }) => impl.createSuo5Profile(
+    projectId: projectId,
+    name: name,
+    targetUrl: targetUrl,
+    listenHost: listenHost,
+    listenPort: listenPort,
+  );
 
   Future<List<Suo5Profile>> getSuo5ProfilesByProject(int projectId) =>
       impl.getSuo5ProfilesByProject(projectId);
@@ -201,14 +203,13 @@ class DatabaseHelper {
     required String targetUrl,
     required String listenHost,
     required int listenPort,
-  }) =>
-      impl.createSuo6Profile(
-        projectId: projectId,
-        name: name,
-        targetUrl: targetUrl,
-        listenHost: listenHost,
-        listenPort: listenPort,
-      );
+  }) => impl.createSuo6Profile(
+    projectId: projectId,
+    name: name,
+    targetUrl: targetUrl,
+    listenHost: listenHost,
+    listenPort: listenPort,
+  );
 
   Future<List<Suo6Profile>> getSuo6ProfilesByProject(int projectId) =>
       impl.getSuo6ProfilesByProject(projectId);

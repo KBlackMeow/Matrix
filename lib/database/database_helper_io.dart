@@ -34,10 +34,10 @@ class DatabaseHelperIo {
   late final ProjectDao _projectDao = ProjectDao(() => database);
   late final WebshellDao _webshellDao = WebshellDao(() => database);
   late final PayloadDao _payloadDao = PayloadDao(
-        () => database,
-        payloadsDirProvider: _payloadsDir,
-        hashedFileName: _hashedFileName,
-      );
+    () => database,
+    payloadsDirProvider: _payloadsDir,
+    hashedFileName: _hashedFileName,
+  );
   late final FrpProfileDao _frpProfileDao = FrpProfileDao(() => database);
   late final Suo5ProfileDao _suo5ProfileDao = Suo5ProfileDao(() => database);
   late final Suo6ProfileDao _suo6ProfileDao = Suo6ProfileDao(() => database);
@@ -175,11 +175,13 @@ class DatabaseHelperIo {
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute(
-          'ALTER TABLE projects ADD COLUMN domain TEXT NOT NULL DEFAULT ""');
+        'ALTER TABLE projects ADD COLUMN domain TEXT NOT NULL DEFAULT ""',
+      );
     }
     if (oldVersion < 3) {
       await db.execute(
-          "ALTER TABLE webshells ADD COLUMN type TEXT NOT NULL DEFAULT 'php'");
+        "ALTER TABLE webshells ADD COLUMN type TEXT NOT NULL DEFAULT 'php'",
+      );
     }
     if (oldVersion < 4) {
       await db.execute('''
@@ -198,7 +200,8 @@ class DatabaseHelperIo {
     if (oldVersion < 5) {
       // 读取旧版所有 payload 的内容，迁移到本地文件
       final rows = await db.rawQuery(
-          'SELECT id, name, type, content, description, tags, created_at, updated_at FROM payloads');
+        'SELECT id, name, type, content, description, tags, created_at, updated_at FROM payloads',
+      );
 
       // 创建新表（用 file_path 替换 content）
       await db.execute('''
@@ -222,8 +225,7 @@ class DatabaseHelperIo {
         final id = row['id'] as int;
         final name = row['name'] as String;
         final content = (row['content'] as String?) ?? '';
-        final file = File(
-            '${payloadsDir.path}/${_hashedFileName(id, name)}');
+        final file = File('${payloadsDir.path}/${_hashedFileName(id, name)}');
         await file.writeAsString(content);
 
         await db.insert('payloads_v5', {
@@ -243,16 +245,20 @@ class DatabaseHelperIo {
     }
     if (oldVersion < 7) {
       await db.execute(
-          'CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+        'CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+      );
       await db.execute(
-          'ALTER TABLE payloads ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0');
+        'ALTER TABLE payloads ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0',
+      );
     }
     if (oldVersion < 8) {
       await db.execute(
-          "ALTER TABLE webshells ADD COLUMN connector_type TEXT NOT NULL DEFAULT 'php_eval'");
+        "ALTER TABLE webshells ADD COLUMN connector_type TEXT NOT NULL DEFAULT 'php_eval'",
+      );
       // 旧 JSP 类型自动映射到 jsp_classloader
       await db.execute(
-          "UPDATE webshells SET connector_type = 'jsp_classloader' WHERE type = 'jsp'");
+        "UPDATE webshells SET connector_type = 'jsp_classloader' WHERE type = 'jsp'",
+      );
     }
     if (oldVersion < 10) {
       await db.execute('''
@@ -326,7 +332,11 @@ class DatabaseHelperIo {
     }
   }
 
-  Future<Project> createProject(String name, {required String domain, String? description}) async {
+  Future<Project> createProject(
+    String name, {
+    required String domain,
+    String? description,
+  }) async {
     return _projectDao.createProject(
       name,
       domain: domain,
@@ -518,14 +528,13 @@ class DatabaseHelperIo {
     required String targetUrl,
     required String listenHost,
     required int listenPort,
-  }) =>
-      _suo5ProfileDao.createSuo5Profile(
-        projectId: projectId,
-        name: name,
-        targetUrl: targetUrl,
-        listenHost: listenHost,
-        listenPort: listenPort,
-      );
+  }) => _suo5ProfileDao.createSuo5Profile(
+    projectId: projectId,
+    name: name,
+    targetUrl: targetUrl,
+    listenHost: listenHost,
+    listenPort: listenPort,
+  );
 
   Future<List<Suo5Profile>> getSuo5ProfilesByProject(int projectId) =>
       _suo5ProfileDao.getSuo5ProfilesByProject(projectId);
@@ -544,14 +553,13 @@ class DatabaseHelperIo {
     required String targetUrl,
     required String listenHost,
     required int listenPort,
-  }) =>
-      _suo6ProfileDao.createSuo6Profile(
-        projectId: projectId,
-        name: name,
-        targetUrl: targetUrl,
-        listenHost: listenHost,
-        listenPort: listenPort,
-      );
+  }) => _suo6ProfileDao.createSuo6Profile(
+    projectId: projectId,
+    name: name,
+    targetUrl: targetUrl,
+    listenHost: listenHost,
+    listenPort: listenPort,
+  );
 
   Future<List<Suo6Profile>> getSuo6ProfilesByProject(int projectId) =>
       _suo6ProfileDao.getSuo6ProfilesByProject(projectId);
@@ -565,8 +573,11 @@ class DatabaseHelperIo {
 
 final _io = DatabaseHelperIo();
 
-Future<Project> createProject(String name, {required String domain, String? description}) =>
-    _io.createProject(name, domain: domain, description: description);
+Future<Project> createProject(
+  String name, {
+  required String domain,
+  String? description,
+}) => _io.createProject(name, domain: domain, description: description);
 
 Future<List<Project>> getAllProjects() => _io.getAllProjects();
 
@@ -584,16 +595,15 @@ Future<Webshell> createWebshell(
   String method = 'POST',
   String type = 'php',
   String connectorType = 'php_eval',
-}) =>
-    _io.createWebshell(
-      projectId,
-      name: name,
-      url: url,
-      password: password,
-      method: method,
-      type: type,
-      connectorType: connectorType,
-    );
+}) => _io.createWebshell(
+  projectId,
+  name: name,
+  url: url,
+  password: password,
+  method: method,
+  type: type,
+  connectorType: connectorType,
+);
 
 Future<List<Webshell>> getWebshellsByProject(int projectId) =>
     _io.getWebshellsByProject(projectId);
@@ -616,15 +626,14 @@ Future<Payload> createPayload({
   bool isDefault = false,
   String? description,
   String? tags,
-}) =>
-    _io.createPayload(
-      name: name,
-      type: type,
-      content: content,
-      isDefault: isDefault,
-      description: description,
-      tags: tags,
-    );
+}) => _io.createPayload(
+  name: name,
+  type: type,
+  content: content,
+  isDefault: isDefault,
+  description: description,
+  tags: tags,
+);
 
 Future<List<Payload>> getAllPayloads() => _io.getAllPayloads();
 
@@ -645,20 +654,19 @@ Future<FrpProfile> createFrpProfile({
   required String version,
   required bool useTcpMux,
   required FrpAuthMode authMode,
-}) =>
-    _io.createFrpProfile(
-      name: name,
-      serverAddr: serverAddr,
-      serverPort: serverPort,
-      token: token,
-      proxyName: proxyName,
-      remotePort: remotePort,
-      localAddr: localAddr,
-      localPort: localPort,
-      version: version,
-      useTcpMux: useTcpMux,
-      authMode: authMode,
-    );
+}) => _io.createFrpProfile(
+  name: name,
+  serverAddr: serverAddr,
+  serverPort: serverPort,
+  token: token,
+  proxyName: proxyName,
+  remotePort: remotePort,
+  localAddr: localAddr,
+  localPort: localPort,
+  version: version,
+  useTcpMux: useTcpMux,
+  authMode: authMode,
+);
 
 Future<List<FrpProfile>> getAllFrpProfiles() => _io.getAllFrpProfiles();
 
@@ -675,21 +683,20 @@ Future<FrpProfile?> updateFrpProfile({
   required String version,
   required bool useTcpMux,
   required FrpAuthMode authMode,
-}) =>
-    _io.updateFrpProfile(
-      id: id,
-      name: name,
-      serverAddr: serverAddr,
-      serverPort: serverPort,
-      token: token,
-      proxyName: proxyName,
-      remotePort: remotePort,
-      localAddr: localAddr,
-      localPort: localPort,
-      version: version,
-      useTcpMux: useTcpMux,
-      authMode: authMode,
-    );
+}) => _io.updateFrpProfile(
+  id: id,
+  name: name,
+  serverAddr: serverAddr,
+  serverPort: serverPort,
+  token: token,
+  proxyName: proxyName,
+  remotePort: remotePort,
+  localAddr: localAddr,
+  localPort: localPort,
+  version: version,
+  useTcpMux: useTcpMux,
+  authMode: authMode,
+);
 
 Future<int> deleteFrpProfile(int id) => _io.deleteFrpProfile(id);
 
@@ -700,14 +707,13 @@ Future<Suo5Profile> createSuo5Profile({
   required String targetUrl,
   required String listenHost,
   required int listenPort,
-}) =>
-    _io.createSuo5Profile(
-      projectId: projectId,
-      name: name,
-      targetUrl: targetUrl,
-      listenHost: listenHost,
-      listenPort: listenPort,
-    );
+}) => _io.createSuo5Profile(
+  projectId: projectId,
+  name: name,
+  targetUrl: targetUrl,
+  listenHost: listenHost,
+  listenPort: listenPort,
+);
 
 Future<List<Suo5Profile>> getSuo5ProfilesByProject(int projectId) =>
     _io.getSuo5ProfilesByProject(projectId);
@@ -724,14 +730,13 @@ Future<Suo6Profile> createSuo6Profile({
   required String targetUrl,
   required String listenHost,
   required int listenPort,
-}) =>
-    _io.createSuo6Profile(
-      projectId: projectId,
-      name: name,
-      targetUrl: targetUrl,
-      listenHost: listenHost,
-      listenPort: listenPort,
-    );
+}) => _io.createSuo6Profile(
+  projectId: projectId,
+  name: name,
+  targetUrl: targetUrl,
+  listenHost: listenHost,
+  listenPort: listenPort,
+);
 
 Future<List<Suo6Profile>> getSuo6ProfilesByProject(int projectId) =>
     _io.getSuo6ProfilesByProject(projectId);

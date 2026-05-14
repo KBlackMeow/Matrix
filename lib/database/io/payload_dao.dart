@@ -65,10 +65,7 @@ class PayloadDao {
 
   Future<List<Payload>> getAllPayloads() async {
     final db = await _databaseProvider();
-    final maps = await db.query(
-      'payloads',
-      orderBy: 'name COLLATE NOCASE ASC',
-    );
+    final maps = await db.query('payloads', orderBy: 'name COLLATE NOCASE ASC');
     final result = <Payload>[];
     for (final m in maps) {
       final filePath = (m['file_path'] as String?) ?? '';
