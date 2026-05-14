@@ -53,6 +53,13 @@ class _MemoryDb implements DatabaseHelper {
   }
 
   @override
+  Future<int> deletePayload(int id) async {
+    final before = _payloads.length;
+    _payloads.removeWhere((p) => p.id == id);
+    return before - _payloads.length;
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
   void seedExisting(Payload payload) {
@@ -74,7 +81,7 @@ void main() {
 
         final payloads = await db.getAllPayloads();
         expect(payloads, isNotEmpty);
-        expect(payloads.length, equals(25));
+        expect(payloads.length, equals(28));
         expect(payloads.map((p) => p.name), contains('php_eval_post.php'));
         expect(payloads.map((p) => p.name), contains('jsp_behinder.jsp'));
         expect(payloads.map((p) => p.name), contains('aspx_cmd_post.aspx'));
@@ -82,7 +89,7 @@ void main() {
         expect(payloads.map((p) => p.name), contains('suo5.jsp'));
         expect(payloads.map((p) => p.name), contains('suo5.aspx'));
         expect(payloads.map((p) => p.name), contains('suo6.jsp'));
-        expect(await db.getMetaValue('seed_version'), equals('11'));
+        expect(await db.getMetaValue('seed_version'), equals('12'));
       },
     );
 
@@ -138,6 +145,45 @@ void main() {
         expect(b64.content, contains(r"$f = str_rot13('onfr64_qrpbqr');"));
         expect(b64.content, contains(r"$q = $f($_POST['mAtrix_911']);"));
         expect(b64.content, contains('@eval(\$q);'));
+      },
+    );
+
+    test(
+      'purges default payloads no longer in built-in list; keeps user payloads',
+      () async {
+        final now = DateTime.now();
+        final db = _MemoryDb();
+        db.seedExisting(
+          Payload(
+            id: 9001,
+            name: 'legacy_default_removed.jsp',
+            type: 'jsp',
+            content: '// obsolete',
+            isDefault: true,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        db.seedExisting(
+          Payload(
+            id: 9002,
+            name: 'user_custom.jsp',
+            type: 'jsp',
+            content: '// user',
+            isDefault: false,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        await SeedService.seed(db);
+        final payloads = await db.getAllPayloads();
+
+        expect(
+          payloads.map((p) => p.name),
+          isNot(contains('legacy_default_removed.jsp')),
+        );
+        expect(payloads.map((p) => p.name), contains('user_custom.jsp'));
       },
     );
   });

@@ -426,6 +426,28 @@ class SeedService {
         );
       } catch (_) {}
     }
+
+    // 3) 移除已从内置列表下架的默认 payload（数据库行 + 本地文件，见 PayloadDao.deletePayload）
+    existingPayloads = await db.getAllPayloads();
+    final allowedDefaultNames = _defaultPayloads.map((e) => e.name).toSet();
+    for (final p in existingPayloads) {
+      if (!p.isDefault) continue;
+      if (allowedDefaultNames.contains(p.name)) continue;
+      try {
+        await db.deletePayload(p.id);
+        developer.log(
+          'Removed obsolete default payload: ${p.name}',
+          name: 'SeedService',
+        );
+      } catch (e, st) {
+        developer.log(
+          'Failed to remove obsolete default payload: ${p.name}',
+          name: 'SeedService',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
   }
 
   static Future<String> _loadPayloadContent(_PayloadDef def) async {
