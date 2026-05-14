@@ -7,6 +7,7 @@ import '../database/database_helper.dart';
 import '../models/payload.dart';
 import '../models/webshell.dart';
 import '../services/reverse_shell_service.dart';
+import '../core/crypto/payload_obfuscator.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/matrix_console_log.dart';
@@ -473,7 +474,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       }
       return false;
     }
-    final bytes = _decodePayloadBytes(pl);
+    var bytes = _decodePayloadBytes(pl);
     if (bytes == null || bytes.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -490,6 +491,9 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
         ? scriptDir
         : await _service.getCurrentDir();
     final remotePath = _joinRemoteDirFile(dir, payloadName);
+    final fileType = PayloadObfuscator.typeFromFileName(payloadName);
+    final obfuscated = PayloadObfuscator.obfuscateBytes(bytes, fileType);
+    if (obfuscated != null) bytes = obfuscated;
     final ok = await _service.writeFileBinary(remotePath, bytes);
     if (!ok) {
       if (mounted) {

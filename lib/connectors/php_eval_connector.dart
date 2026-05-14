@@ -143,7 +143,10 @@ class PhpEvalConnector extends ShellConnector {
   @override
   Future<String?> getShellScriptDir() async {
     final r = (await sendPhpCode(
-      '\$d=@realpath(dirname(__FILE__));echo (\$d!==false&&\$d!=="")?\$d:"";',
+      '\$f=isset(\$_SERVER["SCRIPT_FILENAME"])?\$_SERVER["SCRIPT_FILENAME"]:"";'
+      '\$d=(\$f!=="")?@realpath(dirname(\$f)):false;'
+      'if(\$d===false||\$d===""){\$f2=explode("(",__FILE__)[0];\$d=@realpath(dirname(\$f2));}'
+      'echo(\$d!==false&&\$d!=="")?\$d:"";',
     )).trim();
     if (r.isEmpty || r.startsWith('[')) return null;
     return r;

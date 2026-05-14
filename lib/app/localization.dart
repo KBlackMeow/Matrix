@@ -6666,4 +6666,116 @@ class S {
   static String get suo6StatusConnecting => suo5StatusConnecting;
   static String get suo6StatusError => suo5StatusError;
   static String get suo6StatusIdle => suo5StatusIdle;
+
+  // ── Payload 混淆 ──────────────────────────────────────────────────────────
+
+  static String get obfuscateUploadLabel {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '混淆压缩上传';
+      case AppLanguage.ja:
+        return '難読化・圧縮アップロード';
+      case AppLanguage.en:
+        return 'Obfuscate & compress on upload';
+    }
+  }
+
+  static String get obfuscateUploadTooltip {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '上传前混淆压缩（PHP/JSP/ASPX/ASP），防止代码泄露并压缩体积';
+      case AppLanguage.ja:
+        return 'アップロード前に難読化・圧縮（PHP/JSP/ASPX/ASP）、ソース隠蔽＋サイズ削減';
+      case AppLanguage.en:
+        return 'Obfuscate & compress before upload (PHP/JSP/ASPX/ASP) — hides source and reduces size';
+    }
+  }
+
+  static String get obfuscateModeOn {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '混淆模式已开启，下次 Payload 上传将自动混淆压缩';
+      case AppLanguage.ja:
+        return '難読化モード ON：次回 Payload アップロード時に自動で難読化・圧縮';
+      case AppLanguage.en:
+        return 'Obfuscate mode ON — next payload upload will be obfuscated';
+    }
+  }
+
+  static String get obfuscateModeOff {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '混淆模式已关闭';
+      case AppLanguage.ja:
+        return '難読化モード OFF';
+      case AppLanguage.en:
+        return 'Obfuscate mode OFF';
+    }
+  }
+
+  static String get tooltipDeobfuscate {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '还原混淆代码';
+      case AppLanguage.ja:
+        return '難読化を解除';
+      case AppLanguage.en:
+        return 'Deobfuscate';
+    }
+  }
+
+  static String get tooltipShowObfuscated {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '显示混淆原文';
+      case AppLanguage.ja:
+        return '難読化済みを表示';
+      case AppLanguage.en:
+        return 'Show obfuscated source';
+    }
+  }
+
+  static String get obfuscatedFileDialogTitle {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '检测到混淆文件';
+      case AppLanguage.ja:
+        return '難読化ファイルを検出';
+      case AppLanguage.en:
+        return 'Obfuscated file detected';
+    }
+  }
+
+  static String get obfuscatedFileDialogMsg {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '此文件包含混淆压缩的代码，是否保存还原后的版本？';
+      case AppLanguage.ja:
+        return 'このファイルは難読化・圧縮されたコードを含みます。復元バージョンを保存しますか？';
+      case AppLanguage.en:
+        return 'This file contains obfuscated/compressed code. Save the deobfuscated version?';
+    }
+  }
+
+  static String get btnSaveDeobfuscated {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '保存还原版';
+      case AppLanguage.ja:
+        return '復元版を保存';
+      case AppLanguage.en:
+        return 'Save deobfuscated';
+    }
+  }
+
+  static String get btnSaveAsIs {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '保存原始';
+      case AppLanguage.ja:
+        return 'そのまま保存';
+      case AppLanguage.en:
+        return 'Save as-is';
+    }
+  }
 }

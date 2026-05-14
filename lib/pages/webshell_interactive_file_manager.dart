@@ -5,6 +5,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/crypto/payload_obfuscator.dart';
 import '../database/database_helper.dart';
 import '../models/payload.dart';
 import '../services/webshell_service.dart';
@@ -195,7 +196,7 @@ class _FileManagerTabState extends State<FileManagerTab>
     );
     if (selected == null || !mounted) return;
 
-    final bytes = _payloadBytes(selected);
+    var bytes = _payloadBytes(selected);
     if (bytes == null) {
       await showUploadFailureDialog(
         context,
@@ -203,6 +204,10 @@ class _FileManagerTabState extends State<FileManagerTab>
       );
       return;
     }
+
+    final type = PayloadObfuscator.typeFromFileName(selected.name);
+    final obfuscated = PayloadObfuscator.obfuscateBytes(bytes, type);
+    if (obfuscated != null) bytes = obfuscated;
 
     await _uploadBytes(selected.name, bytes);
   }
@@ -382,28 +387,80 @@ class _FileManagerTabState extends State<FileManagerTab>
         },
       ),
     );
+    var progressPopped = false;
+    void popProgress() {
+      if (!progressPopped && rootNav.mounted) {
+        progressPopped = true;
+        rootNav.pop();
+      }
+    }
+
     try {
-      final bytes = await widget.service.readFileBinary(remotePath);
+      var bytes = await widget.service.readFileBinary(remotePath);
       if (!mounted) {
-        if (rootNav.mounted) rootNav.pop();
+        popProgress();
         transferred.dispose();
         return;
       }
       if (_downloadCancelled) {
-        // 已被用户取消，丢弃结果
         setState(() => _downloading = false);
-        if (rootNav.mounted) rootNav.pop();
+        popProgress();
         transferred.dispose();
         return;
       }
-      await File(localPath).writeAsBytes(bytes, flush: true);
+      // Dismiss the progress indicator before potentially showing another dialog.
+      popProgress();
+
+      List<int> saveBytes = bytes;
+      if (!_isBinary(bytes)) {
+        try {
+          final text = utf8.decode(bytes);
+          final deobfuscated = PayloadObfuscator.tryDeobfuscate(text);
+          if (deobfuscated != null && mounted) {
+            final choice = await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: Text(
+                  S.obfuscatedFileDialogTitle,
+                  style: const TextStyle(color: AppColors.primary),
+                ),
+                content: Text(
+                  S.obfuscatedFileDialogMsg,
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: Text(
+                      S.btnSaveAsIs,
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.bgDark,
+                    ),
+                    child: Text(S.btnSaveDeobfuscated),
+                  ),
+                ],
+              ),
+            );
+            if (choice == true) saveBytes = utf8.encode(deobfuscated);
+          }
+        } catch (_) {}
+      }
       if (!mounted) {
-        if (rootNav.mounted) rootNav.pop();
+        transferred.dispose();
+        return;
+      }
+      await File(localPath).writeAsBytes(saveBytes, flush: true);
+      if (!mounted) {
         transferred.dispose();
         return;
       }
       setState(() => _downloading = false);
-      if (rootNav.mounted) rootNav.pop();
       transferred.dispose();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -417,11 +474,11 @@ class _FileManagerTabState extends State<FileManagerTab>
       );
     } catch (e) {
       if (!mounted) {
-        if (rootNav.mounted) rootNav.pop();
+        popProgress();
         transferred.dispose();
         return;
       }
-      if (rootNav.mounted) rootNav.pop();
+      popProgress();
       setState(() => _downloading = false);
       transferred.dispose();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1164,7 +1221,9 @@ class _FileViewDialog extends StatefulWidget {
 
 class _FileViewDialogState extends State<_FileViewDialog> {
   String? _content;
+  String? _deobfuscated;
   bool _loading = true;
+  bool _showDeobfuscated = false;
 
   @override
   void initState() {
@@ -1175,12 +1234,18 @@ class _FileViewDialogState extends State<_FileViewDialog> {
   Future<void> _load() async {
     final content = await widget.service.readFile(widget.path);
     if (mounted) {
+      final deob = PayloadObfuscator.tryDeobfuscate(content);
       setState(() {
         _content = content;
+        _deobfuscated = deob;
+        _showDeobfuscated = deob != null;
         _loading = false;
       });
     }
   }
+
+  String get _displayContent =>
+      (_showDeobfuscated && _deobfuscated != null) ? _deobfuscated! : (_content ?? '');
 
   @override
   Widget build(BuildContext context) {
@@ -1215,10 +1280,28 @@ class _FileViewDialogState extends State<_FileViewDialog> {
                       ),
                     ),
                   ),
-                  if (_content != null)
+                  // Deobfuscate toggle (only shown when content is obfuscated)
+                  if (!_loading && _deobfuscated != null)
                     IconButton(
                       onPressed: () =>
-                          Clipboard.setData(ClipboardData(text: _content!)),
+                          setState(() => _showDeobfuscated = !_showDeobfuscated),
+                      icon: Icon(
+                        _showDeobfuscated
+                            ? Icons.lock_open_outlined
+                            : Icons.lock_outline,
+                        size: 16,
+                      ),
+                      color: _showDeobfuscated
+                          ? AppColors.primary
+                          : AppColors.amber,
+                      tooltip: _showDeobfuscated
+                          ? S.tooltipShowObfuscated
+                          : S.tooltipDeobfuscate,
+                    ),
+                  if (!_loading && _content != null)
+                    IconButton(
+                      onPressed: () => Clipboard.setData(
+                          ClipboardData(text: _displayContent)),
                       icon: const Icon(
                         Icons.copy_outlined,
                         size: 16,
@@ -1247,7 +1330,7 @@ class _FileViewDialogState extends State<_FileViewDialog> {
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(16),
                       child: SelectableText(
-                        _content ?? '',
+                        _displayContent,
                         style: const TextStyle(
                           color: Color(0xFFB8C0CC),
                           fontFamily: 'Monaco',
