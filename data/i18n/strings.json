@@ -2960,9 +2960,9 @@
     "en": "Obfuscate & compress on upload"
   },
   "obfuscateUploadTooltip": {
-    "zh": "上传前混淆压缩（PHP/JSP/ASPX/ASP），防止代码泄露并压缩体积",
-    "ja": "アップロード前に難読化・圧縮（PHP/JSP/ASPX/ASP）、ソース隠蔽＋サイズ削減",
-    "en": "Obfuscate & compress before upload (PHP/JSP/ASPX/ASP) — hides source and reduces size"
+    "zh": "上传前对 PHP 混淆压缩，防止代码泄露并压缩体积",
+    "ja": "アップロード前に PHP を難読化・圧縮、ソース隠蔽＋サイズ削減",
+    "en": "Obfuscate & compress PHP before upload — hides source and reduces size"
   },
   "obfuscateModeOn": {
     "zh": "混淆模式已开启，下次 Payload 上传将自动混淆压缩",

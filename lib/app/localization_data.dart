@@ -596,7 +596,7 @@ class LocalizationData {
     'confirmDeleteSuo6': {'zh': '确定删除配置「{name}」？', 'ja': '設定「{name}」を削除しますか？', 'en': 'Delete config "{name}"?'},
     'suo6MissingUrl': {'zh': '请填写 suo6 URL', 'ja': 'suo6 URL を入力してください', 'en': 'Please enter the suo6 URL'},
     'obfuscateUploadLabel': {'zh': '混淆压缩上传', 'ja': '難読化・圧縮アップロード', 'en': 'Obfuscate & compress on upload'},
-    'obfuscateUploadTooltip': {'zh': '上传前混淆压缩（PHP/JSP/ASPX/ASP），防止代码泄露并压缩体积', 'ja': 'アップロード前に難読化・圧縮（PHP/JSP/ASPX/ASP）、ソース隠蔽＋サイズ削減', 'en': 'Obfuscate & compress before upload (PHP/JSP/ASPX/ASP) — hides source and reduces size'},
+    'obfuscateUploadTooltip': {'zh': '上传前对 PHP 混淆压缩，防止代码泄露并压缩体积', 'ja': 'アップロード前に PHP を難読化・圧縮、ソース隠蔽＋サイズ削減', 'en': 'Obfuscate & compress PHP before upload — hides source and reduces size'},
     'obfuscateModeOn': {'zh': '混淆模式已开启，下次 Payload 上传将自动混淆压缩', 'ja': '難読化モード ON：次回 Payload アップロード時に自動で難読化・圧縮', 'en': 'Obfuscate mode ON — next payload upload will be obfuscated'},
     'obfuscateModeOff': {'zh': '混淆模式已关闭', 'ja': '難読化モード OFF', 'en': 'Obfuscate mode OFF'},
     'tooltipDeobfuscate': {'zh': '还原混淆代码', 'ja': '難読化を解除', 'en': 'Deobfuscate'},

