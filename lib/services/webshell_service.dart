@@ -16,15 +16,21 @@ class WebshellService {
   final Webshell webshell;
   late final ShellConnector _connector;
 
+  /// [getShellScriptDirectory] / [getInitialWorkingDirectory] 共用，只向目标探测一次。
+  Future<String?>? _memoShellScriptDir;
+
+  /// [getInitialWorkingDirectory] 全量结果只算一次（含回落 [getCurrentDir]）。
+  Future<String>? _memoInitialWorkingDir;
+
   WebshellService(this.webshell)
-      : _connector = ConnectorFactory.create(webshell);
+    : _connector = ConnectorFactory.create(webshell);
 
   // 暴露连接器能力，供 UI 判断是否显示某些功能
   Set<ConnectorCapability> get capabilities => _connector.capabilities;
   bool get supportsShellExec => _connector.supportsShellExec;
-  bool get supportsFileRead  => _connector.supportsFileRead;
+  bool get supportsFileRead => _connector.supportsFileRead;
   bool get supportsFileWrite => _connector.supportsFileWrite;
-  bool get isProbeOnly       => _connector.isProbeOnly;
+  bool get isProbeOnly => _connector.isProbeOnly;
   bool get isWindowsTarget => webshell.connectorType.startsWith('asp');
 
   String get currentDir => _connector.currentDir;
@@ -40,6 +46,29 @@ class WebshellService {
       _connector.executeCommand(cmd, workingDir: workingDir);
 
   Future<String> getCurrentDir() => _connector.getCurrentDir();
+
+  /// 若连接器可在目标上解析出当前 Webshell 脚本所在目录则返回，否则 `null`。
+  /// 同一 [WebshellService] 实例内只执行一次远端探测。
+  Future<String?> getShellScriptDirectory() {
+    _memoShellScriptDir ??= _connector.getShellScriptDir();
+    return _memoShellScriptDir!;
+  }
+
+  /// 终端 / 文件管理器打开时的初始目录：优先 webshell 脚本所在目录（若可解析且存在），否则 [getCurrentDir]。
+  /// 同一 [WebshellService] 实例内只完整解析一次。
+  Future<String> getInitialWorkingDirectory() {
+    _memoInitialWorkingDir ??= _resolveInitialWorkingDirectoryOnce();
+    return _memoInitialWorkingDir!;
+  }
+
+  Future<String> _resolveInitialWorkingDirectoryOnce() async {
+    final scriptDir = await getShellScriptDirectory();
+    if (scriptDir != null && scriptDir.isNotEmpty) {
+      _connector.currentDir = scriptDir;
+      return scriptDir;
+    }
+    return getCurrentDir();
+  }
 
   Future<List<FileEntry>> listDirectory(String path) =>
       _connector.listDirectory(path);
@@ -66,8 +95,8 @@ class WebshellService {
   Future<Map<String, String>> getSystemInfo() => _connector.getSystemInfo();
 
   Future<List<({String name, bool isDir})>> listNamesForCompletion(
-          String path) =>
-      _connector.listNamesForCompletion(path);
+    String path,
+  ) => _connector.listNamesForCompletion(path);
 
   Future<String> getHomeDir() => _connector.getHomeDir();
 
@@ -114,8 +143,7 @@ class WebshellService {
     String lhost,
     int lport, {
     bool preferScript = true,
-  }) =>
-      _connector.startReverseShell(lhost, lport, preferScript: preferScript);
+  }) => _connector.startReverseShell(lhost, lport, preferScript: preferScript);
 
   /// 当前连接器是否支持注入内存马（仅 jsp_behinder 支持）。
   bool get canInjectSuo5 => _connector is JspBehinderConnector;

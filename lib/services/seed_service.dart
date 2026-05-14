@@ -83,7 +83,7 @@ class SeedService {
       sinceVersion: 5,
     ),
     _PayloadDef(
-      asset: 'assets/defaults/payloads/webshell/jsp_behinder_mem.jsp',
+      asset: 'assets/defaults/payloads/webshell/jsp_behinder_mem_servlet.jsp',
       name: 'jsp_behinder_mem.jsp',
       type: 'jsp',
       description: 'JSP 内存马注入（Behinder 兼容），动态注册 Servlet 并通过 AES 通信',
@@ -132,29 +132,13 @@ class SeedService {
       tags: 'suo5,aspx,proxy,tunnel,socks5,dotnet',
       sinceVersion: 10,
     ),
-    // ── SUO6 代理载荷（多路复用二进制隧道）────────────────────────────────
-    _PayloadDef(
-      asset: 'assets/defaults/payloads/suo6/suo6.php',
-      name: 'suo6.php',
-      type: 'php',
-      description: 'SUO6 PHP 代理 payload，单条 HTTP 连接多路复用 SOCKS5 流，XOR 加密',
-      tags: 'suo6,php,proxy,tunnel,socks5,multiplex',
-      sinceVersion: 11,
-    ),
+    // ── SUO6 代理载荷（JSP 单文件；PHP/ASPX 与流式模型不兼容，不提供默认资产）
     _PayloadDef(
       asset: 'assets/defaults/payloads/suo6/suo6.jsp',
       name: 'suo6.jsp',
       type: 'jsp',
       description: 'SUO6 JSP 代理 payload，单条 HTTP 连接多路复用 SOCKS5 流，XOR 加密',
       tags: 'suo6,jsp,proxy,tunnel,socks5,multiplex',
-      sinceVersion: 11,
-    ),
-    _PayloadDef(
-      asset: 'assets/defaults/payloads/suo6/suo6.aspx',
-      name: 'suo6.aspx',
-      type: 'aspx',
-      description: 'SUO6 ASPX 代理 payload，单条 HTTP 连接多路复用 SOCKS5 流，XOR 加密',
-      tags: 'suo6,aspx,proxy,tunnel,socks5,multiplex,dotnet',
       sinceVersion: 11,
     ),
     // ── COPY-FAIL（二进制）─────────────────────────────────────────────────

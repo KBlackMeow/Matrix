@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../app/localization.dart';
+import '../../app/main_nav_bus.dart';
 import '../../models/project.dart';
 import '../../pages/frp_tunnel_page.dart';
 import '../../pages/payload_management_page.dart';
 import '../../pages/project_management_page.dart';
 import '../../pages/project_scoped_page.dart';
 import '../../pages/reverse_shell_dashboard_page.dart';
-import '../../pages/suo5_proxy_page.dart';
-import '../../pages/suo6_proxy_page.dart';
+import '../../pages/suo_tunnel_proxy_page.dart';
 import '../../pages/webshell_management_page.dart';
 import '../../theme/app_theme.dart';
 import 'exp_content.dart' as exp;
@@ -42,13 +42,11 @@ class _MainLayoutState extends State<MainLayout> {
   late ProjectManagementPage _projectPage;
   late ProjectScopedPage _webshellPage;
   late ProjectScopedPage _expPage;
-  late ProjectScopedPage _suo5Page;
-  late ProjectScopedPage _suo6Page;
+  late ProjectScopedPage _suoTunnelPage;
   late RepaintBoundary _projectBoundary;
   late RepaintBoundary _webshellBoundary;
   late RepaintBoundary _expBoundary;
-  late RepaintBoundary _suo5Boundary;
-  late RepaintBoundary _suo6Boundary;
+  late RepaintBoundary _suoTunnelBoundary;
   late List<Widget> _staticPages;
   late List<Widget> _pages;
 
@@ -75,19 +73,14 @@ class _MainLayoutState extends State<MainLayout> {
       selectedIcon: Icons.computer,
     ),
     MenuItem(
-      icon: Icons.alt_route_outlined,
+      icon: AppTunnelIcons.outlined,
       label: '',
-      selectedIcon: Icons.alt_route,
+      selectedIcon: AppTunnelIcons.filled,
     ),
     MenuItem(
-      icon: Icons.sync_alt_outlined,
+      icon: AppTunnelIcons.outlined,
       label: '',
-      selectedIcon: Icons.sync_alt,
-    ),
-    MenuItem(
-      icon: Icons.cable_outlined,
-      label: '',
-      selectedIcon: Icons.cable,
+      selectedIcon: AppTunnelIcons.filled,
     ),
   ];
 
@@ -95,6 +88,7 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     _rebuildDynamicPages();
+    MainNavBus.onRequestOpenTunnelTab = _goTunnelManagerTab;
     AppLanguageController.notifier.addListener(_onLanguageChanged);
     PackageInfo.fromPlatform().then((info) {
       if (!mounted) return;
@@ -106,8 +100,15 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   void dispose() {
+    MainNavBus.onRequestOpenTunnelTab = null;
     AppLanguageController.notifier.removeListener(_onLanguageChanged);
     super.dispose();
+  }
+
+  void _goTunnelManagerTab() {
+    if (!mounted) return;
+    setState(() => _selectedIndex = 6);
+    SuoTunnelProxyPage.notifyRefresh();
   }
 
   void _onLanguageChanged() {
@@ -215,7 +216,7 @@ class _MainLayoutState extends State<MainLayout> {
       ),
     );
     _expBoundary = RepaintBoundary(child: _expPage);
-    _suo5Page = ProjectScopedPage(
+    _suoTunnelPage = ProjectScopedPage(
       selectedProject: _selectedProject,
       onSelectProject: (p) {
         setState(() {
@@ -236,43 +237,14 @@ class _MainLayoutState extends State<MainLayout> {
           _rebuildDynamicPages();
         });
       },
-      title: S.titleSuo5Manager,
-      icon: Icons.sync_alt,
-      contentBuilder: (project, onSwitchProject) => Suo5ProxyPage(
+      title: S.titleSuoTunnelManager,
+      icon: AppTunnelIcons.outlined,
+      contentBuilder: (project, onSwitchProject) => SuoTunnelProxyPage(
         project: project,
         onSwitchProject: onSwitchProject,
       ),
     );
-    _suo5Boundary = RepaintBoundary(child: _suo5Page);
-    _suo6Page = ProjectScopedPage(
-      selectedProject: _selectedProject,
-      onSelectProject: (p) {
-        setState(() {
-          _selectedProject = p;
-          _rebuildDynamicPages();
-        });
-      },
-      onClearProject: () {
-        setState(() {
-          _selectedProject = null;
-          _rebuildDynamicPages();
-        });
-      },
-      onNavigateToProjectManagement: () {
-        setState(() {
-          _selectedIndex = 0;
-          _selectedProject = null;
-          _rebuildDynamicPages();
-        });
-      },
-      title: S.titleSuo6Manager,
-      icon: Icons.cable,
-      contentBuilder: (project, onSwitchProject) => Suo6ProxyPage(
-        project: project,
-        onSwitchProject: onSwitchProject,
-      ),
-    );
-    _suo6Boundary = RepaintBoundary(child: _suo6Page);
+    _suoTunnelBoundary = RepaintBoundary(child: _suoTunnelPage);
     // 注意：每次都 new 一份非 const 实例，确保语言变化时 Flutter 会下钻 build()
     // （const 单例会被 widget 比对识为未变更，从而跳过子树重建）。
     _staticPages = <Widget>[
@@ -280,16 +252,14 @@ class _MainLayoutState extends State<MainLayout> {
       RepaintBoundary(child: PayloadManagementPage()),
       RepaintBoundary(child: ReverseShellDashboardPage()),
       RepaintBoundary(child: FrpTunnelPage()),
-      _suo5Boundary,
-      _suo6Boundary,
+      _suoTunnelBoundary,
     ];
     _pages = [_projectBoundary, _webshellBoundary, ..._staticPages];
   }
 
   void _handleMenuTap(int index) {
     setState(() => _selectedIndex = index);
-    if (index == 6) Suo5ProxyPage.notifyRefresh();
-    if (index == 7) Suo6ProxyPage.notifyRefresh();
+    if (index == 6) SuoTunnelProxyPage.notifyRefresh();
   }
 
   String _menuLabelForIndex(int index) {
@@ -307,9 +277,7 @@ class _MainLayoutState extends State<MainLayout> {
       case 5:
         return S.menuFrp;
       case 6:
-        return S.menuSuo5;
-      case 7:
-        return S.menuSuo6;
+        return S.menuSuoTunnel;
       default:
         return '';
     }

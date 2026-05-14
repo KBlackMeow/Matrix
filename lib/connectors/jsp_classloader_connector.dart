@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
+import 'jsp_webapp_path.dart';
 import 'shell_connector.dart';
 import 'shell_exec_connector.dart';
 
@@ -61,9 +62,23 @@ class JspClassloaderConnector extends ShellConnector {
       });
       final builder = BytesBuilder(copy: false);
       try {
-        await for (final chunk in resp) {
+        // 避免对端不发 body / 半开连接时 await for 永久挂起（整机 UI 无响应）。
+        await for (final chunk in resp.timeout(
+          _kPostTimeout,
+          onTimeout: (sink) =>
+              sink.addError(TimeoutException('JSP response body')),
+        )) {
           builder.add(chunk);
         }
+      } on TimeoutException catch (e) {
+        if (code == 200 && builder.isNotEmpty) {
+          return http.Response.bytes(
+            builder.takeBytes(),
+            code,
+            headers: rh,
+          );
+        }
+        throw http.ClientException('Timeout: ${e.message}', uri);
       } on io.HttpException catch (e) {
         // Tomcat 在 JSP 异常或连接策略下可能先发 200 再在收完 body 前 RST。
         // 已收到部分 body → 仍当作成功（如 MATRIX_JSP_PING）。
@@ -330,6 +345,14 @@ class JspClassloaderConnector extends ShellConnector {
     if (r.isNotEmpty && !r.startsWith('[')) currentDir = r;
     return currentDir;
   }
+
+  @override
+  Future<String?> getShellScriptDir() => JspWebappPath.resolveJspAgentShellScriptDir(
+        supportsShellExec: supportsShellExec,
+        shellUrl: webshell.url,
+        loadSysinfo: getSystemInfo,
+        exec: executeCommand,
+      );
 
   @override
   Future<List<FileEntry>> listDirectory(String path) async {

@@ -362,7 +362,11 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
             ),
             child: Row(
               children: [
-                Icon(Icons.alt_route, color: _statusColor(status), size: 32),
+                Icon(
+                  AppTunnelIcons.filled,
+                  color: _statusColor(status),
+                  size: 32,
+                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(

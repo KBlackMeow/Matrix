@@ -141,6 +141,15 @@ class PhpEvalConnector extends ShellConnector {
   }
 
   @override
+  Future<String?> getShellScriptDir() async {
+    final r = (await sendPhpCode(
+      '\$d=@realpath(dirname(__FILE__));echo (\$d!==false&&\$d!=="")?\$d:"";',
+    )).trim();
+    if (r.isEmpty || r.startsWith('[')) return null;
+    return r;
+  }
+
+  @override
   Future<List<FileEntry>> listDirectory(String path) async {
     final b64 = base64.encode(utf8.encode(path));
     // 使用普通字符串，PHP 变量前缀 $ 用 \$ 转义

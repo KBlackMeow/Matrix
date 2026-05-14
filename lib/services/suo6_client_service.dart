@@ -146,12 +146,12 @@ class Suo6Session {
       await _openChannel(config);
       _server = await ServerSocket.bind(config.listenHost, config.listenPort);
       _server!.listen(_handleSocksClientRaw, onError: (Object e, _) {
-        _log('SOCKS5 error: $e');
+        _log('SOCKS5 服务错误: $e');
       });
-      _log('SOCKS5 listening on ${config.listenHost}:${config.listenPort}');
+      _log('SOCKS5 已启动 ${config.listenHost}:${config.listenPort}');
       _setStatus(Suo6Status.running);
     } catch (e) {
-      _log('start failed: $e');
+      _log('启动失败: $e');
       await stop();
       _setStatus(Suo6Status.error);
     }
@@ -178,7 +178,17 @@ class Suo6Session {
 
   // ── Channel open + handshake ──────────────────────────────────────────────
 
-  Future<void> _openChannel(Suo6Config config) async {
+  /// 仅完成 HTTP 体握手（密钥协商），不启 SOCKS、不启 ping；用于「测试握手」。
+  Future<void> probe(Suo6Config config) async {
+    try {
+      await _openChannel(config, keepAlive: false);
+    } finally {
+      await stop();
+    }
+  }
+
+  Future<void> _openChannel(Suo6Config config, {bool keepAlive = true}) async {
+    final channelOpenStarted = DateTime.now();
     for (var attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) {
         await Future<void>.delayed(Duration(milliseconds: 200 * attempt));
@@ -210,20 +220,26 @@ class Suo6Session {
         _channel = ch;
         ch = null;
 
-        _pingTimer?.cancel();
-        _pingTimer = Timer.periodic(const Duration(seconds: 12), (_) {
-          _channel?.sendFrame(0, _tPing, const []);
-        });
+        if (keepAlive) {
+          _pingTimer?.cancel();
+          _pingTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+            _channel?.sendFrame(0, _tPing, const []);
+          });
+          _channel!.onFrame = _handleServerFrame;
+        }
 
-        _channel!.onFrame = _handleServerFrame;
         _channel!.onClose = () {
-          _log('channel closed');
+          _log('通道已关闭');
           if (_status == Suo6Status.running) {
             _setStatus(Suo6Status.error);
           }
         };
 
-        _log('suo6 channel established');
+        final openMs =
+            DateTime.now().difference(channelOpenStarted).inMilliseconds;
+        _log(keepAlive
+            ? 'suo6 通道已建立 latency=${openMs}ms'
+            : '握手成功 latency=${openMs}ms');
         return;
       } catch (e, st) {
         if (ch != null) {
@@ -232,10 +248,10 @@ class Suo6Session {
           } catch (_) {}
         }
         if (attempt == 2) {
-          _log('suo6 open failed after retries: $e');
+          _log('suo6 建立通道失败（已重试 3 次）: $e');
           Error.throwWithStackTrace(e, st);
         } else {
-          _log('suo6 open retry ${attempt + 1}/3: $e');
+          _log('suo6 建立通道重试 ${attempt + 1}/3: $e');
         }
       }
     }
@@ -288,7 +304,7 @@ class Suo6Session {
 
       ch = _channel;
       if (ch == null || ch.isClosed) {
-        _log('SOCKS channel unavailable, rejecting $target');
+        _log('SOCKS 通道不可用，拒绝 $target');
         socket.add([0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0]);
         await socket.flush();
         return;
@@ -298,7 +314,7 @@ class Suo6Session {
       streamId = ch.allocateStreamId();
       final stream = _Suo6Stream(streamId, socket, ch);
       ch.registerStream(streamId, stream);
-      _log('→ $target  (#$streamId)');
+      _log('隧道建立中 id=$streamId -> $target');
 
       // OPEN frame: port(2B) + host(utf8)
       final hostBytes = utf8.encode(host);
@@ -311,12 +327,12 @@ class Suo6Session {
       // Wait for OPEN_ACK (15 s timeout → false)
       final ok = await stream.waitForAck;
       if (!ok) {
-        _log('✗ $target  (#$streamId) open failed/timeout');
+        _log('隧道建立失败 id=$streamId -> $target（超时或失败）');
         socket.add([0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0]);
         await socket.flush();
         return;
       }
-      _log('✓ $target  (#$streamId)');
+      _log('隧道建立成功 id=$streamId -> $target');
 
       socket.add([0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0]);
       await socket.flush();
@@ -343,7 +359,7 @@ class Suo6Session {
       await stream.done;
     } catch (e) {
       if (!_isBenignSocksClose(e)) {
-        _log(target == null ? 'SOCKS error: $e' : 'SOCKS error $target: $e');
+        _log(target == null ? 'SOCKS 会话异常: $e' : 'SOCKS 会话异常 $target: $e');
       }
     } finally {
       _activeConnections = (_activeConnections - 1).clamp(0, 1 << 30);
@@ -1015,6 +1031,18 @@ class Suo6ClientService {
     await s.start(config);
   }
 
+  /// 探测：临时会话只跑握手，不监听 SOCKS、不启 ping，与 [Suo5ClientService.probe] 对齐。
+  Future<void> probe(Suo6Config config, {String label = ''}) async {
+    final temp = Suo6Session(label: label);
+    temp.onLog = (when, msg) => _appendLog(when, label, msg);
+    temp.onChanged = _emit;
+    try {
+      await temp.probe(config);
+    } finally {
+      await temp.dispose();
+    }
+  }
+
   Future<void> stopProfile(int profileId) async {
     final s = _sessions[profileId];
     if (s == null) return;
@@ -1040,6 +1068,11 @@ class Suo6ClientService {
   int get totalDownload   => _sessions.values.fold(0, (a, s) => a + s.downloadBytes);
 
   List<String> get aggregatedLogs => _aggLog.map((e) => e.format()).toList(growable: false);
+
+  /// 与 [Suo5ClientService.aggregatedLogEvents] 成对使用：按 [when] 合并为一条时间线。
+  List<({DateTime when, String line})> get aggregatedLogEvents => [
+        for (final e in _aggLog) (when: e.when, line: '[suo6] ${e.format()}'),
+      ];
 
   void clearAllLogs() {
     _aggLog.clear();

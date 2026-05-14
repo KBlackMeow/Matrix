@@ -123,6 +123,15 @@ class AspWscriptConnector extends ShellExecConnector {
   }
 
   @override
+  Future<String?> getShellScriptDir() async {
+    final r = (await sendRawCommand(
+      'if defined SCRIPT_FILENAME (for %I in ("%SCRIPT_FILENAME%") do @echo %~dpI)',
+    )).trim();
+    if (r.isEmpty || r.startsWith('[')) return null;
+    return r.replaceAll('\r', '').trim();
+  }
+
+  @override
   Future<List<FileEntry>> listDirectory(String path) async {
     // Use cmd metadata expansion instead of parsing localized `dir` output.
     final raw = await sendRawCommand(

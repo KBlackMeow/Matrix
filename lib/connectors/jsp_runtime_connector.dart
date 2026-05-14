@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../app/constants.dart';
+import 'jsp_webapp_path.dart';
 import 'shell_connector.dart';
 import 'shell_exec_connector.dart';
 import '../utils/encoding_utils.dart';
@@ -84,6 +85,12 @@ class JspRuntimeConnector extends ShellExecConnector {
 
   @override
   Future<String> sendRawCommand(String cmd) => _requestRuntime(cmd);
+
+  @override
+  Future<String?> getShellScriptDir() => JspWebappPath.resolveJspRuntimeShellScriptDir(
+        shellUrl: webshell.url,
+        exec: sendRawCommand,
+      );
 
   static const int _kUploadChunkBytes = 56 * 1024;
 

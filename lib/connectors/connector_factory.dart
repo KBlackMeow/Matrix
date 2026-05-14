@@ -164,6 +164,10 @@ class ConnectorFactory {
   static String? fixedMethod(String connectorType) =>
       _def(connectorType)?.fixedMethod;
 
+  /// SOCKS 隧道新建对话框：JSP 类连接器默认勾选 suo6（多路复用）协议。
+  static bool defaultSuo6TunnelProtocol(String connectorType) =>
+      connectorType.startsWith('jsp');
+
   static final List<String> allTypes = _definitions
       .map((d) => d.type)
       .toList(growable: false);

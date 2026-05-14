@@ -330,7 +330,8 @@ class Suo5Session {
       req.headers.set(HttpHeaders.cookieHeader, _cookieHeader);
     }
     req.add(body);
-    final resp = await req.close();
+    // 对端不响应时 req.close() 可能一直挂起，须加超时以免卡住整个 UI 隔离。
+    final resp = await req.close().timeout(const Duration(seconds: 90));
     for (final c in resp.cookies) {
       if (c.value.isEmpty) continue;
       _cookies[c.name] = c.value;
@@ -641,6 +642,11 @@ class Suo5ClientService {
 
   List<String> get aggregatedLogs =>
       _aggLog.map((e) => e.format()).toList(growable: false);
+
+  /// 与 [Suo6ClientService.aggregatedLogEvents] 成对使用：按 [when] 合并为一条时间线。
+  List<({DateTime when, String line})> get aggregatedLogEvents => [
+        for (final e in _aggLog) (when: e.when, line: '[suo5] ${e.format()}'),
+      ];
 
   void clearAllLogs() {
     _aggLog.clear();

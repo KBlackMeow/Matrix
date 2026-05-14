@@ -150,6 +150,14 @@ abstract class ShellExecConnector extends ShellConnector {
   }
 
   @override
+  Future<String?> getShellScriptDir() async {
+    final r =
+        (await sendRawCommand(ShellConnector.kUnixShellScriptDirProbe)).trim();
+    if (r.isEmpty || r.startsWith('[')) return null;
+    return r;
+  }
+
+  @override
   Future<List<FileEntry>> listDirectory(String path) async {
     final raw = await sendRawCommand('ls -la ${sq(path)} 2>&1');
     return parseLsLa(raw);

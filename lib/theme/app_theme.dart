@@ -69,3 +69,11 @@ class AppTextStyles {
         letterSpacing: 0.5,
       );
 }
+
+/// FRP、suo5/6 与一键创建隧道等入口的共用图标（侧栏、页头、工具栏一致）。
+abstract final class AppTunnelIcons {
+  AppTunnelIcons._();
+
+  static const IconData outlined = Icons.route_outlined;
+  static const IconData filled = Icons.route;
+}

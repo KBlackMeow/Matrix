@@ -195,6 +195,15 @@ class PhpBehinderConnector extends ShellConnector {
   }
 
   @override
+  Future<String?> getShellScriptDir() async {
+    final r = (await _sendPhp(
+      '\$d=@realpath(dirname(__FILE__));echo (\$d!==false&&\$d!=="")?\$d:"";',
+    )).trim();
+    if (r.isEmpty || r.startsWith('[')) return null;
+    return r;
+  }
+
+  @override
   Future<List<FileEntry>> listDirectory(String path) async {
     final b64 = base64.encode(utf8.encode(path));
     // 1) 优先 opendir/readdir；若被 disable_functions 限制则回退到 shell_exec

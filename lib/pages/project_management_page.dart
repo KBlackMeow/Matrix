@@ -509,8 +509,8 @@ class _ProjectCardState extends State<_ProjectCard> {
                 Navigator.of(ctx).pop();
                 widget.onEnterSuo5();
               },
-              icon: const Icon(Icons.sync_alt, size: 20),
-              label: Text(S.menuEnterSuo5),
+              icon: const Icon(AppTunnelIcons.outlined, size: 20),
+              label: Text(S.menuEnterSuoTunnel),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -675,7 +675,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                   onSelected: (value) {
                     if (value == 'webshell') widget.onEnterWebshell();
                     if (value == 'exp') widget.onEnterExp();
-                    if (value == 'suo5') widget.onEnterSuo5();
+                    if (value == 'tunnel') widget.onEnterSuo5();
                   },
                   itemBuilder: (context) => [
                     PopupMenuItem(
@@ -713,17 +713,17 @@ class _ProjectCardState extends State<_ProjectCard> {
                       ),
                     ),
                     PopupMenuItem(
-                      value: 'suo5',
+                      value: 'tunnel',
                       child: Row(
                         children: [
                           const Icon(
-                            Icons.sync_alt,
+                            AppTunnelIcons.outlined,
                             color: AppColors.primary,
                             size: 20,
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            S.menuEnterSuo5,
+                            S.menuEnterSuoTunnel,
                             style: AppTextStyles.body(color: AppColors.textPrimary),
                           ),
                         ],

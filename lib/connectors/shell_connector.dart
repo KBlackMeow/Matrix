@@ -17,6 +17,10 @@ abstract class ShellConnector {
   final Webshell webshell;
   String currentDir = '/';
 
+  /// 类 Unix：由子进程环境中的 `SCRIPT_FILENAME` 推导 webshell 脚本所在目录（若存在）。
+  static const String kUnixShellScriptDirProbe =
+      r'[ -n "${SCRIPT_FILENAME-}" ] && d=$(dirname -- "${SCRIPT_FILENAME}") && [ -d "$d" ] && printf %s "$d"';
+
   ShellConnector(this.webshell);
 
   Set<ConnectorCapability> get capabilities;
@@ -34,6 +38,9 @@ abstract class ShellConnector {
 
   Future<String> executeCommand(String cmd, {String workingDir = ''});
   Future<String> getCurrentDir();
+
+  /// 当前 webshell 脚本所在目录（若连接器可获知且目录存在），否则 `null`。
+  Future<String?> getShellScriptDir() async => null;
   Future<List<FileEntry>> listDirectory(String path);
   Future<String> readFile(String path);
   Future<bool> writeFile(String path, String content);

@@ -54,11 +54,7 @@ class _FileManagerTabState extends State<FileManagerTab>
   }
 
   Future<void> _initPath() async {
-    if (widget.service.isWindowsTarget) {
-      if (mounted) _loadDirectory(r'C:\');
-      return;
-    }
-    final dir = await widget.service.getCurrentDir();
+    final dir = await widget.service.getInitialWorkingDirectory();
     if (mounted) _loadDirectory(dir);
   }
 

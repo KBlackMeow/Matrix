@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:convert';
 
 import '../database/database_helper.dart';
+import '../models/payload.dart';
 import '../models/webshell.dart';
 import '../services/reverse_shell_service.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/matrix_console_log.dart';
 import '../app/localization.dart';
+import '../app/main_nav_bus.dart';
 import 'reverse_shell_terminal_page.dart';
-import 'suo5_proxy_page.dart';
-import 'suo6_proxy_page.dart';
+import 'suo_tunnel_proxy_page.dart';
 import 'webshell_interactive_file_manager.dart';
 import 'webshell_interactive_system_priv_esc.dart';
 import 'webshell_interactive_terminal_shared.dart';
@@ -35,11 +37,33 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
   late final TabCompleter _completer;
   bool _isConnected = false;
   bool _isChecking = true;
+  bool _creatingOneClickTunnel = false;
   String? _lastPingError;
 
   /// 提权检查为 Linux/bash 场景；Windows（ASP/ASPX）连接器下隐藏。
   bool get _showPrivEscTab =>
       !widget.webshell.connectorType.startsWith('asp');
+
+  /// 一键隧道：JSP 默认 suo6（冰蝎优先内存注入，否则上传 suo6.jsp）；其它类型上传 suo5。
+  bool get _supportsOneClickTunnelAction =>
+      _service.canInjectSuo6 ||
+      (_service.supportsFileWrite &&
+          _oneClickTunnelPayloadName(widget.webshell.connectorType) != null);
+
+  /// JSP → suo6 载荷 `suo6.jsp`；PHP / ASPX-CMD → suo5 内置脚本。
+  String? _oneClickTunnelPayloadName(String connectorType) {
+    if (connectorType.startsWith('jsp')) return 'suo6.jsp';
+    if (connectorType.startsWith('php')) return 'suo5.php';
+    if (connectorType == 'aspx_cmd') return 'suo5.aspx';
+    return null;
+  }
+
+  bool get _oneClickTunnelIsSuo6 =>
+      widget.webshell.connectorType.startsWith('jsp');
+
+  /// 冰蝎 suo6 内存马默认参数（与 [WebshellService.injectSuo6MemShell] 默认一致）。
+  static const _kSuo6MemFilter = 'suo6';
+  static const _kSuo6MemPath = '/s6';
 
   @override
   void initState() {
@@ -185,6 +209,11 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                             child: _TerminalTab(
                               service: _service,
                               completer: _completer,
+                              showOneClickTunnel: _supportsOneClickTunnelAction,
+                              creatingOneClickTunnel: _creatingOneClickTunnel,
+                              oneClickTunnelActionDisabled:
+                                  _isChecking || !_isConnected,
+                              onOneClickTunnel: _runOneClickTunnelCreate,
                             ),
                           ),
                           FocusScope(
@@ -311,25 +340,6 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
             ),
           ),
           const SizedBox(width: 4),
-          if (_service.canInjectSuo5)
-            IconButton(
-              onPressed: _isChecking ? null : _showInjectSuo5Dialog,
-              icon: const Icon(Icons.cable_outlined, size: 17),
-              color: AppColors.cyan,
-              tooltip: '注入 suo5 内存马',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            ),
-          if (_service.canInjectSuo6)
-            IconButton(
-              onPressed: _isChecking ? null : _showInjectSuo6Dialog,
-              icon: const Icon(Icons.cable, size: 17),
-              color: AppColors.primary,
-              tooltip: '注入 suo6 内存马（二进制多路复用）',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            ),
-          const SizedBox(width: 4),
           _methodBadge(widget.webshell.method),
           const SizedBox(width: 8),
         ],
@@ -337,174 +347,199 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     );
   }
 
-  Future<void> _showInjectSuo5Dialog() async {
-    final pathCtrl = TextEditingController(text: '/suo5_tunnel');
-    final nameCtrl = TextEditingController(text: 's5_mem');
-    bool injecting = false;
-    String? result;
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          backgroundColor: AppColors.bgCard,
-          title: Text(
-            '注入 suo5 内存马',
-            style: AppTextStyles.heading(color: AppColors.cyan),
-          ),
-          content: SizedBox(
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '通过冰蝎通道向目标注入 suo5 Filter 内存马。\n注入成功后可用该路径创建 suo5 代理。',
-                  style: AppTextStyles.caption(
-                    size: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _dialogField(nameCtrl, 'Filter 名称', 's5_mem', enabled: !injecting),
-                const SizedBox(height: 12),
-                _dialogField(pathCtrl, '监听路径 (URL Pattern)', '/suo5_tunnel', enabled: !injecting),
-                if (result != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: (result!.startsWith('OK'))
-                          ? AppColors.primary.withValues(alpha: 0.1)
-                          : AppColors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: (result!.startsWith('OK'))
-                            ? AppColors.primary.withValues(alpha: 0.5)
-                            : AppColors.red.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    child: Text(
-                      result!,
-                      style: AppTextStyles.terminal(
-                        size: 12,
-                        color: result!.startsWith('OK')
-                            ? AppColors.primary
-                            : AppColors.red,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: injecting ? null : () => Navigator.pop(ctx),
-              child: Text(
-                result != null && result!.startsWith('OK') ? S.btnClose : S.btnCancel,
-                style: AppTextStyles.body(color: AppColors.textSecondary),
-              ),
-            ),
-            if (result == null || !result!.startsWith('OK'))
-              FilledButton(
-                onPressed: injecting
-                    ? null
-                    : () async {
-                        final path = pathCtrl.text.trim();
-                        final name = nameCtrl.text.trim();
-                        if (path.isEmpty) return;
-                        setState(() { injecting = true; result = null; });
-                        final r = await _service.injectSuo5MemShell(
-                          filterName: name.isEmpty ? 's5_mem' : name,
-                          urlPath: path,
-                        );
-                        setState(() { injecting = false; result = r; });
-                        if (r.startsWith('OK') && ctx.mounted) {
-                          _onInjectSuccess(ctx, path);
-                        }
-                      },
-                style: FilledButton.styleFrom(backgroundColor: AppColors.cyan),
-                child: injecting
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(
-                        '注入',
-                        style: AppTextStyles.body(color: AppColors.bgDark),
-                      ),
-              ),
-          ],
-        ),
-      ),
-    );
+  String _joinRemoteDirFile(String dir, String fileName) {
+    final d = dir.trim();
+    if (d.contains(r'\')) {
+      return d.endsWith(r'\') ? '$d$fileName' : '$d\\$fileName';
+    }
+    if (d.endsWith('/')) return '$d$fileName';
+    return '$d/$fileName';
   }
 
-  void _onInjectSuccess(BuildContext dialogCtx, String urlPath) {
-    Navigator.pop(dialogCtx);
-    final baseUri = Uri.tryParse(widget.webshell.url);
-    if (baseUri == null) return;
-    final suo5Url = baseUri.replace(path: urlPath).toString();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
-        title: Text(
-          '注入成功',
-          style: AppTextStyles.heading(color: AppColors.primary),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'suo5 Filter 已注入，目标路径：',
-              style: AppTextStyles.body(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 8),
-            SelectableText(
-              suo5Url,
-              style: AppTextStyles.terminal(
-                size: 13,
-                color: AppColors.cyan,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '在「suo5 代理」页面以该 URL 创建代理配置即可使用。',
-              style: AppTextStyles.caption(
-                size: 12,
-                color: AppColors.textMuted,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(S.btnClose, style: AppTextStyles.body(color: AppColors.textSecondary)),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _createSuo5Profile(suo5Url, urlPath);
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            child: Text(
-              '自动创建代理配置',
-              style: AppTextStyles.body(color: AppColors.bgDark),
-            ),
-          ),
-        ],
-      ),
-    );
+  Uri _payloadHttpUriBesideShell(String shellUrl, String fileName) {
+    final u = Uri.parse(shellUrl);
+    final path = u.path.isEmpty ? '/' : u.path;
+    if (path == '/' || path.isEmpty) {
+      return u.replace(path: '/$fileName');
+    }
+    final slash = path.lastIndexOf('/');
+    final parent = slash < 0 ? '/' : path.substring(0, slash + 1);
+    var newPath = '$parent$fileName';
+    if (!newPath.startsWith('/')) {
+      newPath = '/$newPath';
+    }
+    return u.replace(path: newPath);
   }
+
+  Uint8List? _decodePayloadBytes(Payload p) {
+    const binaryPrefix = '__MATRIX_BINARY_B64__:';
+    if (p.content.startsWith(binaryPrefix)) {
+      try {
+        return base64Decode(p.content.substring(binaryPrefix.length));
+      } catch (_) {
+        return null;
+      }
+    }
+    return Uint8List.fromList(utf8.encode(p.content));
+  }
+
+  void _finishOneClickTunnelAndNavigate() {
+    if (!mounted) return;
+    setState(() => _creatingOneClickTunnel = false);
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      MainNavBus.onRequestOpenTunnelTab?.call();
+    });
+  }
+
+  Future<bool> _uploadOneClickTunnelPayloadAndCreateProfile() async {
+    final payloadName =
+        _oneClickTunnelPayloadName(widget.webshell.connectorType);
+    if (payloadName == null) return false;
+    final db = DatabaseHelper();
+    final payloads = await db.getAllPayloads();
+    Payload? pl;
+    for (final p in payloads) {
+      if (p.name == payloadName) {
+        pl = p;
+        break;
+      }
+    }
+    if (pl == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.webshellOneClickTunnelPayloadMissing),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return false;
+    }
+    final bytes = _decodePayloadBytes(pl);
+    if (bytes == null || bytes.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.webshellOneClickTunnelPayloadMissing),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return false;
+    }
+    final scriptDir = await _service.getShellScriptDirectory();
+    final dir = (scriptDir != null && scriptDir.isNotEmpty)
+        ? scriptDir
+        : await _service.getCurrentDir();
+    final remotePath = _joinRemoteDirFile(dir, payloadName);
+    final ok = await _service.writeFileBinary(remotePath, bytes);
+    if (!ok) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.webshellOneClickTunnelUploadFailed),
+            backgroundColor: AppColors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return false;
+    }
+    final targetUrl =
+        _payloadHttpUriBesideShell(widget.webshell.url, payloadName).toString();
+    if (_oneClickTunnelIsSuo6) {
+      await _createSuo6Profile(targetUrl, payloadName, showSnackBar: false);
+    } else {
+      await _createSuo5Profile(targetUrl, payloadName, showSnackBar: false);
+    }
+    return true;
+  }
+
+  Future<void> _runOneClickTunnelCreate() async {
+    if (!mounted) return;
+    if (!_isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(S.webshellOneClickTunnelNeedConn),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (!_supportsOneClickTunnelAction) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.webshellOneClickTunnelUnavailable),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+    setState(() => _creatingOneClickTunnel = true);
+    try {
+      if (_service.canInjectSuo6) {
+        final r = await _service.injectSuo6MemShell(
+          filterName: _kSuo6MemFilter,
+          urlPath: _kSuo6MemPath,
+        );
+        if (r.startsWith('OK')) {
+          final base = Uri.tryParse(widget.webshell.url);
+          if (base != null) {
+            final tunnelUrl = base.replace(path: _kSuo6MemPath).toString();
+            await _createSuo6Profile(
+              tunnelUrl,
+              _kSuo6MemPath,
+              showSnackBar: false,
+            );
+            if (!mounted) return;
+            _finishOneClickTunnelAndNavigate();
+            return;
+          }
+        }
+        if (_service.supportsFileWrite &&
+            _oneClickTunnelPayloadName(widget.webshell.connectorType) != null) {
+          final ok = await _uploadOneClickTunnelPayloadAndCreateProfile();
+          if (ok && mounted) {
+            _finishOneClickTunnelAndNavigate();
+          }
+          return;
+        }
+        if (mounted) {
+          final msg = r.length > 220 ? '${r.substring(0, 220)}…' : r;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(msg),
+              backgroundColor: AppColors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+      final ok = await _uploadOneClickTunnelPayloadAndCreateProfile();
+      if (ok && mounted) {
+        _finishOneClickTunnelAndNavigate();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$e'),
+            backgroundColor: AppColors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted && _creatingOneClickTunnel) {
+        setState(() => _creatingOneClickTunnel = false);
+      }
+    }
+  }
+
 
   /// 在本项目内为 [listenHost] 选择首个未被 suo5 / suo6 任一配置占用的本地端口。
   Future<int> _pickLocalListenPort(int projectId, String listenHost) async {
@@ -523,7 +558,11 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     return 1080;
   }
 
-  Future<void> _createSuo5Profile(String targetUrl, String path) async {
+  Future<void> _createSuo5Profile(
+    String targetUrl,
+    String path, {
+    bool showSnackBar = true,
+  }) async {
     try {
       final db = DatabaseHelper();
       final pathName = path.replaceAll('/', '_').replaceAll('*', '').trim();
@@ -537,15 +576,17 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
         listenHost: listenHost,
         listenPort: listenPort,
       );
-      Suo5ProxyPage.notifyRefresh();
+      SuoTunnelProxyPage.notifyRefresh();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('suo5 代理配置已创建，请前往「suo5 代理」页面启动'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 3),
-        ),
-      );
+      if (showSnackBar) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('suo5 代理配置已创建，请前往「suo5」页面启动'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -558,7 +599,11 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     }
   }
 
-  Future<void> _createSuo6Profile(String targetUrl, String path) async {
+  Future<void> _createSuo6Profile(
+    String targetUrl,
+    String path, {
+    bool showSnackBar = true,
+  }) async {
     try {
       final db = DatabaseHelper();
       final pathName = path.replaceAll('/', '_').replaceAll('*', '').trim();
@@ -572,15 +617,19 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
         listenHost: listenHost,
         listenPort: listenPort,
       );
-      Suo6ProxyPage.notifyRefresh();
+      SuoTunnelProxyPage.notifyRefresh();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('suo6 代理配置已创建，请前往「suo6 代理」页面启动'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 3),
-        ),
-      );
+      if (showSnackBar) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${S.suoTunnelProtocolSuo6} 代理配置已创建，请前往「${S.menuSuoTunnel}」页面启动',
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -591,173 +640,6 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
         ),
       );
     }
-  }
-
-  // ── Suo6 inject ──────────────────────────────────────────────────────────
-
-  Future<void> _showInjectSuo6Dialog() async {
-    final nameCtrl = TextEditingController(text: 'suo6');
-    final pathCtrl = TextEditingController(text: '/s6');
-    bool injecting = false;
-    String? result;
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          backgroundColor: AppColors.bgCard,
-          title: Text(
-            '注入 suo6 内存马',
-            style: AppTextStyles.heading(color: AppColors.primary),
-          ),
-          content: SizedBox(
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '注入后通过该路径建立二进制多路复用隧道，速度优于 suo5。',
-                  style: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
-                ),
-                const SizedBox(height: 12),
-                _dialogField(nameCtrl, 'Filter 名称', 'suo6', enabled: !injecting),
-                const SizedBox(height: 8),
-                _dialogField(pathCtrl, '监听路径 (URL Pattern)', '/s6', enabled: !injecting),
-                if (result != null) ...[
-                  const SizedBox(height: 12),
-                  SelectableText(
-                    result!,
-                    style: AppTextStyles.terminal(
-                      size: 12,
-                      color: result!.startsWith('OK')
-                          ? AppColors.primary
-                          : AppColors.red,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: injecting ? null : () => Navigator.pop(ctx),
-              child: Text(S.btnClose, style: AppTextStyles.body(color: AppColors.textSecondary)),
-            ),
-            FilledButton(
-              onPressed: injecting
-                  ? null
-                  : () async {
-                      final name = nameCtrl.text.trim();
-                      final path = pathCtrl.text.trim();
-                      setState(() { injecting = true; result = null; });
-                      final r = await _service.injectSuo6MemShell(
-                        filterName: name.isEmpty ? 'suo6' : name,
-                        urlPath: path.isEmpty ? '/s6' : path,
-                      );
-                      setState(() { injecting = false; result = r; });
-                      if (r.startsWith('OK') && ctx.mounted) {
-                        _onInjectSuo6Success(ctx, path.isEmpty ? '/s6' : path);
-                      }
-                    },
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-              child: injecting
-                  ? const SizedBox(
-                      width: 14, height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : Text('注入', style: AppTextStyles.body(color: AppColors.bgDark)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _onInjectSuo6Success(BuildContext dialogCtx, String urlPath) {
-    Navigator.pop(dialogCtx);
-    final baseUri = Uri.tryParse(widget.webshell.url);
-    if (baseUri == null) return;
-    final suo6Url = baseUri.replace(path: urlPath).toString();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
-        title: Text('注入成功', style: AppTextStyles.heading(color: AppColors.primary)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'suo6 Filter 已注入，目标路径：',
-              style: AppTextStyles.body(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 8),
-            SelectableText(
-              suo6Url,
-              style: AppTextStyles.terminal(size: 13, color: AppColors.primary),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '在「suo6 代理」页面以该 URL 创建代理配置即可使用。',
-              style: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(S.btnClose, style: AppTextStyles.body(color: AppColors.textSecondary)),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _createSuo6Profile(suo6Url, urlPath);
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            child: Text(
-              '自动创建代理配置',
-              style: AppTextStyles.body(color: AppColors.bgDark),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static Widget _dialogField(
-    TextEditingController ctrl,
-    String label,
-    String hint, {
-    bool enabled = true,
-  }) {
-    return TextField(
-      controller: ctrl,
-      enabled: enabled,
-      style: const TextStyle(
-        color: AppColors.textPrimary,
-        fontFamily: 'monospace',
-        fontSize: 13,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textMuted),
-        labelStyle: const TextStyle(color: AppColors.textSecondary),
-        enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: AppColors.cyan.withValues(alpha: 0.5)),
-        ),
-        focusedBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: AppColors.cyan),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.3)),
-        ),
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      ),
-    );
   }
 
   Widget _methodBadge(String method) {
@@ -818,8 +700,19 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
 class _TerminalTab extends StatefulWidget {
   final WebshellService service;
   final TabCompleter completer;
+  final bool showOneClickTunnel;
+  final bool creatingOneClickTunnel;
+  final bool oneClickTunnelActionDisabled;
+  final VoidCallback onOneClickTunnel;
 
-  const _TerminalTab({required this.service, required this.completer});
+  const _TerminalTab({
+    required this.service,
+    required this.completer,
+    this.showOneClickTunnel = false,
+    this.creatingOneClickTunnel = false,
+    this.oneClickTunnelActionDisabled = false,
+    required this.onOneClickTunnel,
+  });
 
   @override
   State<_TerminalTab> createState() => _TerminalTabState();
@@ -860,9 +753,7 @@ class _TerminalTabState extends State<_TerminalTab>
   }
 
   Future<void> _initDir() async {
-    final dir = widget.service.isWindowsTarget
-        ? r'C:\'
-        : await widget.service.getCurrentDir();
+    final dir = await widget.service.getInitialWorkingDirectory();
     final lower = dir.trim().toLowerCase();
     final isWinPath = RegExp(r'^[a-z]:[\\/]').hasMatch(lower) ||
         lower.startsWith(r'\\');
@@ -1027,13 +918,36 @@ class _TerminalTabState extends State<_TerminalTab>
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (_entries.isNotEmpty)
-                _toolbarBtn(
-                  icon: Icons.delete_sweep_outlined,
-                  tooltip: S.tooltipClearTerminal,
-                  onTap: () => setState(() => _entries.clear()),
-                ),
+              _toolbarBtn(
+                icon: Icons.delete_sweep_outlined,
+                tooltip: S.tooltipClearTerminal,
+                onTap: _entries.isNotEmpty
+                    ? () => setState(() => _entries.clear())
+                    : null,
+              ),
               const SizedBox(width: 6),
+              if (widget.showOneClickTunnel) ...[
+                _toolbarBtn(
+                  icon: AppTunnelIcons.outlined,
+                  tooltip: S.tooltipWebshellOneClickTunnel,
+                  onTap: (widget.oneClickTunnelActionDisabled ||
+                          widget.creatingOneClickTunnel)
+                      ? null
+                      : widget.onOneClickTunnel,
+                  iconColor: AppColors.amber,
+                  iconWidget: widget.creatingOneClickTunnel
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.amber,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 6),
+              ],
               if (!widget.service.webshell.connectorType.startsWith('asp')) ...[
                 // 完整终端（反弹 Shell）按钮
                 _toolbarBtn(
@@ -1702,8 +1616,13 @@ class _TerminalTabState extends State<_TerminalTab>
   Widget _toolbarBtn({
     required IconData icon,
     required String tooltip,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
+    Color? iconColor,
+    Widget? iconWidget,
   }) {
+    final base = iconColor ?? AppColors.textSecondary;
+    final effectiveColor =
+        onTap == null ? base.withValues(alpha: 0.35) : base;
     return Tooltip(
       message: tooltip,
       child: InkWell(
@@ -1711,7 +1630,8 @@ class _TerminalTabState extends State<_TerminalTab>
         borderRadius: BorderRadius.circular(6),
         child: Padding(
           padding: const EdgeInsets.all(5),
-          child: Icon(icon, size: 16, color: AppColors.textSecondary),
+          child: iconWidget ??
+              Icon(icon, size: 16, color: effectiveColor),
         ),
       ),
     );

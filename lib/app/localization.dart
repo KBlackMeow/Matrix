@@ -5534,322 +5534,436 @@ class S {
 
   static String get expTagGeneric {
     switch (_lang) {
-      case AppLanguage.zh: return '通用';
-      case AppLanguage.ja: return '汎用';
-      case AppLanguage.en: return 'Generic';
+      case AppLanguage.zh:
+        return '通用';
+      case AppLanguage.ja:
+        return '汎用';
+      case AppLanguage.en:
+        return 'Generic';
     }
   }
 
   static String get expTagZentao {
     switch (_lang) {
-      case AppLanguage.zh: return '禅道';
-      case AppLanguage.ja: return 'Zentao';
-      case AppLanguage.en: return 'Zentao';
+      case AppLanguage.zh:
+        return '禅道';
+      case AppLanguage.ja:
+        return 'Zentao';
+      case AppLanguage.en:
+        return 'Zentao';
     }
   }
 
   // Shiro
   static String get expSubtitleShiro {
     switch (_lang) {
-      case AppLanguage.zh: return 'rememberMe Key 爆破 / Payload 注入';
-      case AppLanguage.ja: return 'rememberMe Key 爆破 / Payload 注入';
-      case AppLanguage.en: return 'rememberMe key bruteforce / Payload injection';
+      case AppLanguage.zh:
+        return 'rememberMe Key 爆破 / Payload 注入';
+      case AppLanguage.ja:
+        return 'rememberMe Key 爆破 / Payload 注入';
+      case AppLanguage.en:
+        return 'rememberMe key bruteforce / Payload injection';
     }
   }
 
   static String get expVersionShiro {
     switch (_lang) {
-      case AppLanguage.zh: return 'Shiro: <=1.2.4 | 条件: rememberMe 默认密钥场景';
-      case AppLanguage.ja: return 'Shiro: <=1.2.4 | 条件: rememberMe デフォルトキーのケース';
-      case AppLanguage.en: return 'Shiro: <=1.2.4 | Condition: default rememberMe key';
+      case AppLanguage.zh:
+        return 'Shiro: <=1.2.4 | 条件: rememberMe 默认密钥场景';
+      case AppLanguage.ja:
+        return 'Shiro: <=1.2.4 | 条件: rememberMe デフォルトキーのケース';
+      case AppLanguage.en:
+        return 'Shiro: <=1.2.4 | Condition: default rememberMe key';
     }
   }
 
   // ThinkPHP
   static String get expSubtitleThinkphp {
     switch (_lang) {
-      case AppLanguage.zh: return '3.x/5.x/6.x 漏洞检测、RCE、GetShell';
-      case AppLanguage.ja: return '3.x/5.x/6.x の脆弱性検出・RCE・GetShell';
-      case AppLanguage.en: return '3.x/5.x/6.x vuln detection, RCE, GetShell';
+      case AppLanguage.zh:
+        return '3.x/5.x/6.x 漏洞检测、RCE、GetShell';
+      case AppLanguage.ja:
+        return '3.x/5.x/6.x の脆弱性検出・RCE・GetShell';
+      case AppLanguage.en:
+        return '3.x/5.x/6.x vuln detection, RCE, GetShell';
     }
   }
 
   static String get expVersionThinkphp {
     switch (_lang) {
-      case AppLanguage.zh: return 'ThinkPHP: 2.x / <=5.0.23 / 5.0.22/5.1.29 | 条件: 路由/调用链可达';
-      case AppLanguage.ja: return 'ThinkPHP: 2.x / <=5.0.23 / 5.0.22/5.1.29 | 条件: ルート/呼び出し連鎖到達可能';
-      case AppLanguage.en: return 'ThinkPHP: 2.x / <=5.0.23 / 5.0.22/5.1.29 | Condition: route/gadget chain reachable';
+      case AppLanguage.zh:
+        return 'ThinkPHP: 2.x / <=5.0.23 / 5.0.22/5.1.29 | 条件: 路由/调用链可达';
+      case AppLanguage.ja:
+        return 'ThinkPHP: 2.x / <=5.0.23 / 5.0.22/5.1.29 | 条件: ルート/呼び出し連鎖到達可能';
+      case AppLanguage.en:
+        return 'ThinkPHP: 2.x / <=5.0.23 / 5.0.22/5.1.29 | Condition: route/gadget chain reachable';
     }
   }
 
   // Zentao
   static String get expSubtitleZentao {
     switch (_lang) {
-      case AppLanguage.zh: return '绕过登录 · Repo 配置写入冰蝎 WebShell';
-      case AppLanguage.ja: return 'ログインバイパス · Repo 設定で Behinder WebShell を書き込み';
-      case AppLanguage.en: return 'Login bypass · Write Behinder WebShell via Repo config';
+      case AppLanguage.zh:
+        return '绕过登录 · Repo 配置写入冰蝎 WebShell';
+      case AppLanguage.ja:
+        return 'ログインバイパス · Repo 設定で Behinder WebShell を書き込み';
+      case AppLanguage.en:
+        return 'Login bypass · Write Behinder WebShell via Repo config';
     }
   }
 
   static String get expVersionZentao {
     switch (_lang) {
-      case AppLanguage.zh: return 'Zentao: 请按官方公告版本区间核对 | 条件: 漏洞链路可达';
-      case AppLanguage.ja: return 'Zentao: 公式アドバイザリのバージョンを参照 | 条件: 攻撃連鎖到達可能';
-      case AppLanguage.en: return 'Zentao: see official advisory range | Condition: exploit path reachable';
+      case AppLanguage.zh:
+        return 'Zentao: 请按官方公告版本区间核对 | 条件: 漏洞链路可达';
+      case AppLanguage.ja:
+        return 'Zentao: 公式アドバイザリのバージョンを参照 | 条件: 攻撃連鎖到達可能';
+      case AppLanguage.en:
+        return 'Zentao: see official advisory range | Condition: exploit path reachable';
     }
   }
 
   // Struts2
   static String get expSubtitleStruts2 {
     switch (_lang) {
-      case AppLanguage.zh: return 'OGNL 表达式注入 RCE 系列';
-      case AppLanguage.ja: return 'OGNL 式インジェクション RCE シリーズ';
-      case AppLanguage.en: return 'OGNL expression injection RCE series';
+      case AppLanguage.zh:
+        return 'OGNL 表达式注入 RCE 系列';
+      case AppLanguage.ja:
+        return 'OGNL 式インジェクション RCE シリーズ';
+      case AppLanguage.en:
+        return 'OGNL expression injection RCE series';
     }
   }
 
   static String get expVersionStruts2 {
     switch (_lang) {
-      case AppLanguage.zh: return 'Struts2: S2-032=2.3.20-2.3.28(除2.3.20.3/2.3.24.3); S2-045/053/057/059=2.0.0-2.5.20 | 条件: 对应 OGNL 触发面存在';
-      case AppLanguage.ja: return 'Struts2: S2-032=2.3.20-2.3.28(2.3.20.3/2.3.24.3 除く); S2-045/053/057/059=2.0.0-2.5.20 | 条件: 対応する OGNL トリガー面が存在';
-      case AppLanguage.en: return 'Struts2: S2-032=2.3.20-2.3.28(except 2.3.20.3/2.3.24.3); S2-045/053/057/059=2.0.0-2.5.20 | Condition: matching OGNL trigger surface present';
+      case AppLanguage.zh:
+        return 'Struts2: S2-032=2.3.20-2.3.28(除2.3.20.3/2.3.24.3); S2-045/053/057/059=2.0.0-2.5.20 | 条件: 对应 OGNL 触发面存在';
+      case AppLanguage.ja:
+        return 'Struts2: S2-032=2.3.20-2.3.28(2.3.20.3/2.3.24.3 除く); S2-045/053/057/059=2.0.0-2.5.20 | 条件: 対応する OGNL トリガー面が存在';
+      case AppLanguage.en:
+        return 'Struts2: S2-032=2.3.20-2.3.28(except 2.3.20.3/2.3.24.3); S2-045/053/057/059=2.0.0-2.5.20 | Condition: matching OGNL trigger surface present';
     }
   }
 
   // Spring
   static String get expSubtitleSpring {
     switch (_lang) {
-      case AppLanguage.zh: return 'Spring4Shell / Cloud Function / Data SpEL 注入系列';
-      case AppLanguage.ja: return 'Spring4Shell / Cloud Function / Data SpEL インジェクションシリーズ';
-      case AppLanguage.en: return 'Spring4Shell / Cloud Function / Data SpEL injection series';
+      case AppLanguage.zh:
+        return 'Spring4Shell / Cloud Function / Data SpEL 注入系列';
+      case AppLanguage.ja:
+        return 'Spring4Shell / Cloud Function / Data SpEL インジェクションシリーズ';
+      case AppLanguage.en:
+        return 'Spring4Shell / Cloud Function / Data SpEL injection series';
     }
   }
 
   static String get expVersionSpring {
     switch (_lang) {
-      case AppLanguage.zh: return 'Spring: 22965=5.3.17; 22963=SCF 3.2.2; 1273=Data Commons<=2.0.5; 8046=Data REST 2.6.6 | 条件: 各 CVE 对应部署方式满足';
-      case AppLanguage.ja: return 'Spring: 22965=5.3.17; 22963=SCF 3.2.2; 1273=Data Commons<=2.0.5; 8046=Data REST 2.6.6 | 条件: 各 CVE のデプロイ条件を満たす';
-      case AppLanguage.en: return 'Spring: 22965=5.3.17; 22963=SCF 3.2.2; 1273=Data Commons<=2.0.5; 8046=Data REST 2.6.6 | Condition: deployment matches each CVE';
+      case AppLanguage.zh:
+        return 'Spring: 22965=5.3.17; 22963=SCF 3.2.2; 1273=Data Commons<=2.0.5; 8046=Data REST 2.6.6 | 条件: 各 CVE 对应部署方式满足';
+      case AppLanguage.ja:
+        return 'Spring: 22965=5.3.17; 22963=SCF 3.2.2; 1273=Data Commons<=2.0.5; 8046=Data REST 2.6.6 | 条件: 各 CVE のデプロイ条件を満たす';
+      case AppLanguage.en:
+        return 'Spring: 22965=5.3.17; 22963=SCF 3.2.2; 1273=Data Commons<=2.0.5; 8046=Data REST 2.6.6 | Condition: deployment matches each CVE';
     }
   }
 
   // HTTPd
   static String get expSubtitleHttpd {
     switch (_lang) {
-      case AppLanguage.zh: return '路径规范化缺陷 — 路径穿越文件读取 + CGI RCE';
-      case AppLanguage.ja: return 'パス正規化の不具合 — パストラバーサル + CGI RCE';
-      case AppLanguage.en: return 'Path normalization flaw — path traversal + CGI RCE';
+      case AppLanguage.zh:
+        return '路径规范化缺陷 — 路径穿越文件读取 + CGI RCE';
+      case AppLanguage.ja:
+        return 'パス正規化の不具合 — パストラバーサル + CGI RCE';
+      case AppLanguage.en:
+        return 'Path normalization flaw — path traversal + CGI RCE';
     }
   }
 
   static String get expVersionHttpd {
     switch (_lang) {
-      case AppLanguage.zh: return 'HTTPd: =2.4.49 | 条件: 目录访问配置允许穿越';
-      case AppLanguage.ja: return 'HTTPd: =2.4.49 | 条件: ディレクトリ設定がトラバーサルを許可';
-      case AppLanguage.en: return 'HTTPd: =2.4.49 | Condition: directory config allows traversal';
+      case AppLanguage.zh:
+        return 'HTTPd: =2.4.49 | 条件: 目录访问配置允许穿越';
+      case AppLanguage.ja:
+        return 'HTTPd: =2.4.49 | 条件: ディレクトリ設定がトラバーサルを許可';
+      case AppLanguage.en:
+        return 'HTTPd: =2.4.49 | Condition: directory config allows traversal';
     }
   }
 
   // Druid
   static String get expSubtitleDruid {
     switch (_lang) {
-      case AppLanguage.zh: return '嵌入式 JavaScript 代码注入 RCE (≤ 0.20.0)';
-      case AppLanguage.ja: return '組み込み JavaScript コード注入 RCE (≤ 0.20.0)';
-      case AppLanguage.en: return 'Embedded JavaScript code injection RCE (≤ 0.20.0)';
+      case AppLanguage.zh:
+        return '嵌入式 JavaScript 代码注入 RCE (≤ 0.20.0)';
+      case AppLanguage.ja:
+        return '組み込み JavaScript コード注入 RCE (≤ 0.20.0)';
+      case AppLanguage.en:
+        return 'Embedded JavaScript code injection RCE (≤ 0.20.0)';
     }
   }
 
   static String get expVersionDruid {
     switch (_lang) {
-      case AppLanguage.zh: return 'Druid: <=0.20.0 | 条件: sampler/indexer 接口可访问';
-      case AppLanguage.ja: return 'Druid: <=0.20.0 | 条件: sampler/indexer エンドポイントへアクセス可能';
-      case AppLanguage.en: return 'Druid: <=0.20.0 | Condition: sampler/indexer endpoints reachable';
+      case AppLanguage.zh:
+        return 'Druid: <=0.20.0 | 条件: sampler/indexer 接口可访问';
+      case AppLanguage.ja:
+        return 'Druid: <=0.20.0 | 条件: sampler/indexer エンドポイントへアクセス可能';
+      case AppLanguage.en:
+        return 'Druid: <=0.20.0 | Condition: sampler/indexer endpoints reachable';
     }
   }
 
   // OFBiz
   static String get expSubtitleOfbiz {
     switch (_lang) {
-      case AppLanguage.zh: return 'Groovy 代码注入无需认证 RCE';
-      case AppLanguage.ja: return '認証不要の Groovy コード注入 RCE';
-      case AppLanguage.en: return 'Unauthenticated Groovy code injection RCE';
+      case AppLanguage.zh:
+        return 'Groovy 代码注入无需认证 RCE';
+      case AppLanguage.ja:
+        return '認証不要の Groovy コード注入 RCE';
+      case AppLanguage.en:
+        return 'Unauthenticated Groovy code injection RCE';
     }
   }
 
   static String get expVersionOfbiz {
     switch (_lang) {
-      case AppLanguage.zh: return 'OFBiz: 18.12.10 / 18.12.11 | 条件: ProgramExport 路径可达';
-      case AppLanguage.ja: return 'OFBiz: 18.12.10 / 18.12.11 | 条件: ProgramExport パスが到達可能';
-      case AppLanguage.en: return 'OFBiz: 18.12.10 / 18.12.11 | Condition: ProgramExport path reachable';
+      case AppLanguage.zh:
+        return 'OFBiz: 18.12.10 / 18.12.11 | 条件: ProgramExport 路径可达';
+      case AppLanguage.ja:
+        return 'OFBiz: 18.12.10 / 18.12.11 | 条件: ProgramExport パスが到達可能';
+      case AppLanguage.en:
+        return 'OFBiz: 18.12.10 / 18.12.11 | Condition: ProgramExport path reachable';
     }
   }
 
   // Solr
   static String get expSubtitleSolr {
     switch (_lang) {
-      case AppLanguage.zh: return 'RunExecutableListener 任意命令执行 (< 7.1.0)';
-      case AppLanguage.ja: return 'RunExecutableListener 任意コマンド実行 (< 7.1.0)';
-      case AppLanguage.en: return 'RunExecutableListener arbitrary command execution (< 7.1.0)';
+      case AppLanguage.zh:
+        return 'RunExecutableListener 任意命令执行 (< 7.1.0)';
+      case AppLanguage.ja:
+        return 'RunExecutableListener 任意コマンド実行 (< 7.1.0)';
+      case AppLanguage.en:
+        return 'RunExecutableListener arbitrary command execution (< 7.1.0)';
     }
   }
 
   static String get expVersionSolr {
     switch (_lang) {
-      case AppLanguage.zh: return 'Solr: <7.1.0 | 条件: config API 可写 listener';
-      case AppLanguage.ja: return 'Solr: <7.1.0 | 条件: config API でリスナー書き込み可能';
-      case AppLanguage.en: return 'Solr: <7.1.0 | Condition: config API can write listener';
+      case AppLanguage.zh:
+        return 'Solr: <7.1.0 | 条件: config API 可写 listener';
+      case AppLanguage.ja:
+        return 'Solr: <7.1.0 | 条件: config API でリスナー書き込み可能';
+      case AppLanguage.en:
+        return 'Solr: <7.1.0 | Condition: config API can write listener';
     }
   }
 
   // Drupal
   static String get expSubtitleDrupal {
     switch (_lang) {
-      case AppLanguage.zh: return 'Form API #post_render 回调 PHP 代码执行';
-      case AppLanguage.ja: return 'Form API #post_render コールバックによる PHP 実行';
-      case AppLanguage.en: return 'Form API #post_render callback PHP execution';
+      case AppLanguage.zh:
+        return 'Form API #post_render 回调 PHP 代码执行';
+      case AppLanguage.ja:
+        return 'Form API #post_render コールバックによる PHP 実行';
+      case AppLanguage.en:
+        return 'Form API #post_render callback PHP execution';
     }
   }
 
   static String get expVersionDrupal {
     switch (_lang) {
-      case AppLanguage.zh: return 'Drupal: <7.58; 8.x<8.3.9/<8.4.6/<8.5.1 | 条件: Form API 路径可达';
-      case AppLanguage.ja: return 'Drupal: <7.58; 8.x<8.3.9/<8.4.6/<8.5.1 | 条件: Form API パス到達可能';
-      case AppLanguage.en: return 'Drupal: <7.58; 8.x<8.3.9/<8.4.6/<8.5.1 | Condition: Form API path reachable';
+      case AppLanguage.zh:
+        return 'Drupal: <7.58; 8.x<8.3.9/<8.4.6/<8.5.1 | 条件: Form API 路径可达';
+      case AppLanguage.ja:
+        return 'Drupal: <7.58; 8.x<8.3.9/<8.4.6/<8.5.1 | 条件: Form API パス到達可能';
+      case AppLanguage.en:
+        return 'Drupal: <7.58; 8.x<8.3.9/<8.4.6/<8.5.1 | Condition: Form API path reachable';
     }
   }
 
   // Elasticsearch
   static String get expSubtitleElastic {
     switch (_lang) {
-      case AppLanguage.zh: return 'Groovy 脚本沙箱逃逸 RCE (< 1.3.8 / < 1.4.3)';
-      case AppLanguage.ja: return 'Groovy スクリプトサンドボックス回避 RCE (< 1.3.8 / < 1.4.3)';
-      case AppLanguage.en: return 'Groovy script sandbox escape RCE (< 1.3.8 / < 1.4.3)';
+      case AppLanguage.zh:
+        return 'Groovy 脚本沙箱逃逸 RCE (< 1.3.8 / < 1.4.3)';
+      case AppLanguage.ja:
+        return 'Groovy スクリプトサンドボックス回避 RCE (< 1.3.8 / < 1.4.3)';
+      case AppLanguage.en:
+        return 'Groovy script sandbox escape RCE (< 1.3.8 / < 1.4.3)';
     }
   }
 
   static String get expVersionElastic {
     switch (_lang) {
-      case AppLanguage.zh: return 'Elasticsearch: <1.3.8 或 <1.4.3 | 条件: 动态脚本执行可用';
-      case AppLanguage.ja: return 'Elasticsearch: <1.3.8 または <1.4.3 | 条件: 動的スクリプト実行が有効';
-      case AppLanguage.en: return 'Elasticsearch: <1.3.8 or <1.4.3 | Condition: dynamic scripting enabled';
+      case AppLanguage.zh:
+        return 'Elasticsearch: <1.3.8 或 <1.4.3 | 条件: 动态脚本执行可用';
+      case AppLanguage.ja:
+        return 'Elasticsearch: <1.3.8 または <1.4.3 | 条件: 動的スクリプト実行が有効';
+      case AppLanguage.en:
+        return 'Elasticsearch: <1.3.8 or <1.4.3 | Condition: dynamic scripting enabled';
     }
   }
 
   // Flask SSTI
   static String get expSubtitleFlaskSsti {
     switch (_lang) {
-      case AppLanguage.zh: return '服务端模板注入执行任意 Python 代码';
-      case AppLanguage.ja: return 'サーバーサイドテンプレートインジェクションで任意 Python 実行';
-      case AppLanguage.en: return 'Server-side template injection executes arbitrary Python code';
+      case AppLanguage.zh:
+        return '服务端模板注入执行任意 Python 代码';
+      case AppLanguage.ja:
+        return 'サーバーサイドテンプレートインジェクションで任意 Python 実行';
+      case AppLanguage.en:
+        return 'Server-side template injection executes arbitrary Python code';
     }
   }
 
   static String get expVersionFlaskSsti {
     switch (_lang) {
-      case AppLanguage.zh: return 'Flask/Jinja2: 取决于组件版本 | 条件: 存在 SSTI 模板注入点';
-      case AppLanguage.ja: return 'Flask/Jinja2: コンポーネント次第 | 条件: SSTI 注入点が存在';
-      case AppLanguage.en: return 'Flask/Jinja2: depends on components | Condition: SSTI injection point exists';
+      case AppLanguage.zh:
+        return 'Flask/Jinja2: 取决于组件版本 | 条件: 存在 SSTI 模板注入点';
+      case AppLanguage.ja:
+        return 'Flask/Jinja2: コンポーネント次第 | 条件: SSTI 注入点が存在';
+      case AppLanguage.en:
+        return 'Flask/Jinja2: depends on components | Condition: SSTI injection point exists';
     }
   }
 
   // PHP backdoor / CGI
   static String get expTitlePhp {
     switch (_lang) {
-      case AppLanguage.zh: return 'PHP 8.1.0-dev 后门 / CVE-2012-1823 PHP-CGI';
-      case AppLanguage.ja: return 'PHP 8.1.0-dev バックドア / CVE-2012-1823 PHP-CGI';
-      case AppLanguage.en: return 'PHP 8.1.0-dev backdoor / CVE-2012-1823 PHP-CGI';
+      case AppLanguage.zh:
+        return 'PHP 8.1.0-dev 后门 / CVE-2012-1823 PHP-CGI';
+      case AppLanguage.ja:
+        return 'PHP 8.1.0-dev バックドア / CVE-2012-1823 PHP-CGI';
+      case AppLanguage.en:
+        return 'PHP 8.1.0-dev backdoor / CVE-2012-1823 PHP-CGI';
     }
   }
 
   static String get expSubtitlePhp {
     switch (_lang) {
-      case AppLanguage.zh: return 'User-Agentt 后门 + CGI 参数注入 RCE';
-      case AppLanguage.ja: return 'User-Agentt バックドア + CGI 引数インジェクション RCE';
-      case AppLanguage.en: return 'User-Agentt backdoor + CGI argument injection RCE';
+      case AppLanguage.zh:
+        return 'User-Agentt 后门 + CGI 参数注入 RCE';
+      case AppLanguage.ja:
+        return 'User-Agentt バックドア + CGI 引数インジェクション RCE';
+      case AppLanguage.en:
+        return 'User-Agentt backdoor + CGI argument injection RCE';
     }
   }
 
   static String get expVersionPhp {
     switch (_lang) {
-      case AppLanguage.zh: return 'PHP: 8.1.0-dev 或 CGI<5.3.12/<5.4.2 | 条件: 后门头/CGI 参数可达';
-      case AppLanguage.ja: return 'PHP: 8.1.0-dev または CGI<5.3.12/<5.4.2 | 条件: バックドアヘッダ/CGI 引数到達可能';
-      case AppLanguage.en: return 'PHP: 8.1.0-dev or CGI<5.3.12/<5.4.2 | Condition: backdoor header / CGI args reachable';
+      case AppLanguage.zh:
+        return 'PHP: 8.1.0-dev 或 CGI<5.3.12/<5.4.2 | 条件: 后门头/CGI 参数可达';
+      case AppLanguage.ja:
+        return 'PHP: 8.1.0-dev または CGI<5.3.12/<5.4.2 | 条件: バックドアヘッダ/CGI 引数到達可能';
+      case AppLanguage.en:
+        return 'PHP: 8.1.0-dev or CGI<5.3.12/<5.4.2 | Condition: backdoor header / CGI args reachable';
     }
   }
 
   // Tomcat
   static String get expSubtitleTomcat {
     switch (_lang) {
-      case AppLanguage.zh: return 'PUT 方法开启时上传 JSP Webshell RCE';
-      case AppLanguage.ja: return 'PUT メソッド有効時に JSP Webshell をアップロードして RCE';
-      case AppLanguage.en: return 'Upload JSP Webshell when PUT method is enabled';
+      case AppLanguage.zh:
+        return 'PUT 方法开启时上传 JSP Webshell RCE';
+      case AppLanguage.ja:
+        return 'PUT メソッド有効時に JSP Webshell をアップロードして RCE';
+      case AppLanguage.en:
+        return 'Upload JSP Webshell when PUT method is enabled';
     }
   }
 
   static String get expVersionTomcat {
     switch (_lang) {
-      case AppLanguage.zh: return 'Tomcat: 8.5.19 | 条件: DefaultServlet readonly=false';
-      case AppLanguage.ja: return 'Tomcat: 8.5.19 | 条件: DefaultServlet readonly=false';
-      case AppLanguage.en: return 'Tomcat: 8.5.19 | Condition: DefaultServlet readonly=false';
+      case AppLanguage.zh:
+        return 'Tomcat: 8.5.19 | 条件: DefaultServlet readonly=false';
+      case AppLanguage.ja:
+        return 'Tomcat: 8.5.19 | 条件: DefaultServlet readonly=false';
+      case AppLanguage.en:
+        return 'Tomcat: 8.5.19 | Condition: DefaultServlet readonly=false';
     }
   }
 
   // WebLogic
   static String get expSubtitleWeblogic {
     switch (_lang) {
-      case AppLanguage.zh: return 'XMLDecoder 反序列化 + 控制台未授权 + WS 测试页文件上传 RCE';
-      case AppLanguage.ja: return 'XMLDecoder デシリアライゼーション + コンソール未認証 + WS テストページファイルアップロード RCE';
-      case AppLanguage.en: return 'XMLDecoder deserialization + console unauth + WS test page upload RCE';
+      case AppLanguage.zh:
+        return 'XMLDecoder 反序列化 + 控制台未授权 + WS 测试页文件上传 RCE';
+      case AppLanguage.ja:
+        return 'XMLDecoder デシリアライゼーション + コンソール未認証 + WS テストページファイルアップロード RCE';
+      case AppLanguage.en:
+        return 'XMLDecoder deserialization + console unauth + WS test page upload RCE';
     }
   }
 
   static String get expVersionWeblogic {
     switch (_lang) {
-      case AppLanguage.zh: return 'WebLogic: 10271<10.3.6; 14882/14883=12.2.1.3(12.2.1+) | 条件: 控制台/组件路径可达';
-      case AppLanguage.ja: return 'WebLogic: 10271<10.3.6; 14882/14883=12.2.1.3(12.2.1+) | 条件: コンソール/コンポーネント到達可能';
-      case AppLanguage.en: return 'WebLogic: 10271<10.3.6; 14882/14883=12.2.1.3(12.2.1+) | Condition: console/component reachable';
+      case AppLanguage.zh:
+        return 'WebLogic: 10271<10.3.6; 14882/14883=12.2.1.3(12.2.1+) | 条件: 控制台/组件路径可达';
+      case AppLanguage.ja:
+        return 'WebLogic: 10271<10.3.6; 14882/14883=12.2.1.3(12.2.1+) | 条件: コンソール/コンポーネント到達可能';
+      case AppLanguage.en:
+        return 'WebLogic: 10271<10.3.6; 14882/14883=12.2.1.3(12.2.1+) | Condition: console/component reachable';
     }
   }
 
   // XXL-JOB
   static String get expTitleXxljob {
     switch (_lang) {
-      case AppLanguage.zh: return 'XXL-JOB 未授权访问执行器 RCE';
-      case AppLanguage.ja: return 'XXL-JOB 未認証 Executor アクセス RCE';
-      case AppLanguage.en: return 'XXL-JOB unauthenticated executor RCE';
+      case AppLanguage.zh:
+        return 'XXL-JOB 未授权访问执行器 RCE';
+      case AppLanguage.ja:
+        return 'XXL-JOB 未認証 Executor アクセス RCE';
+      case AppLanguage.en:
+        return 'XXL-JOB unauthenticated executor RCE';
     }
   }
 
   static String get expSubtitleXxljob {
     switch (_lang) {
-      case AppLanguage.zh: return 'GLUE_SHELL 类型提交任意 Shell 命令 (2.2.0)';
-      case AppLanguage.ja: return 'GLUE_SHELL タイプで任意 Shell コマンド送信 (2.2.0)';
-      case AppLanguage.en: return 'Submit arbitrary shell commands via GLUE_SHELL type (2.2.0)';
+      case AppLanguage.zh:
+        return 'GLUE_SHELL 类型提交任意 Shell 命令 (2.2.0)';
+      case AppLanguage.ja:
+        return 'GLUE_SHELL タイプで任意 Shell コマンド送信 (2.2.0)';
+      case AppLanguage.en:
+        return 'Submit arbitrary shell commands via GLUE_SHELL type (2.2.0)';
     }
   }
 
   static String get expVersionXxljob {
     switch (_lang) {
-      case AppLanguage.zh: return 'XXL-JOB: 按官方公告核对 | 条件: 未授权访问执行器接口';
-      case AppLanguage.ja: return 'XXL-JOB: 公式アドバイザリで確認 | 条件: Executor 未認証アクセス';
-      case AppLanguage.en: return 'XXL-JOB: cross-check official advisory | Condition: unauthenticated executor';
+      case AppLanguage.zh:
+        return 'XXL-JOB: 按官方公告核对 | 条件: 未授权访问执行器接口';
+      case AppLanguage.ja:
+        return 'XXL-JOB: 公式アドバイザリで確認 | 条件: Executor 未認証アクセス';
+      case AppLanguage.en:
+        return 'XXL-JOB: cross-check official advisory | Condition: unauthenticated executor';
     }
   }
 
   // Nacos
   static String get expSubtitleNacos {
     switch (_lang) {
-      case AppLanguage.zh: return 'User-Agent 认证绕过，枚举/创建用户 (< 1.4.1)';
-      case AppLanguage.ja: return 'User-Agent 認証バイパスでユーザー列挙/作成 (< 1.4.1)';
-      case AppLanguage.en: return 'User-Agent auth bypass, enumerate/create users (< 1.4.1)';
+      case AppLanguage.zh:
+        return 'User-Agent 认证绕过，枚举/创建用户 (< 1.4.1)';
+      case AppLanguage.ja:
+        return 'User-Agent 認証バイパスでユーザー列挙/作成 (< 1.4.1)';
+      case AppLanguage.en:
+        return 'User-Agent auth bypass, enumerate/create users (< 1.4.1)';
     }
   }
 
   static String get expVersionNacos {
     switch (_lang) {
-      case AppLanguage.zh: return 'Nacos: <1.4.1 | 条件: User-Agent 绕过链可达';
-      case AppLanguage.ja: return 'Nacos: <1.4.1 | 条件: User-Agent バイパス連鎖到達可能';
-      case AppLanguage.en: return 'Nacos: <1.4.1 | Condition: User-Agent bypass chain reachable';
+      case AppLanguage.zh:
+        return 'Nacos: <1.4.1 | 条件: User-Agent 绕过链可达';
+      case AppLanguage.ja:
+        return 'Nacos: <1.4.1 | 条件: User-Agent バイパス連鎖到達可能';
+      case AppLanguage.en:
+        return 'Nacos: <1.4.1 | Condition: User-Agent bypass chain reachable';
     }
   }
 
@@ -5865,6 +5979,17 @@ class S {
         return 'suo5 プロキシへ';
       case AppLanguage.en:
         return 'Open suo5 Proxy';
+    }
+  }
+
+  static String get menuEnterSuoTunnel {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '进入 suo5';
+      case AppLanguage.ja:
+        return 'suo5 へ';
+      case AppLanguage.en:
+        return 'Open suo5';
     }
   }
 
@@ -6243,123 +6368,258 @@ class S {
     }
   }
 
-  // --- suo6 proxy management ---
+  // --- unified suo5 / suo6 SOCKS tunnel (single page) ---
 
-  static String get menuSuo6 {
+  static String get menuSuoTunnel {
     switch (_lang) {
-      case AppLanguage.zh: return 'suo6代理';
-      case AppLanguage.ja: return 'suo6 プロキシ';
-      case AppLanguage.en: return 'suo6 Proxy';
+      case AppLanguage.zh:
+        return 'suo5';
+      case AppLanguage.ja:
+        return 'suo5';
+      case AppLanguage.en:
+        return 'suo5';
     }
   }
 
-  static String get titleSuo6Manager {
+  static String get titleSuoTunnelManager {
     switch (_lang) {
-      case AppLanguage.zh: return 'suo6 代理';
-      case AppLanguage.ja: return 'suo6 プロキシ';
-      case AppLanguage.en: return 'suo6 Proxy';
+      case AppLanguage.zh:
+        return 'suo5';
+      case AppLanguage.ja:
+        return 'suo5';
+      case AppLanguage.en:
+        return 'suo5';
     }
   }
 
-  static String suo6ManagementTitle(String projectName) {
+  static String suoTunnelManagementTitle(String projectName) {
     switch (_lang) {
-      case AppLanguage.zh: return 'suo6 · $projectName';
-      case AppLanguage.ja: return 'suo6 · $projectName';
-      case AppLanguage.en: return 'suo6 · $projectName';
+      case AppLanguage.zh:
+        return 'SOCKS · $projectName';
+      case AppLanguage.ja:
+        return 'SOCKS · $projectName';
+      case AppLanguage.en:
+        return 'SOCKS · $projectName';
     }
   }
 
-  static String get actionAddSuo6 {
+  static String get actionAddSuoTunnel {
     switch (_lang) {
-      case AppLanguage.zh: return '添加 suo6 代理';
-      case AppLanguage.ja: return 'suo6 プロキシを追加';
-      case AppLanguage.en: return 'Add suo6 Proxy';
+      case AppLanguage.zh:
+        return '添加代理';
+      case AppLanguage.ja:
+        return 'プロキシを追加';
+      case AppLanguage.en:
+        return 'Add proxy';
     }
   }
 
-  static String get suo6NewConfigTitle {
+  /// Webshell 交互页：一键创建 suo5/suo6 SOCKS 隧道。
+  static String get tooltipWebshellOneClickTunnel {
     switch (_lang) {
-      case AppLanguage.zh: return '新建 suo6 代理';
-      case AppLanguage.ja: return '新規 suo6 プロキシ';
-      case AppLanguage.en: return 'New suo6 Proxy';
+      case AppLanguage.zh:
+        return '创建suo隧道';
+      case AppLanguage.ja:
+        return 'suoトンネルを作成';
+      case AppLanguage.en:
+        return 'Create suo tunnel';
     }
   }
 
-  static String get suo6EditConfigTitle {
+  static String get webshellOneClickTunnelUnavailable {
     switch (_lang) {
-      case AppLanguage.zh: return '编辑 suo6 代理';
-      case AppLanguage.ja: return 'suo6 プロキシを編集';
-      case AppLanguage.en: return 'Edit suo6 Proxy';
+      case AppLanguage.zh:
+        return '当前 Shell 无法一键创建隧道（JSP 需可写或冰蝎；PHP/ASPX 需可写与内置脚本）';
+      case AppLanguage.ja:
+        return 'この Shell ではトンネルを作成できません';
+      case AppLanguage.en:
+        return 'Cannot create tunnel for this shell';
     }
   }
 
-  static String get suo6TargetUrl {
+  static String get webshellOneClickTunnelNeedConn {
     switch (_lang) {
-      case AppLanguage.zh: return 'suo6 URL';
-      case AppLanguage.ja: return 'suo6 URL';
-      case AppLanguage.en: return 'suo6 URL';
+      case AppLanguage.zh:
+        return '请先连接 Shell';
+      case AppLanguage.ja:
+        return '先に Shell に接続してください';
+      case AppLanguage.en:
+        return 'Connect to the shell first';
     }
   }
 
-  static String get suo6TargetUrlHint {
+  static String get webshellOneClickTunnelPayloadMissing {
     switch (_lang) {
-      case AppLanguage.zh: return 'https://target/s6';
-      case AppLanguage.ja: return 'https://target/s6';
-      case AppLanguage.en: return 'https://target/s6';
+      case AppLanguage.zh:
+        return '本地未找到该 suo5 载荷，请在「载荷」页同步默认数据';
+      case AppLanguage.ja:
+        return 'suo5 ペイロードがありません。「ペイロード」で同期してください';
+      case AppLanguage.en:
+        return 'Payload not in library. Sync defaults on the Payloads page';
     }
   }
 
-  static String suo6Count(int n) {
+  static String get webshellOneClickTunnelUploadFailed {
     switch (_lang) {
-      case AppLanguage.zh: return '共 $n 条配置';
-      case AppLanguage.ja: return '合計 $n 件';
-      case AppLanguage.en: return '$n config${n == 1 ? '' : 's'}';
+      case AppLanguage.zh:
+        return '上传隧道脚本到 Webshell 目录失败';
+      case AppLanguage.ja:
+        return 'トンネルスクリプトのアップロードに失敗しました';
+      case AppLanguage.en:
+        return 'Failed to upload tunnel script beside the webshell';
     }
   }
 
-  static String suo6EmptyHint(String addLabel) {
+  static String get suoTunnelNewConfigTitle {
     switch (_lang) {
-      case AppLanguage.zh: return '暂无 suo6 代理，点击「$addLabel」开始';
-      case AppLanguage.ja: return 'suo6 プロキシがありません。「$addLabel」をクリックして開始';
-      case AppLanguage.en: return 'No suo6 proxy yet. Click "$addLabel" to get started';
+      case AppLanguage.zh:
+        return '新建代理';
+      case AppLanguage.ja:
+        return '新規プロキシ';
+      case AppLanguage.en:
+        return 'New proxy';
+    }
+  }
+
+  static String get suoTunnelEditConfigTitle {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '编辑代理';
+      case AppLanguage.ja:
+        return 'プロキシを編集';
+      case AppLanguage.en:
+        return 'Edit proxy';
+    }
+  }
+
+  static String get suoTunnelProtocol {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '协议版本';
+      case AppLanguage.ja:
+        return 'プロトコル';
+      case AppLanguage.en:
+        return 'Protocol';
+    }
+  }
+
+  static String get suoTunnelProtocolSuo5 {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'suo5';
+      case AppLanguage.ja:
+        return 'suo5';
+      case AppLanguage.en:
+        return 'suo5';
+    }
+  }
+
+  static String get suoTunnelProtocolSuo6 {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'suo6';
+      case AppLanguage.ja:
+        return 'suo6';
+      case AppLanguage.en:
+        return 'suo6';
+    }
+  }
+
+  static String get suoTunnelRunLog {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '运行日志';
+      case AppLanguage.ja:
+        return '実行ログ';
+      case AppLanguage.en:
+        return 'Run log';
+    }
+  }
+
+  static String suoTunnelEmptyHint(String addLabel) {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '暂无配置，点击「$addLabel」添加';
+      case AppLanguage.ja:
+        return '設定がありません。「$addLabel」から追加';
+      case AppLanguage.en:
+        return 'No profiles. Tap "$addLabel" to add one.';
+    }
+  }
+
+  static String suoTunnelCount(int n) {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '共 $n 条';
+      case AppLanguage.ja:
+        return '全 $n 件';
+      case AppLanguage.en:
+        return '$n total';
+    }
+  }
+
+  static String get suoTunnelProfileCreatedSnack {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '代理配置已保存';
+      case AppLanguage.ja:
+        return 'プロキシを保存しました';
+      case AppLanguage.en:
+        return 'Proxy profile saved';
+    }
+  }
+
+  static String get suoTunnelProtocolSwitchTitle {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '切换协议版本';
+      case AppLanguage.ja:
+        return 'プロトコルを変更';
+      case AppLanguage.en:
+        return 'Change protocol';
+    }
+  }
+
+  static String get suoTunnelProtocolSwitchBody {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '将删除当前配置并以相同监听地址与目标 URL 新建另一条记录。确定继续？';
+      case AppLanguage.ja:
+        return '現在の設定を削除し、同じ URL/ポートで新規作成します。続行しますか？';
+      case AppLanguage.en:
+        return 'This removes the current profile and creates a new one with the same URL and listen settings. Continue?';
     }
   }
 
   static String confirmDeleteSuo6(String name) {
     switch (_lang) {
-      case AppLanguage.zh: return '确定删除配置「$name」？';
-      case AppLanguage.ja: return '設定「$name」を削除しますか？';
-      case AppLanguage.en: return 'Delete config "$name"?';
+      case AppLanguage.zh:
+        return '确定删除配置「$name」？';
+      case AppLanguage.ja:
+        return '設定「$name」を削除しますか？';
+      case AppLanguage.en:
+        return 'Delete config "$name"?';
     }
   }
 
   static String get suo6MissingUrl {
     switch (_lang) {
-      case AppLanguage.zh: return '请填写 suo6 URL';
-      case AppLanguage.ja: return 'suo6 URL を入力してください';
-      case AppLanguage.en: return 'Please enter the suo6 URL';
+      case AppLanguage.zh:
+        return '请填写 suo6 URL';
+      case AppLanguage.ja:
+        return 'suo6 URL を入力してください';
+      case AppLanguage.en:
+        return 'Please enter the suo6 URL';
     }
   }
 
   static String get suo6InvalidUrl => suo5InvalidUrl;
   static String get suo6InvalidPort => suo5InvalidPort;
-  static String get suo6ConfigName => suo5ConfigName;
-  static String get suo6ConfigNameHint => suo5ConfigNameHint;
-  static String get suo6ListenHost => suo5ListenHost;
-  static String get suo6ListenPort => suo5ListenPort;
-  static String get suo6RunningNoEdit => suo5RunningNoEdit;
   static String get suo6StatActiveConn => suo5StatActiveConn;
   static String get suo6StatUpload => suo5StatUpload;
   static String get suo6StatDownload => suo5StatDownload;
-  static String get suo6RunLog => suo5RunLog;
-  static String get suo6NoLogs => suo5NoLogs;
-  static String get suo6LogCopiedSnack => suo5LogCopiedSnack;
   static String get suo6StatusRunning => suo5StatusRunning;
   static String get suo6StatusConnecting => suo5StatusConnecting;
   static String get suo6StatusError => suo5StatusError;
   static String get suo6StatusIdle => suo5StatusIdle;
-
-  static String suo6HeaderRunningSummary(int running, int total) =>
-      suo5HeaderRunningSummary(running, total);
-
 }
