@@ -1,0 +1,3007 @@
+{
+  "configMenuTitle": {
+    "zh": "配置",
+    "ja": "設定",
+    "en": "Settings"
+  },
+  "loading": {
+    "zh": "加载中...",
+    "ja": "読み込み中...",
+    "en": "Loading..."
+  },
+  "snackCopied": {
+    "zh": "已复制到剪贴板",
+    "ja": "クリップボードにコピーしました",
+    "en": "Copied to clipboard"
+  },
+  "noOutput": {
+    "zh": "(无输出)",
+    "ja": "(出力なし)",
+    "en": "(no output)"
+  },
+  "errorResult": {
+    "zh": "[错误] {e}",
+    "ja": "[エラー] {e}",
+    "en": "[Error] {e}"
+  },
+  "logErrorTag": {
+    "zh": "[错误]",
+    "ja": "[エラー]",
+    "en": "[Error]"
+  },
+  "languageChinese": {
+    "zh": "中文",
+    "ja": "中国語",
+    "en": "Chinese"
+  },
+  "languageJapanese": {
+    "zh": "日文",
+    "ja": "日本語",
+    "en": "Japanese"
+  },
+  "languageEnglish": {
+    "zh": "英文",
+    "ja": "英語",
+    "en": "English"
+  },
+  "menuProject": {
+    "zh": "项目",
+    "ja": "プロジェクト",
+    "en": "Projects"
+  },
+  "menuWebshell": {
+    "zh": "Webshell",
+    "ja": "Webshell",
+    "en": "Webshell"
+  },
+  "menuExp": {
+    "zh": "EXP",
+    "ja": "EXP",
+    "en": "Exploits"
+  },
+  "menuPayload": {
+    "zh": "Payload",
+    "ja": "Payload",
+    "en": "Payloads"
+  },
+  "menuTerminal": {
+    "zh": "完整终端",
+    "ja": "フルターミナル",
+    "en": "Terminal"
+  },
+  "menuFrp": {
+    "zh": "FRP 客户端",
+    "ja": "FRP クライアント",
+    "en": "FRP Client"
+  },
+  "menuSuo5": {
+    "zh": "suo5代理",
+    "ja": "suo5 プロキシ",
+    "en": "suo5 Proxy"
+  },
+  "sidebarCollapse": {
+    "zh": "收起",
+    "ja": "折りたたむ",
+    "en": "Collapse"
+  },
+  "sidebarExpandTooltip": {
+    "zh": "展开菜单",
+    "ja": "メニューを展開",
+    "en": "Expand menu"
+  },
+  "workspaceWelcomeTitle": {
+    "zh": "> 欢迎使用 Matrix",
+    "ja": "> Matrix へようこそ",
+    "en": "> Welcome to Matrix"
+  },
+  "workspaceWelcomeSubtitle": {
+    "zh": "当前页面：{pageTitle} · 开始您的工作吧",
+    "ja": "現在のページ：{pageTitle} · 作業を始めましょう",
+    "en": "Current page: {pageTitle} · Let's get started"
+  },
+  "workspaceQuickActions": {
+    "zh": "快捷入口",
+    "ja": "クイック操作",
+    "en": "Quick actions"
+  },
+  "quickActionNew": {
+    "zh": "新建",
+    "ja": "新規作成",
+    "en": "New"
+  },
+  "workspaceRecentActivities": {
+    "zh": "最近活动",
+    "ja": "最近のアクティビティ",
+    "en": "Recent activity"
+  },
+  "recentFileTitle": {
+    "zh": "项目文件 {index}",
+    "ja": "プロジェクトファイル {index}",
+    "en": "Project file {index}"
+  },
+  "recentHoursAgo": {
+    "zh": "{hours} 小时前",
+    "ja": "{hours} 時間前",
+    "en": "{hours} hours ago"
+  },
+  "actionNewProject": {
+    "zh": "新建项目",
+    "ja": "新規プロジェクト",
+    "en": "New project"
+  },
+  "actionAddWebshell": {
+    "zh": "添加 Webshell",
+    "ja": "Webshell を追加",
+    "en": "Add Webshell"
+  },
+  "actionGoCreateProject": {
+    "zh": "去创建项目",
+    "ja": "プロジェクトを作成",
+    "en": "Create project"
+  },
+  "actionRefresh": {
+    "zh": "刷新",
+    "ja": "更新",
+    "en": "Refresh"
+  },
+  "actionListenConfig": {
+    "zh": "监听配置",
+    "ja": "リッスン設定",
+    "en": "Listener config"
+  },
+  "actionCopy": {
+    "zh": "复制",
+    "ja": "コピー",
+    "en": "Copy"
+  },
+  "actionCopyBase64": {
+    "zh": "复制为Base64",
+    "ja": "Base64でコピー",
+    "en": "Copy as Base64"
+  },
+  "actionDownload": {
+    "zh": "下载",
+    "ja": "ダウンロード",
+    "en": "Download"
+  },
+  "quickActionUpload": {
+    "zh": "上传",
+    "ja": "アップロード",
+    "en": "Upload"
+  },
+  "quickActionOpen": {
+    "zh": "打开",
+    "ja": "開く",
+    "en": "Open"
+  },
+  "tabFileManager": {
+    "zh": "文件管理",
+    "ja": "ファイル管理",
+    "en": "File manager"
+  },
+  "tabTerminal": {
+    "zh": "终  端",
+    "ja": "ターミナル",
+    "en": "Terminal"
+  },
+  "tabSysInfo": {
+    "zh": "系统信息",
+    "ja": "システム情報",
+    "en": "System info"
+  },
+  "sectionPrivEsc": {
+    "zh": "提权检查",
+    "ja": "権限昇格チェック",
+    "en": "Privilege check"
+  },
+  "btnCancel": {
+    "zh": "取消",
+    "ja": "キャンセル",
+    "en": "Cancel"
+  },
+  "btnConfirm": {
+    "zh": "确定",
+    "ja": "確認",
+    "en": "OK"
+  },
+  "btnSave": {
+    "zh": "保存",
+    "ja": "保存",
+    "en": "Save"
+  },
+  "btnDelete": {
+    "zh": "删除",
+    "ja": "削除",
+    "en": "Delete"
+  },
+  "btnCreate": {
+    "zh": "创建",
+    "ja": "作成",
+    "en": "Create"
+  },
+  "btnClose": {
+    "zh": "关闭",
+    "ja": "閉じる",
+    "en": "Close"
+  },
+  "btnAdd": {
+    "zh": "添加",
+    "ja": "追加",
+    "en": "Add"
+  },
+  "btnRetry": {
+    "zh": "重试",
+    "ja": "再試行",
+    "en": "Retry"
+  },
+  "btnClear": {
+    "zh": "清空",
+    "ja": "クリア",
+    "en": "Clear"
+  },
+  "btnExecute": {
+    "zh": "执行",
+    "ja": "実行",
+    "en": "Run"
+  },
+  "btnAutoDetect": {
+    "zh": "自动检测",
+    "ja": "自動検出",
+    "en": "Auto detect"
+  },
+  "btnSwitchProject": {
+    "zh": "切换项目",
+    "ja": "プロジェクト切替",
+    "en": "Switch project"
+  },
+  "btnStartListen": {
+    "zh": "启动监听",
+    "ja": "監視開始",
+    "en": "Start listen"
+  },
+  "btnStopListen": {
+    "zh": "关闭监听",
+    "ja": "監視停止",
+    "en": "Stop listen"
+  },
+  "btnPortOccupied": {
+    "zh": "端口占用",
+    "ja": "ポート使用中",
+    "en": "Port in use"
+  },
+  "btnCheckAll": {
+    "zh": "一键检查",
+    "ja": "一括チェック",
+    "en": "Check all"
+  },
+  "tooltipEdit": {
+    "zh": "编辑",
+    "ja": "編集",
+    "en": "Edit"
+  },
+  "tooltipDelete": {
+    "zh": "删除",
+    "ja": "削除",
+    "en": "Delete"
+  },
+  "tooltipBack": {
+    "zh": "返回",
+    "ja": "戻る",
+    "en": "Back"
+  },
+  "tooltipView": {
+    "zh": "查看",
+    "ja": "表示",
+    "en": "View"
+  },
+  "tooltipCopyContent": {
+    "zh": "复制内容",
+    "ja": "内容をコピー",
+    "en": "Copy content"
+  },
+  "tooltipClearTerminal": {
+    "zh": "清空终端",
+    "ja": "ターミナルをクリア",
+    "en": "Clear terminal"
+  },
+  "tooltipFullTerminal": {
+    "zh": "完整终端（反弹 Shell）",
+    "ja": "フルターミナル（リバースシェル）",
+    "en": "Full terminal (reverse shell)"
+  },
+  "tooltipParentDir": {
+    "zh": "上级目录",
+    "ja": "上位ディレクトリ",
+    "en": "Parent directory"
+  },
+  "tooltipUploadFile": {
+    "zh": "上传文件",
+    "ja": "ファイルをアップロード",
+    "en": "Upload file"
+  },
+  "tooltipDownload": {
+    "zh": "下载",
+    "ja": "ダウンロード",
+    "en": "Download"
+  },
+  "tooltipClose": {
+    "zh": "关闭",
+    "ja": "閉じる",
+    "en": "Close"
+  },
+  "selectDownloadDir": {
+    "zh": "选择下载目录",
+    "ja": "ダウンロード先を選択",
+    "en": "Select download folder"
+  },
+  "snackWriteNotSupported": {
+    "zh": "当前连接器不支持文件写入",
+    "ja": "現在のコネクターはファイル書き込みをサポートしていません",
+    "en": "Current connector does not support file write"
+  },
+  "tooltipSwitchToSeparate": {
+    "zh": "切换到分离式（底部输入栏）",
+    "ja": "分離モードへ切替（下部入力バー）",
+    "en": "Switch to split mode (bottom input bar)"
+  },
+  "tooltipSwitchToIntegrated": {
+    "zh": "切换到一体式（模拟真实终端）",
+    "ja": "統合モードへ切替（ターミナル風）",
+    "en": "Switch to integrated mode (terminal-like)"
+  },
+  "payloadCount": {
+    "zh": "{n} 个文件",
+    "ja": "{n} ファイル",
+    "en": "{n} files"
+  },
+  "titleDeletePayload": {
+    "zh": "删除 Payload",
+    "ja": "Payload 削除",
+    "en": "Delete payload"
+  },
+  "confirmDeletePayload": {
+    "zh": "确定要删除 \"{name}\" 吗？\\n此操作不可撤销。",
+    "ja": "\"{name}\" を削除してもよろしいですか？\\nこの操作は元に戻せません。",
+    "en": "Delete \"{name}\"?\\nThis action cannot be undone."
+  },
+  "payloadNoneFound": {
+    "zh": "暂无 Payload",
+    "ja": "Payload が見つかりません",
+    "en": "No payloads found"
+  },
+  "payloadImportHint": {
+    "zh": "导入文件以开始",
+    "ja": "ファイルをインポートして開始",
+    "en": "Import a file to get started"
+  },
+  "payloadBuiltinTooltip": {
+    "zh": "内置默认，不可删除",
+    "ja": "組み込みデフォルト、削除不可",
+    "en": "Built-in default, cannot delete"
+  },
+  "payloadBuiltin": {
+    "zh": "内置",
+    "ja": "組み込み",
+    "en": "Built-in"
+  },
+  "binaryPreviewDisabled": {
+    "zh": "二进制 Payload，无法预览。",
+    "ja": "バイナリ Payload のためプレビュー不可。",
+    "en": "Binary payload detected.\\nPreview disabled."
+  },
+  "snackImported": {
+    "zh": "已导入 {name}",
+    "ja": "{name} をインポートしました",
+    "en": "Imported {name}"
+  },
+  "snackImportFailed": {
+    "zh": "导入失败: {e}",
+    "ja": "インポート失敗: {e}",
+    "en": "Import failed: {e}"
+  },
+  "snackSavedTo": {
+    "zh": "已保存到 {path}",
+    "ja": "{path} に保存しました",
+    "en": "Saved to {path}"
+  },
+  "snackSaveFailed": {
+    "zh": "保存失败: {e}",
+    "ja": "保存失敗: {e}",
+    "en": "Save failed: {e}"
+  },
+  "snackBinaryCopyUnsupported": {
+    "zh": "二进制 Payload 不支持直接复制文本",
+    "ja": "バイナリ Payload はテキストとしてコピーできません",
+    "en": "Binary payload cannot be copied as text"
+  },
+  "snackCopiedBase64": {
+    "zh": "已复制为 Base64",
+    "ja": "Base64 でコピーしました",
+    "en": "Copied as Base64"
+  },
+  "fieldProjectName": {
+    "zh": "项目名称",
+    "ja": "プロジェクト名",
+    "en": "Project name"
+  },
+  "fieldDomainOrId": {
+    "zh": "目标 URL *",
+    "ja": "ターゲット URL *",
+    "en": "Target URL *"
+  },
+  "hintDomainOrId": {
+    "zh": "例如：https://target.example 或 http://192.168.1.1:8080",
+    "ja": "例：https://target.example または http://192.168.1.1:8080",
+    "en": "e.g. https://target.example or http://192.168.1.1:8080"
+  },
+  "fieldDescription": {
+    "zh": "描述（可选）",
+    "ja": "説明（任意）",
+    "en": "Description (optional)"
+  },
+  "titleEditProject": {
+    "zh": "编辑项目 #{id}",
+    "ja": "プロジェクト #{id} を編集",
+    "en": "Edit project #{id}"
+  },
+  "webModeWarning": {
+    "zh": "Web 模式：数据仅保存在内存中，刷新页面将丢失。请使用桌面版以持久化存储。",
+    "ja": "Web モード：データはメモリのみに保存されます。ページを更新すると失われます。永続保存にはデスクトップ版をご利用ください。",
+    "en": "Web mode: data is stored in memory only and will be lost on refresh. Use the desktop app for persistent storage."
+  },
+  "projectEmptyHint": {
+    "zh": "暂无项目，点击「{newProjectLabel}」开始",
+    "ja": "プロジェクトがありません。「{newProjectLabel}」をクリックして開始",
+    "en": "No projects yet. Click \"{newProjectLabel}\" to get started"
+  },
+  "projectCreatedUpdated": {
+    "zh": "创建于 {created} · 更新于 {updated}",
+    "ja": "作成：{created} · 更新：{updated}",
+    "en": "Created {created} · Updated {updated}"
+  },
+  "menuEnterWebshell": {
+    "zh": "进入 Webshell",
+    "ja": "Webshell へ",
+    "en": "Open Webshell"
+  },
+  "menuEnterExp": {
+    "zh": "进入 EXP",
+    "ja": "EXP へ",
+    "en": "Open Exploits"
+  },
+  "dialogChooseProjectEntryTitle": {
+    "zh": "选择进入方式",
+    "ja": "開く方法を選択",
+    "en": "Choose where to open"
+  },
+  "confirmDeleteProject": {
+    "zh": "确定要删除项目「{name}」吗？将同时删除该项目的 Webshell 及信息收集数据，此操作不可恢复。",
+    "ja": "プロジェクト「{name}」を削除してもよろしいですか？Webshell と収集データも削除されます。この操作は元に戻せません。",
+    "en": "Delete project \"{name}\"? This will also delete its Webshell and collected data. This action cannot be undone."
+  },
+  "noProjects": {
+    "zh": "暂无项目",
+    "ja": "プロジェクトなし",
+    "en": "No projects"
+  },
+  "noProjectsHint": {
+    "zh": "请先创建项目后再使用此功能",
+    "ja": "この機能を使用するには先にプロジェクトを作成してください",
+    "en": "Please create a project before using this feature"
+  },
+  "selectProject": {
+    "zh": "请选择项目",
+    "ja": "プロジェクトを選択してください",
+    "en": "Select a project"
+  },
+  "titleSelectProject": {
+    "zh": "选择项目",
+    "ja": "プロジェクトを選択",
+    "en": "Select project"
+  },
+  "terminalTitle": {
+    "zh": "完整终端 · 反弹 Shell 会话",
+    "ja": "フルターミナル · リバースシェルセッション",
+    "en": "Full terminal · Reverse shell sessions"
+  },
+  "noActiveSessions": {
+    "zh": "当前没有活跃的反弹 Shell 会话",
+    "ja": "アクティブなリバースシェルセッションはありません",
+    "en": "No active reverse shell sessions"
+  },
+  "activeSessionCount": {
+    "zh": "活跃会话数：{n}",
+    "ja": "アクティブセッション数：{n}",
+    "en": "Active sessions: {n}"
+  },
+  "listeningOn": {
+    "zh": "监听中：{addr}:{port}",
+    "ja": "監視中：{addr}:{port}",
+    "en": "Listening: {addr}:{port}"
+  },
+  "portOccupiedOn": {
+    "zh": "端口占用：{addr}:{port}（可能已有监听）",
+    "ja": "ポート使用中：{addr}:{port}（既に監視中の可能性）",
+    "en": "Port in use: {addr}:{port} (may already be listening)"
+  },
+  "notListening": {
+    "zh": "未监听（配置：{host}:{port}）",
+    "ja": "未監視（設定：{host}:{port}）",
+    "en": "Not listening (config: {host}:{port})"
+  },
+  "fieldLhost": {
+    "zh": "监听 IP（LHOST）",
+    "ja": "待受 IP（LHOST）",
+    "en": "Listen IP (LHOST)"
+  },
+  "fieldLport": {
+    "zh": "监听端口（LPORT）",
+    "ja": "待受ポート（LPORT）",
+    "en": "Listen port (LPORT)"
+  },
+  "snackPortOccupied": {
+    "zh": "端口处于占用状态，请先释放后再启动监听",
+    "ja": "ポートが使用中です。解放してから監視を開始してください",
+    "en": "Port is in use. Release it before starting to listen"
+  },
+  "snackListenStarted": {
+    "zh": "已在 :{lport} 启动监听（LHOST={lhost}）",
+    "ja": ":{lport} で監視開始（LHOST={lhost}）",
+    "en": "Listening on :{lport} (LHOST={lhost})"
+  },
+  "snackListenFailed": {
+    "zh": "启动监听失败：{e}",
+    "ja": "監視開始失敗：{e}",
+    "en": "Failed to start listener: {e}"
+  },
+  "noSessionsHint": {
+    "zh": "> 暂无会话，可在 Webshell 终端中点击「完整终端」发起反弹 Shell。",
+    "ja": "> セッションなし。Webshell ターミナルで「フルターミナル」をクリックしてリバースシェルを開始。",
+    "en": "> No sessions. Click \"Full terminal\" in the Webshell terminal to start a reverse shell."
+  },
+  "snackSessionDisconnected": {
+    "zh": "该会话已断开，无法打开终端",
+    "ja": "セッションが切断されました。ターミナルを開けません",
+    "en": "Session disconnected, cannot open terminal"
+  },
+  "sessionDisconnected": {
+    "zh": "已断开",
+    "ja": "切断済み",
+    "en": "Disconnected"
+  },
+  "pingFailHint": {
+    "zh": "请核对：① 连接器类型与目标脚本是否一致；② 地址能否在浏览器打开。",
+    "ja": "確認：① コネクタタイプとターゲットスクリプトが一致しているか；② URLにブラウザからアクセスできるか。",
+    "en": "Check: ① Connector type matches the target script; ② URL is accessible in a browser."
+  },
+  "connectionFailed": {
+    "zh": "连接失败，命令执行可能异常",
+    "ja": "接続失敗。コマンド実行が正常でない可能性があります",
+    "en": "Connection failed, command execution may be unreliable"
+  },
+  "statusChecking": {
+    "zh": "检测中",
+    "ja": "確認中",
+    "en": "Checking"
+  },
+  "statusConnected": {
+    "zh": "已连接",
+    "ja": "接続済み",
+    "en": "Connected"
+  },
+  "statusReconnect": {
+    "zh": "重连",
+    "ja": "再接続",
+    "en": "Reconnect"
+  },
+  "titleSelectTerminalMode": {
+    "zh": "选择完整终端方案",
+    "ja": "フルターミナルの方式を選択",
+    "en": "Select terminal mode"
+  },
+  "terminalModeScript": {
+    "zh": "内置反弹 · script 模式",
+    "ja": "内蔵リバース · script モード",
+    "en": "Built-in reverse · script mode"
+  },
+  "terminalModeScriptDesc": {
+    "zh": "优先使用 script 分配伪终端，推荐在类 Unix 目标上使用",
+    "ja": "script で疑似ターミナルを割り当て。Unix 系ターゲットに推奨",
+    "en": "Uses script to allocate a pseudo-terminal. Recommended for Unix-like targets"
+  },
+  "terminalModeBash": {
+    "zh": "内置反弹 · bash 模式",
+    "ja": "内蔵リバース · bash モード",
+    "en": "Built-in reverse · bash mode"
+  },
+  "terminalModeBashDesc": {
+    "zh": "不依赖 script，仅使用 bash -i 或 /bin/sh -i 反弹",
+    "ja": "script 不要。bash -i または /bin/sh -i のみ使用",
+    "en": "No script dependency. Uses bash -i or /bin/sh -i only"
+  },
+  "terminalModeSocat": {
+    "zh": "socat 反弹（在目标上手动执行命令）",
+    "ja": "socat リバース（ターゲットで手動実行）",
+    "en": "socat reverse (manually run command on target)"
+  },
+  "terminalModeSocatDesc": {
+    "zh": "适合目标已安装 socat，获得更完整的 TTY 体验",
+    "ja": "socat がインストール済みのターゲットに適合。より完全な TTY 体験",
+    "en": "For targets with socat installed. Provides a more complete TTY experience"
+  },
+  "snackReverseShellSent": {
+    "zh": "已发送反弹 Shell 命令，等待连接 ...",
+    "ja": "リバースシェルコマンドを送信しました。接続を待機中 ...",
+    "en": "Reverse shell command sent, waiting for connection ..."
+  },
+  "snackStartFailed": {
+    "zh": "启动失败：{e}",
+    "ja": "起動失敗：{e}",
+    "en": "Failed to start: {e}"
+  },
+  "titleSocatCommand": {
+    "zh": "socat 反弹命令",
+    "ja": "socat リバースシェルコマンド",
+    "en": "socat reverse shell command"
+  },
+  "socatInstructions": {
+    "zh": "在目标机器上执行以下命令以建立完整 TTY 反弹 Shell：",
+    "ja": "ターゲットマシンで以下のコマンドを実行してフル TTY リバースシェルを確立：",
+    "en": "Run the following command on the target to establish a full TTY reverse shell:"
+  },
+  "socatTips": {
+    "zh": "提示：\\n1. 本机已在 :{lport} 端口监听。\\n2. 目标执行成功后，这里会自动弹出完整终端窗口。",
+    "ja": "ヒント：\\n1. ローカルは :{lport} で待受中。\\n2. ターゲット実行成功後、ターミナルウィンドウが自動で開きます。",
+    "en": "Tips:\\n1. Local machine is listening on :{lport}.\\n2. After the target connects, the terminal window will open automatically."
+  },
+  "terminalEmptyHint": {
+    "zh": "> 输入命令开始执行",
+    "ja": "> コマンドを入力して実行開始",
+    "en": "> Type a command to get started"
+  },
+  "terminalKeyHint": {
+    "zh": "使用 ↑↓ 键切换历史命令，输入 clear 清空终端",
+    "ja": "↑↓ キーで履歴切替、clear でターミナルをクリア",
+    "en": "Use ↑↓ to navigate history, type clear to reset"
+  },
+  "modeIntegrated": {
+    "zh": "一体式",
+    "ja": "統合",
+    "en": "Integrated"
+  },
+  "modeSeparate": {
+    "zh": "分离式",
+    "ja": "分離",
+    "en": "Split"
+  },
+  "tabCompletionTitle": {
+    "zh": "Tab 候选（{total}）",
+    "ja": "Tab 補完（{total}）",
+    "en": "Tab candidates ({total})"
+  },
+  "noCompletions": {
+    "zh": "当前无候选",
+    "ja": "候補なし",
+    "en": "No candidates"
+  },
+  "executing": {
+    "zh": "执行中...",
+    "ja": "実行中...",
+    "en": "Running..."
+  },
+  "fieldWebshellUrl": {
+    "zh": "Webshell 地址 *",
+    "ja": "Webshell URL *",
+    "en": "Webshell URL *"
+  },
+  "hintWebshellUrl": {
+    "zh": "http://example.com/shell.php",
+    "ja": "http://example.com/shell.php",
+    "en": "http://example.com/shell.php"
+  },
+  "fieldWebshellName": {
+    "zh": "备注名称（可选）",
+    "ja": "メモ名（任意）",
+    "en": "Alias (optional)"
+  },
+  "hintWebshellName": {
+    "zh": "例如：后台管理 Shell",
+    "ja": "例：管理画面 Shell",
+    "en": "e.g. Admin panel shell"
+  },
+  "labelRequestMethod": {
+    "zh": "请求方法：",
+    "ja": "リクエストメソッド：",
+    "en": "Request method:"
+  },
+  "snackFillUrlAndPassword": {
+    "zh": "请先填写地址和密码",
+    "ja": "URLとパスワードを入力してください",
+    "en": "Please enter the URL and password first"
+  },
+  "titleEditWebshell": {
+    "zh": "编辑 Webshell",
+    "ja": "Webshell を編集",
+    "en": "Edit Webshell"
+  },
+  "confirmDeleteWebshell": {
+    "zh": "确定要删除「{name}」吗？此操作不可恢复。",
+    "ja": "「{name}」を削除してもよろしいですか？この操作は元に戻せません。",
+    "en": "Delete \"{name}\"? This action cannot be undone."
+  },
+  "webshellManagementTitle": {
+    "zh": "Webshell · {projectName}",
+    "ja": "Webshell · {projectName}",
+    "en": "Webshell · {projectName}"
+  },
+  "expManagementScopedTitle": {
+    "zh": "EXP · {projectName}",
+    "ja": "EXP · {projectName}",
+    "en": "Exploits · {projectName}"
+  },
+  "webshellCount": {
+    "zh": "共 {n} 条",
+    "ja": "計 {n} 件",
+    "en": "{n} total"
+  },
+  "webshellEmptyHint": {
+    "zh": "暂无 Webshell，点击「{addLabel}」开始",
+    "ja": "Webshell がありません。「{addLabel}」をクリックして開始",
+    "en": "No Webshell yet. Click \"{addLabel}\" to get started"
+  },
+  "webshellPasswordLabel": {
+    "zh": "密码",
+    "ja": "パスワード",
+    "en": "Password"
+  },
+  "connectorMethodFixed": {
+    "zh": "由连接器固定",
+    "ja": "コネクタで固定",
+    "en": "Fixed by connector"
+  },
+  "fieldConnectorType": {
+    "zh": "连接器类型",
+    "ja": "コネクタタイプ",
+    "en": "Connector type"
+  },
+  "unknownConnector": {
+    "zh": "未知: {value}",
+    "ja": "不明: {value}",
+    "en": "Unknown: {value}"
+  },
+  "fieldPasswordKey": {
+    "zh": "连接密码/密钥 *",
+    "ja": "接続パスワード/キー *",
+    "en": "Password / key *"
+  },
+  "fieldParamName": {
+    "zh": "参数名 *",
+    "ja": "パラメータ名 *",
+    "en": "Parameter name *"
+  },
+  "hintPasswordKey": {
+    "zh": "默认 mAtrix_911，或 payload 中 k 的 16 位 hex",
+    "ja": "デフォルト mAtrix_911、または payload の k の 16 進数 16 桁",
+    "en": "Default mAtrix_911, or the 16-char hex of k in the payload"
+  },
+  "helperPasswordKey": {
+    "zh": "连接密码（MD5 前 16 位为密钥）；或直接填 payload 中 String k=\"xxx\" 的 hex 值",
+    "ja": "接続パスワード（MD5 前半 16 桁をキーとして使用）；または payload の String k=\"xxx\" の hex 値を直接入力",
+    "en": "Connection password (first 16 chars of MD5 as key); or enter the hex value of String k=\"xxx\" from the payload directly"
+  },
+  "helperParamName": {
+    "zh": "Payload 中接收命令的 HTTP 参数名（如 $_POST[\"{param}\"]）",
+    "ja": "Payload でコマンドを受け取る HTTP パラメータ名（例：$_POST[\"{param}\"]）",
+    "en": "HTTP parameter name for receiving commands in the payload (e.g. $_POST[\"{param}\"])"
+  },
+  "hintParamName": {
+    "zh": "参数名，默认: {param}",
+    "ja": "パラメータ名、デフォルト: {param}",
+    "en": "Parameter name, default: {param}"
+  },
+  "detectSuccess": {
+    "zh": "检测完成，已自动选择第一个有响应的类型",
+    "ja": "検出完了。最初に応答したタイプを自動選択しました",
+    "en": "Detection complete. Auto-selected the first responsive connector type"
+  },
+  "detectFailed": {
+    "zh": "未检测到有响应的连接器，请检查地址与密码",
+    "ja": "応答するコネクタが見つかりません。URLとパスワードを確認してください",
+    "en": "No responsive connector found. Check the URL and password"
+  },
+  "snackWriteUnsupported": {
+    "zh": "当前连接器不支持文件写入",
+    "ja": "現在のコネクタはファイル書き込みをサポートしていません",
+    "en": "Current connector does not support file writing"
+  },
+  "allFiles": {
+    "zh": "所有文件",
+    "ja": "全てのファイル",
+    "en": "All files"
+  },
+  "snackNoPayloads": {
+    "zh": "暂无可上传的 Payload",
+    "ja": "アップロード可能な Payload がありません",
+    "en": "No payloads available to upload"
+  },
+  "snackPayloadDecodeFailed": {
+    "zh": "Payload 解码失败: {name}",
+    "ja": "Payload デコード失敗: {name}",
+    "en": "Payload decode failed: {name}"
+  },
+  "dirEmptyOrDenied": {
+    "zh": "目录为空或无权访问",
+    "ja": "ディレクトリが空またはアクセス権限がありません",
+    "en": "Directory is empty or access denied"
+  },
+  "dirEmpty": {
+    "zh": "目录为空",
+    "ja": "ディレクトリが空です",
+    "en": "Directory is empty"
+  },
+  "colName": {
+    "zh": "名称",
+    "ja": "名前",
+    "en": "Name"
+  },
+  "colSize": {
+    "zh": "大小",
+    "ja": "サイズ",
+    "en": "Size"
+  },
+  "colPermissions": {
+    "zh": "权限",
+    "ja": "権限",
+    "en": "Perms"
+  },
+  "colModified": {
+    "zh": "修改时间",
+    "ja": "更新日時",
+    "en": "Modified"
+  },
+  "titleConfirmDelete": {
+    "zh": "确认删除",
+    "ja": "削除確認",
+    "en": "Confirm delete"
+  },
+  "confirmDeleteFile": {
+    "zh": "确定删除「{name}」吗？此操作不可恢复。",
+    "ja": "「{name}」を削除してもよろしいですか？この操作は元に戻せません。",
+    "en": "Delete \"{name}\"? This action cannot be undone."
+  },
+  "snackDeleted": {
+    "zh": "已删除 {name}",
+    "ja": "{name} を削除しました",
+    "en": "Deleted {name}"
+  },
+  "snackDeleteFailed": {
+    "zh": "删除失败",
+    "ja": "削除失敗",
+    "en": "Delete failed"
+  },
+  "snackUploadCancelled": {
+    "zh": "上传已取消",
+    "ja": "アップロードをキャンセルしました",
+    "en": "Upload cancelled"
+  },
+  "snackUploadFailed": {
+    "zh": "上传失败: {e}",
+    "ja": "アップロード失敗: {e}",
+    "en": "Upload failed: {e}"
+  },
+  "snackUploaded": {
+    "zh": "已上传 {fileName}",
+    "ja": "{fileName} をアップロードしました",
+    "en": "Uploaded {fileName}"
+  },
+  "snackUploadFail": {
+    "zh": "上传失败",
+    "ja": "アップロード失敗",
+    "en": "Upload failed"
+  },
+  "snackDownloadedTo": {
+    "zh": "已保存至 {path}",
+    "ja": "{path} に保存しました",
+    "en": "Saved to {path}"
+  },
+  "snackDownloadFailed": {
+    "zh": "下载失败: {e}",
+    "ja": "ダウンロード失敗: {e}",
+    "en": "Download failed: {e}"
+  },
+  "titleSelectPayload": {
+    "zh": "选择 Payload 上传",
+    "ja": "アップロードする Payload を選択",
+    "en": "Select payload to upload"
+  },
+  "tooltipPayloadUploadToWebshellTmp": {
+    "zh": "上传到 Webshell 的 /tmp",
+    "ja": "Webshell の /tmp にアップロード",
+    "en": "Upload to Webshell /tmp"
+  },
+  "titleSelectWebshellForPayload": {
+    "zh": "选择 Webshell（上传到 /tmp）",
+    "ja": "Webshell を選択（/tmp にアップロード）",
+    "en": "Select Webshell (upload to /tmp)"
+  },
+  "snackNoWebshellsAnyProject": {
+    "zh": "没有任何项目下保存 Webshell，请先在 Webshell 中添加",
+    "ja": "Webshell がありません。先に Webshell で追加してください",
+    "en": "No Webshell found. Add one under Webshell first"
+  },
+  "snackPayloadUploadedToRemote": {
+    "zh": "已上传至 {remotePath}",
+    "ja": "{remotePath} にアップロードしました",
+    "en": "Uploaded to {remotePath}"
+  },
+  "dialogUploadSuccessTitle": {
+    "zh": "上传成功",
+    "ja": "アップロード完了",
+    "en": "Upload successful"
+  },
+  "dialogUploadFailureTitle": {
+    "zh": "上传失败",
+    "ja": "アップロード失敗",
+    "en": "Upload failed"
+  },
+  "uploading": {
+    "zh": "上传中",
+    "ja": "アップロード中",
+    "en": "Uploading"
+  },
+  "downloading": {
+    "zh": "下载中",
+    "ja": "ダウンロード中",
+    "en": "Downloading"
+  },
+  "uploadingProgress": {
+    "zh": "正在上传...",
+    "ja": "アップロード中...",
+    "en": "Uploading..."
+  },
+  "downloadingProgress": {
+    "zh": "正在接收数据，请稍候...",
+    "ja": "データを受信中、しばらくお待ちください...",
+    "en": "Receiving data, please wait..."
+  },
+  "snackSaveSuccess": {
+    "zh": "保存成功",
+    "ja": "保存しました",
+    "en": "Saved successfully"
+  },
+  "snackSaveFailure": {
+    "zh": "保存失败",
+    "ja": "保存失敗",
+    "en": "Save failed"
+  },
+  "serverInfo": {
+    "zh": "服务器基本信息",
+    "ja": "サーバー基本情報",
+    "en": "Server information"
+  },
+  "sysInfoFailed": {
+    "zh": "无法获取系统信息",
+    "ja": "システム情報を取得できません",
+    "en": "Failed to retrieve system info"
+  },
+  "sysInfoFailedHint": {
+    "zh": "请检查 Webshell 是否可正常执行远程代码/命令",
+    "ja": "Webshell がリモートコード/コマンドを正常に実行できるか確認してください",
+    "en": "Check whether the Webshell can execute remote code/commands normally"
+  },
+  "disabledFunctions": {
+    "zh": "禁用函数 ({n})",
+    "ja": "無効化関数 ({n})",
+    "en": "Disabled functions ({n})"
+  },
+  "loadedExtensions": {
+    "zh": "已加载扩展 ({n})",
+    "ja": "読み込み済み拡張 ({n})",
+    "en": "Loaded extensions ({n})"
+  },
+  "sysInfoFieldOs": {
+    "zh": "操作系统",
+    "ja": "OS",
+    "en": "OS"
+  },
+  "sysInfoFieldPhpVersion": {
+    "zh": "PHP版本",
+    "ja": "PHP バージョン",
+    "en": "PHP version"
+  },
+  "sysInfoFieldRunUser": {
+    "zh": "运行用户",
+    "ja": "実行ユーザー",
+    "en": "Runtime user"
+  },
+  "sysInfoFieldServerIp": {
+    "zh": "服务器IP",
+    "ja": "サーバーIP",
+    "en": "Server IP"
+  },
+  "sysInfoFieldServerSoftware": {
+    "zh": "服务器软件",
+    "ja": "サーバーソフト",
+    "en": "Server software"
+  },
+  "sysInfoFieldDocRoot": {
+    "zh": "文档根目录",
+    "ja": "ドキュメントルート",
+    "en": "Document root"
+  },
+  "sysInfoFieldCurrentDir": {
+    "zh": "当前目录",
+    "ja": "現在ディレクトリ",
+    "en": "Current directory"
+  },
+  "sysInfoFieldMemoryLimit": {
+    "zh": "内存限制",
+    "ja": "メモリ制限",
+    "en": "Memory limit"
+  },
+  "sysInfoFieldMaxExecutionTime": {
+    "zh": "最大执行时间",
+    "ja": "最大実行時間",
+    "en": "Max execution time"
+  },
+  "sysInfoFieldSafeMode": {
+    "zh": "Safe Mode",
+    "ja": "セーフモード",
+    "en": "Safe Mode"
+  },
+  "sysInfoFieldHost": {
+    "zh": "主机名",
+    "ja": "ホスト名",
+    "en": "Hostname"
+  },
+  "sysInfoFieldUserId": {
+    "zh": "用户ID",
+    "ja": "ユーザーID",
+    "en": "User ID"
+  },
+  "sysInfoFieldKernelVersion": {
+    "zh": "内核版本",
+    "ja": "カーネルバージョン",
+    "en": "Kernel version"
+  },
+  "sysInfoFieldDotnetClr": {
+    "zh": ".NET CLR 版本",
+    "ja": ".NET CLR バージョン",
+    "en": ".NET CLR version"
+  },
+  "privEscTitle": {
+    "zh": "本地提权检查",
+    "ja": "ローカル権限昇格チェック",
+    "en": "Privilege escalation checks"
+  },
+  "checkingAll": {
+    "zh": "检查中…",
+    "ja": "チェック中…",
+    "en": "Checking…"
+  },
+  "privEscSuggestions": {
+    "zh": "提权建议（根据检查结果）",
+    "ja": "権限昇格の提案（チェック結果に基づく）",
+    "en": "Privilege escalation suggestions (based on results)"
+  },
+  "privEscGroupCurrentPriv": {
+    "zh": "当前权限",
+    "ja": "現在の権限",
+    "en": "Current privileges"
+  },
+  "privEscGroupSysInfo": {
+    "zh": "系统信息",
+    "ja": "システム情報",
+    "en": "System info"
+  },
+  "privEscGroupEscVectors": {
+    "zh": "提权向量",
+    "ja": "昇格ベクター",
+    "en": "Escalation vectors"
+  },
+  "privEscGroupSensitiveInfo": {
+    "zh": "敏感信息",
+    "ja": "機密情報",
+    "en": "Sensitive information"
+  },
+  "privEscItemUserGroup": {
+    "zh": "用户 & 组",
+    "ja": "ユーザー & グループ",
+    "en": "User & group"
+  },
+  "privEscItemUserGroupDesc": {
+    "zh": "当前用户 UID/GID 及所属组",
+    "ja": "現在のユーザー UID/GID と所属グループ",
+    "en": "Current user UID/GID and groups"
+  },
+  "privEscItemSudo": {
+    "zh": "Sudo 权限",
+    "ja": "Sudo 権限",
+    "en": "Sudo privileges"
+  },
+  "privEscItemSudoDesc": {
+    "zh": "可 sudo 免密执行的命令",
+    "ja": "パスワードなしで sudo 実行できるコマンド",
+    "en": "Commands executable via sudo without password"
+  },
+  "privEscItemEnv": {
+    "zh": "环境变量",
+    "ja": "環境変数",
+    "en": "Environment variables"
+  },
+  "privEscItemEnvDesc": {
+    "zh": "环境变量中可能含凭证",
+    "ja": "環境変数に認証情報が含まれる可能性",
+    "en": "Environment variables may contain credentials"
+  },
+  "privEscItemKernel": {
+    "zh": "内核版本",
+    "ja": "カーネルバージョン",
+    "en": "Kernel version"
+  },
+  "privEscItemKernelDesc": {
+    "zh": "检查内核版本以匹配本地提权 EXP",
+    "ja": "カーネルバージョンを確認してローカル昇格 EXP に照合",
+    "en": "Check kernel version to match local privilege escalation exploits"
+  },
+  "privEscItemDistro": {
+    "zh": "发行版",
+    "ja": "ディストリビューション",
+    "en": "Distribution"
+  },
+  "privEscItemDistroDesc": {
+    "zh": "Linux 发行版及版本号",
+    "ja": "Linux ディストリビューションとバージョン",
+    "en": "Linux distribution and version"
+  },
+  "privEscItemLoggedUsers": {
+    "zh": "登录用户",
+    "ja": "ログインユーザー",
+    "en": "Logged-in users"
+  },
+  "privEscItemLoggedUsersDesc": {
+    "zh": "当前在线会话",
+    "ja": "現在のオンラインセッション",
+    "en": "Current active sessions"
+  },
+  "privEscItemRootProcs": {
+    "zh": "以 root 运行的进程",
+    "ja": "root で実行中のプロセス",
+    "en": "Processes running as root"
+  },
+  "privEscItemRootProcsDesc": {
+    "zh": "以 root 身份运行的服务进程",
+    "ja": "root として動作しているサービスプロセス",
+    "en": "Service processes running as root"
+  },
+  "privEscItemSuid": {
+    "zh": "SUID 文件",
+    "ja": "SUID ファイル",
+    "en": "SUID files"
+  },
+  "privEscItemSuidDesc": {
+    "zh": "具有 SUID 位的可执行文件（可用于提权）",
+    "ja": "SUID ビットを持つ実行ファイル（昇格に利用可能）",
+    "en": "Executables with SUID bit set (may be used for escalation)"
+  },
+  "privEscItemSgid": {
+    "zh": "SGID 文件",
+    "ja": "SGID ファイル",
+    "en": "SGID files"
+  },
+  "privEscItemSgidDesc": {
+    "zh": "具有 SGID 位的可执行文件",
+    "ja": "SGID ビットを持つ実行ファイル",
+    "en": "Executables with SGID bit set"
+  },
+  "privEscItemCap": {
+    "zh": "Capabilities",
+    "ja": "Capabilities",
+    "en": "Capabilities"
+  },
+  "privEscItemCapDesc": {
+    "zh": "具有 Linux Capabilities 的文件",
+    "ja": "Linux Capabilities を持つファイル",
+    "en": "Files with Linux capabilities"
+  },
+  "privEscItemCron": {
+    "zh": "Cron 任务",
+    "ja": "Cron タスク",
+    "en": "Cron jobs"
+  },
+  "privEscItemCronDesc": {
+    "zh": "定时任务配置及脚本",
+    "ja": "スケジュールタスクの設定とスクリプト",
+    "en": "Scheduled task configuration and scripts"
+  },
+  "privEscItemCronWritable": {
+    "zh": "Cron 可写脚本",
+    "ja": "Cron 書き込み可能スクリプト",
+    "en": "Writable cron scripts"
+  },
+  "privEscItemCronWritableDesc": {
+    "zh": "根据权限位+当前用户/组判断可写（无写入、无副作用）",
+    "ja": "権限ビットと現在のユーザー/グループに基づき書き込み可能と判断（書き込みなし、副作用なし）",
+    "en": "Writable by current user/group based on permission bits (read-only check, no side effects)"
+  },
+  "privEscItemWritableDirs": {
+    "zh": "可写目录",
+    "ja": "書き込み可能ディレクトリ",
+    "en": "Writable directories"
+  },
+  "privEscItemWritableDirsDesc": {
+    "zh": "当前用户可写的目录",
+    "ja": "現在のユーザーが書き込み可能なディレクトリ",
+    "en": "Directories writable by the current user"
+  },
+  "privEscItemPathHijack": {
+    "zh": "PATH 劫持",
+    "ja": "PATH ハイジャック",
+    "en": "PATH hijacking"
+  },
+  "privEscItemPathHijackDesc": {
+    "zh": "检查 PATH 中是否有可写目录",
+    "ja": "PATH 内に書き込み可能なディレクトリがあるか確認",
+    "en": "Check for writable directories in PATH"
+  },
+  "privEscItemLoginableAccounts": {
+    "zh": "可登录账户",
+    "ja": "ログイン可能アカウント",
+    "en": "Loginable accounts"
+  },
+  "privEscItemLoginableAccountsDesc": {
+    "zh": "可正常登录的用户账户",
+    "ja": "正常にログインできるユーザーアカウント",
+    "en": "User accounts that can log in normally"
+  },
+  "privEscItemShadow": {
+    "zh": "Shadow 文件",
+    "ja": "Shadow ファイル",
+    "en": "Shadow file"
+  },
+  "privEscItemShadowDesc": {
+    "zh": "尝试读取密码哈希（需 root）",
+    "ja": "パスワードハッシュの読み取りを試みる（root 必要）",
+    "en": "Attempt to read password hashes (requires root)"
+  },
+  "privEscItemHistory": {
+    "zh": "历史命令",
+    "ja": "コマンド履歴",
+    "en": "Command history"
+  },
+  "privEscItemHistoryDesc": {
+    "zh": "历史命令中可能含明文凭证",
+    "ja": "コマンド履歴に平文の認証情報が含まれる可能性",
+    "en": "Command history may contain plaintext credentials"
+  },
+  "privEscItemSshKeys": {
+    "zh": "SSH 密钥",
+    "ja": "SSH 鍵",
+    "en": "SSH keys"
+  },
+  "privEscItemSshKeysDesc": {
+    "zh": "私钥文件是否可读",
+    "ja": "秘密鍵ファイルが読み取り可能かどうか",
+    "en": "Whether private key files are readable"
+  },
+  "privEscItemConfigPasswords": {
+    "zh": "配置文件密码",
+    "ja": "設定ファイルのパスワード",
+    "en": "Config file passwords"
+  },
+  "privEscItemConfigPasswordsDesc": {
+    "zh": "Web/系统配置文件中的明文密码",
+    "ja": "Web/システム設定ファイル内の平文パスワード",
+    "en": "Plaintext passwords in web/system config files"
+  },
+  "privEscSudoAllTitle": {
+    "zh": "Sudo 免密提权",
+    "ja": "Sudo パスワードなし昇格",
+    "en": "Sudo passwordless escalation"
+  },
+  "privEscSudoAllReason": {
+    "zh": "检测到 sudo 可免密执行 ALL，直接提权：",
+    "ja": "sudo が NOPASSWD で ALL を実行可能と検出。直接昇格：",
+    "en": "Detected sudo can run ALL without password. Direct escalation:"
+  },
+  "privEscSudoLimitedTitle": {
+    "zh": "Sudo 受限命令提权",
+    "ja": "Sudo 制限コマンド昇格",
+    "en": "Sudo limited command escalation"
+  },
+  "privEscSudoLimitedReason": {
+    "zh": "检测到免密 sudo：{paths}",
+    "ja": "パスワードなし sudo を検出：{paths}",
+    "en": "Detected passwordless sudo: {paths}"
+  },
+  "privEscSuidTitle": {
+    "zh": "SUID 提权",
+    "ja": "SUID 権限昇格",
+    "en": "SUID escalation"
+  },
+  "privEscSuidReason": {
+    "zh": "发现可滥用 SUID 文件，在终端执行（需在可写目录）：",
+    "ja": "悪用可能な SUID ファイルを発見。ターミナルで実行（書き込み可能ディレクトリ必要）：",
+    "en": "Found exploitable SUID files. Execute in terminal (requires writable directory):"
+  },
+  "privEscKernelTitle": {
+    "zh": "内核提权（需本地查找 exploit）",
+    "ja": "カーネル昇格（ローカルで exploit を検索が必要）",
+    "en": "Kernel escalation (find exploit locally)"
+  },
+  "privEscKernelReason": {
+    "zh": "内核 {ver} ({arch})，需在本地搜索对应 CVE",
+    "ja": "カーネル {ver} ({arch})。対応する CVE をローカルで検索",
+    "en": "Kernel {ver} ({arch}). Search for matching CVE locally"
+  },
+  "privEscShadowTitle": {
+    "zh": "密码哈希破解（需本地破解）",
+    "ja": "パスワードハッシュ解析（ローカル解析が必要）",
+    "en": "Password hash cracking (crack locally)"
+  },
+  "privEscShadowReason": {
+    "zh": "已获取 shadow，本地破解（{hashMode}），成功率取决于密码强度",
+    "ja": "shadow を取得。ローカル解析（{hashMode}）。成功率はパスワード強度に依存",
+    "en": "Obtained shadow. Crack locally ({hashMode}). Success rate depends on password strength"
+  },
+  "privEscCronTitle": {
+    "zh": "Cron 劫持（已验证可写）",
+    "ja": "Cron ハイジャック（書き込み確認済み）",
+    "en": "Cron hijacking (write access confirmed)"
+  },
+  "privEscCronReason": {
+    "zh": "已自动检测到可写 cron 文件：{paths}",
+    "ja": "書き込み可能な cron ファイルを自動検出：{paths}",
+    "en": "Auto-detected writable cron files: {paths}"
+  },
+  "privEscCapTitle": {
+    "zh": "Capabilities 提权",
+    "ja": "Capabilities 権限昇格",
+    "en": "Capabilities escalation"
+  },
+  "privEscCapReason": {
+    "zh": "发现 cap_setuid，直接执行上述路径：",
+    "ja": "cap_setuid を発見。上記のパスを直接実行：",
+    "en": "Found cap_setuid. Execute the path above directly:"
+  },
+  "expWaiting": {
+    "zh": "> 等待操作",
+    "ja": "> 操作を待機中",
+    "en": "> Awaiting action"
+  },
+  "statusRunning": {
+    "zh": "运行中",
+    "ja": "実行中",
+    "en": "Running"
+  },
+  "statusIdle": {
+    "zh": "空闲",
+    "ja": "アイドル",
+    "en": "Idle"
+  },
+  "expManagementTitle": {
+    "zh": "EXP 管理",
+    "ja": "EXP 管理",
+    "en": "EXP Management"
+  },
+  "expManagementHint": {
+    "zh": "在这里集中管理各类漏洞利用模块，点击条目进入对应利用界面",
+    "ja": "各種エクスプロイトモジュールをここで一元管理。エントリをクリックして利用画面へ",
+    "en": "Manage all exploit modules here. Tap an entry to open its exploit interface"
+  },
+  "expVersionRequirement": {
+    "zh": "版本要求：{ver}",
+    "ja": "バージョン要件：{ver}",
+    "en": "Version requirement: {ver}"
+  },
+  "sectionTargetConfig": {
+    "zh": "目标配置",
+    "ja": "ターゲット設定",
+    "en": "Target config"
+  },
+  "fieldTargetUrl": {
+    "zh": "目标 URL",
+    "ja": "ターゲット URL",
+    "en": "Target URL"
+  },
+  "fieldTimeout": {
+    "zh": "超时(s)",
+    "ja": "タイムアウト(s)",
+    "en": "Timeout (s)"
+  },
+  "fieldCommand": {
+    "zh": "命令",
+    "ja": "コマンド",
+    "en": "Command"
+  },
+  "btnDetect": {
+    "zh": "检测",
+    "ja": "検出",
+    "en": "Detect"
+  },
+  "btnDetectVuln": {
+    "zh": "检测漏洞",
+    "ja": "脆弱性を検出",
+    "en": "Detect vuln"
+  },
+  "btnDetectAll": {
+    "zh": "检测全部",
+    "ja": "全て検出",
+    "en": "Detect all"
+  },
+  "btnExecCmd": {
+    "zh": "执行命令",
+    "ja": "コマンド実行",
+    "en": "Execute command"
+  },
+  "btnSubmitCmd": {
+    "zh": "提交命令",
+    "ja": "コマンドを送信",
+    "en": "Submit command"
+  },
+  "sectionCmdExec": {
+    "zh": "命令执行",
+    "ja": "コマンド実行",
+    "en": "Command execution"
+  },
+  "sectionGetShell": {
+    "zh": "GetShell（反弹 Shell）",
+    "ja": "GetShell（リバースシェル）",
+    "en": "GetShell (reverse shell)"
+  },
+  "fieldAttackerIp": {
+    "zh": "攻击机 IP",
+    "ja": "攻撃者 IP",
+    "en": "Attacker IP"
+  },
+  "fieldAttackerPort": {
+    "zh": "攻击机端口",
+    "ja": "攻撃者ポート",
+    "en": "Attacker port"
+  },
+  "btnStartReverseShell": {
+    "zh": "启动反弹终端",
+    "ja": "リバースシェル起動",
+    "en": "Start reverse shell"
+  },
+  "fieldShellPassword": {
+    "zh": "冰蝎密码",
+    "ja": "Behinder パスワード",
+    "en": "Shell password"
+  },
+  "btnWriteWebShell": {
+    "zh": "写入 WebShell",
+    "ja": "WebShell を書き込む",
+    "en": "Write WebShell"
+  },
+  "sectionVulnSelect": {
+    "zh": "漏洞选择",
+    "ja": "脆弱性を選択",
+    "en": "Vuln selection"
+  },
+  "titleWebshellManager": {
+    "zh": "Webshell",
+    "ja": "Webshell",
+    "en": "Webshell"
+  },
+  "expLogEnterTargetUrl": {
+    "zh": "[!] 请输入目标 URL",
+    "ja": "[!] ターゲット URL を入力してください",
+    "en": "[!] Please enter the target URL"
+  },
+  "expLogException": {
+    "zh": "[!] 异常: {e}",
+    "ja": "[!] 例外: {e}",
+    "en": "[!] Error: {e}"
+  },
+  "expLogInvalidLhostLport": {
+    "zh": "[!] LHOST/LPORT 无效",
+    "ja": "[!] LHOST/LPORT が無効です",
+    "en": "[!] Invalid LHOST/LPORT"
+  },
+  "expLogNoVulnGeneric": {
+    "zh": "[-] 未检测到漏洞",
+    "ja": "[-] 脆弱性は検出されませんでした",
+    "en": "[-] No vulnerability detected"
+  },
+  "expLogReverseSentWaiting": {
+    "zh": "[+] 已发送反弹 shell，等待连接...",
+    "ja": "[+] リバースシェルを送信しました。接続待ち...",
+    "en": "[+] Reverse shell payload sent, waiting for connection..."
+  },
+  "expLogSendFailed": {
+    "zh": "[-] 发送失败",
+    "ja": "[-] 送信に失敗しました",
+    "en": "[-] Send failed"
+  },
+  "expLogStartFailed": {
+    "zh": "[!] 启动失败: {e}",
+    "ja": "[!] 起動失敗: {e}",
+    "en": "[!] Failed to start: {e}"
+  },
+  "expLogStartFullTerminalListen": {
+    "zh": "[*] 启动完整终端监听: {lhost}:{lport} ({mode})",
+    "ja": "[*] フルターミナル待受を開始: {lhost}:{lport} ({mode})",
+    "en": "[*] Starting full-terminal listener: {lhost}:{lport} ({mode})"
+  },
+  "expLogSocatRunOnTarget": {
+    "zh": "[i] 在目标执行 socat 命令建立连接:",
+    "ja": "[i] ターゲットで socat コマンドを実行して接続:",
+    "en": "[i] Run the following socat command on the target:"
+  },
+  "terminalConnectionClosed": {
+    "zh": "连接已断开",
+    "ja": "接続が切断されました",
+    "en": "Connection closed"
+  },
+  "frpLogCopiedSnack": {
+    "zh": "日志已复制到剪贴板",
+    "ja": "ログをクリップボードにコピーしました",
+    "en": "Log copied to clipboard"
+  },
+  "frpDupDisplayName": {
+    "zh": "{base} 副本",
+    "ja": "{base} のコピー",
+    "en": "{base} copy"
+  },
+  "frpDupDisplayNameIndexed": {
+    "zh": "{base} 副本 ({i})",
+    "ja": "{base} のコピー ({i})",
+    "en": "{base} copy ({i})"
+  },
+  "frpDupProxyFirst": {
+    "zh": "{proxyName}_副本",
+    "ja": "{proxyName}_copy",
+    "en": "{proxyName}_copy"
+  },
+  "frpDupProxyIndexed": {
+    "zh": "{proxyName}_副本{i}",
+    "ja": "{proxyName}_copy{i}",
+    "en": "{proxyName}_copy{i}"
+  },
+  "frpAuthMd5Label": {
+    "zh": "MD5 (官方默认)",
+    "ja": "MD5（公式デフォルト）",
+    "en": "MD5 (official default)"
+  },
+  "frpAuthHmacSha1Label": {
+    "zh": "HMAC-SHA1",
+    "ja": "HMAC-SHA1",
+    "en": "HMAC-SHA1"
+  },
+  "frpAuthHmacSha256Label": {
+    "zh": "HMAC-SHA256",
+    "ja": "HMAC-SHA256",
+    "en": "HMAC-SHA256"
+  },
+  "frpAuthRawTokenLabel": {
+    "zh": "Raw Token",
+    "ja": "Raw Token",
+    "en": "Raw Token"
+  },
+  "sectionVulnType": {
+    "zh": "漏洞类型",
+    "ja": "脆弱性タイプ",
+    "en": "Vulnerability type"
+  },
+  "nacosStep2": {
+    "zh": "Step 2 — Derby SQL RCE",
+    "ja": "Step 2 — Derby SQL RCE",
+    "en": "Step 2 — Derby SQL RCE"
+  },
+  "sectionSshModuleCmdInject": {
+    "zh": "SSH 模块命令注入",
+    "ja": "SSH モジュール コマンドインジェクション",
+    "en": "SSH module command injection"
+  },
+  "btnGetShell": {
+    "zh": "GetShell",
+    "ja": "GetShell",
+    "en": "GetShell"
+  },
+  "connectorUiLabel": {
+    "zh": "PHP 冰蝎 (Behinder)",
+    "ja": "PHP Behinder",
+    "en": "PHP Behinder"
+  },
+  "detectPingOk": {
+    "zh": "有响应",
+    "ja": "応答あり",
+    "en": "Responded"
+  },
+  "detectPingNo": {
+    "zh": "无响应",
+    "ja": "応答なし",
+    "en": "No response"
+  },
+  "detectPingTimeout": {
+    "zh": "超时",
+    "ja": "タイムアウト",
+    "en": "Timeout"
+  },
+  "detectPingConnectFailed": {
+    "zh": "连接失败",
+    "ja": "接続失敗",
+    "en": "Connection failed"
+  },
+  "terminalFullTitle": {
+    "zh": "完整终端 · {label}",
+    "ja": "フルターミナル · {label}",
+    "en": "Full terminal · {label}"
+  },
+  "btnDisconnect": {
+    "zh": "主动断开",
+    "ja": "切断する",
+    "en": "Disconnect"
+  },
+  "actionPaste": {
+    "zh": "粘贴",
+    "ja": "貼り付け",
+    "en": "Paste"
+  },
+  "frpTunnelTitle": {
+    "zh": "FRP 客户端",
+    "ja": "FRP クライアント",
+    "en": "FRP Client"
+  },
+  "frpStatusRunning": {
+    "zh": "隧道运行中 · 远端流量将转发到本地",
+    "ja": "トンネル実行中 · リモートトラフィックをローカルに転送",
+    "en": "Tunnel running · Remote traffic is being forwarded locally"
+  },
+  "frpStatusConnecting": {
+    "zh": "正在连接...",
+    "ja": "接続中...",
+    "en": "Connecting..."
+  },
+  "frpStatusError": {
+    "zh": "连接出错，请检查参数或日志",
+    "ja": "接続エラー。パラメーターまたはログを確認してください",
+    "en": "Connection error. Check parameters or logs"
+  },
+  "frpStatusIdle": {
+    "zh": "就绪 · 在列表中点击「启动」连接隧道",
+    "ja": "待機中 · リストで「起動」をクリックしてトンネルに接続",
+    "en": "Ready · Click \"Start\" in the list to connect the tunnel"
+  },
+  "frpSavedConfigs": {
+    "zh": "已保存配置",
+    "ja": "保存済み設定",
+    "en": "Saved profiles"
+  },
+  "frpNoConfigs": {
+    "zh": "暂无配置，点击底部「新建配置」添加。",
+    "ja": "設定なし。下の「新規設定」をクリックして追加してください。",
+    "en": "No profiles yet. Click \"New profile\" below to add one."
+  },
+  "frpNewConfig": {
+    "zh": "新建配置",
+    "ja": "新規設定",
+    "en": "New profile"
+  },
+  "frpRunLog": {
+    "zh": "运行日志",
+    "ja": "実行ログ",
+    "en": "Run log"
+  },
+  "frpNoLogs": {
+    "zh": "> 尚无日志",
+    "ja": "> ログなし",
+    "en": "> No logs yet"
+  },
+  "frpDuplicatedSnack": {
+    "zh": "已复制「{name}」\\n代理名 {proxyName} · 远端端口 {port}（已与原版区分，可按需再改）",
+    "ja": "「{name}」を複製しました\\nプロキシ名 {proxyName} · リモートポート {port}（元と区別済み、必要に応じて変更可）",
+    "en": "Duplicated \"{name}\"\\nProxy {proxyName} · Remote port {port} (distinct from original, edit as needed)"
+  },
+  "frpDuplicateFailed": {
+    "zh": "复制失败：{e}",
+    "ja": "複製失敗：{e}",
+    "en": "Duplicate failed: {e}"
+  },
+  "frpMissingServerOrProxy": {
+    "zh": "该配置缺少服务器地址或代理名称，请先编辑保存",
+    "ja": "サーバーアドレスまたはプロキシ名が不足しています。先に編集して保存してください",
+    "en": "This profile is missing a server address or proxy name. Edit and save first"
+  },
+  "frpDeleteTitle": {
+    "zh": "删除配置",
+    "ja": "設定を削除",
+    "en": "Delete profile"
+  },
+  "frpConfirmDelete": {
+    "zh": "确定删除「{name}」？此操作不可恢复。",
+    "ja": "「{name}」を削除しますか？この操作は元に戻せません。",
+    "en": "Delete \"{name}\"? This action cannot be undone."
+  },
+  "frpDeletedSnack": {
+    "zh": "已删除「{name}」",
+    "ja": "「{name}」を削除しました",
+    "en": "Deleted \"{name}\""
+  },
+  "frpMappingLabel": {
+    "zh": "映射 远端端口 {remotePort} → 本地 {localAddr}:{localPort}",
+    "ja": "リモートポート {remotePort} → ローカル {localAddr}:{localPort}",
+    "en": "Remote port {remotePort} → Local {localAddr}:{localPort}"
+  },
+  "frpServerLabel": {
+    "zh": "frp 服务器 {serverAddr}:{serverPort}",
+    "ja": "frp サーバー {serverAddr}:{serverPort}",
+    "en": "frp server {serverAddr}:{serverPort}"
+  },
+  "btnStart": {
+    "zh": "启动",
+    "ja": "起動",
+    "en": "Start"
+  },
+  "btnStop": {
+    "zh": "停止",
+    "ja": "停止",
+    "en": "Stop"
+  },
+  "btnEdit": {
+    "zh": "编辑",
+    "ja": "編集",
+    "en": "Edit"
+  },
+  "btnDuplicate": {
+    "zh": "复制",
+    "ja": "複製",
+    "en": "Duplicate"
+  },
+  "frpNewConfigTitle": {
+    "zh": "新建配置",
+    "ja": "新規設定",
+    "en": "New profile"
+  },
+  "frpEditConfigTitle": {
+    "zh": "编辑配置",
+    "ja": "設定を編集",
+    "en": "Edit profile"
+  },
+  "frpRunningNoEdit": {
+    "zh": "运行中不可改",
+    "ja": "実行中は変更不可",
+    "en": "Cannot edit while running"
+  },
+  "frpAutoSave": {
+    "zh": "修改将自动保存",
+    "ja": "変更は自動保存されます",
+    "en": "Changes auto-save"
+  },
+  "frpConfigName": {
+    "zh": "配置名称",
+    "ja": "設定名",
+    "en": "Profile name"
+  },
+  "frpConfigNameHint": {
+    "zh": "例如 办公网 / 测试机",
+    "ja": "例：オフィスネット / テストサーバー",
+    "en": "e.g. Office network / Test server"
+  },
+  "frpServerSection": {
+    "zh": "服务端配置",
+    "ja": "サーバー設定",
+    "en": "Server config"
+  },
+  "frpServerAddr": {
+    "zh": "frp 服务器地址",
+    "ja": "frp サーバーアドレス",
+    "en": "frp server address"
+  },
+  "frpServerAddrHint": {
+    "zh": "例如 1.2.3.4",
+    "ja": "例：1.2.3.4",
+    "en": "e.g. 1.2.3.4"
+  },
+  "frpPort": {
+    "zh": "端口",
+    "ja": "ポート",
+    "en": "Port"
+  },
+  "frpProxySection": {
+    "zh": "代理配置",
+    "ja": "プロキシ設定",
+    "en": "Proxy config"
+  },
+  "frpProxyName": {
+    "zh": "代理名称",
+    "ja": "プロキシ名",
+    "en": "Proxy name"
+  },
+  "frpRemotePort": {
+    "zh": "远端端口",
+    "ja": "リモートポート",
+    "en": "Remote port"
+  },
+  "frpLocalAddr": {
+    "zh": "本地地址",
+    "ja": "ローカルアドレス",
+    "en": "Local address"
+  },
+  "frpLocalPort": {
+    "zh": "本地端口",
+    "ja": "ローカルポート",
+    "en": "Local port"
+  },
+  "frpAdvanced": {
+    "zh": "高级选项",
+    "ja": "詳細オプション",
+    "en": "Advanced options"
+  },
+  "frpVersionLabel": {
+    "zh": "客户端版本号（留空则不携带）",
+    "ja": "クライアントバージョン（空欄は省略）",
+    "en": "Client version (leave blank to omit)"
+  },
+  "frpVersionHint": {
+    "zh": "例如 0.51.3 / 0.61.1",
+    "ja": "例：0.51.3 / 0.61.1",
+    "en": "e.g. 0.51.3 / 0.61.1"
+  },
+  "frpTcpMux": {
+    "zh": "TCPMux（yamux 多路复用）",
+    "ja": "TCPMux（yamux 多重化）",
+    "en": "TCPMux (yamux multiplexing)"
+  },
+  "frpAutoReconnect": {
+    "zh": "断开后自动重连（5 秒后重试）",
+    "ja": "切断後に自動再接続（5 秒後に再試行）",
+    "en": "Auto-reconnect on disconnect (retry after 5 s)"
+  },
+  "frpAuthAlgorithm": {
+    "zh": "认证算法：",
+    "ja": "認証アルゴリズム：",
+    "en": "Auth algorithm:"
+  },
+  "frpToken": {
+    "zh": "Token（可留空）",
+    "ja": "Token（空欄可）",
+    "en": "Token (optional)"
+  },
+  "frpUnnamedConfig": {
+    "zh": "未命名配置",
+    "ja": "無名設定",
+    "en": "Unnamed profile"
+  },
+  "frpSaveFailed": {
+    "zh": "保存失败：{e}",
+    "ja": "保存失敗：{e}",
+    "en": "Save failed: {e}"
+  },
+  "frpActiveNotMatched": {
+    "zh": "连接仍在，但与已保存配置不一致（例如切页后未恢复对应项）。可点右侧「停止连接」",
+    "ja": "接続中ですが、保存済み設定と一致しません（ページ切替後など）。右の「接続停止」をクリック",
+    "en": "Tunnel active but does not match any saved profile (e.g. after navigation). Click \"Stop\" on the right"
+  },
+  "frpStopConnection": {
+    "zh": "停止连接",
+    "ja": "接続を停止",
+    "en": "Stop connection"
+  },
+  "shiroPageTitle": {
+    "zh": "Apache Shiro 反序列化利用",
+    "ja": "Apache Shiro デシリアライゼーション攻撃",
+    "en": "Apache Shiro Deserialization Exploit"
+  },
+  "shiroCardTitle": {
+    "zh": "rememberMe Key 爆破与利用",
+    "ja": "rememberMe Key ブルートフォースと利用",
+    "en": "rememberMe Key bruteforce & exploit"
+  },
+  "shiroCardSubtitle": {
+    "zh": "支持 AES-CBC / AES-GCM，字典爆破 Key 后加载自定义 Payload",
+    "ja": "AES-CBC / AES-GCM 対応。辞書でKey爆破後にカスタム Payload をロード",
+    "en": "Supports AES-CBC / AES-GCM. Bruteforce Key then load custom Payload"
+  },
+  "shiroInnerTitle": {
+    "zh": "Shiro 反序列化",
+    "ja": "Shiro デシリアライゼーション",
+    "en": "Shiro deserialization"
+  },
+  "shiroSectionKeyPayload": {
+    "zh": "Key 与 Payload",
+    "ja": "Key と Payload",
+    "en": "Key & Payload"
+  },
+  "shiroSectionMemShell": {
+    "zh": "内存冰蝎马注入",
+    "ja": "メモリ Behinder シェル注入",
+    "en": "In-memory Behinder shell injection"
+  },
+  "shiroFieldMethod": {
+    "zh": "方法",
+    "ja": "メソッド",
+    "en": "Method"
+  },
+  "shiroFieldMode": {
+    "zh": "模式",
+    "ja": "モード",
+    "en": "Mode"
+  },
+  "shiroModeHint": {
+    "zh": "模式: 自定义 Payload（仅发送下方 Base64）",
+    "ja": "モード: カスタム Payload（下の Base64 のみ送信）",
+    "en": "Mode: custom Payload (only sends the Base64 below)"
+  },
+  "shiroFieldCookieName": {
+    "zh": "Cookie 名",
+    "ja": "Cookie 名",
+    "en": "Cookie name"
+  },
+  "shiroVerboseLog": {
+    "zh": "详细日志",
+    "ja": "詳細ログ",
+    "en": "Verbose log"
+  },
+  "shiroCurrentKey": {
+    "zh": "当前 Key",
+    "ja": "現在の Key",
+    "en": "Current Key"
+  },
+  "shiroKeyAutoFilled": {
+    "zh": "爆破后自动填充",
+    "ja": "ブルートフォース後に自動入力",
+    "en": "Auto-filled after bruteforce"
+  },
+  "shiroPayloadBase64": {
+    "zh": "Payload Base64",
+    "ja": "Payload Base64",
+    "en": "Payload Base64"
+  },
+  "shiroPayloadHint": {
+    "zh": "粘贴 Base64 编码的序列化 Payload",
+    "ja": "Base64 エンコードされたシリアライズ Payload を貼り付け",
+    "en": "Paste Base64-encoded serialized Payload"
+  },
+  "shiroCheckBtn": {
+    "zh": "检测 Shiro",
+    "ja": "Shiro を検出",
+    "en": "Detect Shiro"
+  },
+  "shiroBruteforceBtn": {
+    "zh": "爆破 Key",
+    "ja": "Key をブルートフォース",
+    "en": "Bruteforce Key"
+  },
+  "shiroVerifyBtn": {
+    "zh": "验证 Key",
+    "ja": "Key を検証",
+    "en": "Verify Key"
+  },
+  "shiroSendPayloadBtn": {
+    "zh": "发送 Payload",
+    "ja": "Payload を送信",
+    "en": "Send Payload"
+  },
+  "shiroShellType": {
+    "zh": "Shell 类型",
+    "ja": "Shell タイプ",
+    "en": "Shell type"
+  },
+  "shiroShellPassword": {
+    "zh": "冰蝎密码（16位HEX）",
+    "ja": "Behinder パスワード（16桁 HEX）",
+    "en": "Behinder password (16-char HEX)"
+  },
+  "shiroShellPath": {
+    "zh": "Shell 路径",
+    "ja": "Shell パス",
+    "en": "Shell path"
+  },
+  "shiroMemShellDesc": {
+    "zh": "内置 CB1-InjectMemTool 链，无需手动填写 Payload。服务端反序列化后读取 user 参数注入冰蝎内存马。",
+    "ja": "内蔵 CB1-InjectMemTool チェーン。Payload 手動入力不要。サーバーデシリアライズ後、user パラメーターで Behinder メモリシェルを注入。",
+    "en": "Built-in CB1-InjectMemTool chain. No manual Payload required. After server deserialization, injects a Behinder memory shell via the user parameter."
+  },
+  "noProjectTitle": {
+    "zh": "暂无项目",
+    "ja": "プロジェクトなし",
+    "en": "No projects"
+  },
+  "hintCreateProjectForWebshell": {
+    "zh": "请先创建一个项目以保存 Webshell",
+    "ja": "Webshell を保存するプロジェクトを先に作成してください",
+    "en": "Create a project first to save the Webshell"
+  },
+  "fieldProjectNameHint": {
+    "zh": "例如：目标站点",
+    "ja": "例：ターゲットサイト",
+    "en": "e.g. Target site"
+  },
+  "fieldDomainOrIdHint": {
+    "zh": "例如：example.com",
+    "ja": "例：example.com",
+    "en": "e.g. example.com"
+  },
+  "btnSkip": {
+    "zh": "跳过",
+    "ja": "スキップ",
+    "en": "Skip"
+  },
+  "thinkphpTitle": {
+    "zh": "ThinkPHP CVE-2018-20062/CVE-2019-9082/CNVD-2022-86535",
+    "ja": "ThinkPHP CVE-2018-20062/CVE-2019-9082/CNVD-2022-86535",
+    "en": "ThinkPHP CVE-2018-20062/CVE-2019-9082/CNVD-2022-86535"
+  },
+  "thinkphpSubtitle": {
+    "zh": "支持漏洞检测、命令执行、GetShell，100% 复现 ThinkphpGUI",
+    "ja": "脆弱性検出・コマンド実行・GetShell 対応。ThinkphpGUI を 100% 再現",
+    "en": "Vuln detection, command execution, GetShell. 100% ThinkphpGUI replication"
+  },
+  "thinkphpInnerTitle": {
+    "zh": "ThinkPHP 漏洞利用",
+    "ja": "ThinkPHP エクスプロイト",
+    "en": "ThinkPHP exploit"
+  },
+  "thinkphpCurrentVuln": {
+    "zh": "当前: {label}",
+    "ja": "選択中: {label}",
+    "en": "Current: {label}"
+  },
+  "thinkphpSectionDetect": {
+    "zh": "漏洞检测",
+    "ja": "脆弱性検出",
+    "en": "Vuln detection"
+  },
+  "thinkphpSectionRce": {
+    "zh": "RCE 利用",
+    "ja": "RCE 利用",
+    "en": "RCE exploit"
+  },
+  "thinkphpSingleVuln": {
+    "zh": "单漏洞:",
+    "ja": "単一 CVE:",
+    "en": "Single CVE:"
+  },
+  "thinkphpExploitVuln": {
+    "zh": "利用漏洞:",
+    "ja": "利用する CVE:",
+    "en": "Exploit CVE:"
+  },
+  "thinkphpGetShellPassword": {
+    "zh": "GetShell 密码",
+    "ja": "GetShell パスワード",
+    "en": "GetShell password"
+  },
+  "thinkphpCheckAllRce": {
+    "zh": "检测全部RCE",
+    "ja": "全RCEを検出",
+    "en": "Detect all RCE"
+  },
+  "zentaoTitle": {
+    "zh": "Zentao CVE-2024-24216 · GetShell",
+    "ja": "Zentao CVE-2024-24216 · GetShell",
+    "en": "Zentao CVE-2024-24216 · GetShell"
+  },
+  "zentaoSubtitle": {
+    "zh": "利用禅道 Repo 配置写入冰蝎 WebShell，一键 GetShell",
+    "ja": "禅道 Repo 設定を悪用して Behinder WebShell を書き込み。ワンクリック GetShell",
+    "en": "Exploit Zentao Repo config to write a Behinder WebShell. One-click GetShell"
+  },
+  "zentaoRootPath": {
+    "zh": "禅道根路径",
+    "ja": "Zentao ルートパス",
+    "en": "Zentao root path"
+  },
+  "zentaoSectionExploit": {
+    "zh": "利用动作",
+    "ja": "攻撃アクション",
+    "en": "Exploit actions"
+  },
+  "zentaoDetectBtn": {
+    "zh": "探测/验证绕过",
+    "ja": "検出/バイパス確認",
+    "en": "Probe / verify bypass"
+  },
+  "vulhubDrupalTitle": {
+    "zh": "Drupal CVE-2018-7600 (Drupalgeddon2) Form API RCE",
+    "ja": "Drupal CVE-2018-7600 (Drupalgeddon2) Form API RCE",
+    "en": "Drupal CVE-2018-7600 (Drupalgeddon2) Form API RCE"
+  },
+  "vulhubDrupalCardTitle": {
+    "zh": "Drupal CVE-2018-7600",
+    "ja": "Drupal CVE-2018-7600",
+    "en": "Drupal CVE-2018-7600"
+  },
+  "vulhubDrupalCardSubtitle": {
+    "zh": "Drupalgeddon2 — Form API #post_render 回调 PHP 代码执行",
+    "ja": "Drupalgeddon2 — Form API #post_render コールバック PHP コード実行",
+    "en": "Drupalgeddon2 — Form API #post_render callback PHP code execution"
+  },
+  "vulhubFlaskSstiTitle": {
+    "zh": "Flask / Jinja2 SSTI 服务端模板注入 RCE",
+    "ja": "Flask / Jinja2 SSTI サーバーサイドテンプレートインジェクション RCE",
+    "en": "Flask / Jinja2 SSTI Server-Side Template Injection RCE"
+  },
+  "vulhubFlaskSstiCardTitle": {
+    "zh": "Flask / Jinja2 SSTI",
+    "ja": "Flask / Jinja2 SSTI",
+    "en": "Flask / Jinja2 SSTI"
+  },
+  "vulhubFlaskSstiCardSubtitle": {
+    "zh": "服务端 Jinja2 模板注入，通过 URL 参数执行任意 Python 代码",
+    "ja": "サーバーサイド Jinja2 テンプレートインジェクション。URL パラメーターで任意 Python コードを実行",
+    "en": "Server-side Jinja2 template injection. Execute arbitrary Python code via URL parameter"
+  },
+  "vulhubHttpdTitle": {
+    "zh": "Apache HTTP Server CVE-2021-41773 路径穿越 + CGI RCE",
+    "ja": "Apache HTTP Server CVE-2021-41773 パストラバーサル + CGI RCE",
+    "en": "Apache HTTP Server CVE-2021-41773 Path Traversal + CGI RCE"
+  },
+  "vulhubHttpdCardTitle": {
+    "zh": "Apache HTTPd CVE-2021-41773",
+    "ja": "Apache HTTPd CVE-2021-41773",
+    "en": "Apache HTTPd CVE-2021-41773"
+  },
+  "vulhubHttpdCardSubtitle": {
+    "zh": "路径规范化缺陷 — 文件读取 + CGI 命令执行 (Apache 2.4.49)",
+    "ja": "パス正規化の欠陥 — ファイル読み取り + CGI コマンド実行 (Apache 2.4.49)",
+    "en": "Path normalization flaw — file read + CGI command execution (Apache 2.4.49)"
+  },
+  "vulhubNacosTitle": {
+    "zh": "Nacos CVE-2021-29441 User-Agent 认证绕过",
+    "ja": "Nacos CVE-2021-29441 User-Agent 認証バイパス",
+    "en": "Nacos CVE-2021-29441 User-Agent Auth Bypass"
+  },
+  "vulhubNacosCardTitle": {
+    "zh": "Nacos CVE-2021-29441",
+    "ja": "Nacos CVE-2021-29441",
+    "en": "Nacos CVE-2021-29441"
+  },
+  "vulhubNacosCardSubtitle": {
+    "zh": "User-Agent: Nacos-Server 绕过认证，枚举/创建用户（< 1.4.1）",
+    "ja": "User-Agent: Nacos-Server で認証バイパス。ユーザーの列挙/作成（< 1.4.1）",
+    "en": "User-Agent: Nacos-Server bypasses auth. Enumerate/create users (< 1.4.1)"
+  },
+  "vulhubPhpTitle": {
+    "zh": "PHP 8.1.0-dev 后门 / CVE-2012-1823 PHP-CGI RCE",
+    "ja": "PHP 8.1.0-dev バックドア / CVE-2012-1823 PHP-CGI RCE",
+    "en": "PHP 8.1.0-dev Backdoor / CVE-2012-1823 PHP-CGI RCE"
+  },
+  "vulhubPhpCardTitle": {
+    "zh": "PHP RCE 系列",
+    "ja": "PHP RCE シリーズ",
+    "en": "PHP RCE Series"
+  },
+  "vulhubPhpCardSubtitle": {
+    "zh": "PHP 8.1.0-dev User-Agentt 后门 + CVE-2012-1823 PHP-CGI 参数注入",
+    "ja": "PHP 8.1.0-dev User-Agentt バックドア + CVE-2012-1823 PHP-CGI パラメーターインジェクション",
+    "en": "PHP 8.1.0-dev User-Agentt backdoor + CVE-2012-1823 PHP-CGI parameter injection"
+  },
+  "vulhubSpringTitle": {
+    "zh": "Spring Framework CVE-2022-22965/22963/CVE-2018-1273/CVE-2017-8046 RCE",
+    "ja": "Spring Framework CVE-2022-22965/22963/CVE-2018-1273/CVE-2017-8046 RCE",
+    "en": "Spring Framework CVE-2022-22965/22963/CVE-2018-1273/CVE-2017-8046 RCE"
+  },
+  "vulhubSpringCardTitle": {
+    "zh": "Spring Framework RCE",
+    "ja": "Spring Framework RCE",
+    "en": "Spring Framework RCE"
+  },
+  "vulhubSpringCardSubtitle": {
+    "zh": "Spring4Shell / Spring Cloud Function / Spring Data SpEL 注入系列",
+    "ja": "Spring4Shell / Spring Cloud Function / Spring Data SpEL インジェクションシリーズ",
+    "en": "Spring4Shell / Spring Cloud Function / Spring Data SpEL injection series"
+  },
+  "vulhubStruts2Title": {
+    "zh": "Apache Struts2 S2-032/045/053/057/059 RCE",
+    "ja": "Apache Struts2 S2-032/045/053/057/059 RCE",
+    "en": "Apache Struts2 S2-032/045/053/057/059 RCE"
+  },
+  "vulhubStruts2CardTitle": {
+    "zh": "Apache Struts2 RCE",
+    "ja": "Apache Struts2 RCE",
+    "en": "Apache Struts2 RCE"
+  },
+  "vulhubStruts2CardSubtitle": {
+    "zh": "S2-032 / S2-045 / S2-053 / S2-057 / S2-059 — OGNL 表达式注入",
+    "ja": "S2-032 / S2-045 / S2-053 / S2-057 / S2-059 — OGNL 式インジェクション",
+    "en": "S2-032 / S2-045 / S2-053 / S2-057 / S2-059 — OGNL expression injection"
+  },
+  "vulhubTomcatTitle": {
+    "zh": "Apache Tomcat CVE-2017-12615 PUT 方法任意文件上传 RCE",
+    "ja": "Apache Tomcat CVE-2017-12615 PUT メソッド任意ファイルアップロード RCE",
+    "en": "Apache Tomcat CVE-2017-12615 PUT Method Arbitrary File Upload RCE"
+  },
+  "vulhubTomcatCardTitle": {
+    "zh": "Apache Tomcat CVE-2017-12615",
+    "ja": "Apache Tomcat CVE-2017-12615",
+    "en": "Apache Tomcat CVE-2017-12615"
+  },
+  "vulhubTomcatCardSubtitle": {
+    "zh": "PUT 方法开启时上传 JSP Webshell 执行命令 (Tomcat 8.5.19)",
+    "ja": "PUT メソッド有効時に JSP Webshell をアップロードしてコマンド実行 (Tomcat 8.5.19)",
+    "en": "Upload JSP Webshell when PUT method is enabled (Tomcat 8.5.19)"
+  },
+  "vulhubWeblogicTitle": {
+    "zh": "Oracle WebLogic CVE-2019-2725/CVE-2020-14882/CVE-2020-14883 RCE",
+    "ja": "Oracle WebLogic CVE-2019-2725/CVE-2020-14882/CVE-2020-14883 RCE",
+    "en": "Oracle WebLogic CVE-2019-2725/CVE-2020-14882/CVE-2020-14883 RCE"
+  },
+  "vulhubWeblogicCardTitle": {
+    "zh": "Oracle WebLogic RCE",
+    "ja": "Oracle WebLogic RCE",
+    "en": "Oracle WebLogic RCE"
+  },
+  "vulhubWeblogicCardSubtitle": {
+    "zh": "XMLDecoder 反序列化 + 控制台未授权 RCE",
+    "ja": "XMLDecoder デシリアライゼーション + コンソール未認証 RCE",
+    "en": "XMLDecoder deserialization + console unauthenticated RCE"
+  },
+  "vulhubXxljobTitle": {
+    "zh": "XXL-JOB 未授权访问执行器 RCE",
+    "ja": "XXL-JOB 未認証アクセス Executor RCE",
+    "en": "XXL-JOB Unauthenticated Executor RCE"
+  },
+  "vulhubXxljobCardTitle": {
+    "zh": "XXL-JOB 未授权 RCE",
+    "ja": "XXL-JOB 未認証 RCE",
+    "en": "XXL-JOB Unauthenticated RCE"
+  },
+  "vulhubXxljobCardSubtitle": {
+    "zh": "执行器接口未授权，通过 GLUE_SHELL 类型提交任意 Shell 命令 (2.2.0)",
+    "ja": "Executor インターフェース未認証。GLUE_SHELL タイプで任意 Shell コマンドを送信 (2.2.0)",
+    "en": "Unauthenticated Executor interface. Submit arbitrary shell commands via GLUE_SHELL type (2.2.0)"
+  },
+  "vulhubAria2BtnListTasks": {
+    "zh": "列出活跃任务",
+    "ja": "アクティブタスクを一覧",
+    "en": "List active tasks"
+  },
+  "vulhubAria2SectionCron": {
+    "zh": "Cron 写入 RCE",
+    "ja": "Cron 書き込み RCE",
+    "en": "Cron write RCE"
+  },
+  "vulhubAria2FieldCronUrl": {
+    "zh": "攻击者 cron 文件 URL",
+    "ja": "攻撃者 cron ファイル URL",
+    "en": "Attacker cron file URL"
+  },
+  "sectionFullTerminal": {
+    "zh": "完整终端",
+    "ja": "フルターミナル",
+    "en": "Full terminal"
+  },
+  "fieldBasicAuth": {
+    "zh": "Basic Auth 凭据",
+    "ja": "Basic Auth 認証情報",
+    "en": "Basic Auth credentials"
+  },
+  "sectionVulnDetect": {
+    "zh": "漏洞检测",
+    "ja": "脆弱性検出",
+    "en": "Vuln detection"
+  },
+  "sectionGroovyRce": {
+    "zh": "Groovy RCE 执行",
+    "ja": "Groovy RCE 実行",
+    "en": "Groovy RCE execution"
+  },
+  "sectionPathTraversal": {
+    "zh": "路径穿越文件读取",
+    "ja": "パストラバーサル ファイル読み取り",
+    "en": "Path traversal file read"
+  },
+  "fieldFilePath": {
+    "zh": "文件路径",
+    "ja": "ファイルパス",
+    "en": "File path"
+  },
+  "sectionCgiRce": {
+    "zh": "CGI RCE（需 mod_cgi 启用）",
+    "ja": "CGI RCE（mod_cgi 有効化が必要）",
+    "en": "CGI RCE (requires mod_cgi enabled)"
+  },
+  "btnReadFile": {
+    "zh": "读取文件",
+    "ja": "ファイルを読み取る",
+    "en": "Read file"
+  },
+  "fieldCoreName": {
+    "zh": "Core 名称",
+    "ja": "Core 名",
+    "en": "Core name"
+  },
+  "sectionCmdExecOob": {
+    "zh": "命令执行（无回显，结合 OOB 验证）",
+    "ja": "コマンド実行（応答なし、OOB で検証）",
+    "en": "Command execution (blind, verify via OOB)"
+  },
+  "sectionCmdExecAutoUpload": {
+    "zh": "命令执行（自动上传 + 执行）",
+    "ja": "コマンド実行（自動アップロード + 実行）",
+    "en": "Command execution (auto-upload + execute)"
+  },
+  "sectionCmdExecOobNeeded": {
+    "zh": "命令执行（无回显，需 OOB）",
+    "ja": "コマンド実行（応答なし、OOB 必要）",
+    "en": "Command execution (no output, OOB required)"
+  },
+  "sectionCmdExecUserAgentInject": {
+    "zh": "命令执行（通过 User-Agent 注入）",
+    "ja": "コマンド実行（User-Agent インジェクション経由）",
+    "en": "Command execution (via User-Agent injection)"
+  },
+  "btnInjectAndTrigger": {
+    "zh": "注入并触发",
+    "ja": "注入して起動",
+    "en": "Inject and trigger"
+  },
+  "sectionCveSelect": {
+    "zh": "CVE 选择",
+    "ja": "CVE 選択",
+    "en": "CVE selection"
+  },
+  "fieldUsername": {
+    "zh": "用户名",
+    "ja": "ユーザー名",
+    "en": "Username"
+  },
+  "fieldPassword": {
+    "zh": "密码",
+    "ja": "パスワード",
+    "en": "Password"
+  },
+  "nacosStep1": {
+    "zh": "Step 1 — 创建/使用管理员账号",
+    "ja": "Step 1 — 管理者アカウントを作成/使用",
+    "en": "Step 1 — Create / use admin account"
+  },
+  "nacosStep3": {
+    "zh": "Step 3 — Cron 反弹 Shell",
+    "ja": "Step 3 — Cron リバースシェル",
+    "en": "Step 3 — Cron reverse shell"
+  },
+  "nacosListUsers": {
+    "zh": "枚举用户",
+    "ja": "ユーザーを列挙",
+    "en": "Enumerate users"
+  },
+  "nacosCreateUser": {
+    "zh": "创建用户",
+    "ja": "ユーザーを作成",
+    "en": "Create user"
+  },
+  "nacosLoginForToken": {
+    "zh": "登录获取 Token",
+    "ja": "ログインして Token を取得",
+    "en": "Login to get Token"
+  },
+  "nacosTokenHint": {
+    "zh": "登录后自动填入",
+    "ja": "ログイン後に自動入力",
+    "en": "Auto-filled after login"
+  },
+  "nacosDerbySql": {
+    "zh": "任意 Derby SQL",
+    "ja": "任意 Derby SQL",
+    "en": "Arbitrary Derby SQL"
+  },
+  "nacosExecSql": {
+    "zh": "执行 SQL",
+    "ja": "SQL を実行",
+    "en": "Execute SQL"
+  },
+  "flaskSstiInjectParam": {
+    "zh": "注入参数名 (GET)",
+    "ja": "注入パラメーター名 (GET)",
+    "en": "Injection parameter (GET)"
+  },
+  "sectionRequestHeaders": {
+    "zh": "请求头",
+    "ja": "リクエストヘッダー",
+    "en": "Request headers"
+  },
+  "fieldCustomHeaders": {
+    "zh": "自定义 Headers",
+    "ja": "カスタム Headers",
+    "en": "Custom headers"
+  },
+  "sectionRequestBody": {
+    "zh": "请求体",
+    "ja": "リクエストボディ",
+    "en": "Request body"
+  },
+  "flaskSstiBodyInject": {
+    "zh": "请求体（{{INJECT}} 为注入点）",
+    "ja": "リクエストボディ（{{INJECT}} が注入点）",
+    "en": "Request body ({{INJECT}} is the injection point)"
+  },
+  "flaskSstiBodyPostOnly": {
+    "zh": "请求体（POST 模式生效）",
+    "ja": "リクエストボディ（POST モードのみ有効）",
+    "en": "Request body (POST mode only)"
+  },
+  "flaskSstiBtnDetect": {
+    "zh": "检测 SSTI",
+    "ja": "SSTI を検出",
+    "en": "Detect SSTI"
+  },
+  "phpFieldFilePath": {
+    "zh": "PHP 文件路径",
+    "ja": "PHP ファイルパス",
+    "en": "PHP file path"
+  },
+  "struts2FieldPath": {
+    "zh": "路径 (005/007/052/053/057)",
+    "ja": "パス (005/007/052/053/057)",
+    "en": "Path (005/007/052/053/057)"
+  },
+  "supervisorBtnDetect": {
+    "zh": "检测 XML-RPC",
+    "ja": "XML-RPC を検出",
+    "en": "Detect XML-RPC"
+  },
+  "xxljobBtnDetect": {
+    "zh": "检测未授权",
+    "ja": "未認証アクセスを検出",
+    "en": "Detect unauthorized access"
+  },
+  "ofbizBtnDetect51467": {
+    "zh": "检测 CVE-2023-51467 (OFBiz 18.12.10)",
+    "ja": "CVE-2023-51467 を検出 (OFBiz 18.12.10)",
+    "en": "Detect CVE-2023-51467 (OFBiz 18.12.10)"
+  },
+  "ofbizBtnDetect38856": {
+    "zh": "检测 CVE-2024-38856 (OFBiz 18.12.11)",
+    "ja": "CVE-2024-38856 を検出 (OFBiz 18.12.11)",
+    "en": "Detect CVE-2024-38856 (OFBiz 18.12.11)"
+  },
+  "tomcatFieldPath": {
+    "zh": "上传路径",
+    "ja": "アップロードパス",
+    "en": "Upload path"
+  },
+  "expTagGeneric": {
+    "zh": "通用",
+    "ja": "汎用",
+    "en": "Generic"
+  },
+  "expTagZentao": {
+    "zh": "禅道",
+    "ja": "Zentao",
+    "en": "Zentao"
+  },
+  "expSubtitleShiro": {
+    "zh": "rememberMe Key 爆破 / Payload 注入",
+    "ja": "rememberMe Key 爆破 / Payload 注入",
+    "en": "rememberMe key bruteforce / Payload injection"
+  },
+  "expVersionShiro": {
+    "zh": "Shiro: <=1.2.4 | 条件: rememberMe 默认密钥场景",
+    "ja": "Shiro: <=1.2.4 | 条件: rememberMe デフォルトキーのケース",
+    "en": "Shiro: <=1.2.4 | Condition: default rememberMe key"
+  },
+  "expSubtitleThinkphp": {
+    "zh": "3.x/5.x/6.x 漏洞检测、RCE、GetShell",
+    "ja": "3.x/5.x/6.x の脆弱性検出・RCE・GetShell",
+    "en": "3.x/5.x/6.x vuln detection, RCE, GetShell"
+  },
+  "expVersionThinkphp": {
+    "zh": "ThinkPHP: 2.x / <=5.0.23 / 5.0.22/5.1.29 | 条件: 路由/调用链可达",
+    "ja": "ThinkPHP: 2.x / <=5.0.23 / 5.0.22/5.1.29 | 条件: ルート/呼び出し連鎖到達可能",
+    "en": "ThinkPHP: 2.x / <=5.0.23 / 5.0.22/5.1.29 | Condition: route/gadget chain reachable"
+  },
+  "expSubtitleZentao": {
+    "zh": "绕过登录 · Repo 配置写入冰蝎 WebShell",
+    "ja": "ログインバイパス · Repo 設定で Behinder WebShell を書き込み",
+    "en": "Login bypass · Write Behinder WebShell via Repo config"
+  },
+  "expVersionZentao": {
+    "zh": "Zentao: 请按官方公告版本区间核对 | 条件: 漏洞链路可达",
+    "ja": "Zentao: 公式アドバイザリのバージョンを参照 | 条件: 攻撃連鎖到達可能",
+    "en": "Zentao: see official advisory range | Condition: exploit path reachable"
+  },
+  "expSubtitleStruts2": {
+    "zh": "OGNL 表达式注入 RCE 系列",
+    "ja": "OGNL 式インジェクション RCE シリーズ",
+    "en": "OGNL expression injection RCE series"
+  },
+  "expVersionStruts2": {
+    "zh": "Struts2: S2-032=2.3.20-2.3.28(除2.3.20.3/2.3.24.3); S2-045/053/057/059=2.0.0-2.5.20 | 条件: 对应 OGNL 触发面存在",
+    "ja": "Struts2: S2-032=2.3.20-2.3.28(2.3.20.3/2.3.24.3 除く); S2-045/053/057/059=2.0.0-2.5.20 | 条件: 対応する OGNL トリガー面が存在",
+    "en": "Struts2: S2-032=2.3.20-2.3.28(except 2.3.20.3/2.3.24.3); S2-045/053/057/059=2.0.0-2.5.20 | Condition: matching OGNL trigger surface present"
+  },
+  "expSubtitleSpring": {
+    "zh": "Spring4Shell / Cloud Function / Data SpEL 注入系列",
+    "ja": "Spring4Shell / Cloud Function / Data SpEL インジェクションシリーズ",
+    "en": "Spring4Shell / Cloud Function / Data SpEL injection series"
+  },
+  "expVersionSpring": {
+    "zh": "Spring: 22965=5.3.17; 22963=SCF 3.2.2; 1273=Data Commons<=2.0.5; 8046=Data REST 2.6.6 | 条件: 各 CVE 对应部署方式满足",
+    "ja": "Spring: 22965=5.3.17; 22963=SCF 3.2.2; 1273=Data Commons<=2.0.5; 8046=Data REST 2.6.6 | 条件: 各 CVE のデプロイ条件を満たす",
+    "en": "Spring: 22965=5.3.17; 22963=SCF 3.2.2; 1273=Data Commons<=2.0.5; 8046=Data REST 2.6.6 | Condition: deployment matches each CVE"
+  },
+  "expSubtitleHttpd": {
+    "zh": "路径规范化缺陷 — 路径穿越文件读取 + CGI RCE",
+    "ja": "パス正規化の不具合 — パストラバーサル + CGI RCE",
+    "en": "Path normalization flaw — path traversal + CGI RCE"
+  },
+  "expVersionHttpd": {
+    "zh": "HTTPd: =2.4.49 | 条件: 目录访问配置允许穿越",
+    "ja": "HTTPd: =2.4.49 | 条件: ディレクトリ設定がトラバーサルを許可",
+    "en": "HTTPd: =2.4.49 | Condition: directory config allows traversal"
+  },
+  "expSubtitleDruid": {
+    "zh": "嵌入式 JavaScript 代码注入 RCE (≤ 0.20.0)",
+    "ja": "組み込み JavaScript コード注入 RCE (≤ 0.20.0)",
+    "en": "Embedded JavaScript code injection RCE (≤ 0.20.0)"
+  },
+  "expVersionDruid": {
+    "zh": "Druid: <=0.20.0 | 条件: sampler/indexer 接口可访问",
+    "ja": "Druid: <=0.20.0 | 条件: sampler/indexer エンドポイントへアクセス可能",
+    "en": "Druid: <=0.20.0 | Condition: sampler/indexer endpoints reachable"
+  },
+  "expSubtitleOfbiz": {
+    "zh": "Groovy 代码注入无需认证 RCE",
+    "ja": "認証不要の Groovy コード注入 RCE",
+    "en": "Unauthenticated Groovy code injection RCE"
+  },
+  "expVersionOfbiz": {
+    "zh": "OFBiz: 18.12.10 / 18.12.11 | 条件: ProgramExport 路径可达",
+    "ja": "OFBiz: 18.12.10 / 18.12.11 | 条件: ProgramExport パスが到達可能",
+    "en": "OFBiz: 18.12.10 / 18.12.11 | Condition: ProgramExport path reachable"
+  },
+  "expSubtitleSolr": {
+    "zh": "RunExecutableListener 任意命令执行 (< 7.1.0)",
+    "ja": "RunExecutableListener 任意コマンド実行 (< 7.1.0)",
+    "en": "RunExecutableListener arbitrary command execution (< 7.1.0)"
+  },
+  "expVersionSolr": {
+    "zh": "Solr: <7.1.0 | 条件: config API 可写 listener",
+    "ja": "Solr: <7.1.0 | 条件: config API でリスナー書き込み可能",
+    "en": "Solr: <7.1.0 | Condition: config API can write listener"
+  },
+  "expSubtitleDrupal": {
+    "zh": "Form API #post_render 回调 PHP 代码执行",
+    "ja": "Form API #post_render コールバックによる PHP 実行",
+    "en": "Form API #post_render callback PHP execution"
+  },
+  "expVersionDrupal": {
+    "zh": "Drupal: <7.58; 8.x<8.3.9/<8.4.6/<8.5.1 | 条件: Form API 路径可达",
+    "ja": "Drupal: <7.58; 8.x<8.3.9/<8.4.6/<8.5.1 | 条件: Form API パス到達可能",
+    "en": "Drupal: <7.58; 8.x<8.3.9/<8.4.6/<8.5.1 | Condition: Form API path reachable"
+  },
+  "expSubtitleElastic": {
+    "zh": "Groovy 脚本沙箱逃逸 RCE (< 1.3.8 / < 1.4.3)",
+    "ja": "Groovy スクリプトサンドボックス回避 RCE (< 1.3.8 / < 1.4.3)",
+    "en": "Groovy script sandbox escape RCE (< 1.3.8 / < 1.4.3)"
+  },
+  "expVersionElastic": {
+    "zh": "Elasticsearch: <1.3.8 或 <1.4.3 | 条件: 动态脚本执行可用",
+    "ja": "Elasticsearch: <1.3.8 または <1.4.3 | 条件: 動的スクリプト実行が有効",
+    "en": "Elasticsearch: <1.3.8 or <1.4.3 | Condition: dynamic scripting enabled"
+  },
+  "expSubtitleFlaskSsti": {
+    "zh": "服务端模板注入执行任意 Python 代码",
+    "ja": "サーバーサイドテンプレートインジェクションで任意 Python 実行",
+    "en": "Server-side template injection executes arbitrary Python code"
+  },
+  "expVersionFlaskSsti": {
+    "zh": "Flask/Jinja2: 取决于组件版本 | 条件: 存在 SSTI 模板注入点",
+    "ja": "Flask/Jinja2: コンポーネント次第 | 条件: SSTI 注入点が存在",
+    "en": "Flask/Jinja2: depends on components | Condition: SSTI injection point exists"
+  },
+  "expTitlePhp": {
+    "zh": "PHP 8.1.0-dev 后门 / CVE-2012-1823 PHP-CGI",
+    "ja": "PHP 8.1.0-dev バックドア / CVE-2012-1823 PHP-CGI",
+    "en": "PHP 8.1.0-dev backdoor / CVE-2012-1823 PHP-CGI"
+  },
+  "expSubtitlePhp": {
+    "zh": "User-Agentt 后门 + CGI 参数注入 RCE",
+    "ja": "User-Agentt バックドア + CGI 引数インジェクション RCE",
+    "en": "User-Agentt backdoor + CGI argument injection RCE"
+  },
+  "expVersionPhp": {
+    "zh": "PHP: 8.1.0-dev 或 CGI<5.3.12/<5.4.2 | 条件: 后门头/CGI 参数可达",
+    "ja": "PHP: 8.1.0-dev または CGI<5.3.12/<5.4.2 | 条件: バックドアヘッダ/CGI 引数到達可能",
+    "en": "PHP: 8.1.0-dev or CGI<5.3.12/<5.4.2 | Condition: backdoor header / CGI args reachable"
+  },
+  "expSubtitleTomcat": {
+    "zh": "PUT 方法开启时上传 JSP Webshell RCE",
+    "ja": "PUT メソッド有効時に JSP Webshell をアップロードして RCE",
+    "en": "Upload JSP Webshell when PUT method is enabled"
+  },
+  "expVersionTomcat": {
+    "zh": "Tomcat: 8.5.19 | 条件: DefaultServlet readonly=false",
+    "ja": "Tomcat: 8.5.19 | 条件: DefaultServlet readonly=false",
+    "en": "Tomcat: 8.5.19 | Condition: DefaultServlet readonly=false"
+  },
+  "expSubtitleWeblogic": {
+    "zh": "XMLDecoder 反序列化 + 控制台未授权 + WS 测试页文件上传 RCE",
+    "ja": "XMLDecoder デシリアライゼーション + コンソール未認証 + WS テストページファイルアップロード RCE",
+    "en": "XMLDecoder deserialization + console unauth + WS test page upload RCE"
+  },
+  "expVersionWeblogic": {
+    "zh": "WebLogic: 10271<10.3.6; 14882/14883=12.2.1.3(12.2.1+) | 条件: 控制台/组件路径可达",
+    "ja": "WebLogic: 10271<10.3.6; 14882/14883=12.2.1.3(12.2.1+) | 条件: コンソール/コンポーネント到達可能",
+    "en": "WebLogic: 10271<10.3.6; 14882/14883=12.2.1.3(12.2.1+) | Condition: console/component reachable"
+  },
+  "expTitleXxljob": {
+    "zh": "XXL-JOB 未授权访问执行器 RCE",
+    "ja": "XXL-JOB 未認証 Executor アクセス RCE",
+    "en": "XXL-JOB unauthenticated executor RCE"
+  },
+  "expSubtitleXxljob": {
+    "zh": "GLUE_SHELL 类型提交任意 Shell 命令 (2.2.0)",
+    "ja": "GLUE_SHELL タイプで任意 Shell コマンド送信 (2.2.0)",
+    "en": "Submit arbitrary shell commands via GLUE_SHELL type (2.2.0)"
+  },
+  "expVersionXxljob": {
+    "zh": "XXL-JOB: 按官方公告核对 | 条件: 未授权访问执行器接口",
+    "ja": "XXL-JOB: 公式アドバイザリで確認 | 条件: Executor 未認証アクセス",
+    "en": "XXL-JOB: cross-check official advisory | Condition: unauthenticated executor"
+  },
+  "expSubtitleNacos": {
+    "zh": "User-Agent 认证绕过，枚举/创建用户 (< 1.4.1)",
+    "ja": "User-Agent 認証バイパスでユーザー列挙/作成 (< 1.4.1)",
+    "en": "User-Agent auth bypass, enumerate/create users (< 1.4.1)"
+  },
+  "expVersionNacos": {
+    "zh": "Nacos: <1.4.1 | 条件: User-Agent 绕过链可达",
+    "ja": "Nacos: <1.4.1 | 条件: User-Agent バイパス連鎖到達可能",
+    "en": "Nacos: <1.4.1 | Condition: User-Agent bypass chain reachable"
+  },
+  "menuEnterSuo5": {
+    "zh": "进入 suo5 代理",
+    "ja": "suo5 プロキシへ",
+    "en": "Open suo5 Proxy"
+  },
+  "menuEnterSuoTunnel": {
+    "zh": "进入 suo5",
+    "ja": "suo5 へ",
+    "en": "Open suo5"
+  },
+  "titleSuo5Manager": {
+    "zh": "suo5 代理",
+    "ja": "suo5 プロキシ",
+    "en": "suo5 Proxy"
+  },
+  "suo5ManagementTitle": {
+    "zh": "suo5 · {projectName}",
+    "ja": "suo5 · {projectName}",
+    "en": "suo5 · {projectName}"
+  },
+  "actionAddSuo5": {
+    "zh": "添加 suo5 代理",
+    "ja": "suo5 プロキシを追加",
+    "en": "Add suo5 Proxy"
+  },
+  "suo5NewConfigTitle": {
+    "zh": "新建 suo5 代理",
+    "ja": "新規 suo5 プロキシ",
+    "en": "New suo5 Proxy"
+  },
+  "suo5EditConfigTitle": {
+    "zh": "编辑 suo5 代理",
+    "ja": "suo5 プロキシを編集",
+    "en": "Edit suo5 Proxy"
+  },
+  "suo5ConfigName": {
+    "zh": "配置名称",
+    "ja": "設定名",
+    "en": "Profile name"
+  },
+  "suo5ConfigNameHint": {
+    "zh": "便于识别的名称",
+    "ja": "識別しやすい名前",
+    "en": "A friendly name"
+  },
+  "suo5TargetUrl": {
+    "zh": "suo5 URL",
+    "ja": "suo5 URL",
+    "en": "suo5 URL"
+  },
+  "suo5TargetUrlHint": {
+    "zh": "https://target/path/suo5.php",
+    "ja": "https://target/path/suo5.php",
+    "en": "https://target/path/suo5.php"
+  },
+  "suo5ListenHost": {
+    "zh": "监听地址",
+    "ja": "リッスンアドレス",
+    "en": "Listen host"
+  },
+  "suo5ListenPort": {
+    "zh": "监听端口",
+    "ja": "リッスンポート",
+    "en": "Listen port"
+  },
+  "suo5Count": {
+    "zh": "共 {n} 条",
+    "ja": "計 {n} 件",
+    "en": "{n} total"
+  },
+  "suo5EmptyHint": {
+    "zh": "暂无 suo5 代理，点击「{addLabel}」开始",
+    "ja": "suo5 プロキシがありません。「{addLabel}」をクリックして開始",
+    "en": "No suo5 proxy yet. Click \"{addLabel}\" to get started"
+  },
+  "confirmDeleteSuo5": {
+    "zh": "确定要删除「{name}」吗？此操作不可恢复。",
+    "ja": "「{name}」を削除してもよろしいですか？この操作は元に戻せません。",
+    "en": "Delete \"{name}\"? This action cannot be undone."
+  },
+  "suo5StatusRunning": {
+    "zh": "运行中",
+    "ja": "実行中",
+    "en": "Running"
+  },
+  "suo5StatusConnecting": {
+    "zh": "连接中",
+    "ja": "接続中",
+    "en": "Connecting"
+  },
+  "suo5StatusError": {
+    "zh": "错误",
+    "ja": "エラー",
+    "en": "Error"
+  },
+  "suo5StatusIdle": {
+    "zh": "空闲",
+    "ja": "待機中",
+    "en": "Idle"
+  },
+  "suo5InvalidUrl": {
+    "zh": "URL 必须是 http/https",
+    "ja": "URL は http/https である必要があります",
+    "en": "URL must be http/https"
+  },
+  "suo5InvalidPort": {
+    "zh": "监听端口不合法",
+    "ja": "リッスンポートが無効です",
+    "en": "Listen port is invalid"
+  },
+  "suo5MissingUrl": {
+    "zh": "请填写 suo5 URL",
+    "ja": "suo5 URL を入力してください",
+    "en": "Please enter the suo5 URL"
+  },
+  "suo5RunningNoEdit": {
+    "zh": "运行中不可编辑",
+    "ja": "実行中は編集できません",
+    "en": "Cannot edit while running"
+  },
+  "suo5StatActiveConn": {
+    "zh": "连接数",
+    "ja": "接続数",
+    "en": "Conns"
+  },
+  "suo5StatUpload": {
+    "zh": "上传",
+    "ja": "アップロード",
+    "en": "Upload"
+  },
+  "suo5StatDownload": {
+    "zh": "下载",
+    "ja": "ダウンロード",
+    "en": "Download"
+  },
+  "suo5RunLog": {
+    "zh": "运行日志",
+    "ja": "実行ログ",
+    "en": "Run log"
+  },
+  "suo5NoLogs": {
+    "zh": "> 尚无日志",
+    "ja": "> ログなし",
+    "en": "> No logs yet"
+  },
+  "suo5LogCopiedSnack": {
+    "zh": "日志已复制",
+    "ja": "ログをコピーしました",
+    "en": "Logs copied"
+  },
+  "suo5HandshakeOk": {
+    "zh": "握手成功",
+    "ja": "ハンドシェイク成功",
+    "en": "Handshake OK"
+  },
+  "suo5HandshakeFailed": {
+    "zh": "握手失败: {e}",
+    "ja": "ハンドシェイク失敗: {e}",
+    "en": "Handshake failed: {e}"
+  },
+  "suo5BtnProbe": {
+    "zh": "测试握手",
+    "ja": "ハンドシェイク確認",
+    "en": "Probe"
+  },
+  "suoProbeHandshakeLoading": {
+    "zh": "正在测试与服务端的握手…",
+    "ja": "サーバーとのハンドシェイクを確認しています…",
+    "en": "Testing handshake with server…"
+  },
+  "suoHandshakeResultTitle": {
+    "zh": "握手结果",
+    "ja": "ハンドシェイク結果",
+    "en": "Handshake result"
+  },
+  "suo5MappingLabel": {
+    "zh": "本地监听",
+    "ja": "ローカルリッスン",
+    "en": "Local listen"
+  },
+  "suo5ActiveBanner": {
+    "zh": "{statusLabel} · {name}",
+    "ja": "{statusLabel} · {name}",
+    "en": "{statusLabel} · {name}"
+  },
+  "suo5HeaderRunningSummary": {
+    "zh": "运行中 {running} / {total}",
+    "ja": "実行中 {running} / {total}",
+    "en": "Running {running} / {total}"
+  },
+  "menuSuoTunnel": {
+    "zh": "suo5",
+    "ja": "suo5",
+    "en": "suo5"
+  },
+  "titleSuoTunnelManager": {
+    "zh": "suo5",
+    "ja": "suo5",
+    "en": "suo5"
+  },
+  "suoTunnelManagementTitle": {
+    "zh": "SOCKS · {projectName}",
+    "ja": "SOCKS · {projectName}",
+    "en": "SOCKS · {projectName}"
+  },
+  "actionAddSuoTunnel": {
+    "zh": "添加代理",
+    "ja": "プロキシを追加",
+    "en": "Add proxy"
+  },
+  "tooltipWebshellOneClickTunnel": {
+    "zh": "创建 suo 隧道",
+    "ja": "suo トンネルを作成",
+    "en": "Create suo tunnel"
+  },
+  "webshellJspSuoTunnelPickTitle": {
+    "zh": "选择隧道协议",
+    "ja": "トンネル方式を選択",
+    "en": "Choose tunnel protocol"
+  },
+  "webshellJspSuoTunnelPickBody": {
+    "zh": "JSP 环境请选用 suo5 或 suo6。冰蝎连接器会优先尝试对应内存马；失败且支持写文件时再上传 jsp 脚本。",
+    "ja": "JSP では suo5 または suo6 を選びます。Behinder 接続時はメモリ注入を優先し、失敗時は JSP をアップロードします。",
+    "en": "Pick suo5 or suo6 for JSP. With Behinder, memory injection is tried first; on failure, the jsp file is uploaded if the shell is writable."
+  },
+  "webshellOneClickTunnelUnavailable": {
+    "zh": "当前 Shell 无法一键创建隧道（JSP 需可写或冰蝎；PHP/ASPX 需可写与内置脚本）",
+    "ja": "この Shell ではトンネルを作成できません",
+    "en": "Cannot create tunnel for this shell"
+  },
+  "webshellOneClickTunnelNeedConn": {
+    "zh": "请先连接 Shell",
+    "ja": "先に Shell に接続してください",
+    "en": "Connect to the shell first"
+  },
+  "webshellOneClickTunnelPayloadMissing": {
+    "zh": "本地未找到所需隧道脚本（如 suo5.jsp / suo6.jsp），请在「载荷」页同步默认数据",
+    "ja": "必要なトンネル用 JSP がありません。「ペイロード」で既定を同期してください",
+    "en": "Tunnel script not in library (e.g. suo5.jsp / suo6.jsp). Sync defaults on the Payloads page"
+  },
+  "webshellOneClickTunnelUploadFailed": {
+    "zh": "上传隧道脚本到 Webshell 目录失败",
+    "ja": "トンネルスクリプトのアップロードに失敗しました",
+    "en": "Failed to upload tunnel script beside the webshell"
+  },
+  "suoTunnelNewConfigTitle": {
+    "zh": "新建代理",
+    "ja": "新規プロキシ",
+    "en": "New proxy"
+  },
+  "suoTunnelEditConfigTitle": {
+    "zh": "编辑代理",
+    "ja": "プロキシを編集",
+    "en": "Edit proxy"
+  },
+  "suoTunnelProtocol": {
+    "zh": "协议版本",
+    "ja": "プロトコル",
+    "en": "Protocol"
+  },
+  "suoTunnelProtocolSuo5": {
+    "zh": "suo5",
+    "ja": "suo5",
+    "en": "suo5"
+  },
+  "suoTunnelProtocolSuo6": {
+    "zh": "suo6",
+    "ja": "suo6",
+    "en": "suo6"
+  },
+  "suoTunnelRunLog": {
+    "zh": "运行日志",
+    "ja": "実行ログ",
+    "en": "Run log"
+  },
+  "suoTunnelEmptyHint": {
+    "zh": "暂无配置，点击「{addLabel}」添加",
+    "ja": "設定がありません。「{addLabel}」から追加",
+    "en": "No profiles. Tap \"{addLabel}\" to add one."
+  },
+  "suoTunnelCount": {
+    "zh": "共 {n} 条",
+    "ja": "全 {n} 件",
+    "en": "{n} total"
+  },
+  "suoTunnelProfileCreatedSnack": {
+    "zh": "代理配置已保存",
+    "ja": "プロキシを保存しました",
+    "en": "Proxy profile saved"
+  },
+  "suoTunnelProtocolSwitchTitle": {
+    "zh": "切换协议版本",
+    "ja": "プロトコルを変更",
+    "en": "Change protocol"
+  },
+  "suoTunnelProtocolSwitchBody": {
+    "zh": "将删除当前配置并以相同监听地址与目标 URL 新建另一条记录。确定继续？",
+    "ja": "現在の設定を削除し、同じ URL/ポートで新規作成します。続行しますか？",
+    "en": "This removes the current profile and creates a new one with the same URL and listen settings. Continue?"
+  },
+  "confirmDeleteSuo6": {
+    "zh": "确定删除配置「{name}」？",
+    "ja": "設定「{name}」を削除しますか？",
+    "en": "Delete config \"{name}\"?"
+  },
+  "suo6MissingUrl": {
+    "zh": "请填写 suo6 URL",
+    "ja": "suo6 URL を入力してください",
+    "en": "Please enter the suo6 URL"
+  },
+  "obfuscateUploadLabel": {
+    "zh": "混淆压缩上传",
+    "ja": "難読化・圧縮アップロード",
+    "en": "Obfuscate & compress on upload"
+  },
+  "obfuscateUploadTooltip": {
+    "zh": "上传前混淆压缩（PHP/JSP/ASPX/ASP），防止代码泄露并压缩体积",
+    "ja": "アップロード前に難読化・圧縮（PHP/JSP/ASPX/ASP）、ソース隠蔽＋サイズ削減",
+    "en": "Obfuscate & compress before upload (PHP/JSP/ASPX/ASP) — hides source and reduces size"
+  },
+  "obfuscateModeOn": {
+    "zh": "混淆模式已开启，下次 Payload 上传将自动混淆压缩",
+    "ja": "難読化モード ON：次回 Payload アップロード時に自動で難読化・圧縮",
+    "en": "Obfuscate mode ON — next payload upload will be obfuscated"
+  },
+  "obfuscateModeOff": {
+    "zh": "混淆模式已关闭",
+    "ja": "難読化モード OFF",
+    "en": "Obfuscate mode OFF"
+  },
+  "tooltipDeobfuscate": {
+    "zh": "还原混淆代码",
+    "ja": "難読化を解除",
+    "en": "Deobfuscate"
+  },
+  "tooltipShowObfuscated": {
+    "zh": "显示混淆原文",
+    "ja": "難読化済みを表示",
+    "en": "Show obfuscated source"
+  },
+  "obfuscatedFileDialogTitle": {
+    "zh": "检测到混淆文件",
+    "ja": "難読化ファイルを検出",
+    "en": "Obfuscated file detected"
+  },
+  "obfuscatedFileDialogMsg": {
+    "zh": "此文件包含混淆压缩的代码，是否保存还原后的版本？",
+    "ja": "このファイルは難読化・圧縮されたコードを含みます。復元バージョンを保存しますか？",
+    "en": "This file contains obfuscated/compressed code. Save the deobfuscated version?"
+  },
+  "btnSaveDeobfuscated": {
+    "zh": "保存还原版",
+    "ja": "復元版を保存",
+    "en": "Save deobfuscated"
+  },
+  "btnSaveAsIs": {
+    "zh": "保存原始",
+    "ja": "そのまま保存",
+    "en": "Save as-is"
+  }
+}
