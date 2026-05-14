@@ -102,7 +102,6 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
           }
 
           return AlertDialog(
-            backgroundColor: AppColors.bgCard,
             title: Text(
               S.actionAddWebshell,
               style: AppTextStyles.heading(color: AppColors.primary),
@@ -275,7 +274,6 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
           }
 
           return AlertDialog(
-            backgroundColor: AppColors.bgCard,
             title: Text(
               S.titleEditWebshell,
               style: AppTextStyles.heading(color: AppColors.primary),
@@ -400,7 +398,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
+        shape: MatrixDialogStyle.outlineDanger(0.28),
         title: Text(S.btnDelete, style: const TextStyle(color: AppColors.red)),
         content: Text(
           S.confirmDeleteWebshell(ws.name),

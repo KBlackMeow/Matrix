@@ -67,7 +67,7 @@ class PayloadDao {
     final db = await _databaseProvider();
     final maps = await db.query(
       'payloads',
-      orderBy: 'is_default DESC, updated_at DESC',
+      orderBy: 'name COLLATE NOCASE ASC',
     );
     final result = <Payload>[];
     for (final m in maps) {

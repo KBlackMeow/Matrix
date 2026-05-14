@@ -70,10 +70,57 @@ class AppTextStyles {
       );
 }
 
-/// FRP、suo5/6 与一键创建隧道等入口的共用图标（侧栏、页头、工具栏一致）。
+/// suo5/6 与一键创建隧道等入口的共用图标（侧栏、页头、工具栏一致）。
 abstract final class AppTunnelIcons {
   AppTunnelIcons._();
 
   static const IconData outlined = Icons.route_outlined;
   static const IconData filled = Icons.route;
+}
+
+/// FRP 客户端（侧栏、页头）；与 [AppTunnelIcons] 区分。
+abstract final class AppFrpIcons {
+  AppFrpIcons._();
+
+  static const IconData outlined = Icons.router_outlined;
+  static const IconData filled = Icons.router;
+}
+
+/// 弹窗与 [ThemeData.dialogTheme] 共用的圆角、描边与遮罩。
+abstract final class MatrixDialogStyle {
+  MatrixDialogStyle._();
+
+  static const double radius = 14;
+
+  /// 与页面背景同色相的暗色 scrim（略偏绿）。
+  static Color get barrier => const Color(0xE6081010);
+
+  static ShapeBorder outlinePrimary([double alpha = 0.28]) =>
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radius),
+        side: BorderSide(
+          color: AppColors.primary.withValues(alpha: alpha),
+          width: 1,
+        ),
+      );
+
+  static ShapeBorder outlineDanger([double alpha = 0.32]) =>
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radius),
+        side: BorderSide(
+          color: AppColors.red.withValues(alpha: alpha),
+          width: 1,
+        ),
+      );
+
+  static ShapeBorder outlineMuted() => RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radius),
+        side: const BorderSide(color: AppColors.borderGlow, width: 1),
+      );
+
+  static ShapeBorder outlineAccent(Color accent, [double alpha = 0.28]) =>
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radius),
+        side: BorderSide(color: accent.withValues(alpha: alpha), width: 1),
+      );
 }

@@ -58,7 +58,6 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
         title: Text(
           S.btnCreate,
           style: AppTextStyles.heading(color: AppColors.primary),
@@ -176,7 +175,6 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
         title: Text(
           S.titleEditProject(project.id),
           style: AppTextStyles.heading(color: AppColors.primary),
@@ -294,7 +292,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
+        shape: MatrixDialogStyle.outlineDanger(0.28),
         title: Text(S.btnDelete, style: const TextStyle(color: AppColors.red)),
         content: Text(
           S.confirmDeleteProject(project.name),
@@ -455,7 +453,6 @@ class _ProjectCardState extends State<_ProjectCard> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
         title: Text(
           S.dialogChooseProjectEntryTitle,
           style: AppTextStyles.heading(color: AppColors.primary),

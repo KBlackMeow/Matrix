@@ -447,7 +447,6 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
         title: Text(
           S.noProjectTitle,
           style: AppTextStyles.heading(color: AppColors.primary),
@@ -1027,7 +1026,6 @@ class _ProjectPickerDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: AppColors.bgCard,
       title: Text(
         S.titleSelectProject,
         style: AppTextStyles.heading(color: AppColors.primary),

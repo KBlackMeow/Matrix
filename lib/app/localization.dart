@@ -187,11 +187,11 @@ class S {
   static String get menuFrp {
     switch (_lang) {
       case AppLanguage.zh:
-        return 'FRP隧道';
+        return 'FRP 客户端';
       case AppLanguage.ja:
-        return 'FRP トンネル';
+        return 'FRP クライアント';
       case AppLanguage.en:
-        return 'FRP Tunnel';
+        return 'FRP Client';
     }
   }
 
@@ -3716,15 +3716,15 @@ class S {
     }
   }
 
-  // --- FRP tunnel ---
+  // --- FRP client ---
   static String get frpTunnelTitle {
     switch (_lang) {
       case AppLanguage.zh:
-        return 'FRP 隧道客户端';
+        return 'FRP 客户端';
       case AppLanguage.ja:
-        return 'FRP トンネルクライアント';
+        return 'FRP クライアント';
       case AppLanguage.en:
-        return 'FRP Tunnel Client';
+        return 'FRP Client';
     }
   }
 
@@ -6334,6 +6334,28 @@ class S {
     }
   }
 
+  static String get suoProbeHandshakeLoading {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '正在测试与服务端的握手…';
+      case AppLanguage.ja:
+        return 'サーバーとのハンドシェイクを確認しています…';
+      case AppLanguage.en:
+        return 'Testing handshake with server…';
+    }
+  }
+
+  static String get suoHandshakeResultTitle {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '握手结果';
+      case AppLanguage.ja:
+        return 'ハンドシェイク結果';
+      case AppLanguage.en:
+        return 'Handshake result';
+    }
+  }
+
   static String get suo5MappingLabel {
     switch (_lang) {
       case AppLanguage.zh:
@@ -6418,11 +6440,33 @@ class S {
   static String get tooltipWebshellOneClickTunnel {
     switch (_lang) {
       case AppLanguage.zh:
-        return '创建suo隧道';
+        return '创建 suo 隧道';
       case AppLanguage.ja:
-        return 'suoトンネルを作成';
+        return 'suo トンネルを作成';
       case AppLanguage.en:
         return 'Create suo tunnel';
+    }
+  }
+
+  static String get webshellJspSuoTunnelPickTitle {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return '选择隧道协议';
+      case AppLanguage.ja:
+        return 'トンネル方式を選択';
+      case AppLanguage.en:
+        return 'Choose tunnel protocol';
+    }
+  }
+
+  static String get webshellJspSuoTunnelPickBody {
+    switch (_lang) {
+      case AppLanguage.zh:
+        return 'JSP 环境请选用 suo5 或 suo6。冰蝎连接器会优先尝试对应内存马；失败且支持写文件时再上传 jsp 脚本。';
+      case AppLanguage.ja:
+        return 'JSP では suo5 または suo6 を選びます。Behinder 接続時はメモリ注入を優先し、失敗時は JSP をアップロードします。';
+      case AppLanguage.en:
+        return 'Pick suo5 or suo6 for JSP. With Behinder, memory injection is tried first; on failure, the jsp file is uploaded if the shell is writable.';
     }
   }
 
@@ -6451,11 +6495,11 @@ class S {
   static String get webshellOneClickTunnelPayloadMissing {
     switch (_lang) {
       case AppLanguage.zh:
-        return '本地未找到该 suo5 载荷，请在「载荷」页同步默认数据';
+        return '本地未找到所需隧道脚本（如 suo5.jsp / suo6.jsp），请在「载荷」页同步默认数据';
       case AppLanguage.ja:
-        return 'suo5 ペイロードがありません。「ペイロード」で同期してください';
+        return '必要なトンネル用 JSP がありません。「ペイロード」で既定を同期してください';
       case AppLanguage.en:
-        return 'Payload not in library. Sync defaults on the Payloads page';
+        return 'Tunnel script not in library (e.g. suo5.jsp / suo6.jsp). Sync defaults on the Payloads page';
     }
   }
 

@@ -131,8 +131,9 @@ class DatabaseHelperWeb {
   }
 
   Future<List<Payload>> getAllPayloads() async {
-    return List.from(_payloads)
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final copy = List<Payload>.from(_payloads);
+    copy.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return copy;
   }
 
   Future<int> updatePayload(Payload payload) async {

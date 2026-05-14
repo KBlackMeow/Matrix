@@ -79,6 +79,110 @@ class _MergedEntry {
   DateTime get updatedAt => isS6 ? p6!.updatedAt : p5!.updatedAt;
 }
 
+/// 单一路由：加载 → 结果，仅一次 [Navigator.pop]，避免残留遮罩导致无法操作。
+class _SuoHandshakeProbeDialog extends StatefulWidget {
+  const _SuoHandshakeProbeDialog({required this.runProbe});
+
+  final Future<void> Function() runProbe;
+
+  @override
+  State<_SuoHandshakeProbeDialog> createState() => _SuoHandshakeProbeDialogState();
+}
+
+class _SuoHandshakeProbeDialogState extends State<_SuoHandshakeProbeDialog> {
+  bool _loading = true;
+  Object? _err;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _run());
+  }
+
+  Future<void> _run() async {
+    Object? err;
+    try {
+      await widget.runProbe();
+    } catch (e) {
+      err = e;
+    }
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _err = err;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  S.suoProbeHandshakeLoading,
+                  style: AppTextStyles.body(size: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final ok = _err == null;
+    final bodyText =
+        ok ? S.suo5HandshakeOk : S.suo5HandshakeFailed(_err as Object);
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        title: Text(
+          S.suoHandshakeResultTitle,
+          style: AppTextStyles.heading(
+            size: 16,
+            color: ok ? AppColors.primary : AppColors.red,
+          ),
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440, maxHeight: 360),
+          child: SingleChildScrollView(
+            child: SelectableText(
+              bodyText,
+              style: AppTextStyles.body(
+                size: 13,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            style: FilledButton.styleFrom(
+              backgroundColor: ok
+                  ? AppColors.primary.withValues(alpha: 0.22)
+                  : AppColors.red.withValues(alpha: 0.2),
+              foregroundColor: ok ? AppColors.primary : AppColors.red,
+            ),
+            child: Text(S.btnConfirm),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
   final DatabaseHelper _db = DatabaseHelper();
   final Suo5ClientService _s5 = Suo5ClientService();
@@ -249,53 +353,28 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
     }
   }
 
-  Future<void> _probeS5(Suo5Profile p) async {
-    try {
-      await _s5.probe(p.toConfig(), label: p.name);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(S.suo5HandshakeOk),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(S.suo5HandshakeFailed(e)),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+  Future<void> _probeHandshake(
+    Future<void> Function() runProbe,
+  ) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (ctx) => _SuoHandshakeProbeDialog(runProbe: runProbe),
+    );
   }
 
-  Future<void> _probeS6(Suo6Profile p) async {
-    try {
-      await _s6.probe(p.toConfig(), label: p.name);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(S.suo5HandshakeOk),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(S.suo5HandshakeFailed(e)),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
+  Future<void> _probeS5(Suo5Profile p) =>
+      _probeHandshake(() => _s5.probe(p.toConfig(), label: p.name));
+
+  Future<void> _probeS6(Suo6Profile p) =>
+      _probeHandshake(() => _s6.probe(p.toConfig(), label: p.name));
 
   Future<void> _confirmDelete(_MergedEntry e) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
         title: Text(S.btnDelete, style: const TextStyle(color: AppColors.red)),
         content: Text(
           e.isS6 ? S.confirmDeleteSuo6(e.name) : S.confirmDeleteSuo5(e.name),
@@ -463,7 +542,6 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
         final confirm = await showDialog<bool>(
           context: context,
           builder: (c) => AlertDialog(
-            backgroundColor: AppColors.bgCard,
             title: Text(
               S.suoTunnelProtocolSwitchTitle,
               style: AppTextStyles.heading(color: AppColors.primary),
@@ -943,7 +1021,6 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
   Widget build(BuildContext context) {
     final locked = widget.protocolLocked;
     return AlertDialog(
-      backgroundColor: AppColors.bgCard,
       title: Row(
         children: [
           Expanded(

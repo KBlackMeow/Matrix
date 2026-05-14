@@ -10,11 +10,12 @@ import '../models/payload.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 11;
+  static const _kCurrentVersion = 12;
   static const _binaryContentPrefix = '__MATRIX_BINARY_B64__:';
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
   // 命名规则：{语言}_{技术}_{传参方式}
+  // 内置条目的 name 须与 asset 文件名一致；若曾用旧名入库，在 _patchPayloads 里做重命名迁移。
   //
   // PHP
   //   php_eval_post.php       — eval() + POST cmd
@@ -84,11 +85,38 @@ class SeedService {
     ),
     _PayloadDef(
       asset: 'assets/defaults/payloads/webshell/jsp_behinder_mem_servlet.jsp',
-      name: 'jsp_behinder_mem.jsp',
+      name: 'jsp_behinder_mem_servlet.jsp',
       type: 'jsp',
       description: 'JSP 内存马注入（Behinder 兼容），动态注册 Servlet 并通过 AES 通信',
       tags: 'jsp,behinder,memory-shell,servlet,aes,inject',
       sinceVersion: 9,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/webshell/jsp_behinder_mem_filter.jsp',
+      name: 'jsp_behinder_mem_filter.jsp',
+      type: 'jsp',
+      description:
+          'JSP 内存马（Behinder 兼容），动态注册 Filter；javax.servlet，适用 Tomcat 6/7/8/9',
+      tags: 'jsp,behinder,memory-shell,filter,aes,tomcat9',
+      sinceVersion: 12,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/webshell/jsp_behinder_mem_filter_v10.jsp',
+      name: 'jsp_behinder_mem_filter_v10.jsp',
+      type: 'jsp',
+      description:
+          'JSP 内存马（Behinder 兼容），动态注册 Filter；jakarta.servlet，适用 Tomcat 10+',
+      tags: 'jsp,behinder,memory-shell,filter,aes,tomcat10,jakarta',
+      sinceVersion: 12,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/webshell/jsp_classloader_b64_debug.jsp',
+      name: 'jsp_classloader_b64_debug.jsp',
+      type: 'jsp',
+      description:
+          'JSP ClassLoader 加载字节码（调试版），显式错误与 HTTP 状态码；参数 mAtrix_911；生产请用 jsp_classloader_b64.jsp',
+      tags: 'jsp,classloader,bytecode,base64,debug',
+      sinceVersion: 12,
     ),
     // ── ASP ──────────────────────────────────────────────────────────────
     _PayloadDef(
@@ -251,6 +279,10 @@ class SeedService {
     _PayloadPatch(names: ['php_cmd.php'], newName: 'php_passthru_req.php'),
     _PayloadPatch(names: ['jsp_simple.jsp'], newName: 'jsp_runtime_get.jsp'),
     _PayloadPatch(names: ['asp_simple.asp'], newName: 'asp_wscript_get.asp'),
+    _PayloadPatch(
+      names: ['jsp_behinder_mem.jsp'],
+      newName: 'jsp_behinder_mem_servlet.jsp',
+    ),
     // ── 内容修复 + 重命名 ────────────────────────────────────────────────
     // php_b64rot13：eval 不能作变量函数调用，改为 ROT13 混淆 base64_decode
     _PayloadPatch(

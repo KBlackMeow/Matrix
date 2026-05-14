@@ -74,7 +74,7 @@ bool _frpTunnelConfigMatchesProfile(FrpTunnelConfig c, FrpProfile p) {
       c.authMode == p.authMode;
 }
 
-/// FRP 客户端隧道页面
+/// FRP 客户端页面
 ///
 /// 每条配置独立卡片：启动 / 编辑 / 复制 / 删除；编辑在弹窗中打开，修改自动保存。
 class FrpTunnelPage extends StatefulWidget {
@@ -220,7 +220,6 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
         title: Text(S.frpDeleteTitle, style: AppTextStyles.heading(size: 16)),
         content: Text(
           S.frpConfirmDelete(p.name),
@@ -363,7 +362,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
             child: Row(
               children: [
                 Icon(
-                  AppTunnelIcons.filled,
+                  AppFrpIcons.filled,
                   color: _statusColor(status),
                   size: 32,
                 ),
@@ -985,7 +984,6 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
     final dialogW = mq.width >= 560 ? 520.0 : mq.width - 40;
 
     return Dialog(
-      backgroundColor: AppColors.bgCard,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: SizedBox(
         width: dialogW,

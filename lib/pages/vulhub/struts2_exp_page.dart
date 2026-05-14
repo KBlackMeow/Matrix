@@ -234,7 +234,6 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
     return showDialog<Project>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
         title: Text(
           S.titleSelectProject,
           style: AppTextStyles.heading(color: AppColors.primary),
@@ -277,7 +276,6 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
         title: Text(
           '暂无项目',
           style: AppTextStyles.heading(color: AppColors.primary),

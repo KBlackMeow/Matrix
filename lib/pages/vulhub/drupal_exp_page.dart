@@ -169,7 +169,6 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
         title: Text(
           '暂无项目',
           style: AppTextStyles.heading(color: AppColors.primary),
@@ -337,7 +336,6 @@ class _ProjectPickerDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: AppColors.bgCard,
       title: Text(
         S.titleSelectProject,
         style: AppTextStyles.heading(color: AppColors.primary),

@@ -439,8 +439,10 @@ class _ShiroExpCardState extends State<_ShiroExpCard> {
             project = await showDialog<Project>(
               context: context,
               builder: (ctx) => AlertDialog(
-                backgroundColor: AppColors.bgCard,
-                title: Text('选择项目', style: AppTextStyles.heading(color: AppColors.primary)),
+                title: Text(
+                  '选择项目',
+                  style: AppTextStyles.heading(color: AppColors.primary),
+                ),
                 content: SizedBox(
                   width: 360,
                   child: ListView.builder(

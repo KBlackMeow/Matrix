@@ -227,6 +227,7 @@ class _FileManagerTabState extends State<FileManagerTab>
     bool ok = false;
     bool usedBinaryPath = false;
     bool progressShown = false;
+    NavigatorState? uploadProgressNav;
     try {
       // Windows 目标（ASP/ASPX）强制走二进制分块上传，避免 cmd 单条命令长度限制。
       // 其他目标：文本小文件走文本写入；大文件或二进制走分块上传。
@@ -240,8 +241,11 @@ class _FileManagerTabState extends State<FileManagerTab>
       } else {
         usedBinaryPath = true; // 二进制文件或大文件（>100KB）走分块
         setState(() => _uploading = true);
-        showDialog(
+        final nav = Navigator.of(context, rootNavigator: true);
+        uploadProgressNav = nav;
+        showDialog<void>(
           context: context,
+          useRootNavigator: true,
           barrierDismissible: false,
           builder: (_) => _TransferProgressDialog(
             fileName: fileName,
@@ -250,9 +254,7 @@ class _FileManagerTabState extends State<FileManagerTab>
             isUpload: true,
             onCancel: () {
               _uploadCancelled = true;
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
-              }
+              if (nav.mounted) nav.pop();
             },
           ),
         );
@@ -270,12 +272,17 @@ class _FileManagerTabState extends State<FileManagerTab>
         );
       }
     } catch (e) {
-      if (!mounted) return;
+      if (progressShown &&
+          uploadProgressNav != null &&
+          uploadProgressNav.mounted) {
+        uploadProgressNav.pop();
+      }
+      if (!mounted) {
+        transferred.dispose();
+        return;
+      }
       // 不再主动关闭当前页面，仅结束上传状态和进度
       setState(() => _uploading = false);
-      if (progressShown && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
       transferred.dispose();
       if (e is _TransferCancelled) {
         await showUploadCancelledDialog(context);
@@ -297,12 +304,19 @@ class _FileManagerTabState extends State<FileManagerTab>
     }
 
     if (!mounted) {
+      if (progressShown &&
+          uploadProgressNav != null &&
+          uploadProgressNav.mounted) {
+        uploadProgressNav.pop();
+      }
       transferred.dispose();
       return;
     }
     setState(() => _uploading = false);
-    if (progressShown && Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
+    if (progressShown &&
+        uploadProgressNav != null &&
+        uploadProgressNav.mounted) {
+      uploadProgressNav.pop();
     }
     transferred.dispose();
     if (ok) {
@@ -352,8 +366,10 @@ class _FileManagerTabState extends State<FileManagerTab>
     final localPath = '${_downloadDir!}${Platform.pathSeparator}${entry.name}';
     // download is a single HTTP round-trip, so use indeterminate indicator
     final transferred = ValueNotifier<int>(0);
-    showDialog(
+    final rootNav = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (_) => _TransferProgressDialog(
         fileName: entry.name,
@@ -362,31 +378,32 @@ class _FileManagerTabState extends State<FileManagerTab>
         isUpload: false,
         onCancel: () {
           _downloadCancelled = true;
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
-          }
+          if (rootNav.mounted) rootNav.pop();
         },
       ),
     );
     try {
       final bytes = await widget.service.readFileBinary(remotePath);
       if (!mounted) {
+        if (rootNav.mounted) rootNav.pop();
         transferred.dispose();
         return;
       }
       if (_downloadCancelled) {
         // 已被用户取消，丢弃结果
         setState(() => _downloading = false);
+        if (rootNav.mounted) rootNav.pop();
         transferred.dispose();
         return;
       }
       await File(localPath).writeAsBytes(bytes, flush: true);
       if (!mounted) {
+        if (rootNav.mounted) rootNav.pop();
         transferred.dispose();
         return;
       }
       setState(() => _downloading = false);
-      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      if (rootNav.mounted) rootNav.pop();
       transferred.dispose();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -400,10 +417,11 @@ class _FileManagerTabState extends State<FileManagerTab>
       );
     } catch (e) {
       if (!mounted) {
+        if (rootNav.mounted) rootNav.pop();
         transferred.dispose();
         return;
       }
-      Navigator.of(context).pop();
+      if (rootNav.mounted) rootNav.pop();
       setState(() => _downloading = false);
       transferred.dispose();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -427,7 +445,6 @@ class _FileManagerTabState extends State<FileManagerTab>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
         title: Row(
           children: [
             const Icon(Icons.manage_search, color: AppColors.amber, size: 18),
@@ -483,7 +500,6 @@ class _FileManagerTabState extends State<FileManagerTab>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
         title: Text(
           S.titleConfirmDelete,
           style: const TextStyle(color: AppColors.red),
@@ -895,11 +911,7 @@ class _PayloadPickerDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.bgCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.25)),
-      ),
+      shape: MatrixDialogStyle.outlinePrimary(0.25),
       child: SizedBox(
         width: 520,
         height: 520,
@@ -910,7 +922,7 @@ class _PayloadPickerDialog extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
               decoration: const BoxDecoration(
                 color: AppColors.bgElevated,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
                 border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
               child: Row(
@@ -1012,8 +1024,6 @@ class _TransferProgressDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: SizedBox(
@@ -1175,7 +1185,6 @@ class _FileViewDialogState extends State<_FileViewDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.bgCard,
       child: SizedBox(
         width: 700,
         height: 520,
@@ -1185,6 +1194,8 @@ class _FileViewDialogState extends State<_FileViewDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: const BoxDecoration(
+                color: AppColors.bgElevated,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
                 border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
               child: Row(
@@ -1325,7 +1336,6 @@ class _FileEditDialogState extends State<_FileEditDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.bgCard,
       child: SizedBox(
         width: 700,
         height: 560,
@@ -1334,6 +1344,8 @@ class _FileEditDialogState extends State<_FileEditDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: const BoxDecoration(
+                color: AppColors.bgElevated,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
                 border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
               child: Row(

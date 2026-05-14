@@ -44,26 +44,32 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
   bool get _showPrivEscTab =>
       !widget.webshell.connectorType.startsWith('asp');
 
-  /// 一键隧道：JSP 默认 suo6（冰蝎优先内存注入，否则上传 suo6.jsp）；其它类型上传 suo5。
-  bool get _supportsOneClickTunnelAction =>
-      _service.canInjectSuo6 ||
-      (_service.supportsFileWrite &&
-          _oneClickTunnelPayloadName(widget.webshell.connectorType) != null);
-
-  /// JSP → suo6 载荷 `suo6.jsp`；PHP / ASPX-CMD → suo5 内置脚本。
-  String? _oneClickTunnelPayloadName(String connectorType) {
-    if (connectorType.startsWith('jsp')) return 'suo6.jsp';
-    if (connectorType.startsWith('php')) return 'suo5.php';
-    if (connectorType == 'aspx_cmd') return 'suo5.aspx';
-    return null;
+  /// 一键隧道：JSP 由用户选择 suo5 / suo6（冰蝎可内存注入，否则上传对应 jsp）；其它类型上传 suo5。
+  bool get _supportsOneClickTunnelAction {
+    final ct = widget.webshell.connectorType;
+    if (ct.startsWith('jsp')) {
+      return _service.canInjectSuo6 || _service.supportsFileWrite;
+    }
+    return _service.supportsFileWrite && _tunnelPayloadFileName(isSuo6: false) != null;
   }
 
-  bool get _oneClickTunnelIsSuo6 =>
-      widget.webshell.connectorType.startsWith('jsp');
+  /// JSP → `suo5.jsp` / `suo6.jsp`；PHP / ASPX-CMD → suo5 内置脚本。
+  String? _tunnelPayloadFileName({required bool isSuo6}) {
+    if (widget.webshell.connectorType.startsWith('jsp')) {
+      return isSuo6 ? 'suo6.jsp' : 'suo5.jsp';
+    }
+    if (widget.webshell.connectorType.startsWith('php')) return 'suo5.php';
+    if (widget.webshell.connectorType == 'aspx_cmd') return 'suo5.aspx';
+    return null;
+  }
 
   /// 冰蝎 suo6 内存马默认参数（与 [WebshellService.injectSuo6MemShell] 默认一致）。
   static const _kSuo6MemFilter = 'suo6';
   static const _kSuo6MemPath = '/s6';
+
+  /// 冰蝎 suo5 内存马默认参数（与 [WebshellService.injectSuo5MemShell] 默认一致）。
+  static const _kSuo5MemFilter = 's5_mem';
+  static const _kSuo5MemPath = '/*';
 
   @override
   void initState() {
@@ -392,9 +398,60 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     });
   }
 
-  Future<bool> _uploadOneClickTunnelPayloadAndCreateProfile() async {
-    final payloadName =
-        _oneClickTunnelPayloadName(widget.webshell.connectorType);
+  /// `true` = suo6，`false` = suo5，`null` = 取消。
+  Future<bool?> _pickJspSuoTunnelFlavor() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          S.webshellJspSuoTunnelPickTitle,
+          style: AppTextStyles.heading(size: 16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              S.webshellJspSuoTunnelPickBody,
+              style: AppTextStyles.body(
+                size: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+              ),
+              child: Text(S.suoTunnelProtocolSuo5),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary.withValues(alpha: 0.22),
+                foregroundColor: AppColors.primary,
+              ),
+              child: Text(S.suoTunnelProtocolSuo6),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: Text(S.btnCancel, style: AppTextStyles.caption(size: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _uploadOneClickTunnelPayloadAndCreateProfile({
+    required bool isSuo6,
+  }) async {
+    final payloadName = _tunnelPayloadFileName(isSuo6: isSuo6);
     if (payloadName == null) return false;
     final db = DatabaseHelper();
     final payloads = await db.getAllPayloads();
@@ -448,7 +505,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     }
     final targetUrl =
         _payloadHttpUriBesideShell(widget.webshell.url, payloadName).toString();
-    if (_oneClickTunnelIsSuo6) {
+    if (isSuo6) {
       await _createSuo6Profile(targetUrl, payloadName, showSnackBar: false);
     } else {
       await _createSuo5Profile(targetUrl, payloadName, showSnackBar: false);
@@ -478,48 +535,114 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       }
       return;
     }
+
+    bool? jspPickSuo6;
+    if (widget.webshell.connectorType.startsWith('jsp')) {
+      jspPickSuo6 = await _pickJspSuoTunnelFlavor();
+      if (!mounted) return;
+      if (jspPickSuo6 == null) return;
+    }
+
     setState(() => _creatingOneClickTunnel = true);
     try {
-      if (_service.canInjectSuo6) {
-        final r = await _service.injectSuo6MemShell(
-          filterName: _kSuo6MemFilter,
-          urlPath: _kSuo6MemPath,
+      final isJsp = widget.webshell.connectorType.startsWith('jsp');
+      final isSuo6 = isJsp && jspPickSuo6!;
+
+      void snackMemFail(String r) {
+        if (!mounted) return;
+        final msg = r.length > 220 ? '${r.substring(0, 220)}…' : r;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: AppColors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
-        if (r.startsWith('OK')) {
-          final base = Uri.tryParse(widget.webshell.url);
-          if (base != null) {
-            final tunnelUrl = base.replace(path: _kSuo6MemPath).toString();
-            await _createSuo6Profile(
-              tunnelUrl,
-              _kSuo6MemPath,
-              showSnackBar: false,
+      }
+
+      if (_service.canInjectSuo6) {
+        if (isSuo6) {
+          final r = await _service.injectSuo6MemShell(
+            filterName: _kSuo6MemFilter,
+            urlPath: _kSuo6MemPath,
+          );
+          if (r.startsWith('OK')) {
+            final base = Uri.tryParse(widget.webshell.url);
+            if (base != null) {
+              final tunnelUrl = base.replace(path: _kSuo6MemPath).toString();
+              await _createSuo6Profile(
+                tunnelUrl,
+                _kSuo6MemPath,
+                showSnackBar: false,
+              );
+              if (!mounted) return;
+              _finishOneClickTunnelAndNavigate();
+              return;
+            }
+          }
+          if (_service.supportsFileWrite &&
+              _tunnelPayloadFileName(isSuo6: true) != null) {
+            final ok = await _uploadOneClickTunnelPayloadAndCreateProfile(
+              isSuo6: true,
             );
-            if (!mounted) return;
-            _finishOneClickTunnelAndNavigate();
+            if (ok && mounted) {
+              _finishOneClickTunnelAndNavigate();
+            }
             return;
           }
+          snackMemFail(r);
+          return;
+        }
+
+        final r5 = await _service.injectSuo5MemShell(
+          filterName: _kSuo5MemFilter,
+          urlPath: _kSuo5MemPath,
+        );
+        if (r5.startsWith('OK')) {
+          final u = Uri.parse(widget.webshell.url);
+          final tunnelUrl = Uri(
+            scheme: u.scheme,
+            userInfo: u.userInfo.isEmpty ? null : u.userInfo,
+            host: u.host,
+            port: u.hasPort ? u.port : null,
+            path: u.path,
+          ).toString();
+          await _createSuo5Profile(
+            tunnelUrl,
+            _kSuo5MemFilter,
+            showSnackBar: false,
+          );
+          if (!mounted) return;
+          _finishOneClickTunnelAndNavigate();
+          return;
         }
         if (_service.supportsFileWrite &&
-            _oneClickTunnelPayloadName(widget.webshell.connectorType) != null) {
-          final ok = await _uploadOneClickTunnelPayloadAndCreateProfile();
+            _tunnelPayloadFileName(isSuo6: false) != null) {
+          final ok = await _uploadOneClickTunnelPayloadAndCreateProfile(
+            isSuo6: false,
+          );
           if (ok && mounted) {
             _finishOneClickTunnelAndNavigate();
           }
           return;
         }
-        if (mounted) {
-          final msg = r.length > 220 ? '${r.substring(0, 220)}…' : r;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(msg),
-              backgroundColor: AppColors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+        snackMemFail(r5);
+        return;
+      }
+
+      if (isJsp) {
+        final ok = await _uploadOneClickTunnelPayloadAndCreateProfile(
+          isSuo6: isSuo6,
+        );
+        if (ok && mounted) {
+          _finishOneClickTunnelAndNavigate();
         }
         return;
       }
-      final ok = await _uploadOneClickTunnelPayloadAndCreateProfile();
+
+      final ok = await _uploadOneClickTunnelPayloadAndCreateProfile(
+        isSuo6: false,
+      );
       if (ok && mounted) {
         _finishOneClickTunnelAndNavigate();
       }

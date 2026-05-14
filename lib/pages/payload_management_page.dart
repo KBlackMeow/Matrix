@@ -238,6 +238,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
     var usedBinaryPath = false;
     var progressShown = false;
     ValueNotifier<int>? transferred;
+    NavigatorState? uploadProgressNav;
 
     try {
       final looksBinary = _bytesLookBinary(bytes);
@@ -250,8 +251,11 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
         final progress = ValueNotifier<int>(0);
         transferred = progress;
         if (!mounted) return;
+        final nav = Navigator.of(context, rootNavigator: true);
+        uploadProgressNav = nav;
         showDialog<void>(
           context: context,
+          useRootNavigator: true,
           barrierDismissible: false,
           builder: (_) => _PayloadUploadProgressDialog(
             fileName: fileName,
@@ -259,9 +263,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
             transferred: progress,
             onCancel: () {
               uploadCancelled = true;
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
-              }
+              if (nav.mounted) nav.pop();
             },
           ),
         );
@@ -280,11 +282,18 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
       }
     } catch (e) {
       if (!mounted) {
+        if (progressShown &&
+            uploadProgressNav != null &&
+            uploadProgressNav.mounted) {
+          uploadProgressNav.pop();
+        }
         transferred?.dispose();
         return;
       }
-      if (progressShown && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
+      if (progressShown &&
+          uploadProgressNav != null &&
+          uploadProgressNav.mounted) {
+        uploadProgressNav.pop();
       }
       transferred?.dispose();
       if (e is _PayloadUploadCancelled) {
@@ -307,11 +316,18 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
     }
 
     if (!mounted) {
+      if (progressShown &&
+          uploadProgressNav != null &&
+          uploadProgressNav.mounted) {
+        uploadProgressNav.pop();
+      }
       transferred?.dispose();
       return;
     }
-    if (progressShown && Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
+    if (progressShown &&
+        uploadProgressNav != null &&
+        uploadProgressNav.mounted) {
+      uploadProgressNav.pop();
     }
     transferred?.dispose();
 
@@ -765,11 +781,7 @@ class _ConfirmDeleteDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: AppColors.bgCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.red.withValues(alpha: 0.3)),
-      ),
+      shape: MatrixDialogStyle.outlineDanger(0.3),
       title: Row(
         children: [
           Icon(
@@ -854,11 +866,7 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
     final binary = _decodeBinaryPayload(widget.payload);
 
     return Dialog(
-      backgroundColor: AppColors.bgCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: color.withValues(alpha: 0.25)),
-      ),
+      shape: MatrixDialogStyle.outlineAccent(color, 0.25),
       child: SizedBox(
         width: 760,
         height: 580,
@@ -1114,11 +1122,7 @@ class _WebshellPickerDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.bgCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.25)),
-      ),
+      shape: MatrixDialogStyle.outlinePrimary(0.25),
       child: SizedBox(
         width: 520,
         height: 480,
@@ -1129,7 +1133,7 @@ class _WebshellPickerDialog extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
               decoration: const BoxDecoration(
                 color: AppColors.bgElevated,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
                 border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
               child: Row(
@@ -1228,8 +1232,6 @@ class _PayloadUploadProgressDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: SizedBox(

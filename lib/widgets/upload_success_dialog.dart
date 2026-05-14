@@ -7,13 +7,7 @@ import '../theme/app_theme.dart';
 Future<void> showUploadSuccessDialog(BuildContext context, String message) {
   return showDialog<void>(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.55),
     builder: (ctx) => AlertDialog(
-      backgroundColor: AppColors.bgCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.35)),
-      ),
       title: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -62,13 +56,8 @@ Future<void> showUploadSuccessDialog(BuildContext context, String message) {
 Future<void> showUploadFailureDialog(BuildContext context, String message) {
   return showDialog<void>(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.55),
     builder: (ctx) => AlertDialog(
-      backgroundColor: AppColors.bgCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.red.withValues(alpha: 0.45)),
-      ),
+      shape: MatrixDialogStyle.outlineDanger(0.42),
       title: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -117,13 +106,8 @@ Future<void> showUploadFailureDialog(BuildContext context, String message) {
 Future<void> showUploadCancelledDialog(BuildContext context) {
   return showDialog<void>(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.55),
     builder: (ctx) => AlertDialog(
-      backgroundColor: AppColors.bgCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border),
-      ),
+      shape: MatrixDialogStyle.outlineMuted(),
       content: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -73,9 +73,9 @@ class _MainLayoutState extends State<MainLayout> {
       selectedIcon: Icons.computer,
     ),
     MenuItem(
-      icon: AppTunnelIcons.outlined,
+      icon: AppFrpIcons.outlined,
       label: '',
-      selectedIcon: AppTunnelIcons.filled,
+      selectedIcon: AppFrpIcons.filled,
     ),
     MenuItem(
       icon: AppTunnelIcons.outlined,
