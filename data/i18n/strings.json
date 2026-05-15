@@ -1599,10 +1599,10 @@
     "ja": "GetShell",
     "en": "GetShell"
   },
-  "connectorUiLabel": {
-    "zh": "PHP 冰蝎 (Behinder)",
-    "ja": "PHP Behinder",
-    "en": "PHP Behinder"
+  "connectorUiLabelDetail": {
+    "zh": "{stack} · {short}",
+    "ja": "{stack} · {short}",
+    "en": "{stack} · {short}"
   },
   "detectPingOk": {
     "zh": "有响应",
@@ -2835,19 +2835,19 @@
     "en": "Running {running} / {total}"
   },
   "menuSuoTunnel": {
-    "zh": "suo5",
-    "ja": "suo5",
-    "en": "suo5"
+    "zh": "suo5/suo6",
+    "ja": "suo5/suo6",
+    "en": "suo5/suo6"
   },
   "titleSuoTunnelManager": {
-    "zh": "suo5",
-    "ja": "suo5",
-    "en": "suo5"
+    "zh": "suo5/suo6",
+    "ja": "suo5/suo6",
+    "en": "suo5/suo6"
   },
   "suoTunnelManagementTitle": {
-    "zh": "SOCKS · {projectName}",
-    "ja": "SOCKS · {projectName}",
-    "en": "SOCKS · {projectName}"
+    "zh": "suo5/suo6 · {projectName}",
+    "ja": "suo5/suo6 · {projectName}",
+    "en": "suo5/suo6 · {projectName}"
   },
   "actionAddSuoTunnel": {
     "zh": "添加代理",
@@ -2960,14 +2960,14 @@
     "en": "Obfuscate & compress on upload"
   },
   "obfuscateUploadTooltip": {
-    "zh": "上传前对 PHP 混淆压缩，防止代码泄露并压缩体积",
-    "ja": "アップロード前に PHP を難読化・圧縮、ソース隠蔽＋サイズ削減",
-    "en": "Obfuscate & compress PHP before upload — hides source and reduces size"
+    "zh": "上传前自动混淆：PHP 为 gzip+eval 压缩混淆；JSP/ASP/ASPX 为单行并随机 6 位十六进制变量名",
+    "ja": "アップロード前に自動難読化：PHP は gzip+eval 圧縮、JSP/ASP/ASPX は 1 行化＋6 桁 hex 変数名",
+    "en": "Before upload: PHP gzip+eval obfuscation; JSP/ASP/ASPX one-line minify with random 6-char hex identifiers"
   },
   "obfuscateModeOn": {
-    "zh": "混淆模式已开启，下次 Payload 上传将自动混淆压缩",
-    "ja": "難読化モード ON：次回 Payload アップロード時に自動で難読化・圧縮",
-    "en": "Obfuscate mode ON — next payload upload will be obfuscated"
+    "zh": "混淆模式已开启，下次 Payload 上传将自动混淆（PHP 压缩 / JSP·ASP·ASPX 单行变量名）",
+    "ja": "難読化モード ON：次回アップロードで自動（PHP 圧縮／JSP·ASP·ASPX は 1 行＋変数名）",
+    "en": "Obfuscate mode ON — next upload auto-obfuscates (PHP: compress; JSP/ASP/ASPX: one line + hex names)"
   },
   "obfuscateModeOff": {
     "zh": "混淆模式已关闭",
@@ -3003,5 +3003,25 @@
     "zh": "保存原始",
     "ja": "そのまま保存",
     "en": "Save as-is"
+  },
+  "tooltipDetectWritableDirs": {
+    "zh": "检测可写目录",
+    "ja": "書き込み可能なディレクトリを検出",
+    "en": "Detect writable directories"
+  },
+  "writableDirsDialogTitle": {
+    "zh": "可写目录",
+    "ja": "書き込み可能ディレクトリ",
+    "en": "Writable Directories"
+  },
+  "writableDirsNoneFound": {
+    "zh": "未检测到可写目录",
+    "ja": "書き込み可能なディレクトリが見つかりません",
+    "en": "No writable directories found"
+  },
+  "writableDirsFoundHint": {
+    "zh": "找到 {n} 个可写目录，点击跳转：",
+    "ja": "{n} 個の書き込み可能ディレクトリが見つかりました：",
+    "en": "Found {n} writable director{n, plural, one{y} other{ies}}, tap to navigate:"
   }
 }

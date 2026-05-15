@@ -707,10 +707,10 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (!mounted) return;
       if (showSnackBar) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('suo5 代理配置已创建，请前往「suo5」页面启动'),
+          SnackBar(
+            content: Text(S.suoTunnelProfileCreatedSnack),
             behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -718,7 +718,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('创建代理配置失败: $e'),
+          content: Text(S.errorResult(e)),
           backgroundColor: AppColors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -749,9 +749,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (showSnackBar) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              '${S.suoTunnelProtocolSuo6} 代理配置已创建，请前往「${S.menuSuoTunnel}」页面启动',
-            ),
+            content: Text(S.suoTunnelProfileCreatedSnack),
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 3),
           ),
@@ -761,7 +759,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('创建代理配置失败: $e'),
+          content: Text(S.errorResult(e)),
           backgroundColor: AppColors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -928,11 +926,14 @@ class _TerminalTabState extends State<_TerminalTab>
     // cd 命令追加 marker+pwd，单次请求同时获取新目录，不再额外发网络请求
     const cwdMarker = '__MATRIX_CWD__';
     final isCd = cmd == 'cd' || cmd.startsWith('cd ') || cmd.startsWith('cd\t');
-    final sendCmd = isCd
+    var sendCmd = isCd
         ? _isWindowsShell
             ? '$cmd 2>&1 & echo $cwdMarker & cd'
             : "$cmd 2>&1; echo '$cwdMarker'; pwd"
         : cmd;
+    if (!isCd && !_isWindowsShell) {
+      sendCmd = augmentLsToLongListingForShell(cmd, isWindowsShell: _isWindowsShell);
+    }
 
     final execResult = await widget.service.executeCommand(
       sendCmd,
@@ -1395,9 +1396,26 @@ class _TerminalTabState extends State<_TerminalTab>
       ),
       child: Row(
         children: [
-          Text(
-            '$_currentDir\$ ',
-            style: AppTextStyles.terminal(size: 13, color: AppColors.primary),
+          Text.rich(
+            TextSpan(
+              style: AppTextStyles.terminal(size: 13),
+              children: [
+                TextSpan(
+                  text: _currentDir,
+                  style: AppTextStyles.terminal(
+                    size: 13,
+                    color: AppColors.cyan,
+                  ),
+                ),
+                TextSpan(
+                  text: ' ${shellPromptGlyph(_isWindowsShell)} ',
+                  style: AppTextStyles.terminal(
+                    size: 13,
+                    color: AppColors.amber,
+                  ),
+                ),
+              ],
+            ),
           ),
           Expanded(child: _buildInputField()),
           // 执行进度仅在输出区末尾显示一条“执行中...”行，避免这里重复小进度条
@@ -1455,7 +1473,12 @@ class _TerminalTabState extends State<_TerminalTab>
         itemCount: _entries.length + extraItems,
         itemBuilder: (context, i) {
           // 历史条目
-          if (i < _entries.length) return EntryBlock(entry: _entries[i]);
+          if (i < _entries.length) {
+            return EntryBlock(
+              entry: _entries[i],
+              isWindowsShell: _isWindowsShell,
+            );
+          }
 
           // 分离式：执行中的 loading 条目
           if (!embedded && _executing) return _buildLoadingRow();
@@ -1498,9 +1521,26 @@ class _TerminalTabState extends State<_TerminalTab>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            '$_currentDir\$ ',
-            style: AppTextStyles.terminal(size: 13, color: AppColors.primary),
+          Text.rich(
+            TextSpan(
+              style: AppTextStyles.terminal(size: 13),
+              children: [
+                TextSpan(
+                  text: _currentDir,
+                  style: AppTextStyles.terminal(
+                    size: 13,
+                    color: AppColors.cyan,
+                  ),
+                ),
+                TextSpan(
+                  text: ' ${shellPromptGlyph(_isWindowsShell)} ',
+                  style: AppTextStyles.terminal(
+                    size: 13,
+                    color: AppColors.amber,
+                  ),
+                ),
+              ],
+            ),
           ),
           Expanded(child: _buildInputField()),
         ],

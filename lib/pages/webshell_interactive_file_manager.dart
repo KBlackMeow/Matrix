@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:code_text_field/code_text_field.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import '../models/payload.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 import '../app/localization.dart';
+import '../widgets/matrix_syntax_highlight.dart';
 import '../widgets/upload_success_dialog.dart';
 
 // ─── 文件管理 Tab ──────────────────────────────────────────────────────────────
@@ -233,8 +235,16 @@ class _FileManagerTabState extends State<FileManagerTab>
     _uploadCancelled = false;
     bool ok = false;
     bool usedBinaryPath = false;
-    bool progressShown = false;
+    var progressPopped = false;
     NavigatorState? uploadProgressNav;
+    void popProgress() {
+      final nav = uploadProgressNav;
+      if (!progressPopped && nav != null && nav.mounted) {
+        progressPopped = true;
+        nav.pop();
+      }
+    }
+
     try {
       // Windows 目标（ASP/ASPX）强制走二进制分块上传，避免 cmd 单条命令长度限制。
       // 其他目标：文本小文件走文本写入；大文件或二进制走分块上传。
@@ -263,11 +273,11 @@ class _FileManagerTabState extends State<FileManagerTab>
             isUpload: true,
             onCancel: () {
               _uploadCancelled = true;
+              progressPopped = true;
               if (nav.mounted) nav.pop();
             },
           ),
         );
-        progressShown = true;
         ok = await widget.service.writeFileBinaryWithProgress(
           remotePath,
           bytes,
@@ -281,11 +291,7 @@ class _FileManagerTabState extends State<FileManagerTab>
         );
       }
     } catch (e) {
-      if (progressShown &&
-          uploadProgressNav != null &&
-          uploadProgressNav.mounted) {
-        uploadProgressNav.pop();
-      }
+      popProgress();
       if (!mounted) {
         transferred.dispose();
         return;
@@ -313,20 +319,12 @@ class _FileManagerTabState extends State<FileManagerTab>
     }
 
     if (!mounted) {
-      if (progressShown &&
-          uploadProgressNav != null &&
-          uploadProgressNav.mounted) {
-        uploadProgressNav.pop();
-      }
+      popProgress();
       transferred.dispose();
       return;
     }
     setState(() => _uploading = false);
-    if (progressShown &&
-        uploadProgressNav != null &&
-        uploadProgressNav.mounted) {
-      uploadProgressNav.pop();
-    }
+    popProgress();
     transferred.dispose();
     if (ok) {
       await showUploadSuccessDialog(context, S.snackUploaded(fileName));
@@ -510,20 +508,20 @@ class _FileManagerTabState extends State<FileManagerTab>
           children: [
             const Icon(Icons.manage_search, color: AppColors.amber, size: 18),
             const SizedBox(width: 8),
-            const Text('可写目录', style: TextStyle(color: AppColors.textPrimary)),
+            Text(S.writableDirsDialogTitle, style: const TextStyle(color: AppColors.textPrimary)),
           ],
         ),
         content: dirs.isEmpty
-            ? const Text(
-                '未检测到可写目录',
-                style: TextStyle(color: AppColors.textSecondary),
+            ? Text(
+                S.writableDirsNoneFound,
+                style: const TextStyle(color: AppColors.textSecondary),
               )
             : Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '找到 ${dirs.length} 个可写目录，点击跳转：',
+                    S.writableDirsFoundHint(dirs.length),
                     style: AppTextStyles.caption(
                       color: AppColors.textMuted,
                       size: 12,
@@ -692,7 +690,7 @@ class _FileManagerTabState extends State<FileManagerTab>
                   onPressed: _loading ? null : _detectWritableDirs,
                   icon: const Icon(Icons.manage_search, size: 16),
                   color: AppColors.amber,
-                  tooltip: '检测可写目录',
+                  tooltip: S.tooltipDetectWritableDirs,
                 ),
               IconButton(
                 onPressed: _loading ? null : () => _loadDirectory(_currentPath),
@@ -746,24 +744,29 @@ class _FileManagerTabState extends State<FileManagerTab>
                   itemCount: _files.length,
                   itemBuilder: (context, i) {
                     final f = _files[i];
+                    final busy = _uploading || _downloading;
                     return _FileRow(
                       entry: f,
-                      onTap: () => f.isDirectory
-                          ? _loadDirectory(_join(_currentPath, f.name))
-                          : null,
-                      onView: f.isDirectory || f.name == '..'
+                      onTap: busy
+                          ? null
+                          : () => f.isDirectory
+                              ? _loadDirectory(_join(_currentPath, f.name))
+                              : null,
+                      onView: busy || f.isDirectory || f.name == '..'
                           ? null
                           : () => _viewFile(f),
-                      onEdit: f.isDirectory || f.name == '..'
+                      onEdit: busy || f.isDirectory || f.name == '..'
                           ? null
                           : () => _showEditDialog(f),
                       onDownload:
-                          f.isDirectory || f.name == '..' || _downloading
+                          busy || f.isDirectory || f.name == '..'
                           ? null
                           : widget.service.supportsFileRead
                           ? () => _downloadFile(f)
                           : null,
-                      onDelete: f.name == '..' ? null : () => _deleteFile(f),
+                      onDelete: busy || f.name == '..'
+                          ? null
+                          : () => _deleteFile(f),
                     );
                   },
                 ),
@@ -1103,14 +1106,16 @@ class _TransferProgressDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: SizedBox(
-          width: 360,
-          child: ValueListenableBuilder<int>(
-            valueListenable: transferred,
-            builder: (_, sent, _) {
+    return PopScope(
+      canPop: false,
+      child: Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: SizedBox(
+            width: 360,
+            child: ValueListenableBuilder<int>(
+              valueListenable: transferred,
+              builder: (_, sent, _) {
               // Upload: deterministic progress; download: always indeterminate
               final double? progress = isUpload && fileSize > 0
                   ? (sent / fileSize).clamp(0.0, 1.0)
@@ -1212,8 +1217,9 @@ class _TransferProgressDialog extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   static String _fmtSize(int bytes) {
     if (bytes <= 0) return '—';
@@ -1273,10 +1279,16 @@ class _FileViewDialogState extends State<_FileViewDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final mq = MediaQuery.sizeOf(context);
+    const edge = 16.0;
+    final bodyW = (mq.width - edge * 2).clamp(320.0, double.infinity);
+    final bodyH = (mq.height - edge * 2).clamp(280.0, double.infinity);
+
     return Dialog(
+      insetPadding: const EdgeInsets.all(edge),
       child: SizedBox(
-        width: 700,
-        height: 520,
+        width: bodyW,
+        height: bodyH,
         child: Column(
           children: [
             // 标题栏
@@ -1355,28 +1367,9 @@ class _FileViewDialogState extends State<_FileViewDialog> {
                     )
                   : Directionality(
                       textDirection: TextDirection.ltr,
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: SelectableText(
-                            _displayContent,
-                            textDirection: TextDirection.ltr,
-                            textAlign: TextAlign.left,
-                            style: const TextStyle(
-                              color: Color(0xFFB8C0CC),
-                              fontFamily: 'Monaco',
-                              fontFamilyFallback: [
-                                'Courier New',
-                                'Courier',
-                                'monospace',
-                              ],
-                              fontSize: 12,
-                              height: 1.7,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ),
+                      child: matrixSyntaxHighlightReadOnly(
+                        _displayContent,
+                        pathOrName: widget.name,
                       ),
                     ),
             ),
@@ -1409,24 +1402,30 @@ class _FileEditDialog extends StatefulWidget {
 }
 
 class _FileEditDialogState extends State<_FileEditDialog> {
-  late final TextEditingController _controller;
+  late final CodeController _codeController;
+  final FocusNode _editorFocus = FocusNode();
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialContent);
+    _codeController = CodeController(
+      text: widget.initialContent,
+      language: highlightModeForPath(widget.path),
+      params: const EditorParams(tabSpaces: 4),
+    );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _codeController.dispose();
+    _editorFocus.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     setState(() => _saving = true);
-    final ok = await widget.service.writeFile(widget.path, _controller.text);
+    final ok = await widget.service.writeFile(widget.path, _codeController.text);
     if (!mounted) return;
     setState(() => _saving = false);
     if (ok) {
@@ -1452,10 +1451,16 @@ class _FileEditDialogState extends State<_FileEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final mq = MediaQuery.sizeOf(context);
+    const edge = 16.0;
+    final bodyW = (mq.width - edge * 2).clamp(320.0, double.infinity);
+    final bodyH = (mq.height - edge * 2).clamp(280.0, double.infinity);
+
     return Dialog(
+      insetPadding: const EdgeInsets.all(edge),
       child: SizedBox(
-        width: 700,
-        height: 560,
+        width: bodyW,
+        height: bodyH,
         child: Column(
           children: [
             Container(
@@ -1514,25 +1519,9 @@ class _FileEditDialogState extends State<_FileEditDialog> {
             Expanded(
               child: Directionality(
                 textDirection: TextDirection.ltr,
-                child: TextField(
-                  controller: _controller,
-                  maxLines: null,
-                  expands: true,
-                  textDirection: TextDirection.ltr,
-                  textAlign: TextAlign.left,
-                  style: const TextStyle(
-                    color: Color(0xFFB8C0CC),
-                    fontFamily: 'Monaco',
-                    fontFamilyFallback: ['Courier New', 'Courier', 'monospace'],
-                    fontSize: 12,
-                    height: 1.7,
-                  ),
-                  decoration: const InputDecoration(
-                    contentPadding: EdgeInsets.all(16),
-                    border: InputBorder.none,
-                    fillColor: Color(0xFF0D1117),
-                    filled: true,
-                  ),
+                child: matrixCodeEditorField(
+                  controller: _codeController,
+                  focusNode: _editorFocus,
                 ),
               ),
             ),

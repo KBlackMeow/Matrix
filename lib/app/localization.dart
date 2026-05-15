@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+
+import '../connectors/connector_factory.dart';
 import 'localization_data.dart';
 
 /// Supported app languages
@@ -562,6 +564,9 @@ class S {
   static String get obfuscatedFileDialogMsg => _t('obfuscatedFileDialogMsg');
   static String get btnSaveDeobfuscated => _t('btnSaveDeobfuscated');
   static String get btnSaveAsIs => _t('btnSaveAsIs');
+  static String get tooltipDetectWritableDirs => _t('tooltipDetectWritableDirs');
+  static String get writableDirsDialogTitle => _t('writableDirsDialogTitle');
+  static String get writableDirsNoneFound => _t('writableDirsNoneFound');
 
   // ── Parameterized methods ─────────────────────────────────────────────────
 
@@ -671,7 +676,17 @@ class S {
 
   static String frpDupProxyIndexed(String proxyName, int i) => _tp('frpDupProxyIndexed', {'proxyName': proxyName, 'i': i});
 
-  static String connectorUiLabel(String connectorType) => _tp('connectorUiLabel', {'connectorType': connectorType});
+  /// 下拉框等处的连接器展示名（与 [ConnectorFactory] 一致）。
+  ///
+  /// 历史上 `connectorUiLabel` 文案无 `{connectorType}` 占位符，导致所有类型
+  /// 都显示成「PHP 冰蝎」；现改为按类型组合 stack + short 标签。
+  static String connectorUiLabel(String connectorType) => _tp(
+        'connectorUiLabelDetail',
+        {
+          'stack': ConnectorFactory.typeLabel(connectorType).toUpperCase(),
+          'short': ConnectorFactory.shortLabel(connectorType),
+        },
+      );
 
   static String terminalFullTitle(String label) => _tp('terminalFullTitle', {'label': label});
 
@@ -712,6 +727,8 @@ class S {
   static String suoTunnelCount(int n) => _tp('suoTunnelCount', {'n': n});
 
   static String confirmDeleteSuo6(String name) => _tp('confirmDeleteSuo6', {'name': name});
+
+  static String writableDirsFoundHint(int n) => _tp('writableDirsFoundHint', {'n': n});
 
   // ── Aliases ────────────────────────────────────────────────────────────────
   static String get suo6InvalidUrl => suo5InvalidUrl;

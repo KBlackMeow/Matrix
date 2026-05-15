@@ -3,11 +3,39 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:xterm/xterm.dart';
 
 import '../app/localization.dart';
 import '../services/reverse_shell_service.dart';
 import '../theme/app_theme.dart';
+
+/// 与 Matrix 深色主题一致的 xterm 调色板（远端 `ls --color`、`bat` 等 ANSI 输出）。
+const _matrixXtermTheme = TerminalTheme(
+  cursor: Color(0xFF00E676),
+  selection: Color(0x6630363D),
+  foreground: Color(0xFFB8C0CC),
+  background: Color(0xFF0D1117),
+  black: Color(0xFF131920),
+  red: Color(0xFFFF5370),
+  green: Color(0xFF00E676),
+  yellow: Color(0xFFFFD740),
+  blue: Color(0xFF61AEEE),
+  magenta: Color(0xFFD670D6),
+  cyan: Color(0xFF00E5FF),
+  white: Color(0xFFD0E8D0),
+  brightBlack: Color(0xFF5A705A),
+  brightRed: Color(0xFFFF7A8F),
+  brightGreen: Color(0xFF69F0AE),
+  brightYellow: Color(0xFFFFE082),
+  brightBlue: Color(0xFF82B1FF),
+  brightMagenta: Color(0xFFE6A3FF),
+  brightCyan: Color(0xFF84FFFF),
+  brightWhite: Color(0xFFF0FFF4),
+  searchHitBackground: Color(0x66FFD740),
+  searchHitBackgroundCurrent: Color(0xCC00E676),
+  searchHitForeground: Color(0xFF0D1117),
+);
 
 /// 基于反弹 Shell 的完整终端页面（使用 xterm 终端模拟器）
 class ReverseShellTerminalPage extends StatefulWidget {
@@ -96,8 +124,9 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
     final rows = _terminal.viewHeight;
     // 尺寸未变则跳过（含重入页面时 session 已记录上次发送值的情况）
     if (cols == widget.session.lastSttyCols &&
-        rows == widget.session.lastSttyRows)
+        rows == widget.session.lastSttyRows) {
       return;
+    }
     _resizeDebounce?.cancel();
     _resizeDebounce = Timer(const Duration(milliseconds: 300), () {
       if (mounted && widget.session.isAlive) {
@@ -246,6 +275,15 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
           children: [
             TerminalView(
               _terminal,
+              theme: _matrixXtermTheme,
+              textStyle: TerminalStyle.fromTextStyle(
+                GoogleFonts.jetBrainsMono(
+                  fontSize: 13,
+                  height: 1.25,
+                  letterSpacing: 0.2,
+                  color: const Color(0xFFB8C0CC),
+                ),
+              ),
               backgroundOpacity: 0,
               cursorType: TerminalCursorType.block,
               controller: _terminalController,

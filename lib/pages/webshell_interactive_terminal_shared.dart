@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app/localization.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/matrix_syntax_highlight.dart';
 
 class TerminalEntry {
   final String command;
@@ -88,6 +89,8 @@ class ModeToggle extends StatelessWidget {
 //   • $VAR 形式         → 环境变量名补全
 //   • ~ 展开           → 用 HOME 目录替换 ~，保留原始 ~ 在输出中
 //   • 命令与目录候选均实时查询目标，不依赖本地硬编码或目录缓存
+//   • 发往冰蝎等「脚本在 HTTP 头 X-V」的通道时，脚本中避免 printf 的 %s：
+//     部分 Servlet 容器会按百分号解码头值，%s 会被破坏；目录枚举回退改用 echo。
 // ─────────────────────────────────────────────────────────────────────────────
 class TabCompleter {
   final WebshellService service;
@@ -145,7 +148,7 @@ class TabCompleter {
             'IFS=:; for d in \$PATH; do '
             '[ -d "\$d" ] || continue; '
             'for f in "\$d"/*; do '
-            '[ -f "\$f" ] && [ -x "\$f" ] && printf "%s\n" "\${f##*/}"; '
+            '[ -f "\$f" ] && [ -x "\$f" ] && echo "\${f##*/}"; '
             'done; '
             'done',
             workingDir: workingDir,
@@ -219,8 +222,8 @@ class TabCompleter {
         'for f in "\$d"/"\$p"*; do '
         '[ -e "\$f" ] || continue; '
         'n="\${f##*/}"; '
-        'if [ -d "\$f" ]; then printf "%s|d\n" "\$n"; '
-        'else printf "%s|f\n" "\$n"; fi; '
+        'if [ -d "\$f" ]; then echo "\$n|d"; '
+        'else echo "\$n|f"; fi; '
         'done',
         workingDir: dir,
       );
@@ -411,35 +414,124 @@ class TabCompleter {
   }
 }
 
+/// Windows cmd 风格用 `>`，类 Unix 用 `$`（提示符单独配色，便于与路径、命令区分）。
+String shellPromptGlyph(bool isWindowsShell) => isWindowsShell ? '>' : r'$';
+
+/// 将一行 shell 输入拆成「命令名」与「参数」（保留命令后的原始空格）。
+(String command, String arguments) splitShellCommandLine(String raw) {
+  final lead = raw.length - raw.trimLeft().length;
+  final from = raw.substring(lead);
+  if (from.isEmpty) return ('', '');
+  final m = RegExp(r'^(\S+)').firstMatch(from);
+  if (m == null) return (from, '');
+  final cmd = m.group(1)!;
+  final restStart = lead + m.end;
+  final args = restStart < raw.length ? raw.substring(restStart) : '';
+  return (cmd, args);
+}
+
+// ─── ls：默认补全为长列表（-l），便于按权限着色 ─────────────────────────────
+
+bool _lsAugmentSafeShell(String cmd) {
+  final t = cmd.trim();
+  if (t.contains('|') || t.contains(';')) return false;
+  if (t.contains('&&') || t.contains('||')) return false;
+  if (t.contains('`')) return false;
+  if (t.contains(r'$(')) return false;
+  return true;
+}
+
+/// 已为 `ls -l` / `--format=long` 等长列表形式。
+bool lsCommandAlreadyLongListing(String cmd) {
+  final t = cmd.trim().toLowerCase();
+  if (!RegExp(r'^ls\b').hasMatch(t)) return false;
+  if (t.contains('--format=long') || t.contains('--format=verbose')) {
+    return true;
+  }
+  for (final m in RegExp(r'\s+-([a-z0-9]+)(?=\s|$)').allMatches(t)) {
+    if (m.group(1)!.contains('l')) return true;
+  }
+  return false;
+}
+
+/// 非 Windows、纯 `ls` 且未带长列表选项时，在发往远端前补上 `-l`（或与短选项合并为 `-al` 等）。
+///
+/// 不改变 [TerminalEntry.command] 展示；仅影响实际执行字符串。显式 `ls -1` 不改写。
+String augmentLsToLongListingForShell(String cmd, {required bool isWindowsShell}) {
+  if (isWindowsShell) return cmd;
+  final trimmed = cmd.trim();
+  if (trimmed.isEmpty) return cmd;
+  if (!RegExp(r'^ls\b', caseSensitive: false).hasMatch(trimmed)) return cmd;
+  if (!_lsAugmentSafeShell(cmd)) return cmd;
+  if (lsCommandAlreadyLongListing(cmd)) return cmd;
+  if (RegExp(r'(^|\s)-1(\s|$)').hasMatch(trimmed.toLowerCase())) return cmd;
+
+  final wm = RegExp(r'^ls\b', caseSensitive: false).firstMatch(trimmed);
+  if (wm == null) return cmd;
+  final afterLs = trimmed.substring(wm.end);
+  final rest = afterLs.trimLeft();
+  final head = trimmed.substring(0, wm.end);
+  if (rest.isEmpty) {
+    return '$head -l';
+  }
+  final firstTok = rest.split(RegExp(r'\s+')).first;
+  if (firstTok.startsWith('-') && !firstTok.startsWith('--')) {
+    final om = RegExp(r'^-([a-zA-Z0-9]+)$').firstMatch(firstTok);
+    if (om != null) {
+      final f = om.group(1)!;
+      if (!f.contains('l')) {
+        final afterFirst = rest.substring(firstTok.length).trimLeft();
+        final merged = '-${f}l';
+        if (afterFirst.isEmpty) return '$head $merged';
+        return '$head $merged $afterFirst';
+      }
+    }
+    return '$head -l $rest';
+  }
+  return '$head -l $rest';
+}
+
 class EntryBlock extends StatelessWidget {
   final TerminalEntry entry;
+  final bool isWindowsShell;
 
-  const EntryBlock({super.key, required this.entry});
+  const EntryBlock({
+    super.key,
+    required this.entry,
+    this.isWindowsShell = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final glyph = shellPromptGlyph(isWindowsShell);
+    final (cmd, args) = splitShellCommandLine(entry.command);
+    final baseTerm = AppTextStyles.terminal(size: 13);
+    final pathStyle = baseTerm.copyWith(color: AppColors.cyan);
+    final promptStyle = baseTerm.copyWith(color: AppColors.amber);
+    final commandStyle = baseTerm.copyWith(color: AppColors.primary);
+    final argsStyle = baseTerm.copyWith(color: AppColors.textSecondary);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 命令行
+          // 命令行：路径 / 提示符 / 命令 / 参数 分色
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '${entry.dir}\$ ',
-                style: AppTextStyles.terminal(
-                  size: 13,
-                  color: AppColors.primary,
-                ),
-              ),
               Expanded(
-                child: SelectableText(
-                  entry.command,
-                  style: AppTextStyles.terminal(
-                    size: 13,
-                    color: AppColors.cyan,
+                child: SelectableText.rich(
+                  TextSpan(
+                    style: baseTerm,
+                    children: [
+                      TextSpan(text: entry.dir, style: pathStyle),
+                      TextSpan(text: ' $glyph ', style: promptStyle),
+                      if (cmd.isNotEmpty)
+                        TextSpan(text: cmd, style: commandStyle),
+                      if (args.isNotEmpty)
+                        TextSpan(text: args, style: argsStyle),
+                    ],
                   ),
                 ),
               ),
@@ -458,17 +550,16 @@ class EntryBlock extends StatelessWidget {
           if (entry.output != null)
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 4),
-              child: SelectableText(
-                entry.output!,
-                style: const TextStyle(
-                  color: Color(0xFFB8C0CC),
-                  fontFamily: 'Monaco',
-                  fontFamilyFallback: ['Courier New', 'Courier', 'monospace'],
-                  fontSize: 12,
-                  height: 1.6,
-                  letterSpacing: 0.2,
-                ),
-              ),
+              child: entry.output == S.noOutput
+                  ? SelectableText(
+                      entry.output!,
+                      style: matrixCodeTextStyle(height: 1.6),
+                    )
+                  : matrixTerminalOutputBlock(
+                      entry.command,
+                      entry.output!,
+                      isWindowsShell: isWindowsShell,
+                    ),
             ),
           const SizedBox(height: 4),
           const Divider(height: 1, color: Color(0xFF1C2128)),
