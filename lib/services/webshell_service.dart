@@ -48,13 +48,17 @@ class WebshellService {
   Future<String> getCurrentDir() => _connector.getCurrentDir();
 
   /// 若连接器可在目标上解析出当前 Webshell 脚本所在目录则返回，否则 `null`。
+  ///
+  /// 解析顺序（PHP/JSP）：`SCRIPT_FILENAME` / sysinfo / `find` / 常见部署目录扫描。
   /// 同一 [WebshellService] 实例内只执行一次远端探测。
   Future<String?> getShellScriptDirectory() {
     _memoShellScriptDir ??= _connector.getShellScriptDir();
     return _memoShellScriptDir!;
   }
 
-  /// 终端 / 文件管理器打开时的初始目录：优先 webshell 脚本所在目录（若可解析且存在），否则 [getCurrentDir]。
+  /// 终端 / 文件管理器打开时的初始目录。
+  ///
+  /// 优先脚本目录；全部探测失败时使用目标进程当前工作目录（`pwd` / `getcwd`）。
   /// 同一 [WebshellService] 实例内只完整解析一次。
   Future<String> getInitialWorkingDirectory() {
     _memoInitialWorkingDir ??= _resolveInitialWorkingDirectoryOnce();
@@ -67,7 +71,9 @@ class WebshellService {
       _connector.currentDir = scriptDir;
       return scriptDir;
     }
-    return getCurrentDir();
+    final cwd = await getCurrentDir();
+    _connector.currentDir = cwd;
+    return cwd;
   }
 
   Future<List<FileEntry>> listDirectory(String path) =>

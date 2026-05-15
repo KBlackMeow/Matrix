@@ -1,4 +1,5 @@
 import 'shell_connector.dart';
+import 'shell_script_dir_probe.dart';
 
 /// JSP / Tomcat 下「脚本所在 webapp 目录」的推导（不依赖 Tomcat 安装路径名）。
 class JspWebappPath {
@@ -26,18 +27,8 @@ class JspWebappPath {
   }
 
   /// 仅允许 URL 路径最后一段作为 `find -name` 参数，避免向 shell 注入。
-  static String? safeScriptBasenameFromUrl(String url) {
-    try {
-      final u = Uri.parse(url);
-      final parts = u.pathSegments.where((s) => s.isNotEmpty).toList();
-      if (parts.isEmpty) return null;
-      final seg = parts.last;
-      if (!RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(seg)) return null;
-      return seg;
-    } catch (_) {
-      return null;
-    }
-  }
+  static String? safeScriptBasenameFromUrl(String url) =>
+      ShellScriptDirProbe.safeBasenameFromUrl(url);
 
   /// 在常见 Tomcat 根下 `webapps` 内按脚本文件名查找，输出 `.../webapps/<app>`（非 JSP 子目录）。
   static String bashFindTomcatWebappByScriptFilename(String basename) {
@@ -123,8 +114,17 @@ class JspWebappPath {
 
     final script =
         (await exec(ShellConnector.kUnixShellScriptDirProbe)).trim();
-    if (script.isNotEmpty && !script.startsWith('[')) {
+    if (ShellScriptDirProbe.isUsableRemotePath(script)) {
       return normalizeUnixFsDir(script);
+    }
+
+    if (base != null) {
+      final byDirs = (await exec(
+        ShellScriptDirProbe.bashFindScriptInCandidateDirs(base),
+      )).trim();
+      if (ShellScriptDirProbe.isUsableRemotePath(byDirs)) {
+        return normalizeUnixFsDir(byDirs);
+      }
     }
     return null;
   }
@@ -148,8 +148,17 @@ class JspWebappPath {
     }
     final script =
         (await exec(ShellConnector.kUnixShellScriptDirProbe)).trim();
-    if (script.isNotEmpty && !script.startsWith('[')) {
+    if (ShellScriptDirProbe.isUsableRemotePath(script)) {
       return normalizeUnixFsDir(script);
+    }
+
+    if (base != null) {
+      final byDirs = (await exec(
+        ShellScriptDirProbe.bashFindScriptInCandidateDirs(base),
+      )).trim();
+      if (ShellScriptDirProbe.isUsableRemotePath(byDirs)) {
+        return normalizeUnixFsDir(byDirs);
+      }
     }
     return null;
   }
