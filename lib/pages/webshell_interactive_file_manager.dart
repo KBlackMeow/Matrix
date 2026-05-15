@@ -93,7 +93,9 @@ class _FileManagerTabState extends State<FileManagerTab>
       // Drive: C:\dir\sub
       final drive = RegExp(r'^[a-zA-Z]:').stringMatch(p);
       if (drive != null) {
-        var rest = p.substring(drive.length).replaceFirst(RegExp(r'^[\\]+'), '');
+        var rest = p
+            .substring(drive.length)
+            .replaceFirst(RegExp(r'^[\\]+'), '');
         if (rest.isEmpty) return '$drive\\';
         final parts = rest.split(r'\').where((s) => s.isNotEmpty).toList();
         if (parts.isEmpty) return '$drive\\';
@@ -238,7 +240,9 @@ class _FileManagerTabState extends State<FileManagerTab>
       // 其他目标：文本小文件走文本写入；大文件或二进制走分块上传。
       final looksBinary = _isBinary(bytes);
       final useBinaryPath =
-          widget.service.isWindowsTarget || looksBinary || bytes.length > 100 * 1024;
+          widget.service.isWindowsTarget ||
+          looksBinary ||
+          bytes.length > 100 * 1024;
       if (!useBinaryPath) {
         setState(() => _uploading = true);
         final content = utf8.decode(bytes);
@@ -510,13 +514,21 @@ class _FileManagerTabState extends State<FileManagerTab>
           ],
         ),
         content: dirs.isEmpty
-            ? const Text('未检测到可写目录', style: TextStyle(color: AppColors.textSecondary))
+            ? const Text(
+                '未检测到可写目录',
+                style: TextStyle(color: AppColors.textSecondary),
+              )
             : Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('找到 ${dirs.length} 个可写目录，点击跳转：',
-                      style: AppTextStyles.caption(color: AppColors.textMuted, size: 12)),
+                  Text(
+                    '找到 ${dirs.length} 个可写目录，点击跳转：',
+                    style: AppTextStyles.caption(
+                      color: AppColors.textMuted,
+                      size: 12,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   ...dirs.map(
                     (d) => InkWell(
@@ -526,15 +538,26 @@ class _FileManagerTabState extends State<FileManagerTab>
                       },
                       borderRadius: BorderRadius.circular(4),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6,
+                          horizontal: 4,
+                        ),
                         child: Row(
                           children: [
-                            const Icon(Icons.folder_open, color: AppColors.primary, size: 14),
+                            const Icon(
+                              Icons.folder_open,
+                              color: AppColors.primary,
+                              size: 14,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(d,
-                                  style: AppTextStyles.terminal(
-                                      color: AppColors.primary, size: 12)),
+                              child: Text(
+                                d,
+                                style: AppTextStyles.terminal(
+                                  color: AppColors.primary,
+                                  size: 12,
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -1244,8 +1267,9 @@ class _FileViewDialogState extends State<_FileViewDialog> {
     }
   }
 
-  String get _displayContent =>
-      (_showDeobfuscated && _deobfuscated != null) ? _deobfuscated! : (_content ?? '');
+  String get _displayContent => (_showDeobfuscated && _deobfuscated != null)
+      ? _deobfuscated!
+      : (_content ?? '');
 
   @override
   Widget build(BuildContext context) {
@@ -1283,8 +1307,9 @@ class _FileViewDialogState extends State<_FileViewDialog> {
                   // Deobfuscate toggle (only shown when content is obfuscated)
                   if (!_loading && _deobfuscated != null)
                     IconButton(
-                      onPressed: () =>
-                          setState(() => _showDeobfuscated = !_showDeobfuscated),
+                      onPressed: () => setState(
+                        () => _showDeobfuscated = !_showDeobfuscated,
+                      ),
                       icon: Icon(
                         _showDeobfuscated
                             ? Icons.lock_open_outlined
@@ -1301,7 +1326,8 @@ class _FileViewDialogState extends State<_FileViewDialog> {
                   if (!_loading && _content != null)
                     IconButton(
                       onPressed: () => Clipboard.setData(
-                          ClipboardData(text: _displayContent)),
+                        ClipboardData(text: _displayContent),
+                      ),
                       icon: const Icon(
                         Icons.copy_outlined,
                         size: 16,
@@ -1327,21 +1353,29 @@ class _FileViewDialogState extends State<_FileViewDialog> {
                         color: AppColors.primary,
                       ),
                     )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: SelectableText(
-                        _displayContent,
-                        style: const TextStyle(
-                          color: Color(0xFFB8C0CC),
-                          fontFamily: 'Monaco',
-                          fontFamilyFallback: [
-                            'Courier New',
-                            'Courier',
-                            'monospace',
-                          ],
-                          fontSize: 12,
-                          height: 1.7,
-                          letterSpacing: 0.2,
+                  : Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: SelectableText(
+                            _displayContent,
+                            textDirection: TextDirection.ltr,
+                            textAlign: TextAlign.left,
+                            style: const TextStyle(
+                              color: Color(0xFFB8C0CC),
+                              fontFamily: 'Monaco',
+                              fontFamilyFallback: [
+                                'Courier New',
+                                'Courier',
+                                'monospace',
+                              ],
+                              fontSize: 12,
+                              height: 1.7,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -1478,22 +1512,27 @@ class _FileEditDialogState extends State<_FileEditDialog> {
               ),
             ),
             Expanded(
-              child: TextField(
-                controller: _controller,
-                maxLines: null,
-                expands: true,
-                style: const TextStyle(
-                  color: Color(0xFFB8C0CC),
-                  fontFamily: 'Monaco',
-                  fontFamilyFallback: ['Courier New', 'Courier', 'monospace'],
-                  fontSize: 12,
-                  height: 1.7,
-                ),
-                decoration: const InputDecoration(
-                  contentPadding: EdgeInsets.all(16),
-                  border: InputBorder.none,
-                  fillColor: Color(0xFF0D1117),
-                  filled: true,
+              child: Directionality(
+                textDirection: TextDirection.ltr,
+                child: TextField(
+                  controller: _controller,
+                  maxLines: null,
+                  expands: true,
+                  textDirection: TextDirection.ltr,
+                  textAlign: TextAlign.left,
+                  style: const TextStyle(
+                    color: Color(0xFFB8C0CC),
+                    fontFamily: 'Monaco',
+                    fontFamilyFallback: ['Courier New', 'Courier', 'monospace'],
+                    fontSize: 12,
+                    height: 1.7,
+                  ),
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.all(16),
+                    border: InputBorder.none,
+                    fillColor: Color(0xFF0D1117),
+                    filled: true,
+                  ),
                 ),
               ),
             ),
