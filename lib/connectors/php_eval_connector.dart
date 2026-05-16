@@ -16,6 +16,13 @@ import 'shell_connector.dart';
 class PhpEvalConnector extends ShellConnector {
   PhpEvalConnector(super.webshell);
 
+  String? _lastShellScriptDirDiagnostic;
+  int? _lastHttpResponseStatus;
+  int? _lastHttpResponseBodyBytes;
+
+  @override
+  String? get lastShellScriptDirDiagnostic => _lastShellScriptDirDiagnostic;
+
   @override
   Set<ConnectorCapability> get capabilities => const {
         ConnectorCapability.codeExec,
@@ -47,6 +54,9 @@ class PhpEvalConnector extends ShellConnector {
             )
             .timeout(const Duration(seconds: 25));
       }
+
+      _lastHttpResponseStatus = response.statusCode;
+      _lastHttpResponseBodyBytes = response.bodyBytes.length;
 
       if (response.statusCode == 200) {
         return decodeWithFallback(response.bodyBytes);
@@ -143,12 +153,42 @@ class PhpEvalConnector extends ShellConnector {
 
   @override
   Future<String?> getShellScriptDir() async {
+    final wantTrace = ShellScriptDirProbe.forcePhpScriptDirTrace;
     final base = ShellScriptDirProbe.safeBasenameFromUrl(webshell.url);
-    final r = (await sendPhpCode(
-      ShellScriptDirProbe.phpResolveScriptDirCode(base),
-    )).trim();
-    if (!ShellScriptDirProbe.isUsableRemotePath(r)) return null;
-    return r;
+
+    Future<String> probe(bool trace) async {
+      final php = ShellScriptDirProbe.phpResolveScriptDirCode(
+        base,
+        shellUrl: webshell.url,
+        trace: trace,
+      );
+      return (await sendPhpCode(php)).trim();
+    }
+
+    _lastHttpResponseStatus = null;
+    _lastHttpResponseBodyBytes = null;
+
+    var traceUsed = wantTrace;
+    var raw = await probe(wantTrace);
+    String? retryNote;
+    if (raw.isEmpty && wantTrace) {
+      raw = await probe(false);
+      traceUsed = false;
+      retryNote =
+          'retryWithoutTrace=true（trace 探测响应为空，已自动用较短载荷重试）';
+    }
+
+    final outcome = ShellScriptDirProbe.diagnosePhpScriptDirProbeResponse(
+      rawResponse: raw,
+      webshellUrl: webshell.url,
+      connectorLabel: '$runtimeType',
+      traceEnabled: traceUsed,
+      httpStatus: _lastHttpResponseStatus,
+      responseBodyBytes: _lastHttpResponseBodyBytes,
+      retryNote: retryNote,
+    );
+    _lastShellScriptDirDiagnostic = outcome.diagnostic;
+    return outcome.path;
   }
 
   @override

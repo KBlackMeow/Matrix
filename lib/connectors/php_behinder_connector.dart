@@ -35,9 +35,15 @@ class PhpBehinderConnector extends ShellConnector {
   /// 当前使用的模式：ECB 或 CBC。部分环境 "AES128" 映射不同，连接后自动探测
   bool _useCbc = false;
   String? _lastPingDiagnostic;
+  String? _lastShellScriptDirDiagnostic;
+  int? _lastHttpResponseStatus;
+  int? _lastHttpResponseBodyBytes;
 
   @override
   String? get lastPingDiagnostic => _lastPingDiagnostic;
+
+  @override
+  String? get lastShellScriptDirDiagnostic => _lastShellScriptDirDiagnostic;
 
   String _aesEncryptBase64(String plain) {
     final key = enc.Key(Uint8List.fromList(utf8.encode(_aesKey)));
@@ -71,8 +77,23 @@ class PhpBehinderConnector extends ShellConnector {
     return h;
   }
 
+  /// 冰蝎依赖 Session；并发 POST 易出现 **200 + 空 body**。所有 `_sendPhp` 串行执行。
+  Future<void> _phpSendGate = Future.value();
+
   /// 冰蝎 PHP 格式：encrypt("C|php_code")，C.__invoke 执行 eval
   Future<String> _sendPhp(String phpCode) async {
+    final prev = _phpSendGate;
+    final done = Completer<void>();
+    _phpSendGate = done.future;
+    await prev;
+    try {
+      return await _sendPhpUnlocked(phpCode);
+    } finally {
+      done.complete();
+    }
+  }
+
+  Future<String> _sendPhpUnlocked(String phpCode) async {
     try {
       // 目标 bing.php 使用 explode('|') 来分离类名和参数。
       // 如果 phpCode 中包含 '|'，代码会被截断导致 eval 失败。
@@ -87,6 +108,8 @@ class PhpBehinderConnector extends ShellConnector {
           .post(Uri.parse(webshell.url), headers: _requestHeaders(), body: body)
           .timeout(const Duration(seconds: 25));
 
+      _lastHttpResponseStatus = response.statusCode;
+      _lastHttpResponseBodyBytes = response.bodyBytes.length;
       _updateCookies(response);
       if (response.statusCode == 200) {
         return decodeWithFallback(response.bodyBytes);
@@ -198,11 +221,64 @@ class PhpBehinderConnector extends ShellConnector {
   @override
   Future<String?> getShellScriptDir() async {
     final base = ShellScriptDirProbe.safeBasenameFromUrl(webshell.url);
-    final r = (await _sendPhp(
-      ShellScriptDirProbe.phpResolveScriptDirCode(base),
-    )).trim();
-    if (!ShellScriptDirProbe.isUsableRemotePath(r)) return null;
-    return r;
+
+    Future<String> probe(bool trace) async {
+      final php = ShellScriptDirProbe.phpResolveScriptDirCode(
+        base,
+        shellUrl: webshell.url,
+        trace: trace,
+      );
+      return (await _sendPhp(php)).trim();
+    }
+
+    _lastHttpResponseStatus = null;
+    _lastHttpResponseBodyBytes = null;
+
+    // 冰蝎：仅 forcePhpScriptDirTrace 才跑大载荷。
+    final tryRemoteTrace = ShellScriptDirProbe.forcePhpScriptDirTrace;
+    final notes = <String>[];
+    var traceUsed = false;
+    var raw = '';
+
+    if (tryRemoteTrace) {
+      traceUsed = true;
+      raw = await probe(true);
+      if (raw.isEmpty) {
+        notes.add(
+          'behinderRemoteTraceEmpty=true（AES 长探测常返回空体；已改用短探测）',
+        );
+        traceUsed = false;
+      }
+    }
+
+    var shortAttempts = 0;
+    if (raw.isEmpty) {
+      const maxShort = 4;
+      while (raw.isEmpty && shortAttempts < maxShort) {
+        shortAttempts++;
+        raw = await probe(false);
+        if (raw.isEmpty && shortAttempts < maxShort) {
+          await Future<void>.delayed(Duration(milliseconds: 60 * shortAttempts));
+        }
+      }
+      if (shortAttempts > 1) {
+        notes.add('shortProbeAttempts=$shortAttempts');
+      }
+    }
+
+    final retryNote = notes.isEmpty ? null : notes.join('; ');
+
+    final outcome = ShellScriptDirProbe.diagnosePhpScriptDirProbeResponse(
+      rawResponse: raw,
+      webshellUrl: webshell.url,
+      connectorLabel: '$runtimeType',
+      traceEnabled: traceUsed,
+      httpStatus: _lastHttpResponseStatus,
+      responseBodyBytes: _lastHttpResponseBodyBytes,
+      retryNote: retryNote,
+    );
+    _lastShellScriptDirDiagnostic = outcome.diagnostic;
+    return outcome.path;
   }
 
   @override

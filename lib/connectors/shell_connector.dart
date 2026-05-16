@@ -36,6 +36,9 @@ abstract class ShellConnector {
   /// 连接失败时的诊断信息（如 HTTP 错误、MATRIX_ERR 等），供 UI 显示
   String? get lastPingDiagnostic => null;
 
+  /// [getShellScriptDir] 最后一次执行的客户端摘要（调试模式下含远端 `[MX_SD]` 步骤）。
+  String? get lastShellScriptDirDiagnostic => null;
+
   Future<String> executeCommand(String cmd, {String workingDir = ''});
   Future<String> getCurrentDir();
 

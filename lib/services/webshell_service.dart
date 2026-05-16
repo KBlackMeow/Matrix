@@ -42,6 +42,10 @@ class WebshellService {
 
   String? get lastPingDiagnostic => _connector.lastPingDiagnostic;
 
+  /// 最近一次脚本目录探测摘要；若曾开启 [ShellScriptDirProbe.forcePhpScriptDirTrace] 可能含远端 `[MX_SD]` 文本。
+  String? get lastShellScriptDirDiagnostic =>
+      _connector.lastShellScriptDirDiagnostic;
+
   Future<String> executeCommand(String cmd, {String workingDir = ''}) =>
       _connector.executeCommand(cmd, workingDir: workingDir);
 
