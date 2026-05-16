@@ -2,10 +2,9 @@ import 'dart:math' as math;
 
 import 'package:code_text_field/code_text_field.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:highlight/highlight.dart' show Mode;
+import 'package:highlight/highlight.dart' show Mode, Node, Result, highlight;
 import 'package:highlight/languages/all.dart';
 
 import '../theme/app_theme.dart';
@@ -30,7 +29,98 @@ TextStyle matrixCodeTextStyle({double fontSize = 12, double height = 1.65}) =>
       color: const Color(0xFFB8C0CC),
     );
 
-/// 根据路径 / 文件名解析 highlight 语言 id（用于 [allLanguages] / [HighlightView]）。
+/// 与 `flutter_highlight` 的 HighlightView 相同：空格展开 tab。
+String _matrixHlExpandTabs(String input, {int tabSize = 8}) =>
+    input.replaceAll('\t', ' ' * tabSize);
+
+/// highlight.js 结点树 → [TextSpan]（结构与 HighlightView._convert 一致）。
+List<TextSpan> _matrixHlConvertedSpans(List<Node> nodes, Map<String, TextStyle> theme) {
+  final spans = <TextSpan>[];
+  List<TextSpan> currentSpans = spans;
+  final stack = <List<TextSpan>>[];
+
+  TextStyle? styleFor(Node node) {
+    final c = node.className;
+    if (c == null) return null;
+    final s = theme[c];
+    if (s != null) return s;
+    // 未知 token 不占位样式，与普通文本同色
+    return null;
+  }
+
+  void traverse(Node node) {
+    if (node.value != null) {
+      final leafStyle = styleFor(node);
+      currentSpans.add(
+        leafStyle != null ? TextSpan(text: node.value, style: leafStyle) : TextSpan(text: node.value),
+      );
+    } else if (node.children != null) {
+      final tmp = <TextSpan>[];
+      final groupStyle = styleFor(node);
+      currentSpans.add(
+        TextSpan(children: tmp, style: groupStyle),
+      );
+      stack.add(currentSpans);
+      currentSpans = tmp;
+
+      for (final child in node.children!) {
+        traverse(child);
+        if (child == node.children!.last) {
+          currentSpans = stack.isEmpty ? spans : stack.removeLast();
+        }
+      }
+    }
+  }
+
+  for (final node in nodes) {
+    traverse(node);
+  }
+  return spans;
+}
+
+TextStyle _matrixHlSelectableRootStyle(
+  Map<String, TextStyle> theme, {
+  required TextStyle textStyle,
+}) {
+  const rootKey = 'root';
+  const defaultFontColor = Color(0xff000000);
+  var merged = TextStyle(
+    fontFamily: 'monospace',
+    color: theme[rootKey]?.color ?? defaultFontColor,
+  );
+  return merged.merge(textStyle);
+}
+
+/// 可选用 [SelectableText]/[SelectableText.rich]，避免外层横向 [SingleChildScrollView] 抢走拖选手势。
+Widget _matrixHighlightSelectableFormatted(
+  String source, {
+  required String langId,
+  required TextStyle textStyle,
+}) {
+  final expanded = _matrixHlExpandTabs(source);
+  final merged = _matrixHlSelectableRootStyle(matrixCodeHighlightTheme, textStyle: textStyle);
+
+  final Result parsed;
+  try {
+    parsed = highlight.parse(expanded, language: langId);
+  } catch (_) {
+    return SelectableText(expanded, style: textStyle);
+  }
+
+  final nodes = parsed.nodes;
+  if (nodes == null) {
+    return SelectableText(expanded, style: merged);
+  }
+
+  return SelectableText.rich(
+    TextSpan(
+      style: merged,
+      children: _matrixHlConvertedSpans(nodes, matrixCodeHighlightTheme),
+    ),
+  );
+}
+
+/// 根据路径 / 文件名解析 highlight 语言 id（用于 [allLanguages]）。
 String? highlightLanguageIdForPath(String path) {
   final name = path.replaceAll('\\', '/').split('/').last.trim();
   if (name.isEmpty) return null;
@@ -238,15 +328,13 @@ Widget matrixSyntaxHighlightReadOnly(
 
   Widget child;
   try {
-    child = HighlightView(
+    child = _matrixHighlightSelectableFormatted(
       code,
-      language: langId,
-      theme: matrixCodeHighlightTheme,
+      langId: langId,
       textStyle: baseStyle,
-      padding: EdgeInsets.zero,
     );
   } catch (_) {
-    child = Text(code, style: baseStyle);
+    child = SelectableText(_matrixHlExpandTabs(code), style: baseStyle);
   }
 
   const fill = Color(0xFF0D1117);
@@ -268,17 +356,14 @@ Widget matrixSyntaxHighlightReadOnly(
           return SingleChildScrollView(
             padding: padding,
             scrollDirection: Axis.vertical,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minWidth: minW,
-                  minHeight: minH,
-                ),
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: SelectionArea(child: child),
-                ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: minW,
+                minHeight: minH,
+              ),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: child,
               ),
             ),
           );
@@ -433,12 +518,7 @@ Widget matrixLsLongListingOutput(String output) {
     );
   }
 
-  return SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    child: SelectionArea(
-      child: Text.rich(TextSpan(children: children)),
-    ),
-  );
+  return SelectableText.rich(TextSpan(children: children));
 }
 
 /// Webshell 终端块中的命令输出：在可识别为「查看源码文件」时做语法高亮。
@@ -473,17 +553,10 @@ Widget matrixTerminalOutputBlock(
   }
 
   try {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SelectionArea(
-        child: HighlightView(
-          output,
-          language: langId,
-          theme: matrixCodeHighlightTheme,
-          textStyle: matrixCodeTextStyle(height: 1.6),
-          padding: EdgeInsets.zero,
-        ),
-      ),
+    return _matrixHighlightSelectableFormatted(
+      output,
+      langId: langId,
+      textStyle: matrixCodeTextStyle(height: 1.6),
     );
   } catch (_) {
     return SelectableText(
