@@ -22,12 +22,8 @@ final Map<String, TextStyle> matrixCodeHighlightTheme = () {
 }();
 
 TextStyle matrixCodeTextStyle({double fontSize = 12, double height = 1.65}) =>
-    GoogleFonts.jetBrainsMono(
-      fontSize: fontSize,
-      height: height,
-      letterSpacing: 0.2,
-      color: const Color(0xFFB8C0CC),
-    );
+    AppTextStyles.terminal(size: fontSize, color: const Color(0xFFB8C0CC))
+        .copyWith(height: height, letterSpacing: 0.2);
 
 /// 与 `flutter_highlight` 的 HighlightView 相同：空格展开 tab。
 String _matrixHlExpandTabs(String input, {int tabSize = 8}) =>
@@ -85,7 +81,8 @@ TextStyle _matrixHlSelectableRootStyle(
   const rootKey = 'root';
   const defaultFontColor = Color(0xff000000);
   var merged = TextStyle(
-    fontFamily: 'monospace',
+    fontFamily: AppFonts.monoFamily,
+    fontFamilyFallback: AppFonts.cjkFallback,
     color: theme[rootKey]?.color ?? defaultFontColor,
   );
   return merged.merge(textStyle);

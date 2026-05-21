@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
@@ -25,8 +27,25 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
   FlutterWindow window(project);
-  Win32Window::Point origin(10, 10);
-  Win32Window::Size size(1280, 720);
+
+  RECT work_area = {};
+  work_area.left = 0;
+  work_area.top = 0;
+  work_area.right = ::GetSystemMetrics(SM_CXSCREEN);
+  work_area.bottom = ::GetSystemMetrics(SM_CYSCREEN);
+  ::SystemParametersInfo(SPI_GETWORKAREA, 0, &work_area, 0);
+
+  const unsigned int window_width = 1280;
+  const unsigned int window_height = 720;
+  const int work_width = work_area.right - work_area.left;
+  const int work_height = work_area.bottom - work_area.top;
+  const unsigned int origin_x = work_area.left +
+      static_cast<unsigned int>(std::max(0, (work_width - static_cast<int>(window_width)) / 2));
+  const unsigned int origin_y = work_area.top +
+      static_cast<unsigned int>(std::max(0, (work_height - static_cast<int>(window_height)) / 2));
+
+  Win32Window::Point origin(origin_x, origin_y);
+  Win32Window::Size size(window_width, window_height);
   if (!window.Create(L"matrix", origin, size)) {
     return EXIT_FAILURE;
   }

@@ -27,46 +27,68 @@ class AppColors {
   static const Color amber = Color(0xFFFFD740);
 }
 
+/// 跨平台 CJK 回退（JetBrains Mono 不含中文，需统一回退避免 Windows 上混用多种系统字体）
+abstract final class AppFonts {
+  AppFonts._();
+
+  static const List<String> cjkFallback = [
+    'Microsoft YaHei UI',
+    'PingFang SC',
+    'Noto Sans CJK SC',
+    'sans-serif',
+  ];
+
+  static String get monoFamily => GoogleFonts.jetBrainsMono().fontFamily!;
+
+  static TextStyle _mono(TextStyle style) =>
+      style.copyWith(fontFamilyFallback: cjkFallback);
+}
+
 /// 黑客风格文字样式 — 使用 JetBrains Mono（专为代码设计的等宽字体）
 class AppTextStyles {
-  static TextStyle title({double size = 20, Color? color}) =>
-      GoogleFonts.jetBrainsMono(
-        fontSize: size,
-        fontWeight: FontWeight.w700,
-        color: color ?? AppColors.primary,
-        letterSpacing: 1.5,
+  static TextStyle title({double size = 20, Color? color}) => AppFonts._mono(
+        GoogleFonts.jetBrainsMono(
+          fontSize: size,
+          fontWeight: FontWeight.w700,
+          color: color ?? AppColors.primary,
+          letterSpacing: 1.5,
+        ),
       );
 
-  static TextStyle heading({double size = 16, Color? color}) =>
-      GoogleFonts.jetBrainsMono(
-        fontSize: size,
-        fontWeight: FontWeight.w600,
-        color: color ?? AppColors.primary,
-        letterSpacing: 1.0,
+  static TextStyle heading({double size = 16, Color? color}) => AppFonts._mono(
+        GoogleFonts.jetBrainsMono(
+          fontSize: size,
+          fontWeight: FontWeight.w600,
+          color: color ?? AppColors.primary,
+          letterSpacing: 1.0,
+        ),
       );
 
-  static TextStyle body({double size = 14, Color? color}) =>
-      GoogleFonts.jetBrainsMono(
-        fontSize: size,
-        fontWeight: FontWeight.w400,
-        color: color ?? AppColors.textPrimary,
-        letterSpacing: 0.3,
+  static TextStyle body({double size = 14, Color? color}) => AppFonts._mono(
+        GoogleFonts.jetBrainsMono(
+          fontSize: size,
+          fontWeight: FontWeight.w400,
+          color: color ?? AppColors.textPrimary,
+          letterSpacing: 0.3,
+        ),
       );
 
-  static TextStyle caption({double size = 12, Color? color}) =>
-      GoogleFonts.jetBrainsMono(
-        fontSize: size,
-        fontWeight: FontWeight.w400,
-        color: color ?? AppColors.textSecondary,
-        letterSpacing: 0.2,
+  static TextStyle caption({double size = 12, Color? color}) => AppFonts._mono(
+        GoogleFonts.jetBrainsMono(
+          fontSize: size,
+          fontWeight: FontWeight.w400,
+          color: color ?? AppColors.textSecondary,
+          letterSpacing: 0.2,
+        ),
       ).copyWith(overflow: TextOverflow.ellipsis);
 
-  static TextStyle terminal({double size = 14, Color? color}) =>
-      GoogleFonts.jetBrainsMono(
-        fontSize: size,
-        fontWeight: FontWeight.w400,
-        color: color ?? AppColors.primary,
-        letterSpacing: 0.5,
+  static TextStyle terminal({double size = 14, Color? color}) => AppFonts._mono(
+        GoogleFonts.jetBrainsMono(
+          fontSize: size,
+          fontWeight: FontWeight.w400,
+          color: color ?? AppColors.primary,
+          letterSpacing: 0.5,
+        ),
       );
 }
 

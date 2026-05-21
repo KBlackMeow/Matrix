@@ -15,6 +15,8 @@ class MyApp extends StatelessWidget {
           title: S.appName,
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
+            fontFamily: AppFonts.monoFamily,
+            fontFamilyFallback: AppFonts.cjkFallback,
             colorScheme: ColorScheme.dark(
               primary: AppColors.primary,
               surface: AppColors.bgDark,
@@ -52,17 +54,17 @@ class MyApp extends StatelessWidget {
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                textStyle: const TextStyle(fontSize: 14, inherit: false),
+                textStyle: AppTextStyles.body(size: 14).copyWith(inherit: false),
               ),
             ),
             elevatedButtonTheme: ElevatedButtonThemeData(
               style: ElevatedButton.styleFrom(
-                textStyle: const TextStyle(fontSize: 14, inherit: false),
+                textStyle: AppTextStyles.body(size: 14).copyWith(inherit: false),
               ),
             ),
             outlinedButtonTheme: OutlinedButtonThemeData(
               style: OutlinedButton.styleFrom(
-                textStyle: const TextStyle(fontSize: 14, inherit: false),
+                textStyle: AppTextStyles.body(size: 14).copyWith(inherit: false),
               ),
             ),
           ),

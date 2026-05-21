@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:xterm/xterm.dart';
 
 import '../app/localization.dart';
@@ -277,12 +276,10 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
               _terminal,
               theme: _matrixXtermTheme,
               textStyle: TerminalStyle.fromTextStyle(
-                GoogleFonts.jetBrainsMono(
-                  fontSize: 13,
-                  height: 1.25,
-                  letterSpacing: 0.2,
+                AppTextStyles.terminal(
+                  size: 13,
                   color: const Color(0xFFB8C0CC),
-                ),
+                ).copyWith(height: 1.25, letterSpacing: 0.2),
               ),
               backgroundOpacity: 0,
               cursorType: TerminalCursorType.block,

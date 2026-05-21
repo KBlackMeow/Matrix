@@ -1149,15 +1149,12 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
       enabled: enabled,
       onChanged: (_) => setState(() {}),
       keyboardType: number ? TextInputType.number : TextInputType.text,
-      style: const TextStyle(
-        color: AppColors.textPrimary,
-        fontFamily: 'monospace',
-      ),
+      style: AppTextStyles.terminal(size: 14, color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textMuted),
-        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        hintStyle: AppTextStyles.caption(color: AppColors.textMuted),
+        labelStyle: AppTextStyles.caption(color: AppColors.textSecondary),
         enabledBorder: OutlineInputBorder(
           borderSide: BorderSide(
             color: AppColors.primary.withValues(alpha: 0.5),
