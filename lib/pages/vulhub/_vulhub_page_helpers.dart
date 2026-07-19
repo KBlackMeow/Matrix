@@ -324,7 +324,7 @@ Widget vBtn(String label, VoidCallback? onPressed) => SizedBox(
 );
 
 /// Shows the reverse-shell mode picker dialog used by exploit pages.
-/// Returns the selected mode string ('script' | 'bash' | 'socat') or null if cancelled.
+/// Returns the selected mode string ('script' | 'bash') or null if cancelled.
 Future<String?> showReverseShellModeDialog(BuildContext context) {
   return showDialog<String>(
     context: context,
@@ -354,14 +354,6 @@ Future<String?> showReverseShellModeDialog(BuildContext context) {
                   title: Text(S.terminalModeBash),
                   subtitle: Text(
                     S.terminalModeBashDesc,
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                ),
-                RadioListTile<String>(
-                  value: 'socat',
-                  title: Text(S.terminalModeSocat),
-                  subtitle: Text(
-                    S.terminalModeSocatDesc,
                     style: const TextStyle(fontSize: 11),
                   ),
                 ),

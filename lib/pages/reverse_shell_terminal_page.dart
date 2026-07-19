@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
 
 import '../app/localization.dart';
+import '../io/terminal_output_pipe.dart';
 import '../services/reverse_shell_service.dart';
 import '../theme/app_theme.dart';
 
@@ -36,6 +38,47 @@ const _matrixXtermTheme = TerminalTheme(
   searchHitForeground: Color(0xFF0D1117),
 );
 
+TerminalTargetPlatform get _currentPlatform {
+  if (Platform.isMacOS) return TerminalTargetPlatform.macos;
+  if (Platform.isLinux) return TerminalTargetPlatform.linux;
+  if (Platform.isWindows) return TerminalTargetPlatform.windows;
+  return TerminalTargetPlatform.unknown;
+}
+
+/// 等宽 CJK 回退链——优先选用"真正等宽"的 CJK 字体。
+///
+/// 问题：xterm 计算 CJK 字符为 2 cell = `2 × JetBrainsMono.charAdvance` 像素，
+/// 但 PingFang SC / Microsoft YaHei 等比例 CJK 字体的 glyph 宽度不恰好等于该值，
+/// 导致 CJK 字符溢出 cell 或被截断。
+///
+/// 解决：首选用 `Noto Sans Mono CJK SC`——这是 Google 专门为终端设计的等宽 CJK
+/// 字体，Han 字宽严格等于 `2 × Latin`。仅在它不可用时回退到系统字体。
+List<String> get _cjkFallback {
+  // Noto Sans Mono CJK SC 在所有平台上都是首选，它保证 CJK = 2 × Latin 宽度
+  const notoCjk = 'Noto Sans Mono CJK SC';
+  if (Platform.isMacOS) {
+    return const [
+      notoCjk,
+      'Menlo',               // Apple 等宽，有部分 CJK，度量与 JBM 接近
+      'PingFang SC',         // 系统中文（比例字体，最后手段）
+      'sans-serif',
+    ];
+  }
+  if (Platform.isWindows) {
+    return const [
+      notoCjk,
+      'Cascadia Mono',       // 微软等宽终端字体，CJK 度量调校良好
+      'Microsoft YaHei UI',  // 系统中文（比例字体）
+      'sans-serif',
+    ];
+  }
+  return const [
+    notoCjk,
+    'DejaVu Sans Mono',
+    'sans-serif',
+  ];
+}
+
 /// 基于反弹 Shell 的完整终端页面（使用 xterm 终端模拟器）
 class ReverseShellTerminalPage extends StatefulWidget {
   final ReverseShellSession session;
@@ -50,105 +93,170 @@ class ReverseShellTerminalPage extends StatefulWidget {
 class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
   late final Terminal _terminal;
   late final TerminalController _terminalController;
+  late final TerminalOutputPipe _pipe;
   late final FocusNode _focusNode;
-  StreamSubscription<List<int>>? _rawSub;
   bool _closedManually = false;
   bool _connectionClosed = false;
 
-  // 防抖定时器：窗口拖拽时不向远端频繁发 stty
+  // Resize 状态（含消抖定时器）
   Timer? _resizeDebounce;
+  int _lastCols = -1;
+  int _lastRows = -1;
 
   @override
   void initState() {
     super.initState();
 
-    // 本地输入 → 发送到反弹 Shell（连接断开时静默忽略，避免未处理异常）
+    // ── 1. 创建 Terminal（必须先于 pipe，因为 pipe 持有 terminal 引用） ──
     _terminal = Terminal(
       maxLines: 10000,
       onOutput: (data) {
         if (!widget.session.isAlive) return;
         widget.session.send(data).catchError((_) {});
       },
+      onResize: _onTerminalResize,
+      onPrivateOSC: _onPrivateOSC,
+      platform: _currentPlatform,
     );
 
-    _terminalController = TerminalController();
+    // ── 2. 创建输出管线 ──
+    _pipe = TerminalOutputPipe(terminal: _terminal);
+
+    // 背压：pipe 暂停/恢复 → socket 订阅暂停/恢复
+    _pipe.onPause = () => widget.session.subscription?.pause();
+    _pipe.onResume = () => widget.session.subscription?.resume();
+
+    // ── 3. 订阅远端字节流 → pipe.add() ──
+    widget.session.rawStream.listen(
+      (data) => _pipe.add(data),
+      onDone: _onConnectionClosed,
+      onError: (_, _) => _onConnectionClosed(),
+    );
+
+    _terminalController = TerminalController(
+      pointerInputs: const PointerInputs({
+        PointerInput.tap,
+        PointerInput.scroll,
+        PointerInput.drag,
+        PointerInput.move,
+      }),
+    );
     _focusNode = FocusNode();
 
-    // 重新进入完整终端页面时，延后到首帧渲染后再回放历史，确保 Terminal 已 resize 到实际尺寸，
-    // 避免在默认 80x24 下写入后 reflow 导致换行异常
+    // ── 4. 历史回放 ──
+    // resize 由 onResize 回调负责，不需要额外的延迟重试
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (widget.session.historyRaw.isEmpty) return;
-      final combined = <int>[];
       for (final chunk in widget.session.historyRaw) {
-        combined.addAll(chunk);
-      }
-      if (combined.isNotEmpty) {
-        _writeToTerminal(combined);
+        _pipe.add(chunk);
       }
     });
-
-    // 远端输出字节流 → 原样写入终端；连接断开时仅标记状态，不自动关闭（由用户手动关闭）
-    _rawSub = widget.session.rawStream.listen(
-      (data) {
-        _writeToTerminal(data);
-      },
-      onDone: () {
-        if (mounted && !_closedManually) {
-          setState(() => _connectionClosed = true);
-        }
-      },
-      onError: (_, _) {
-        if (mounted && !_closedManually) {
-          setState(() => _connectionClosed = true);
-        }
-      },
-    );
   }
 
   @override
   void dispose() {
-    _rawSub?.cancel();
+    _pipe.dispose();
     _resizeDebounce?.cancel();
     _focusNode.dispose();
     _terminalController.dispose();
     super.dispose();
   }
 
-  /// TerminalView 渲染后读取其实际 cols/rows，同步通知远端 shell。
-  /// 仅在创建时和窗口尺寸变化时发送，避免每次进入页面都重复发送。
-  void _resizeIfNeeded(Size size) {
-    if (size.isEmpty) return;
+  // ── Resize：通过 terminal.onResize 回调触发（非 LayoutBuilder 轮询） ──
+
+  void _onTerminalResize(int cols, int rows, int pw, int ph) {
+    if (cols == _lastCols && rows == _lastRows) return;
+    _lastCols = cols;
+    _lastRows = rows;
+
+    _resizeDebounce?.cancel();
+    _resizeDebounce = Timer(const Duration(milliseconds: 150), () {
+      _sendSttyResize();
+    });
+  }
+
+  /// 通知远端 shell 当前终端尺寸。
+  ///
+  /// 双命令策略兼容有无 PTY 两种场景：
+  /// - `stty cols/rows`——有 PTY（script 模式）时生效，内核发 SIGWINCH，
+  ///   程序通过 `isatty()` 和 `TIOCGWINSZ` 获知正确尺寸
+  /// - `export COLUMNS/LINES`——无 PTY（纯 bash 模式）时兜底，bash
+  ///   用它们做 readline 换行；stty 的 ioctl 错误被 2>/dev/null 吞掉
+  ///
+  /// 仅当不在 alt buffer（vim/less）中时才发送，避免污染正在运行的程序。
+  void _sendSttyResize() {
+    if (!mounted || !widget.session.isAlive) return;
+    if (_terminal.isUsingAltBuffer) return;
     final cols = _terminal.viewWidth;
     final rows = _terminal.viewHeight;
-    // 尺寸未变则跳过（含重入页面时 session 已记录上次发送值的情况）
+    if (cols <= 0 || rows <= 0) return;
+    // 与上次发送的尺寸相同则跳过（包括重入终端页面的场景）
     if (cols == widget.session.lastSttyCols &&
         rows == widget.session.lastSttyRows) {
       return;
     }
-    _resizeDebounce?.cancel();
-    _resizeDebounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted && widget.session.isAlive) {
-        widget.session.lastSttyCols = cols;
-        widget.session.lastSttyRows = rows;
-        widget.session.send('stty cols $cols rows $rows\n').catchError((_) {});
-      }
-    });
+    widget.session.lastSttyCols = cols;
+    widget.session.lastSttyRows = rows;
+    widget.session
+        .send(
+          'export COLUMNS=$cols LINES=$rows; '
+          'stty cols $cols rows $rows 2>/dev/null\n',
+        )
+        .catchError((_) {});
   }
 
-  /// 写入数据到终端控件，并处理“阶梯效应” (Staircase Effect)
-  ///
-  /// 在没有 PTY 的裸反弹 Shell 中，远端只发送 \n 而不包含 \r。
-  /// 此方法确保 \n 都会被解释为 \r\n，从而让光标回到行首。
-  void _writeToTerminal(List<int> data) {
-    // 使用 utf8 解码支持中文字符，allowMalformed 避免非法序列崩溃
-    final text = utf8.decode(data, allowMalformed: true);
+  // ── OSC 52 剪贴板 ──
 
-    // 算法：将所有 \n 替换为 \r\n，但要避免将原本就是 \r\n 的变成 \r\r\n
-    final fixedText = text.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n');
-
-    _terminal.write(fixedText);
+  void _onPrivateOSC(String code, List<String> args) {
+    if (code != '52' || args.isEmpty) return;
+    final payload = args.join(';');
+    final qIdx = payload.indexOf('?');
+    if (qIdx < 0) return;
+    try {
+      final b64 = payload.substring(qIdx + 1);
+      final bytes = base64Decode(b64);
+      final text = utf8.decode(bytes);
+      Clipboard.setData(ClipboardData(text: text));
+    } catch (_) {
+      // OSC 52 数据格式错误 — 静默忽略
+    }
   }
+
+  // ── 连接断开 ──
+
+  void _onConnectionClosed() {
+    if (!mounted || _closedManually) return;
+    _terminal.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+    setState(() => _connectionClosed = true);
+  }
+
+  // ── 平台感知终端样式 ──────────────────────────────────────────────────────────
+
+  TerminalStyle _buildTerminalStyle() {
+    // Windows 系统等宽字体（Consolas / Cascadia）在 w400 下经 Skia 灰阶 AA
+    // 渲染偏细，且没有真 bold cut——Flutter 合成 bold 会加粗变形。对齐 ssterm：
+    // Regular 用 w500（Medium），Bold 与 Regular 同重，避免合成 bold。
+    if (Platform.isWindows) {
+      return TerminalStyle(
+        fontFamily: 'JetBrainsMono',
+        fontSize: 14,
+        height: 1.25,
+        letterSpacing: 0,
+        fontWeight: FontWeight.w500,
+        boldFontWeight: FontWeight.w500,
+        fontFamilyFallback: _cjkFallback,
+      );
+    }
+    return TerminalStyle(
+      fontFamily: 'JetBrainsMono',
+      fontSize: 13,
+      height: 1.25,
+      letterSpacing: 0,
+      fontFamilyFallback: _cjkFallback,
+    );
+  }
+
+  // ── UI ────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -157,7 +265,7 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // 顶部栏，风格与 Webshell 交互页一致
+            // 顶部栏
             Container(
               height: 56,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -246,14 +354,12 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                 ],
               ),
             ),
-            // 终端内容区域（填满剩余空间，无圆角，直接铺满）
+            // 终端内容区域
             Expanded(
               child: Container(
-                // 使用 decoration + clipBehavior，避免 Flutter 对
-                // “color + clipBehavior” 的断言报错
                 decoration: const BoxDecoration(color: Color(0xFF0D1117)),
                 clipBehavior: Clip.hardEdge,
-                child: _buildTerminalWithContextMenu(),
+                child: _buildTerminal(),
               ),
             ),
           ],
@@ -262,78 +368,55 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
     );
   }
 
-  /// 终端 + 右键菜单；外层 LayoutBuilder 负责动态检测并同步终端尺寸
-  Widget _buildTerminalWithContextMenu() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // 在下一帧更新，避免在 build 阶段直接修改状态
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _resizeIfNeeded(constraints.biggest);
-        });
-        return Stack(
-          children: [
-            TerminalView(
-              _terminal,
-              theme: _matrixXtermTheme,
-              textStyle: TerminalStyle.fromTextStyle(
-                AppTextStyles.terminal(
-                  size: 13,
-                  color: const Color(0xFFB8C0CC),
-                ).copyWith(height: 1.25, letterSpacing: 0.2),
-              ),
-              backgroundOpacity: 0,
-              cursorType: TerminalCursorType.block,
-              controller: _terminalController,
-              focusNode: _focusNode,
-              autofocus: true,
-              hardwareKeyboardOnly: true,
-              onSecondaryTapUp: (details, cell) async {
-                final selection = _terminalController.selection;
-                final selectedText = selection != null
-                    ? _terminal.buffer.getText(selection)
-                    : null;
-
-                final ctx = context;
-                if (!ctx.mounted) return;
-                final choice = await showMenu<String>(
-                  context: ctx,
-                  position: RelativeRect.fromLTRB(
-                    details.globalPosition.dx,
-                    details.globalPosition.dy,
-                    details.globalPosition.dx,
-                    details.globalPosition.dy,
-                  ),
-                  items: [
-                    if (selectedText != null)
-                      PopupMenuItem(value: 'copy', child: Text(S.actionCopy)),
-                    PopupMenuItem(value: 'paste', child: Text(S.actionPaste)),
-                  ],
-                );
-
-                if (choice == 'copy' && selectedText != null) {
-                  await Clipboard.setData(ClipboardData(text: selectedText));
-                } else if (choice == 'paste') {
-                  final data = await Clipboard.getData(Clipboard.kTextPlain);
-                  final text = data?.text;
-                  if (text != null && text.isNotEmpty) {
-                    var t = text.replaceAll('\r\n', '\n').replaceAll('\r', '');
-                    while (t.startsWith('\n')) {
-                      t = t.substring(1);
-                    }
-                    if (t.isNotEmpty && widget.session.isAlive) {
-                      // Bracketed Paste Mode：告知远端 bash 这是粘贴而非逐键输入，
-                      // 避免大量内容被 readline 逐字符处理导致缓冲区溢出、从头覆盖
-                      widget.session
-                          .send('\x1b[200~$t\x1b[201~')
-                          .catchError((_) {});
-                    }
-                  }
-                }
-              },
-            ),
-          ],
-        );
-      },
+  Widget _buildTerminal() {
+    return Stack(
+      children: [
+        TerminalView(
+          _terminal,
+          theme: _matrixXtermTheme,
+          textStyle: _buildTerminalStyle(),
+          backgroundOpacity: 0,
+          cursorType: TerminalCursorType.block,
+          controller: _terminalController,
+          focusNode: _focusNode,
+          autofocus: true,
+          hardwareKeyboardOnly: true,
+          onSecondaryTapUp: _onSecondaryTap,
+        ),
+      ],
     );
+  }
+
+  Future<void> _onSecondaryTap(TapUpDetails details, CellOffset cell) async {
+    final selection = _terminalController.selection;
+    final selectedText =
+        selection != null ? _terminal.buffer.getText(selection) : null;
+
+    if (!mounted) return;
+    final choice = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        details.globalPosition.dx,
+        details.globalPosition.dy,
+        details.globalPosition.dx,
+        details.globalPosition.dy,
+      ),
+      items: [
+        if (selectedText != null)
+          PopupMenuItem(value: 'copy', child: Text(S.actionCopy)),
+        PopupMenuItem(value: 'paste', child: Text(S.actionPaste)),
+      ],
+    );
+
+    if (choice == 'copy' && selectedText != null) {
+      await Clipboard.setData(ClipboardData(text: selectedText));
+    } else if (choice == 'paste') {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text;
+      if (text != null && text.isNotEmpty && widget.session.isAlive) {
+        // 使用 terminal.paste() 自动处理 bracketed paste 包裹
+        _terminal.paste(text);
+      }
+    }
   }
 }

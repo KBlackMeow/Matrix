@@ -4,6 +4,7 @@ import 'dart:async';
 import '../services/reverse_shell_service.dart';
 import '../theme/app_theme.dart';
 import '../app/localization.dart';
+import '../io/terminal_logger.dart';
 import 'reverse_shell_terminal_page.dart';
 
 /// 反弹 Shell 会话管理页面（主菜单「完整终端」）
@@ -249,6 +250,25 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                                       : S.btnStartListen),
                           ),
                           style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 32),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: () async {
+                            try {
+                              final dir = await TerminalLogger.logDirectoryPath();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(dir)),
+                                );
+                              }
+                            } catch (_) {}
+                          },
+                          icon: const Icon(Icons.folder_open, size: 16),
+                          label: Text('Logs'),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             minimumSize: const Size(0, 32),
                           ),
                         ),

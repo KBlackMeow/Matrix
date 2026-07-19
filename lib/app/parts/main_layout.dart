@@ -89,7 +89,6 @@ class _MainLayoutState extends State<MainLayout> {
     super.initState();
     _rebuildDynamicPages();
     MainNavBus.onRequestOpenTunnelTab = _goTunnelManagerTab;
-    AppLanguageController.notifier.addListener(_onLanguageChanged);
     PackageInfo.fromPlatform().then((info) {
       if (!mounted) return;
       setState(() {
@@ -101,7 +100,6 @@ class _MainLayoutState extends State<MainLayout> {
   @override
   void dispose() {
     MainNavBus.onRequestOpenTunnelTab = null;
-    AppLanguageController.notifier.removeListener(_onLanguageChanged);
     super.dispose();
   }
 
@@ -109,11 +107,6 @@ class _MainLayoutState extends State<MainLayout> {
     if (!mounted) return;
     setState(() => _selectedIndex = 6);
     SuoTunnelProxyPage.notifyRefresh();
-  }
-
-  void _onLanguageChanged() {
-    if (!mounted) return;
-    setState(_rebuildDynamicPages);
   }
 
   void _rebuildDynamicPages() {
@@ -355,28 +348,6 @@ class _MainLayoutState extends State<MainLayout> {
                                     ),
                                   ),
                                   const Spacer(),
-                                  PopupMenuButton<AppLanguage>(
-                                    icon: const Icon(Icons.settings),
-                                    color: AppColors.bgElevated,
-                                    onSelected: (lang) {
-                                      // 真正的重建已由 _onLanguageChanged 监听处理。
-                                      AppLanguageController.setLanguage(lang);
-                                    },
-                                    itemBuilder: (context) => [
-                                      PopupMenuItem<AppLanguage>(
-                                        value: AppLanguage.zh,
-                                        child: Text(S.languageChinese),
-                                      ),
-                                      PopupMenuItem<AppLanguage>(
-                                        value: AppLanguage.ja,
-                                        child: Text(S.languageJapanese),
-                                      ),
-                                      PopupMenuItem<AppLanguage>(
-                                        value: AppLanguage.en,
-                                        child: Text(S.languageEnglish),
-                                      ),
-                                    ],
-                                  ),
                                   IconButton(
                                     icon: const Icon(Icons.search),
                                     onPressed: () {},

@@ -11,8 +11,13 @@ class ReverseShellSession {
     _historyRaw = <List<int>>[];
     _subscription = _socket.listen(
       (data) {
-        // 记录历史字节数据，便于之后重新打开终端页面时回放
+        // 记录历史字节数据（有界），便于之后重新打开终端页面时回放
+        _historyTotalBytes += data.length;
         _historyRaw.add(List<int>.from(data));
+        // 超过上限时从头部淘汰旧 chunk，保持总大小可控
+        while (_historyTotalBytes > _maxHistoryBytes && _historyRaw.isNotEmpty) {
+          _historyTotalBytes -= _historyRaw.removeAt(0).length;
+        }
         // 原始字节流（供终端控件使用）
         _bytesController.add(data);
         // 兼容旧的字符串输出（如简单日志查看）
@@ -47,10 +52,20 @@ class ReverseShellSession {
   /// Socket 是否仍然存活（远端未断开）
   bool get isAlive => _alive;
 
+  /// 暴露底层订阅，供 [TerminalOutputPipe] 执行背压 pause/resume。
+  StreamSubscription<List<int>>? get subscription => _subscription;
+
   final _controller = StreamController<String>.broadcast();
   late final StreamController<List<int>> _bytesController;
   late final List<List<int>> _historyRaw;
   late final StreamSubscription<List<int>> _subscription;
+
+  /// 写入串行队列，确保多路并发写入不交错（与 suo5 _FullDuplexChannel 同模式）。
+  Future<void> _writeQueue = Future<void>.value();
+
+  /// historyRaw 最大缓冲字节数，防止无限制增长。
+  static const _maxHistoryBytes = 512 * 1024; // 512 KB
+  int _historyTotalBytes = 0;
 
   /// 远端输出（UTF‑8 解码后的文本流）
   Stream<String> get output => _controller.stream;
@@ -63,21 +78,27 @@ class ReverseShellSession {
   /// 返回只读视图，避免外部修改内部缓存。
   List<List<int>> get historyRaw => List.unmodifiable(_historyRaw);
 
-  /// 发送原始命令/按键数据到远端（不会自动追加换行，请在调用方自行控制）
-  Future<void> send(String data) async {
-    if (!_alive) throw StateError('连接已断开');
-    try {
-      _socket.add(utf8.encode(data));
-      await _socket.flush();
-    } catch (e) {
-      _alive = false;
-      rethrow;
-    }
+  /// 发送原始命令/按键数据到远端（不会自动追加换行，请在调用方自行控制）。
+  ///
+  /// 使用串行写入队列避免并发写入交错，写入在后台异步完成。
+  Future<void> send(String data) {
+    if (!_alive) return Future.value();
+    _writeQueue = _writeQueue.then((_) => _sendRaw(utf8.encode(data)));
+    return _writeQueue;
   }
 
-  /// 发送原始字节（用于大块数据传输，避免中间字符串拼接）
-  Future<void> sendBytes(List<int> data) async {
-    if (!_alive) throw StateError('连接已断开');
+  /// 发送一行文本（自动追加换行符 `\n`）。
+  Future<void> sendLine(String line) => send('$line\n');
+
+  /// 发送原始字节（用于大块数据传输，避免中间字符串拼接）。
+  Future<void> sendBytes(List<int> data) {
+    if (!_alive) return Future.value();
+    _writeQueue = _writeQueue.then((_) => _sendRaw(data));
+    return _writeQueue;
+  }
+
+  Future<void> _sendRaw(List<int> data) async {
+    if (!_alive) return;
     try {
       _socket.add(data);
       await _socket.flush();

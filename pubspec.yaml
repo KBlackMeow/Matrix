@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.1.0+1
+version: 1.1.1+1
 
 environment:
   sdk: ^3.11.1
@@ -62,12 +62,19 @@ dependencies:
   # AES 加密（冰蝎协议）
   encrypt: ^5.0.3
 
-  # 终端模拟器控件（完整终端使用）
-  xterm: ^4.0.0
+  # 终端模拟器控件（完整终端使用，vendored from ssterm：CJK 渲染修复 + bold 抑制）
+  xterm:
+    path: packages/xterm
   pointycastle: ^3.9.1
   flutter_highlight: ^0.7.0
   code_text_field: ^1.1.0
   highlight: ^0.7.0
+
+  # vendored xterm 的传递依赖
+  convert: ^3.0.0
+  equatable: ^2.0.3
+  quiver: ^3.0.0
+  zmodem: ^0.0.6
 
 dev_dependencies:
   flutter_test:

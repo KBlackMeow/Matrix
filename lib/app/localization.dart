@@ -1,30 +1,10 @@
-import 'package:flutter/foundation.dart';
-
 import '../connectors/connector_factory.dart';
 import 'localization_data.dart';
 
-/// Supported app languages
-enum AppLanguage { zh, ja, en }
-
-/// Global language controller
-class AppLanguageController {
-  static final ValueNotifier<AppLanguage> notifier =
-      ValueNotifier<AppLanguage>(AppLanguage.zh);
-
-  static AppLanguage get current => notifier.value;
-
-  static void setLanguage(AppLanguage language) {
-    if (language == notifier.value) return;
-    notifier.value = language;
-  }
-}
-
 /// Centralised copy management. Data lives in [LocalizationData.strings].
 class S {
-  static AppLanguage get _lang => AppLanguageController.current;
-
   static String _t(String key) =>
-      LocalizationData.strings[key]?[_lang.name] ?? key;
+      LocalizationData.strings[key] ?? key;
 
   static String _tp(String key, Map<String, Object> args) {
     var s = _t(key);
@@ -42,9 +22,6 @@ class S {
   static String get snackCopied => _t('snackCopied');
   static String get noOutput => _t('noOutput');
   static String get logErrorTag => _t('logErrorTag');
-  static String get languageChinese => _t('languageChinese');
-  static String get languageJapanese => _t('languageJapanese');
-  static String get languageEnglish => _t('languageEnglish');
   static String get menuProject => _t('menuProject');
   static String get menuWebshell => _t('menuWebshell');
   static String get menuExp => _t('menuExp');
@@ -141,11 +118,7 @@ class S {
   static String get terminalModeScriptDesc => _t('terminalModeScriptDesc');
   static String get terminalModeBash => _t('terminalModeBash');
   static String get terminalModeBashDesc => _t('terminalModeBashDesc');
-  static String get terminalModeSocat => _t('terminalModeSocat');
-  static String get terminalModeSocatDesc => _t('terminalModeSocatDesc');
   static String get snackReverseShellSent => _t('snackReverseShellSent');
-  static String get titleSocatCommand => _t('titleSocatCommand');
-  static String get socatInstructions => _t('socatInstructions');
   static String get terminalEmptyHint => _t('terminalEmptyHint');
   static String get terminalKeyHint => _t('terminalKeyHint');
   static String get modeIntegrated => _t('modeIntegrated');
@@ -293,7 +266,6 @@ class S {
   static String get expLogNoVulnGeneric => _t('expLogNoVulnGeneric');
   static String get expLogReverseSentWaiting => _t('expLogReverseSentWaiting');
   static String get expLogSendFailed => _t('expLogSendFailed');
-  static String get expLogSocatRunOnTarget => _t('expLogSocatRunOnTarget');
   static String get terminalConnectionClosed => _t('terminalConnectionClosed');
   static String get frpLogCopiedSnack => _t('frpLogCopiedSnack');
   static String get frpAuthMd5Label => _t('frpAuthMd5Label');
@@ -611,8 +583,6 @@ class S {
   static String snackListenFailed(Object e) => _tp('snackListenFailed', {'e': e});
 
   static String snackStartFailed(Object e) => _tp('snackStartFailed', {'e': e});
-
-  static String socatTips(int lport) => _tp('socatTips', {'lport': lport});
 
   static String tabCompletionTitle(int total) => _tp('tabCompletionTitle', {'total': total});
 
