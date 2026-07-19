@@ -133,10 +133,11 @@ class TerminalOutputPipe {
     return Uint8List.sublistView(out, 0, w);
   }
 
-  static int _countLf(Uint8List data) {
+  int _countLf(Uint8List data) {
     var count = 0;
     for (var i = 0; i < data.length; i++) {
-      if (data[i] == 0x0A && (i == 0 || data[i - 1] != 0x0D)) {
+      final prev = i == 0 ? _prevByte : data[i - 1];
+      if (data[i] == 0x0A && prev != 0x0D) {
         count++;
       }
     }
