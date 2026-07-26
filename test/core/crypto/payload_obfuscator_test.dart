@@ -18,17 +18,31 @@ void main() {
       expect(raw, contains('Class g(byte'));
       expect(raw, contains(').g('));
 
-      // After obfuscation, `.g(` must not remain while `Class g(` is gone.
+      // After obfuscation, `.g(` and `Class g(` must both be gone.
       expect(obfuscated, isNot(contains('Class g(')));
       expect(obfuscated, isNot(contains(').g(')));
-      // Renamed method should still appear on both declaration and call site.
-      final methodDecl = RegExp(r'Class ([a-f][0-9a-f]{5})\(byte');
-      final callSite = RegExp(r'\.([a-f][0-9a-f]{5})\(');
-      final declMatch = methodDecl.firstMatch(obfuscated!);
-      final callMatch = callSite.firstMatch(obfuscated);
-      expect(declMatch, isNotNull, reason: 'expected renamed method declaration');
-      expect(callMatch, isNotNull, reason: 'expected renamed method call');
-      expect(declMatch!.group(1), equals(callMatch!.group(1)));
+
+      // Collect ALL renamed method declarations and call sites,
+      // then verify that at least one declaration/call pair matches.
+      final methodDeclRe = RegExp(r'Class ([a-f][0-9a-f]{5})\(byte');
+      final callSiteRe = RegExp(r'\.([a-f][0-9a-f]{5})\(');
+
+      final declNames = <String>{};
+      for (final m in methodDeclRe.allMatches(obfuscated!)) {
+        declNames.add(m.group(1)!);
+      }
+      final callNames = <String>{};
+      for (final m in callSiteRe.allMatches(obfuscated)) {
+        callNames.add(m.group(1)!);
+      }
+
+      expect(declNames, isNotEmpty, reason: 'expected at least one renamed method declaration');
+      expect(callNames, isNotEmpty, reason: 'expected at least one renamed method call');
+
+      final intersection = declNames.intersection(callNames);
+      expect(intersection, isNotEmpty,
+          reason: 'expected renamed method(s) to appear in both declaration and call site; '
+              'declarations=$declNames, callSites=$callNames');
     });
   });
 }

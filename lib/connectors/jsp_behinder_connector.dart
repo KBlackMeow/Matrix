@@ -182,6 +182,13 @@ class JspBehinderConnector extends ShellConnector {
                 true) {
           return '[Error] 内存马未响应 (被 Shiro 重定向/拦截)';
         }
+        // 标准 Behinder JSP Agent：base64(AES/ECB(json)) 纯 ASCII
+        // → aes_with_magic 协议：base64(AES/ECB(json)) + magic tail
+        // → Matrix 旧版：base64(AES/ECB 纯文本) 或 明文
+        final decrypted = BehinderCrypto.tryDecryptJsp(body, _aesKey) ??
+            BehinderCrypto.tryDecryptJspWithMagic(response.bodyBytes, _aesKey) ??
+            BehinderCrypto.tryDecryptLegacyMatrix(body, _aesKey);
+        if (decrypted != null) return BehinderCrypto.extractResponse(decrypted);
         return body;
       }
 
