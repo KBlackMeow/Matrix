@@ -151,7 +151,7 @@ class AspxCmdConnector extends AspWscriptConnector {
   }
 
 
-  static const _kWinUploadChunkSize = 2048; // keep cmd length safe
+  static const _kWinUploadChunkSize = 4096; // keep cmd length within 8191
 
   @override
   Future<bool> writeFileBinaryWithProgress(

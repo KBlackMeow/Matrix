@@ -236,7 +236,7 @@ class AspWscriptConnector extends ShellExecConnector {
     return _writeBinaryChunked(path, bytes);
   }
 
-  static const _kWinUploadChunkSize = 2048;
+  static const _kWinUploadChunkSize = 4096; // keep cmd length within 8191
   static const _kUploadOkTag = '__MX_UPLOAD_OK__';
 
   @override

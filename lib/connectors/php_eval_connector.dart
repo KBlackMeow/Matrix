@@ -294,7 +294,7 @@ class PhpEvalConnector extends ShellConnector {
     return r.trim() == '1';
   }
 
-  static const _kChunkSize = 128 * 1024; // 128 KB per chunk
+  static const _kChunkSize = 2 * 1024 * 1024; // 2MB per chunk
 
   @override
   Future<bool> writeFileBinaryWithProgress(

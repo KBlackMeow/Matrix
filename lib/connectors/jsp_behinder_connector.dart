@@ -382,13 +382,11 @@ class JspBehinderConnector extends ShellConnector {
   }
 
   /// exec 回退路径：参数在 body 第二行，不再受 Header 8KB 限制。
-  static const _kChunkSize = 64 * 1024;
+  static const _kChunkSize = 512 * 1024; // 512KB exec fallback
 
-  /// 与 Behinder 类似：Session + FileChannel 并行分块（见 docs/jsp_upload_behinder_analysis.md）
-  static const _kWpartParallelism = 8;
-
-  /// wpart 单块最大 raw 字节数：参数在 body 第二行，无 Header 长度限制。
-  static const _kMaxWpartBlockSize = 64 * 1024;
+  /// 单次直写最大字节数；超过则走 wpart 顺序分片。
+  /// raw × 1.78 ≈ POST body（base64+AES+base64），2MB 对应 ~3.6MB body。
+  static const _kMaxSingleWrite = 2 * 1024 * 1024; // 2MB
 
   Future<void> _wcloseRemoteFile(String target) async {
     try {
@@ -406,12 +404,10 @@ class JspBehinderConnector extends ShellConnector {
     if (start >= full.length) return true;
     final end = math.min(start + blockSize, full.length);
     final chunk = full.sublist(start, end);
-    final ph = _pathParams(path);
-    if (ph == null) return false;
     final r = await _sendBehinder(
       'wpart',
       extraParams: {
-        ...ph,
+        ..._pathParams(path),
         'data': base64.encode(chunk),
         'blk': '$blockIndex',
         'bsz': '$blockSize',
@@ -427,39 +423,19 @@ class JspBehinderConnector extends ShellConnector {
     void Function(int sent, int total) onProgress,
   ) async {
     final total = bytes.length;
-    final blockSize = math.min(_kMaxWpartBlockSize, total).clamp(512, _kMaxWpartBlockSize);
+    final blockSize = math.min(_kMaxSingleWrite, total).clamp(512, _kMaxSingleWrite);
     final blockCount = (total + blockSize - 1) ~/ blockSize;
 
     await _sendBehinder('ping');
 
-    if (blockCount > 0) {
-      if (!await _uploadWpartBlock(target, bytes, 0, blockSize)) {
+    for (var bi = 0; bi < blockCount; bi++) {
+      if (!await _uploadWpartBlock(target, bytes, bi, blockSize)) {
         await _wcloseRemoteFile(target);
         return false;
       }
-      onProgress(math.min(blockSize, total), total);
-    }
-
-    for (
-      var batchStart = 1;
-      batchStart < blockCount;
-      batchStart += _kWpartParallelism
-    ) {
-      final batchEnd = math.min(batchStart + _kWpartParallelism, blockCount);
-      final futures = <Future<bool>>[];
-      for (var bi = batchStart; bi < batchEnd; bi++) {
-        futures.add(_uploadWpartBlock(target, bytes, bi, blockSize));
-      }
-      final results = await Future.wait(futures);
-      if (results.any((ok) => !ok)) {
-        await _wcloseRemoteFile(target);
-        return false;
-      }
-      final sent = math.min(batchEnd * blockSize, total);
-      onProgress(sent, total);
+      onProgress(math.min((bi + 1) * blockSize, total), total);
     }
     await _wcloseRemoteFile(target);
-    onProgress(total, total);
     return true;
   }
 
@@ -492,7 +468,7 @@ class JspBehinderConnector extends ShellConnector {
       return r2.trim().endsWith('1');
     }
 
-    if (bytes.length <= _kMaxWpartBlockSize) {
+    if (bytes.length <= _kMaxSingleWrite) {
       final dataB64 = base64.encode(bytes);
       final r = await _sendBehinder(
         'write',

@@ -437,7 +437,8 @@ echo encrypt(json_encode(\$result));
     return r.trim() == '1';
   }
 
-  static const _kChunkSize = 128 * 1024; // 128 KB per chunk
+  /// 单次直写最大字节数；超过则分片。
+  static const _kMaxSingleWrite = 2 * 1024 * 1024; // 2MB
 
   @override
   Future<bool> writeFileBinaryWithProgress(
@@ -449,10 +450,23 @@ echo encrypt(json_encode(\$result));
     final pathB64 = base64.encode(utf8.encode(path));
     onProgress(0, total);
 
+    if (total <= _kMaxSingleWrite) {
+      final contentB64 = base64.encode(bytes);
+      final r = await _sendPhp(
+        "\$p=base64_decode('$pathB64');"
+        "\$c=base64_decode('$contentB64');"
+        "echo file_put_contents(\$p,\$c)!==false?'1':'0';",
+      );
+      if (r.trim() == '1') {
+        onProgress(total, total);
+        return true;
+      }
+    }
+
     int offset = 0;
     bool first = true;
     while (offset < total) {
-      final end = (offset + _kChunkSize).clamp(0, total);
+      final end = (offset + _kMaxSingleWrite).clamp(0, total);
       final chunkB64 = base64.encode(bytes.sublist(offset, end));
       final append = first ? '' : r',FILE_APPEND';
       final r = await _sendPhp(

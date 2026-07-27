@@ -208,7 +208,7 @@ abstract class ShellExecConnector extends ShellConnector {
     return r.trim() == '1';
   }
 
-  static const _kChunkSize = 128 * 1024; // 128 KB per chunk
+  static const _kChunkSize = 512 * 1024; // 512KB
 
   @override
   Future<bool> writeFileBinaryWithProgress(
