@@ -35,6 +35,7 @@ workstation/*
 .pub/
 /build/
 /coverage/
+/dist/
 
 # pubspec.lock 本地锁版本，多人协作时可按需保留
 # pubspec.lock
