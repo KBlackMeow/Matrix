@@ -44,6 +44,9 @@ dependencies:
   path_provider: ^2.1.2
   sqflite_common_ffi: ^2.3.0
 
+  # MCP 协议支持（WebShell MCP Server）
+  mcp_dart: ^2.3.0
+
   # HTTP 客户端（Webshell 通信）
   http: ^1.2.0
 

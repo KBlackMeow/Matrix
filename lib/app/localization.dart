@@ -507,6 +507,7 @@ class S {
   static String get suoHandshakeResultTitle => _t('suoHandshakeResultTitle');
   static String get suo5MappingLabel => _t('suo5MappingLabel');
   static String get menuSuoTunnel => _t('menuSuoTunnel');
+  static String get menuMcp => _t('menuMcp');
   static String get titleSuoTunnelManager => _t('titleSuoTunnelManager');
   static String get actionAddSuoTunnel => _t('actionAddSuoTunnel');
   static String get tooltipWebshellOneClickTunnel => _t('tooltipWebshellOneClickTunnel');

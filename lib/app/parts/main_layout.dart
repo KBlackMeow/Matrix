@@ -7,6 +7,7 @@ import '../../app/localization.dart';
 import '../../app/main_nav_bus.dart';
 import '../../models/project.dart';
 import '../../pages/frp_tunnel_page.dart';
+import '../../pages/mcp_server_page.dart';
 import '../../pages/payload_management_page.dart';
 import '../../pages/project_management_page.dart';
 import '../../pages/project_scoped_page.dart';
@@ -81,6 +82,11 @@ class _MainLayoutState extends State<MainLayout> {
       icon: AppTunnelIcons.outlined,
       label: '',
       selectedIcon: AppTunnelIcons.filled,
+    ),
+    MenuItem(
+      icon: Icons.router_outlined,
+      label: '',
+      selectedIcon: Icons.router,
     ),
   ];
 
@@ -246,6 +252,7 @@ class _MainLayoutState extends State<MainLayout> {
       RepaintBoundary(child: ReverseShellDashboardPage()),
       RepaintBoundary(child: FrpTunnelPage()),
       _suoTunnelBoundary,
+      const RepaintBoundary(child: McpServerPage()),
     ];
     _pages = [_projectBoundary, _webshellBoundary, ..._staticPages];
   }
@@ -271,6 +278,8 @@ class _MainLayoutState extends State<MainLayout> {
         return S.menuFrp;
       case 6:
         return S.menuSuoTunnel;
+      case 7:
+        return S.menuMcp;
       default:
         return '';
     }

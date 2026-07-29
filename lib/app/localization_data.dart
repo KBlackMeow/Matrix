@@ -566,6 +566,7 @@ class LocalizationData {
     'suo5ActiveBanner': '{statusLabel} · {name}',
     'suo5HeaderRunningSummary': 'Running {running} / {total}',
     'menuSuoTunnel': 'suo5/suo6',
+    'menuMcp': 'MCP',
     'titleSuoTunnelManager': 'suo5/suo6',
     'suoTunnelManagementTitle': 'suo5/suo6 · {projectName}',
     'actionAddSuoTunnel': 'Add proxy',

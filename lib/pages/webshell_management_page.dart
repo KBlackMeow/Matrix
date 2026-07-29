@@ -7,6 +7,7 @@ import '../connectors/connector_factory.dart';
 import '../database/database_helper.dart';
 import '../models/project.dart';
 import '../models/webshell.dart';
+import '../services/webshell_connectivity_service.dart';
 import '../theme/app_theme.dart';
 import '../app/localization.dart';
 import 'webshell_interactive_page.dart';
@@ -52,6 +53,27 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
       _webshells = list;
       _loading = false;
     });
+    // 后台并行 ping 所有 WebShell，逐个更新 UI
+    if (list.isNotEmpty) {
+      _runAutoPing(list);
+    }
+  }
+
+  /// 后台并行 ping 所有 WebShell，每完成一个就刷新 UI。
+  Future<void> _runAutoPing(List<Webshell> list) async {
+    await WebshellConnectivityService.pingAll(
+      list,
+      onStatusChanged: (ws) async {
+        await _db.updateWebshell(ws);
+        if (!mounted) return;
+        setState(() {
+          final idx = _webshells.indexWhere((w) => w.id == ws.id);
+          if (idx != -1) {
+            _webshells[idx] = _webshells[idx].copyWith(status: ws.status);
+          }
+        });
+      },
+    );
   }
 
   Future<void> _showCreateDialog() async {
@@ -679,7 +701,7 @@ class _WebshellCardState extends State<_WebshellCard> {
                 width: 10,
                 height: 10,
                 decoration: BoxDecoration(
-                  color: isOnline ? AppColors.primary : AppColors.textMuted,
+                  color: isOnline ? AppColors.primary : AppColors.red,
                   shape: BoxShape.circle,
                   boxShadow: isOnline
                       ? [

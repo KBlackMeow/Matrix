@@ -5,8 +5,8 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:encrypt/encrypt.dart' as enc;
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import '../core/debug_log.dart';
+import '../core/asset_loader.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/crypto/behinder_crypto.dart';
@@ -51,7 +51,7 @@ class JspBehinderConnector extends ShellConnector {
   Future<Uint8List> _getAgentBytes() async {
     String b64;
     try {
-      b64 = (await rootBundle.loadString('data/jsp_agent_M.b64')).trim();
+      b64 = (await loadAssetString('data/jsp_agent_M.b64')).trim();
     } catch (_) {
       try {
         final file = io.File('data/jsp_agent_M.b64');
@@ -382,7 +382,7 @@ class JspBehinderConnector extends ShellConnector {
   }
 
   /// exec 回退路径：参数在 body 第二行，不再受 Header 8KB 限制。
-  static const _kChunkSize = 512 * 1024; // 512KB exec fallback
+  static const _kChunkSize = 32 * 1024; // 32KB — 避免 echo + base64 命令超长
 
   /// 单次直写最大字节数；超过则走 wpart 顺序分片。
   /// raw × 1.78 ≈ POST body（base64+AES+base64），2MB 对应 ~3.6MB body。
@@ -498,7 +498,7 @@ class JspBehinderConnector extends ShellConnector {
       );
       if (!r.trim().endsWith('1')) {
         final snippet = r.length > 500 ? '${r.substring(0, 500)}...' : r;
-        debugPrint(
+        debugLog(
           '[Matrix][jsp_behinder] 上传分块失败 path=$target offset=$offset total=$total '
           'response=${snippet.replaceAll('\n', ' ')}',
         );
@@ -582,7 +582,7 @@ class JspBehinderConnector extends ShellConnector {
         ).readAsString()).trim();
       } catch (_) {
         try {
-          b64 = (await rootBundle.loadString(
+          b64 = (await loadAssetString(
             'data/mem_shell/Suo5FilterInject.b64',
           )).trim();
         } catch (_) {
@@ -646,7 +646,7 @@ class JspBehinderConnector extends ShellConnector {
         ).readAsString()).trim();
       } catch (_) {
         try {
-          b64 = (await rootBundle.loadString(
+          b64 = (await loadAssetString(
             'data/mem_shell/Suo6FilterInject.b64',
           )).trim();
         } catch (_) {

@@ -4,8 +4,8 @@ import 'dart:io' as io;
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import '../core/debug_log.dart';
+import '../core/asset_loader.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/file_entry.dart';
@@ -40,9 +40,6 @@ class JspClassloaderConnector extends ShellConnector {
     h['Connection'] = 'close';
     h['Accept-Encoding'] = 'identity';
     h['User-Agent'] ??= 'Mozilla/5.0 (compatible; Matrix-JSP-CL/1.0)';
-    if (kIsWeb) {
-      return http.post(uri, headers: h, body: body).timeout(_kPostTimeout);
-    }
     final client = io.HttpClient()
       ..connectionTimeout = const Duration(seconds: 60)
       ..idleTimeout = const Duration(seconds: 120);
@@ -184,7 +181,7 @@ class JspClassloaderConnector extends ShellConnector {
       final uri = Uri.parse(webshell.url);
       String payload;
       try {
-        payload = (await rootBundle.loadString('data/jsp_agent_M.b64')).trim();
+        payload = (await loadAssetString('data/jsp_agent_M.b64')).trim();
       } catch (_) {
         try {
           final file = io.File('data/jsp_agent_M.b64');
@@ -493,7 +490,7 @@ class JspClassloaderConnector extends ShellConnector {
       );
       if (!r.trim().endsWith('1')) {
         final snippet = r.length > 500 ? '${r.substring(0, 500)}...' : r;
-        debugPrint(
+        debugLog(
           '[Matrix][jsp_classloader] 上传分块失败 path=$target offset=$offset total=$total '
           'response=${snippet.replaceAll('\n', ' ')}',
         );

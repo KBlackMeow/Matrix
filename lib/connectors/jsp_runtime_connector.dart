@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
+import '../core/debug_log.dart';
 import 'package:http/http.dart' as http;
 
 import '../app/constants.dart';
@@ -117,7 +118,7 @@ class JspRuntimeConnector extends ShellExecConnector {
           '_p=\$(echo ${_sq(b64Path)}|base64 -d) && echo ${_sq(b64)} | base64 -d $redirect "\$_p" && echo 1 || echo 0';
       final r = await _requestRuntime(cmd, timeout: uploadTimeout);
       if (r.trim() != '1') {
-        debugPrint(
+        debugLog(
           '[Matrix][jsp_runtime] 上传分块失败 path=$path offset=$offset total=$total '
           'response=${r.length > 400 ? '${r.substring(0, 400)}...' : r}',
         );
