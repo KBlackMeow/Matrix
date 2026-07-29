@@ -39,9 +39,6 @@ void registerAllTools(McpServer server, SessionPool pool, McpDatabase db,
 // 辅助函数
 // ═══════════════════════════════════════════════════════════════════════════════
 
-String _trunc(String s, int n) =>
-    s.length <= n ? s : '${s.substring(0, n)}…';
-
 CallToolResult _text(String text, {bool isError = false}) {
   return CallToolResult(content: [TextContent(text: text)], isError: isError);
 }
@@ -59,18 +56,17 @@ int? _optShellId(Map<String, dynamic> args) => args['shell_id'] as int?;
 
 void _logCall(McpActivityLogger? log, String tool, Map<String, dynamic> args) {
   if (log == null) return;
-  final a = args.entries
-      .where((e) => e.key != 'password')
-      .map((e) => '${e.key}=${_trunc('${e.value}', 60)}')
-      .join(', ');
-  log('→ $tool($a)');
+  // 只记录 tool 名和 shell_id，不记录命令、文件路径、文件内容等敏感参数
+  final shellId = args['shell_id'];
+  final extra = shellId != null ? ' shell=$shellId' : '';
+  log('→ $tool$extra');
 }
 
-void _logResult(McpActivityLogger? log, String tool, int ms, String summary) {
-  log?.call('← $tool (${ms}ms) ${_trunc(summary, 100)}');
+void _logResult(McpActivityLogger? log, String tool, int ms) {
+  log?.call('← $tool (${ms}ms)');
 }
 
-/// 包装 tool callback，自动记录调用参数和结果摘要。
+/// 包装 tool callback，自动记录调用和耗时（不记录参数和结果内容）。
 ToolFunction _wrap(
   String name,
   ToolFunction fn,
@@ -82,14 +78,10 @@ ToolFunction _wrap(
     final sw = Stopwatch()..start();
     try {
       final r = await fn(args, extra);
-      final preview = r.content
-          .whereType<TextContent>()
-          .map((t) => t.text.replaceAll('\n', ' '))
-          .join(' ');
-      _logResult(log, name, sw.elapsedMilliseconds, preview);
+      _logResult(log, name, sw.elapsedMilliseconds);
       return r;
     } catch (e) {
-      _logResult(log, name, sw.elapsedMilliseconds, 'ERROR: $e');
+      _logResult(log, name, sw.elapsedMilliseconds);
       rethrow;
     }
   };

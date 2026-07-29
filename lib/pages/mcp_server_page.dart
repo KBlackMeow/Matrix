@@ -29,7 +29,7 @@ class _McpServerPageState extends State<McpServerPage> {
   final _dbHelper = DatabaseHelper();
 
   McpDatabase? _mcpDb;
-  SessionPool? _pool;
+  final Map<String, SessionPool> _connectionPools = {};
   StreamableMcpServer? _httpServer;
 
   static const _metaKeyPort = 'mcp_http_port';
@@ -85,17 +85,26 @@ class _McpServerPageState extends State<McpServerPage> {
       _mcpDb = McpDatabase(dbPath);
       await _mcpDb!.database;
 
-      _pool = SessionPool((id) => _mcpDb!.getWebshell(id));
-
       _httpServer = StreamableMcpServer(
-        serverFactory: (_) {
+        serverFactory: (connectionId) {
+          // 每个 MCP 连接持有独立的 SessionPool，避免 shell_use 跨客户端串用
+          final pool = SessionPool((id) => _mcpDb!.getWebshell(id));
+          _connectionPools[connectionId] = pool;
+
           final s = McpServer(
             Implementation(name: 'matrix-mcp', version: '1.2.0'),
             options: McpServerOptions(
               capabilities: ServerCapabilities(tools: ServerCapabilitiesTools()),
             ),
           );
-          registerAllTools(s, _pool!, _mcpDb!, onActivity: _addLog);
+          registerAllTools(s, pool, _mcpDb!, onActivity: _addLog);
+
+          // 连接关闭时清理 pool（框架会通过 factoryOnClose 模式保留此回调）
+          s.server.onclose = () {
+            pool.clear();
+            _connectionPools.remove(connectionId);
+          };
+
           return s;
         },
         host: '127.0.0.1',
@@ -119,8 +128,10 @@ class _McpServerPageState extends State<McpServerPage> {
       await _httpServer?.stop();
     } catch (_) {}
     _httpServer = null;
-    _pool?.clear();
-    _pool = null;
+    for (final pool in _connectionPools.values) {
+      pool.clear();
+    }
+    _connectionPools.clear();
     try {
       await _mcpDb?.close();
     } catch (_) {}
@@ -132,7 +143,7 @@ class _McpServerPageState extends State<McpServerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final onlineCount = _pool?.size ?? 0;
+    final onlineCount = _connectionPools.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

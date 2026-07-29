@@ -40,6 +40,16 @@ class McpDatabase {
 
   Future<Database> get database async {
     if (_db != null) return _db!;
+    if (!File(path).existsSync()) {
+      throw StateError(
+        'Matrix 数据库不存在: $path\n'
+        '请通过 --db-path 参数指定正确的数据库路径，'
+        '或先启动 Matrix 桌面应用以创建数据库。\n'
+        '默认搜索位置:\n'
+        '  - macOS Sandbox: ~/Library/Containers/com.example.matrix/Data/Documents/matrix.db\n'
+        '  - macOS/Linux:   ~/Documents/matrix.db',
+      );
+    }
     _db = await openDatabase(path, version: 13);
     return _db!;
   }

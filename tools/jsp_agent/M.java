@@ -183,6 +183,17 @@ public class M {
         if ("a".equals(name)) { String v = hdr(req, "X-A"); if (v != null) return v; }
         if ("_k".equals(name)) { String v = hdr(req, "X-K"); if (v != null) return v; }
         if ("path".equals(name)) {
+            // 优先从 body 参数读取 path_b64（支持非 ASCII 路径）
+            if (this.params != null) {
+                String pb64 = this.params.get("path_b64");
+                if (pb64 != null && pb64.length() > 0) {
+                    byte[] raw = staticB64Decode(pb64);
+                    if (raw != null && raw.length > 0) {
+                        try { return new String(raw, "UTF-8"); } catch (Exception ignored) {}
+                    }
+                }
+            }
+            // 兼容旧版 X-Path-B64 / X-Path Header 传参
             String pb = hdr(req, "X-Path-B64");
             if (pb != null && pb.length() > 0) {
                 byte[] raw = staticB64Decode(pb);
