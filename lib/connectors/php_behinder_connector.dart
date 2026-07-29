@@ -32,8 +32,10 @@ class PhpBehinderConnector extends ShellConnector {
     ConnectorCapability.fileWrite,
   };
 
-  /// 当前使用的模式：ECB 或 CBC。部分环境 "AES128" 映射不同，连接后自动探测
-  bool _useCbc = false;
+  /// 当前使用的模式：ECB 或 CBC。
+  /// 默认 CBC——php_behinder.php 用 openssl_decrypt("AES128") 即 CBC。
+  /// ping() 遇到 ECB 马会自动切回 ECB。
+  bool _useCbc = true;
   String? _lastPingDiagnostic;
   String? _lastShellScriptDirDiagnostic;
   int? _lastHttpResponseStatus;
