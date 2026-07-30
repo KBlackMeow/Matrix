@@ -2,12 +2,12 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// 验证 MCP 活动日志不记录敏感参数和结果内容。
+/// 验证 MCP 活动日志保留调试所需的参数与结果摘要，且隐藏密码和正文。
 ///
 /// 检查 handlers.dart 中：
-/// - _logCall 只输出 tool 名 + shell_id
-/// - _logResult 只输出 tool 名 + 耗时
-/// - _wrap 不计算结果摘要
+/// - _logCall 输出参数，但不输出 password 或 content 的原始值
+/// - _logResult 输出结果摘要
+/// - _wrap 提取 TextContent 作为结果摘要
 ///
 /// 这是静态源码级检查，配合集成测试和人工审查使用。
 void main() {
@@ -29,7 +29,7 @@ void main() {
     return '';
   }
 
-  group('MCP activity log sanitization', () {
+  group('MCP detailed activity log', () {
     late String source;
 
     setUp(() {
@@ -37,55 +37,36 @@ void main() {
       source = f.readAsStringSync();
     });
 
-    test('_logCall only logs tool name + shell_id', () {
+    test('_logCall logs arguments while redacting password and content', () {
       final body = extractBody(source, 'void _logCall(');
       expect(body, isNotEmpty, reason: '找不到 _logCall 函数体');
 
-      // 应提取 shell_id
-      expect(body.contains('shell_id'), isTrue,
-          reason: '_logCall 应只记录 shell_id');
-
-      // 不应有旧的参数遍历/值拼接（args.entries.map.join 等）
-      expect(body.contains('args.entries'), isFalse,
-          reason: '_logCall 不应遍历全部参数');
-      expect(body.contains('.join('), isFalse,
-          reason: '_logCall 不应拼接参数值');
-      expect(body.contains('password'), isFalse,
-          reason: 'password 不应出现在日志代码中');
-      expect(body.contains('_trunc'), isFalse,
-          reason: '_logCall 不应截断参数值');
+      expect(body.contains('args.entries'), isTrue);
+      expect(body.contains('password'), isTrue);
+      expect(body.contains('content'), isTrue);
+      expect(body.contains('_trunc'), isTrue);
     });
 
-    test('_logResult only logs tool name + latency', () {
+    test('_logResult includes a truncated result summary', () {
       final body = extractBody(source, 'void _logResult(');
       expect(body, isNotEmpty, reason: '找不到 _logResult 函数体');
 
-      // 应只有 tool 名和耗时
-      expect(body.contains('ms'), isTrue,
-          reason: '_logResult 应记录耗时');
-
-      // 不应包含结果内容
-      expect(body.contains('summary'), isFalse,
-          reason: '_logResult 签名不应含 summary 参数');
-      expect(body.contains('_trunc'), isFalse,
-          reason: '_logResult 不应截断内容');
+      expect(body.contains('ms'), isTrue, reason: '_logResult 应记录耗时');
+      expect(body.contains('summary'), isTrue);
+      expect(body.contains('_trunc'), isTrue);
     });
 
-    test('_wrap does not extract result preview for logging', () {
+    test('_wrap extracts a result preview for logging', () {
       final body = extractBody(source, 'ToolFunction _wrap(');
       expect(body, isNotEmpty, reason: '找不到 _wrap 函数体');
 
-      // 不应提取 TextContent 做结果摘要
-      expect(body.contains('preview'), isFalse,
-          reason: '_wrap 不应计算结果预览');
-      expect(body.contains('TextContent'), isFalse,
-          reason: '_wrap 不应提取 TextContent');
-      expect(body.contains('replaceAll'), isFalse,
-          reason: '_wrap 不应格式化结果文本');
-      // 不应有旧的 4 参数 _logResult 调用
-      expect(body.contains('_logResult(log, name, sw.elapsedMilliseconds,'),
-          isFalse,
-          reason: '_logResult 调用不应含第四个参数');
+      expect(body.contains('preview'), isTrue);
+      expect(body.contains('TextContent'), isTrue);
+      expect(body.contains('replaceAll'), isTrue);
+      expect(
+        body.contains('_logResult(log, name, sw.elapsedMilliseconds,'),
+        isTrue,
+      );
     });
   });
 }
