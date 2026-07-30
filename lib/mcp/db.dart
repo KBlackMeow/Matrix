@@ -23,13 +23,21 @@ class McpDatabase {
   }
 
   static String defaultPath() {
-    final home = Platform.environment['HOME'] ??
+    final home =
+        Platform.environment['HOME'] ??
         Platform.environment['USERPROFILE'] ??
         '/tmp';
     // macOS sandboxed first, then unsandboxed
     final candidates = [
-      p.join(home, 'Library', 'Containers', 'com.example.matrix',
-          'Data', 'Documents', 'matrix.db'),
+      p.join(
+        home,
+        'Library',
+        'Containers',
+        'com.example.matrix',
+        'Data',
+        'Documents',
+        'matrix.db',
+      ),
       p.join(home, 'Documents', 'matrix.db'),
     ];
     for (final c in candidates) {
@@ -74,11 +82,7 @@ class McpDatabase {
 
   Future<Webshell?> getWebshell(int id) async {
     final db = await database;
-    final maps = await db.query(
-      'webshells',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final maps = await db.query('webshells', where: 'id = ?', whereArgs: [id]);
     if (maps.isEmpty) return null;
     return Webshell.fromMap(maps.first);
   }
@@ -125,21 +129,26 @@ class McpDatabase {
     );
   }
 
-  /// 获取或创建默认项目（用于通过 MCP 新建 WebShell）。
-  Future<int> ensureDefaultProject() async {
+  /// 返回应用启动时创建的临时项目，用于 MCP 新建 WebShell。
+  Future<int> temporaryProjectId() async {
     final db = await database;
-    final maps = await db.query('projects', limit: 1);
-    if (maps.isNotEmpty) return maps.first['id'] as int;
+    const metaKey = 'temporary_project_id';
+    final meta = await db.query('meta', where: 'key = ?', whereArgs: [metaKey]);
+    final projectId = int.tryParse(meta.firstOrNull?['value'] as String? ?? '');
+    if (projectId == null) {
+      throw StateError('临时项目不存在：请先启动 Matrix 应用。');
+    }
 
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final id = await db.insert('projects', {
-      'name': 'Default',
-      'domain': '',
-      'description': 'Auto-created by MCP Server',
-      'created_at': now,
-      'updated_at': now,
-    });
-    return id;
+    final project = await db.query(
+      'projects',
+      where: 'id = ? AND name = ?',
+      whereArgs: [projectId, '临时项目'],
+      limit: 1,
+    );
+    if (project.isEmpty) {
+      throw StateError('临时项目不存在：请先启动 Matrix 应用。');
+    }
+    return projectId;
   }
 
   Future<void> close() async {

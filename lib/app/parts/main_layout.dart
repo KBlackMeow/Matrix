@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../app/localization.dart';
 import '../../app/main_nav_bus.dart';
+import '../../database/database_helper.dart';
 import '../../models/project.dart';
 import '../../pages/frp_tunnel_page.dart';
 import '../../pages/mcp_server_page.dart';
@@ -14,6 +15,7 @@ import '../../pages/project_scoped_page.dart';
 import '../../pages/reverse_shell_dashboard_page.dart';
 import '../../pages/suo_tunnel_proxy_page.dart';
 import '../../pages/webshell_management_page.dart';
+import '../../services/temporary_project_service.dart';
 import '../../theme/app_theme.dart';
 import 'exp_content.dart' as exp;
 import 'layout_widgets.dart';
@@ -94,12 +96,22 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     _rebuildDynamicPages();
+    _selectTemporaryProject();
     MainNavBus.onRequestOpenTunnelTab = _goTunnelManagerTab;
     PackageInfo.fromPlatform().then((info) {
       if (!mounted) return;
       setState(() {
         _packageVersionLabel = info.version;
       });
+    });
+  }
+
+  Future<void> _selectTemporaryProject() async {
+    final project = await TemporaryProjectService.ensure(DatabaseHelper());
+    if (!mounted) return;
+    setState(() {
+      _selectedProject = project;
+      _rebuildDynamicPages();
     });
   }
 
@@ -209,10 +221,8 @@ class _MainLayoutState extends State<MainLayout> {
       },
       title: S.menuExp,
       icon: Icons.bug_report,
-      contentBuilder: (project, onSwitchProject) => exp.ExpContent(
-        project: project,
-        onSwitchProject: onSwitchProject,
-      ),
+      contentBuilder: (project, onSwitchProject) =>
+          exp.ExpContent(project: project, onSwitchProject: onSwitchProject),
     );
     _expBoundary = RepaintBoundary(child: _expPage);
     _suoTunnelPage = ProjectScopedPage(
@@ -610,16 +620,17 @@ class _MainLayoutState extends State<MainLayout> {
             Opacity(
               opacity: labelOpacity,
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'v$_packageVersionLabel',
                     style: AppTextStyles.caption(
                       size: 11,
-                      color:
-                          AppColors.textSecondary.withValues(alpha: 0.72),
+                      color: AppColors.textSecondary.withValues(alpha: 0.72),
                     ),
                   ),
                 ),

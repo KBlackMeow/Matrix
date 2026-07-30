@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../database/database_helper.dart';
 import '../models/project.dart';
+import '../services/temporary_project_service.dart';
 import '../theme/app_theme.dart';
 import '../app/localization.dart';
 
@@ -32,6 +33,7 @@ class ProjectManagementPage extends StatefulWidget {
 class _ProjectManagementPageState extends State<ProjectManagementPage> {
   final DatabaseHelper _db = DatabaseHelper();
   List<Project> _projects = [];
+  int? _temporaryProjectId;
   bool _loading = true;
 
   @override
@@ -43,8 +45,12 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
   Future<List<Project>> _loadProjects() async {
     setState(() => _loading = true);
     final projects = await _db.getAllProjects();
+    final temporaryProjectId = int.tryParse(
+      await _db.getMetaValue(TemporaryProjectService.projectIdMetaKey) ?? '',
+    );
     setState(() {
       _projects = projects;
+      _temporaryProjectId = temporaryProjectId;
       _loading = false;
     });
     return projects;
@@ -412,7 +418,9 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                     return _ProjectCard(
                       project: project,
                       onEdit: () => _showEditDialog(project),
-                      onDelete: () => _showDeleteConfirm(project),
+                      onDelete: project.id == _temporaryProjectId
+                          ? null
+                          : () => _showDeleteConfirm(project),
                       onEnterWebshell: () => widget.onEnterWebshell(project),
                       onEnterExp: () => widget.onEnterExp(project),
                       onEnterSuo5: () => widget.onEnterSuo5(project),
@@ -428,7 +436,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
 class _ProjectCard extends StatefulWidget {
   final Project project;
   final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final VoidCallback onEnterWebshell;
   final VoidCallback onEnterExp;
   final VoidCallback onEnterSuo5;
@@ -482,7 +490,10 @@ class _ProjectCardState extends State<_ProjectCard> {
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
                 alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -497,7 +508,10 @@ class _ProjectCardState extends State<_ProjectCard> {
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
                 alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -512,7 +526,10 @@ class _ProjectCardState extends State<_ProjectCard> {
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
                 alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
               ),
             ),
           ],
@@ -555,7 +572,9 @@ class _ProjectCardState extends State<_ProjectCard> {
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: _hovered ? 0.14 : 0.0),
+                color: AppColors.primary.withValues(
+                  alpha: _hovered ? 0.14 : 0.0,
+                ),
                 blurRadius: 14,
                 spreadRadius: 0,
               ),
@@ -567,32 +586,32 @@ class _ProjectCardState extends State<_ProjectCard> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                Center(
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.5),
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.folder,
+                        color: AppColors.primary,
+                        size: 24,
                       ),
                     ),
-                    child: const Icon(
-                      Icons.folder,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: SizedBox.expand(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.max,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: SizedBox.expand(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.max,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Row(
                             children: [
                               Flexible(
@@ -660,90 +679,101 @@ class _ProjectCardState extends State<_ProjectCard> {
                               _formatDate(widget.project.createdAt),
                               _formatDate(widget.project.updatedAt),
                             ),
-                            style: AppTextStyles.caption(color: AppColors.textMuted),
+                            style: AppTextStyles.caption(
+                              color: AppColors.textMuted,
+                            ),
                           ),
                         ],
                       ),
+                    ),
                   ),
-                ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
-                  color: AppColors.bgCard,
-                  onSelected: (value) {
-                    if (value == 'webshell') widget.onEnterWebshell();
-                    if (value == 'exp') widget.onEnterExp();
-                    if (value == 'tunnel') widget.onEnterSuo5();
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'webshell',
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.terminal,
-                            color: AppColors.primary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            S.menuEnterWebshell,
-                            style: AppTextStyles.body(color: AppColors.textPrimary),
-                          ),
-                        ],
-                      ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(
+                      Icons.more_vert,
+                      color: AppColors.textSecondary,
                     ),
-                    PopupMenuItem(
-                      value: 'exp',
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.bug_report,
-                            color: AppColors.primary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            S.menuEnterExp,
-                            style: AppTextStyles.body(color: AppColors.textPrimary),
-                          ),
-                        ],
+                    color: AppColors.bgCard,
+                    onSelected: (value) {
+                      if (value == 'webshell') widget.onEnterWebshell();
+                      if (value == 'exp') widget.onEnterExp();
+                      if (value == 'tunnel') widget.onEnterSuo5();
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'webshell',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.terminal,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              S.menuEnterWebshell,
+                              style: AppTextStyles.body(
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    PopupMenuItem(
-                      value: 'tunnel',
-                      child: Row(
-                        children: [
-                          const Icon(
-                            AppTunnelIcons.outlined,
-                            color: AppColors.primary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            S.menuEnterSuoTunnel,
-                            style: AppTextStyles.body(color: AppColors.textPrimary),
-                          ),
-                        ],
+                      PopupMenuItem(
+                        value: 'exp',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.bug_report,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              S.menuEnterExp,
+                              style: AppTextStyles.body(
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                IconButton(
-                  onPressed: widget.onEdit,
-                  icon: const Icon(Icons.edit_outlined),
-                  color: AppColors.cyan,
-                  tooltip: S.tooltipEdit,
-                ),
-                IconButton(
-                  onPressed: widget.onDelete,
-                  icon: const Icon(Icons.delete_outline),
-                  color: AppColors.red,
-                  tooltip: S.tooltipDelete,
-                ),
-              ],
+                      PopupMenuItem(
+                        value: 'tunnel',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              AppTunnelIcons.outlined,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              S.menuEnterSuoTunnel,
+                              style: AppTextStyles.body(
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    onPressed: widget.onEdit,
+                    icon: const Icon(Icons.edit_outlined),
+                    color: AppColors.cyan,
+                    tooltip: S.tooltipEdit,
+                  ),
+                  IconButton(
+                    onPressed: widget.onDelete,
+                    icon: const Icon(Icons.delete_outline),
+                    color: AppColors.red,
+                    tooltip: S.tooltipDelete,
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
         ),
       ),
     );

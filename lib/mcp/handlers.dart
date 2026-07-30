@@ -210,7 +210,7 @@ void _registerShellAdd(
     ),
     callback: _wrap('shell_add', (args, extra) async {
       try {
-        final projectId = await db.ensureDefaultProject();
+        final projectId = await db.temporaryProjectId();
         final ws = await db.createWebshell(
           projectId: projectId,
           name: args['name'] as String,
