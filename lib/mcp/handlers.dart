@@ -24,14 +24,15 @@ void registerAllTools(
   SessionPool pool,
   McpDatabase db,
   LocalWorkspace workspace, {
+  required int projectId,
   required RemoteWriteLockCoordinator writeLocks,
   McpActivityLogger? onActivity,
 }) {
   final log = onActivity;
-  _registerShellList(server, db, log);
-  _registerShellAdd(server, db, log);
-  _registerShellUse(server, pool, db, log);
-  _registerShellRemove(server, pool, db, log);
+  _registerShellList(server, db, projectId, log);
+  _registerShellAdd(server, db, projectId, log);
+  _registerShellUse(server, pool, db, projectId, log);
+  _registerShellRemove(server, pool, db, projectId, log);
   _registerShellExec(server, pool, log);
   _registerFileList(server, pool, log);
   _registerFileRead(server, pool, log);
@@ -140,6 +141,7 @@ bool _isBinary(List<int> bytes) {
 void _registerShellList(
   McpServer server,
   McpDatabase db,
+  int projectId,
   McpActivityLogger? log,
 ) {
   server.registerTool(
@@ -148,7 +150,7 @@ void _registerShellList(
     inputSchema: JsonSchema.object(properties: {}, required: []),
     callback: _wrap('shell_list', (args, extra) async {
       try {
-        final rows = await db.listWebshellsWithProject();
+        final rows = await db.listWebshellsWithProject(projectId);
         final webshells = rows.map((r) => Webshell.fromMap(r)).toList();
 
         final onlineMap = await WebshellConnectivityService.pingAll(
@@ -188,6 +190,7 @@ void _registerShellList(
 void _registerShellAdd(
   McpServer server,
   McpDatabase db,
+  int projectId,
   McpActivityLogger? log,
 ) {
   server.registerTool(
@@ -210,7 +213,6 @@ void _registerShellAdd(
     ),
     callback: _wrap('shell_add', (args, extra) async {
       try {
-        final projectId = await db.temporaryProjectId();
         final ws = await db.createWebshell(
           projectId: projectId,
           name: args['name'] as String,
@@ -239,6 +241,7 @@ void _registerShellUse(
   McpServer server,
   SessionPool pool,
   McpDatabase db,
+  int projectId,
   McpActivityLogger? log,
 ) {
   server.registerTool(
@@ -251,7 +254,7 @@ void _registerShellUse(
     callback: _wrap('shell_use', (args, extra) async {
       try {
         final id = _shellId(args);
-        final ws = await db.getWebshell(id);
+        final ws = await db.getWebshell(id, projectId: projectId);
         if (ws == null) return _error('WebShell $id 不存在');
         pool.defaultShellId = id;
         return _text('已切换到 WebShell #$id (${ws.name})');
@@ -266,6 +269,7 @@ void _registerShellRemove(
   McpServer server,
   SessionPool pool,
   McpDatabase db,
+  int projectId,
   McpActivityLogger? log,
 ) {
   server.registerTool(
@@ -278,10 +282,10 @@ void _registerShellRemove(
     callback: _wrap('shell_remove', (args, extra) async {
       try {
         final id = _shellId(args);
-        final ws = await db.getWebshell(id);
+        final ws = await db.getWebshell(id, projectId: projectId);
         if (ws == null) return _error('WebShell $id 不存在');
         pool.evict(id);
-        await db.deleteWebshell(id);
+        await db.deleteWebshell(id, projectId: projectId);
         if (pool.defaultShellId == id) pool.defaultShellId = null;
         return _text('已删除 WebShell #$id (${ws.name})');
       } catch (e) {

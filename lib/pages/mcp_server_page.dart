@@ -13,11 +13,19 @@ import '../mcp/local_workspace.dart';
 import '../mcp/remote_write_lock.dart';
 import '../mcp/session_pool.dart';
 import '../database/database_helper.dart';
+import '../models/project.dart';
 import '../theme/app_theme.dart';
 
 /// MCP Server 管理页面 —— 直接在进程内启停 Matrix MCP 服务。
 class McpServerPage extends StatefulWidget {
-  const McpServerPage({super.key});
+  final Project project;
+  final VoidCallback onSwitchProject;
+
+  const McpServerPage({
+    super.key,
+    required this.project,
+    required this.onSwitchProject,
+  });
 
   @override
   State<McpServerPage> createState() => _McpServerPageState();
@@ -44,6 +52,14 @@ class _McpServerPageState extends State<McpServerPage> {
   void initState() {
     super.initState();
     _loadPort();
+  }
+
+  @override
+  void didUpdateWidget(covariant McpServerPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.project.id != widget.project.id && _running) {
+      _stop();
+    }
   }
 
   Future<void> _loadPort() async {
@@ -97,7 +113,9 @@ class _McpServerPageState extends State<McpServerPage> {
       _httpServer = StreamableMcpServer(
         serverFactory: (connectionId) {
           // 每个 MCP 连接持有独立的 SessionPool，避免 shell_use 跨客户端串用
-          final pool = SessionPool((id) => _mcpDb!.getWebshell(id));
+          final pool = SessionPool(
+            (id) => _mcpDb!.getWebshell(id, projectId: widget.project.id),
+          );
           _connectionPools[connectionId] = pool;
 
           final s = McpServer(
@@ -113,6 +131,7 @@ class _McpServerPageState extends State<McpServerPage> {
             pool,
             _mcpDb!,
             _workspace!,
+            projectId: widget.project.id,
             writeLocks: _writeLocks,
             onActivity: _addLog,
           );
@@ -264,6 +283,18 @@ class _McpServerPageState extends State<McpServerPage> {
                           ),
                         ],
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _running ? null : widget.onSwitchProject,
+                      icon: const Icon(Icons.swap_horiz, size: 16),
+                      label: Text('Project: ${widget.project.name}'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.cyan,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                     ),
                   ],
                 ),

@@ -5,7 +5,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../app/localization.dart';
 import '../../app/main_nav_bus.dart';
-import '../../database/database_helper.dart';
 import '../../models/project.dart';
 import '../../pages/frp_tunnel_page.dart';
 import '../../pages/mcp_server_page.dart';
@@ -15,7 +14,6 @@ import '../../pages/project_scoped_page.dart';
 import '../../pages/reverse_shell_dashboard_page.dart';
 import '../../pages/suo_tunnel_proxy_page.dart';
 import '../../pages/webshell_management_page.dart';
-import '../../services/temporary_project_service.dart';
 import '../../theme/app_theme.dart';
 import 'exp_content.dart' as exp;
 import 'layout_widgets.dart';
@@ -46,10 +44,12 @@ class _MainLayoutState extends State<MainLayout> {
   late ProjectScopedPage _webshellPage;
   late ProjectScopedPage _expPage;
   late ProjectScopedPage _suoTunnelPage;
+  late ProjectScopedPage _mcpPage;
   late RepaintBoundary _projectBoundary;
   late RepaintBoundary _webshellBoundary;
   late RepaintBoundary _expBoundary;
   late RepaintBoundary _suoTunnelBoundary;
+  late RepaintBoundary _mcpBoundary;
   late List<Widget> _staticPages;
   late List<Widget> _pages;
 
@@ -96,22 +96,12 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     _rebuildDynamicPages();
-    _selectTemporaryProject();
     MainNavBus.onRequestOpenTunnelTab = _goTunnelManagerTab;
     PackageInfo.fromPlatform().then((info) {
       if (!mounted) return;
       setState(() {
         _packageVersionLabel = info.version;
       });
-    });
-  }
-
-  Future<void> _selectTemporaryProject() async {
-    final project = await TemporaryProjectService.ensure(DatabaseHelper());
-    if (!mounted) return;
-    setState(() {
-      _selectedProject = project;
-      _rebuildDynamicPages();
     });
   }
 
@@ -148,6 +138,13 @@ class _MainLayoutState extends State<MainLayout> {
         setState(() {
           _selectedProject = project;
           _selectedIndex = 6;
+          _rebuildDynamicPages();
+        });
+      },
+      onEnterMcp: (project) {
+        setState(() {
+          _selectedProject = project;
+          _selectedIndex = 7;
           _rebuildDynamicPages();
         });
       },
@@ -254,6 +251,33 @@ class _MainLayoutState extends State<MainLayout> {
       ),
     );
     _suoTunnelBoundary = RepaintBoundary(child: _suoTunnelPage);
+    _mcpPage = ProjectScopedPage(
+      selectedProject: _selectedProject,
+      onSelectProject: (p) {
+        setState(() {
+          _selectedProject = p;
+          _rebuildDynamicPages();
+        });
+      },
+      onClearProject: () {
+        setState(() {
+          _selectedProject = null;
+          _rebuildDynamicPages();
+        });
+      },
+      onNavigateToProjectManagement: () {
+        setState(() {
+          _selectedIndex = 0;
+          _selectedProject = null;
+          _rebuildDynamicPages();
+        });
+      },
+      title: 'MCP Server',
+      icon: Icons.router_outlined,
+      contentBuilder: (project, onSwitchProject) =>
+          McpServerPage(project: project, onSwitchProject: onSwitchProject),
+    );
+    _mcpBoundary = RepaintBoundary(child: _mcpPage);
     // 注意：每次都 new 一份非 const 实例，确保语言变化时 Flutter 会下钻 build()
     // （const 单例会被 widget 比对识为未变更，从而跳过子树重建）。
     _staticPages = <Widget>[
@@ -262,13 +286,20 @@ class _MainLayoutState extends State<MainLayout> {
       RepaintBoundary(child: ReverseShellDashboardPage()),
       RepaintBoundary(child: FrpTunnelPage()),
       _suoTunnelBoundary,
-      const RepaintBoundary(child: McpServerPage()),
+      _mcpBoundary,
     ];
     _pages = [_projectBoundary, _webshellBoundary, ..._staticPages];
   }
 
   void _handleMenuTap(int index) {
-    setState(() => _selectedIndex = index);
+    setState(() {
+      _selectedIndex = index;
+      // MCP 必须显式选择项目；从项目管理卡片进入时会直接设置项目。
+      if (index == 7) {
+        _selectedProject = null;
+        _rebuildDynamicPages();
+      }
+    });
     if (index == 6) SuoTunnelProxyPage.notifyRefresh();
   }
 

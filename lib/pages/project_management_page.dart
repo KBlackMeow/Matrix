@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../database/database_helper.dart';
 import '../models/project.dart';
-import '../services/temporary_project_service.dart';
 import '../theme/app_theme.dart';
 import '../app/localization.dart';
 
@@ -13,6 +12,7 @@ class ProjectManagementPage extends StatefulWidget {
   final void Function(Project project) onEnterWebshell;
   final void Function(Project project) onEnterExp;
   final void Function(Project project) onEnterSuo5;
+  final void Function(Project project) onEnterMcp;
   final void Function(Project project)? onProjectUpdated;
   final void Function(int projectId)? onProjectDeleted;
 
@@ -22,6 +22,7 @@ class ProjectManagementPage extends StatefulWidget {
     required this.onEnterWebshell,
     required this.onEnterExp,
     required this.onEnterSuo5,
+    required this.onEnterMcp,
     this.onProjectUpdated,
     this.onProjectDeleted,
   });
@@ -33,7 +34,6 @@ class ProjectManagementPage extends StatefulWidget {
 class _ProjectManagementPageState extends State<ProjectManagementPage> {
   final DatabaseHelper _db = DatabaseHelper();
   List<Project> _projects = [];
-  int? _temporaryProjectId;
   bool _loading = true;
 
   @override
@@ -45,12 +45,8 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
   Future<List<Project>> _loadProjects() async {
     setState(() => _loading = true);
     final projects = await _db.getAllProjects();
-    final temporaryProjectId = int.tryParse(
-      await _db.getMetaValue(TemporaryProjectService.projectIdMetaKey) ?? '',
-    );
     setState(() {
       _projects = projects;
-      _temporaryProjectId = temporaryProjectId;
       _loading = false;
     });
     return projects;
@@ -418,12 +414,11 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                     return _ProjectCard(
                       project: project,
                       onEdit: () => _showEditDialog(project),
-                      onDelete: project.id == _temporaryProjectId
-                          ? null
-                          : () => _showDeleteConfirm(project),
+                      onDelete: () => _showDeleteConfirm(project),
                       onEnterWebshell: () => widget.onEnterWebshell(project),
                       onEnterExp: () => widget.onEnterExp(project),
                       onEnterSuo5: () => widget.onEnterSuo5(project),
+                      onEnterMcp: () => widget.onEnterMcp(project),
                     );
                   },
                 ),
@@ -440,6 +435,7 @@ class _ProjectCard extends StatefulWidget {
   final VoidCallback onEnterWebshell;
   final VoidCallback onEnterExp;
   final VoidCallback onEnterSuo5;
+  final VoidCallback onEnterMcp;
 
   const _ProjectCard({
     required this.project,
@@ -448,6 +444,7 @@ class _ProjectCard extends StatefulWidget {
     required this.onEnterWebshell,
     required this.onEnterExp,
     required this.onEnterSuo5,
+    required this.onEnterMcp,
   });
 
   @override
@@ -522,6 +519,24 @@ class _ProjectCardState extends State<_ProjectCard> {
               },
               icon: const Icon(AppTunnelIcons.outlined, size: 20),
               label: Text(S.menuEnterSuoTunnel),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.bgDark,
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                widget.onEnterMcp();
+              },
+              icon: const Icon(Icons.router_outlined, size: 20),
+              label: const Text('Enter MCP'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -697,6 +712,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                       if (value == 'webshell') widget.onEnterWebshell();
                       if (value == 'exp') widget.onEnterExp();
                       if (value == 'tunnel') widget.onEnterSuo5();
+                      if (value == 'mcp') widget.onEnterMcp();
                     },
                     itemBuilder: (context) => [
                       PopupMenuItem(
@@ -749,6 +765,25 @@ class _ProjectCardState extends State<_ProjectCard> {
                             const SizedBox(width: 12),
                             Text(
                               S.menuEnterSuoTunnel,
+                              style: AppTextStyles.body(
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'mcp',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.router_outlined,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Enter MCP',
                               style: AppTextStyles.body(
                                 color: AppColors.textPrimary,
                               ),
