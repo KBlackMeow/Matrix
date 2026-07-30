@@ -292,14 +292,7 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   void _handleMenuTap(int index) {
-    setState(() {
-      _selectedIndex = index;
-      // MCP 必须显式选择项目；从项目管理卡片进入时会直接设置项目。
-      if (index == 7) {
-        _selectedProject = null;
-        _rebuildDynamicPages();
-      }
-    });
+    setState(() => _selectedIndex = index);
     if (index == 6) SuoTunnelProxyPage.notifyRefresh();
   }
 

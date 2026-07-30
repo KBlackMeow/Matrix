@@ -7,6 +7,25 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   test(
+    'closing MCP database does not close the app database connection',
+    () async {
+      McpDatabase.initFfi();
+      final tempDir = Directory.systemTemp.createTempSync('matrix_mcp_scope_');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+      final dbPath = p.join(tempDir.path, 'matrix.db');
+      final appDb = await openDatabase(dbPath);
+      addTearDown(appDb.close);
+      await appDb.execute('CREATE TABLE projects (id INTEGER PRIMARY KEY)');
+
+      final mcpDb = McpDatabase(dbPath);
+      await mcpDb.database;
+      await mcpDb.close();
+
+      expect(await appDb.query('projects'), isEmpty);
+    },
+  );
+
+  test(
     'MCP database restricts WebShell access to the selected project',
     () async {
       McpDatabase.initFfi();

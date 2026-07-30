@@ -58,7 +58,9 @@ class McpDatabase {
         '  - macOS/Linux:   ~/Documents/matrix.db',
       );
     }
-    _db = await openDatabase(path, version: 13);
+    // MCP must not share sqflite's path-level singleton with the Flutter app:
+    // closing this connection during server shutdown must leave the app database open.
+    _db = await openDatabase(path, version: 13, singleInstance: false);
     return _db!;
   }
 

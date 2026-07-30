@@ -14,6 +14,7 @@ import '../mcp/remote_write_lock.dart';
 import '../mcp/session_pool.dart';
 import '../database/database_helper.dart';
 import '../models/project.dart';
+import '../app/localization.dart';
 import '../theme/app_theme.dart';
 
 /// MCP Server 管理页面 —— 直接在进程内启停 Matrix MCP 服务。
@@ -224,10 +225,17 @@ class _McpServerPageState extends State<McpServerPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'MCP Server',
+                      'MCP Server · ${widget.project.name}',
                       style: AppTextStyles.heading(
-                        size: 18,
-                        color: AppColors.primary,
+                        size: 15,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      widget.project.domain,
+                      style: AppTextStyles.caption(
+                        size: 13,
+                        color: AppColors.cyan,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -287,13 +295,16 @@ class _McpServerPageState extends State<McpServerPage> {
                     const SizedBox(height: 8),
                     TextButton.icon(
                       onPressed: _running ? null : widget.onSwitchProject,
-                      icon: const Icon(Icons.swap_horiz, size: 16),
-                      label: Text('Project: ${widget.project.name}'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.cyan,
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(0, 28),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      icon: const Icon(
+                        Icons.swap_horiz,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      label: Text(
+                        S.btnSwitchProject,
+                        style: AppTextStyles.caption(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],
