@@ -28,21 +28,35 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   FlutterWindow window(project);
 
-  RECT work_area = {};
-  work_area.left = 0;
-  work_area.top = 0;
-  work_area.right = ::GetSystemMetrics(SM_CXSCREEN);
-  work_area.bottom = ::GetSystemMetrics(SM_CYSCREEN);
-  ::SystemParametersInfo(SPI_GETWORKAREA, 0, &work_area, 0);
-
   const unsigned int window_width = 1280;
   const unsigned int window_height = 720;
+  const POINT primary_monitor_origin = {0, 0};
+  const HMONITOR monitor = ::MonitorFromPoint(
+      primary_monitor_origin, MONITOR_DEFAULTTOPRIMARY);
+  MONITORINFO monitor_info = {sizeof(monitor_info)};
+  if (!::GetMonitorInfo(monitor, &monitor_info)) {
+    return EXIT_FAILURE;
+  }
+
+  // Win32Window scales its logical bounds before creating the native window.
+  // Calculate the center in physical pixels first, then convert the origin
+  // back to logical pixels so high-DPI displays remain centered.
+  const double scale_factor = FlutterDesktopGetDpiForMonitor(monitor) / 96.0;
+  const int native_width =
+      static_cast<int>(window_width * scale_factor);
+  const int native_height =
+      static_cast<int>(window_height * scale_factor);
+  const RECT& work_area = monitor_info.rcWork;
   const int work_width = work_area.right - work_area.left;
   const int work_height = work_area.bottom - work_area.top;
-  const unsigned int origin_x = work_area.left +
-      static_cast<unsigned int>(std::max(0, (work_width - static_cast<int>(window_width)) / 2));
-  const unsigned int origin_y = work_area.top +
-      static_cast<unsigned int>(std::max(0, (work_height - static_cast<int>(window_height)) / 2));
+  const int native_origin_x =
+      work_area.left + std::max(0, (work_width - native_width) / 2);
+  const int native_origin_y =
+      work_area.top + std::max(0, (work_height - native_height) / 2);
+  const unsigned int origin_x = static_cast<unsigned int>(
+      std::max(0, static_cast<int>(native_origin_x / scale_factor)));
+  const unsigned int origin_y = static_cast<unsigned int>(
+      std::max(0, static_cast<int>(native_origin_y / scale_factor)));
 
   Win32Window::Point origin(origin_x, origin_y);
   Win32Window::Size size(window_width, window_height);
