@@ -1252,11 +1252,17 @@ class _DetectResultPanel extends StatelessWidget {
                 color: working > 0 ? AppColors.primary : AppColors.textMuted,
               ),
               const SizedBox(width: 6),
-              Text(
-                working > 0 ? S.detectSuccess : S.detectFailed,
-                style: AppTextStyles.caption(
-                  size: 11,
-                  color: working > 0 ? AppColors.primary : AppColors.textMuted,
+              Expanded(
+                child: Text(
+                  working > 0 ? S.detectSuccess : S.detectFailed,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption(
+                    size: 11,
+                    color: working > 0
+                        ? AppColors.primary
+                        : AppColors.textMuted,
+                  ),
                 ),
               ),
             ],
@@ -1279,6 +1285,8 @@ class _DetectResultPanel extends StatelessWidget {
                     width: 96,
                     child: Text(
                       ConnectorFactory.shortLabel(r.type),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.caption(
                         size: 12,
                         color: r.ok
@@ -1287,11 +1295,15 @@ class _DetectResultPanel extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Text(
-                    r.msg,
-                    style: AppTextStyles.caption(
-                      size: 11,
-                      color: r.ok ? AppColors.primary : AppColors.textMuted,
+                  Expanded(
+                    child: Text(
+                      r.msg,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption(
+                        size: 11,
+                        color: r.ok ? AppColors.primary : AppColors.textMuted,
+                      ),
                     ),
                   ),
                 ],
