@@ -203,23 +203,31 @@ class _McpServerPageState extends State<McpServerPage> {
       children: [
         // ── 顶部状态卡 ──────────────────────────────────────────────────────────
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.bgCard,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: (_running ? AppColors.primary : AppColors.border)
-                  .withValues(alpha: _running ? 0.5 : 1.0),
-            ),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
           ),
           child: Row(
             children: [
-              Icon(
-                Icons.router_outlined,
-                color: _running ? AppColors.primary : AppColors.textMuted,
-                size: 32,
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.router_outlined,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,7 +258,6 @@ class _McpServerPageState extends State<McpServerPage> {
                             : AppColors.textMuted,
                       ),
                     ),
-                    const SizedBox(height: 8),
                     Row(
                       children: [
                         // 状态指示灯
@@ -292,22 +299,19 @@ class _McpServerPageState extends State<McpServerPage> {
                         ],
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: _running ? null : widget.onSwitchProject,
-                      icon: const Icon(
-                        Icons.swap_horiz,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                      label: Text(
-                        S.btnSwitchProject,
-                        style: AppTextStyles.caption(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
                   ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: widget.onSwitchProject,
+                icon: const Icon(
+                  Icons.swap_horiz,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+                label: Text(
+                  S.btnSwitchProject,
+                  style: AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
               ),
               const SizedBox(width: 16),
