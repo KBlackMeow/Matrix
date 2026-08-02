@@ -386,7 +386,7 @@ class JspBehinderConnector extends ShellConnector {
 
   /// 单次直写最大字节数；超过则走 wpart 顺序分片。
   /// raw × 1.78 ≈ POST body（base64+AES+base64），2MB 对应 ~3.6MB body。
-  static const _kMaxSingleWrite = 2 * 1024 * 1024; // 2MB
+  static const _kMaxSingleWrite = 256 * 1024; // 256KB
 
   Future<void> _wcloseRemoteFile(String target) async {
     try {

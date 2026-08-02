@@ -440,7 +440,7 @@ echo encrypt(json_encode(\$result));
   }
 
   /// 单次直写最大字节数；超过则分片。
-  static const _kMaxSingleWrite = 2 * 1024 * 1024; // 2MB
+  static const _kMaxSingleWrite = 256 * 1024; // 256KB
 
   @override
   Future<bool> writeFileBinaryWithProgress(

@@ -7,6 +7,7 @@ import 'php_behinder_connector.dart';
 import 'php_passthru_connector.dart';
 import 'jsp_classloader_connector.dart';
 import 'jsp_behinder_connector.dart';
+import 'jsp_behinder_connector_v2.dart';
 import 'jsp_runtime_connector.dart';
 import 'asp_wscript_connector.dart';
 import 'aspx_cmd_connector.dart';
@@ -91,6 +92,15 @@ class ConnectorFactory {
       defaultParam: AppConstants.defaultShellPassword,
       fixedMethod: 'POST', // AES 加密 body
       builder: JspBehinderConnector.new,
+    ),
+    _ConnectorDefinition(
+      type: 'jsp_behinder_v2',
+      typeLabel: 'jsp',
+      shortLabel: 'JSP-BHD-V2',
+      payloadHint: 'jsp_behinder.jsp（动态字节码 — 无需 jsp_agent_M.b64）',
+      defaultParam: AppConstants.defaultShellPassword,
+      fixedMethod: 'POST',
+      builder: JspBehinderConnectorV2.new,
     ),
     _ConnectorDefinition(
       type: 'jsp_runtime',

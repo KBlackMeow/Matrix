@@ -987,6 +987,7 @@ class _ConnectorTypeDropdown extends StatelessWidget {
     ('php_passthru', S.connectorUiLabel('php_passthru')),
     ('jsp_classloader', S.connectorUiLabel('jsp_classloader')),
     ('jsp_behinder', S.connectorUiLabel('jsp_behinder')),
+    ('jsp_behinder_v2', S.connectorUiLabel('jsp_behinder_v2')),
     ('jsp_runtime', S.connectorUiLabel('jsp_runtime')),
     ('asp_wscript', S.connectorUiLabel('asp_wscript')),
     ('aspx_cmd', S.connectorUiLabel('aspx_cmd')),
