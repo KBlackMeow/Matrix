@@ -96,7 +96,7 @@ class ConnectorFactory {
     _ConnectorDefinition(
       type: 'jsp_behinder_v2',
       typeLabel: 'jsp',
-      shortLabel: 'JSP-BHD-V2',
+      shortLabel: 'JSP-BHD2',
       payloadHint: 'jsp_behinder.jsp（动态字节码 — 无需 jsp_agent_M.b64）',
       defaultParam: AppConstants.defaultShellPassword,
       fixedMethod: 'POST',
