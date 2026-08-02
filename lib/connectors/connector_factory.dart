@@ -60,7 +60,7 @@ class ConnectorFactory {
     _ConnectorDefinition(
       type: 'php_behinder',
       typeLabel: 'php',
-      shortLabel: 'PHP-BEHINDER',
+      shortLabel: 'PHP-BHD',
       payloadHint: 'php_behinder.php',
       defaultParam: AppConstants.defaultShellPassword,
       fixedMethod: 'POST', // AES 加密 body
@@ -87,7 +87,7 @@ class ConnectorFactory {
     _ConnectorDefinition(
       type: 'jsp_behinder',
       typeLabel: 'jsp',
-      shortLabel: 'JSP-BEHINDER',
+      shortLabel: 'JSP-BHD',
       payloadHint: 'jsp_behinder.jsp',
       defaultParam: AppConstants.defaultShellPassword,
       fixedMethod: 'POST', // AES 加密 body
