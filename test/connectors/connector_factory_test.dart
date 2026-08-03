@@ -20,7 +20,7 @@ Webshell _fakeWebshell(String connectorType) {
 void main() {
   group('ConnectorFactory', () {
     test('allTypes contains expected connector types', () {
-      expect(ConnectorFactory.allTypes, hasLength(9));
+      expect(ConnectorFactory.allTypes, hasLength(11));
       expect(
         ConnectorFactory.allTypes,
         equals([
@@ -30,9 +30,11 @@ void main() {
           'php_passthru',
           'jsp_classloader',
           'jsp_behinder',
+          'jsp_behinder_v2',
           'jsp_runtime',
           'asp_wscript',
           'aspx_cmd',
+          'aspx_behinder',
         ]),
       );
     });
@@ -57,6 +59,8 @@ void main() {
       expect(ConnectorFactory.fixedMethod('jsp_runtime'), equals('POST'));
       expect(ConnectorFactory.fixedMethod('jsp_classloader'), equals('POST'));
       expect(ConnectorFactory.fixedMethod('php_b64rot13'), equals('POST'));
+      expect(ConnectorFactory.fixedMethod('jsp_behinder_v2'), equals('POST'));
+      expect(ConnectorFactory.fixedMethod('aspx_behinder'), equals('POST'));
     });
 
     test('fixedMethod null for user-selectable-method connectors', () {

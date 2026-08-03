@@ -18,6 +18,7 @@ import 'suo_tunnel_proxy_page.dart';
 import 'webshell_interactive_file_manager.dart';
 import 'webshell_interactive_system_priv_esc.dart';
 import 'webshell_interactive_terminal_shared.dart';
+import 'process_list_tab.dart';
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     super.initState();
     _service = WebshellService(widget.webshell);
     _tabController =
-        TabController(length: _showPrivEscTab ? 4 : 3, vsync: this);
+        TabController(length: (_showPrivEscTab ? 4 : 3) + 1, vsync: this);
     _completer = TabCompleter(_service);
     _checkConnection();
   }
@@ -240,6 +241,10 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                               skipTraversal: _tabController.index != 3,
                               child: PrivEscTab(service: _service),
                             ),
+                          FocusScope(
+                            skipTraversal: _tabController.index != (_showPrivEscTab ? 4 : 3),
+                            child: ProcessListTab(service: _service),
+                          ),
                         ],
                       );
                     },
@@ -816,6 +821,10 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
               icon: const Icon(Icons.shield_outlined, size: 15),
               text: S.sectionPrivEsc,
             ),
+          Tab(
+            icon: const Icon(Icons.memory, size: 15),
+            text: S.tabProcessList,
+          ),
         ],
       ),
     );

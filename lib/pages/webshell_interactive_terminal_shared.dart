@@ -143,28 +143,21 @@ class TabCompleter {
   /// 仅基于目标 PATH 扫描可执行文件，构建命令补全列表（无硬编码兜底）
   Future<List<String>> fetchAvailableCommands(String workingDir) async {
     try {
-      final result = await service
-          .executeCommand(
-            'IFS=:; for d in \$PATH; do '
-            '[ -d "\$d" ] || continue; '
-            'for f in "\$d"/*; do '
-            '[ -f "\$f" ] && [ -x "\$f" ] && echo "\${f##*/}"; '
-            'done; '
-            'done',
-            workingDir: workingDir,
-          )
-          .timeout(const Duration(seconds: 2));
-      final found =
-          result
-              .split('\n')
-              .map((s) => s.trim())
-              .where((s) => s.isNotEmpty)
-              .toSet()
-              .toList()
-            ..sort();
+      final isWin = service.isWindowsTarget;
+      final cmd = isWin
+          ? r'dir /b C:\Windows\System32\*.exe C:\Windows\System32\*.com'
+          : 'IFS=:; for d in \$PATH; do [ -d "\$d" ] || continue; for f in "\$d"/*; do [ -f "\$f" ] && [ -x "\$f" ] && echo "\${f##*/}"; done; done';
+      final result = await service.executeCommand(cmd, workingDir: workingDir).timeout(const Duration(seconds: 3));
+      final found = result.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).map((s) {
+        // strip .exe/.com extension on Windows
+        if (isWin) {
+          final l = s.toLowerCase();
+          if (l.endsWith('.exe') || l.endsWith('.com')) return s.substring(0, s.length - 4);
+        }
+        return s;
+      }).toSet().toList()..sort();
       return found;
     } catch (_) {
-      // 扫描失败时不使用任何本地硬编码命令兜底。
       return [];
     }
   }

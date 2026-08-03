@@ -991,6 +991,7 @@ class _ConnectorTypeDropdown extends StatelessWidget {
     ('jsp_runtime', S.connectorUiLabel('jsp_runtime')),
     ('asp_wscript', S.connectorUiLabel('asp_wscript')),
     ('aspx_cmd', S.connectorUiLabel('aspx_cmd')),
+    ('aspx_behinder', S.connectorUiLabel('aspx_behinder')),
   ];
 
   @override

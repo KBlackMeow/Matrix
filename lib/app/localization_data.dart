@@ -43,6 +43,7 @@ class LocalizationData {
     'tabTerminal': 'Terminal',
     'tabSysInfo': 'System info',
     'sectionPrivEsc': 'Privilege check',
+    'tabProcessList': 'Processes',
     'btnCancel': 'Cancel',
     'btnConfirm': 'OK',
     'btnSave': 'Save',

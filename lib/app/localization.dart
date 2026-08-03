@@ -49,6 +49,7 @@ class S {
   static String get tabTerminal => _t('tabTerminal');
   static String get tabSysInfo => _t('tabSysInfo');
   static String get sectionPrivEsc => _t('sectionPrivEsc');
+  static String get tabProcessList => _t('tabProcessList');
   static String get btnCancel => _t('btnCancel');
   static String get btnConfirm => _t('btnConfirm');
   static String get btnSave => _t('btnSave');

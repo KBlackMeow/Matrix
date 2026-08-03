@@ -10,7 +10,7 @@ import '../models/payload.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 13;
+  static const _kCurrentVersion = 14;
   static const _binaryContentPrefix = '__MATRIX_BINARY_B64__:';
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
@@ -135,6 +135,14 @@ class SeedService {
       description: 'ASPX .NET Process 命令执行，GET/POST 参数 cmd，纯文本输出，支持 PowerShell',
       tags: 'aspx,dotnet,process,cmd,powershell,windows',
       sinceVersion: 2,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/webshell/aspx_behinder.aspx',
+      name: 'aspx_behinder.aspx',
+      type: 'aspx',
+      description: 'ASPX 冰蝎（Behinder）行业标准版，AES-CBC + Assembly.Load，与原版客户端完全兼容',
+      tags: 'aspx,behinder,aes,encrypt,冰蝎,dotnet,standard',
+      sinceVersion: 14,
     ),
     // ── SUO5 代理载荷 ──────────────────────────────────────────────────────
     _PayloadDef(

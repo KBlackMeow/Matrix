@@ -101,6 +101,7 @@ flutter:
 
   assets:
     - data/
+    - data/behinder_csharp/
     - data/mem_shell/
     - assets/icon/
     - assets/defaults/payloads/webshell/

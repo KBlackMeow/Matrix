@@ -45,6 +45,8 @@ void registerAllTools(
   _registerSystemInfo(server, pool, log);
   _registerHomeDir(server, pool, log);
   _registerEnvList(server, pool, log);
+  _registerProcessList(server, pool, log);
+  _registerProcessKill(server, pool, log);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -740,6 +742,75 @@ void _registerEnvList(
         final svc = await pool.resolve(_optShellId(args));
         final vars = await svc.listEnvVarNames();
         return _json({'count': vars.length, 'variables': vars});
+      } catch (e) {
+        return _error('$e');
+      }
+    }, log),
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 进程管理
+// ═══════════════════════════════════════════════════════════════════════════════
+
+void _registerProcessList(
+  McpServer server,
+  SessionPool pool,
+  McpActivityLogger? log,
+) {
+  server.registerTool(
+    'process_list',
+    description: '列出目标机器上的进程（Linux: ps aux, Windows: tasklist）',
+    inputSchema: JsonSchema.object(
+      properties: {
+        'shell_id': JsonSchema.integer(
+          description: 'WebShell ID（已设置默认 shell 时可省略）',
+        ),
+      },
+      required: [],
+    ),
+    callback: _wrap('process_list', (args, extra) async {
+      try {
+        final svc = await pool.resolve(_optShellId(args));
+        final isWin = svc.webshell.connectorType.startsWith('asp');
+        final cmd = isWin ? 'tasklist /FO CSV /NH' : 'ps aux --sort=-%mem';
+        final output = await svc.executeCommand(cmd);
+        return _text(output);
+      } catch (e) {
+        return _error('$e');
+      }
+    }, log),
+  );
+}
+
+void _registerProcessKill(
+  McpServer server,
+  SessionPool pool,
+  McpActivityLogger? log,
+) {
+  server.registerTool(
+    'process_kill',
+    description: '终止目标机器上的进程（通过 PID）',
+    inputSchema: JsonSchema.object(
+      properties: {
+        'shell_id': JsonSchema.integer(
+          description: 'WebShell ID（已设置默认 shell 时可省略）',
+        ),
+        'pid': JsonSchema.string(description: '要终止的进程 PID'),
+      },
+      required: ['pid'],
+    ),
+    callback: _wrap('process_kill', (args, extra) async {
+      try {
+        final svc = await pool.resolve(_optShellId(args));
+        final pid = args['pid'] as String;
+        final isWin = svc.webshell.connectorType.startsWith('asp');
+        final cmd = isWin ? 'taskkill /F /PID $pid' : 'kill -9 $pid';
+        final output = await svc.executeCommand(cmd);
+        final success = !output.contains('not found') &&
+            !output.contains('No such') &&
+            !output.contains('Error');
+        return _text(success ? '进程 $pid 已终止' : '终止失败: $output');
       } catch (e) {
         return _error('$e');
       }

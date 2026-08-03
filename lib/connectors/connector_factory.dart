@@ -10,6 +10,7 @@ import 'jsp_behinder_connector.dart';
 import 'jsp_behinder_connector_v2.dart';
 import 'jsp_runtime_connector.dart';
 import 'asp_wscript_connector.dart';
+import 'aspx_behinder_connector.dart';
 import 'aspx_cmd_connector.dart';
 
 typedef _ConnectorBuilder = ShellConnector Function(Webshell webshell);
@@ -128,6 +129,15 @@ class ConnectorFactory {
       defaultParam: 'cmd',
       fixedMethod: null,
       builder: AspxCmdConnector.new,
+    ),
+    _ConnectorDefinition(
+      type: 'aspx_behinder',
+      typeLabel: 'aspx',
+      shortLabel: 'ASPX-BHD',
+      payloadHint: 'aspx_behinder.aspx',
+      defaultParam: AppConstants.defaultShellPassword,
+      fixedMethod: 'POST',
+      builder: AspxBehinderConnector.new,
     ),
   ];
 
