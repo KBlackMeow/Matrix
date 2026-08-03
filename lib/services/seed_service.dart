@@ -10,7 +10,7 @@ import '../models/payload.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 15;
+  static const _kCurrentVersion = 16;
   static const _binaryContentPrefix = '__MATRIX_BINARY_B64__:';
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ class SeedService {
       type: 'aspx',
       description: 'ASPX 冰蝎（Behinder）行业标准版，AES-CBC + Assembly.Load，与原版客户端完全兼容',
       tags: 'aspx,behinder,aes,encrypt,冰蝎,dotnet,standard',
-      sinceVersion: 15,
+      sinceVersion: 16,
     ),
     // ── SUO5 代理载荷 ──────────────────────────────────────────────────────
     _PayloadDef(
