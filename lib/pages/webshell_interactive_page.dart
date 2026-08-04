@@ -19,6 +19,7 @@ import 'webshell_interactive_file_manager.dart';
 import 'webshell_interactive_system_priv_esc.dart';
 import 'webshell_interactive_terminal_shared.dart';
 import 'process_list_tab.dart';
+import 'webshell_initial_connection_state.dart';
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 
@@ -80,7 +81,15 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     _tabController =
         TabController(length: (_showPrivEscTab ? 4 : 3) + 1, vsync: this);
     _completer = TabCompleter(_service);
-    _checkConnection();
+    final initialConnection =
+        WebshellInitialConnectionState.fromPersistedStatus(
+          widget.webshell.status,
+        );
+    _isConnected = initialConnection.isConnected;
+    _isChecking = initialConnection.shouldCheckOnOpen;
+    if (initialConnection.shouldCheckOnOpen) {
+      _checkConnection();
+    }
   }
 
   static const _kPingFallbackTag = '__MATRIX_PING_FALLBACK_OK__';
