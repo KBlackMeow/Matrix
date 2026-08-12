@@ -881,7 +881,7 @@ class _PrivEscItemWidget extends StatelessWidget {
           color: hasResult
               ? (isError
                     ? AppColors.red.withValues(alpha: 0.4)
-                    : color.withValues(alpha: 0.3))
+                    : AppColors.primary.withValues(alpha: 0.4))
               : AppColors.border,
         ),
       ),
@@ -957,7 +957,7 @@ class _PrivEscItemWidget extends StatelessWidget {
                           style: OutlinedButton.styleFrom(
                             foregroundColor: color,
                             side: BorderSide(
-                              color: color.withValues(alpha: 0.6),
+                              color: color.withValues(alpha: 0.5),
                             ),
                             padding: EdgeInsets.zero,
                             shape: RoundedRectangleBorder(
