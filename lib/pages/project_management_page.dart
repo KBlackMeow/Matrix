@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import '../database/database_helper.dart';
 import '../models/project.dart';
 import '../theme/app_theme.dart';
-import '../app/localization.dart';
-
 /// 项目管理页面：创建、编辑、删除
 class ProjectManagementPage extends StatefulWidget {
   final Project? selectedProject;
@@ -61,7 +59,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          S.btnCreate,
+          'Create',
           style: AppTextStyles.heading(color: AppColors.primary),
         ),
         content: SizedBox(
@@ -75,7 +73,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 autofocus: true,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: S.fieldProjectName,
+                  labelText: 'Project name',
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(
@@ -92,8 +90,8 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 controller: domainController,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: S.fieldDomainOrId,
-                  hintText: S.hintDomainOrId,
+                  labelText: 'Target URL *',
+                  hintText: 'e.g. https://target.example or http://192.168.1.1:8080',
                   hintStyle: const TextStyle(color: Color(0xFF6E7681)),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
@@ -112,7 +110,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 maxLines: 3,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: S.fieldDescription,
+                  labelText: 'Description (optional)',
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(
@@ -131,7 +129,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
-              S.btnCancel,
+              'Cancel',
               style: AppTextStyles.body(color: AppColors.textSecondary),
             ),
           ),
@@ -145,7 +143,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
             child: Text(
-              S.btnCreate,
+              'Create',
               style: AppTextStyles.body(color: AppColors.bgDark),
             ),
           ),
@@ -178,7 +176,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          S.titleEditProject(project.id),
+          'Edit project #${project.id}',
           style: AppTextStyles.heading(color: AppColors.primary),
         ),
         content: SizedBox(
@@ -192,7 +190,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 autofocus: true,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: S.fieldProjectName,
+                  labelText: 'Project name',
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(
@@ -209,8 +207,8 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 controller: domainController,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: S.fieldDomainOrId,
-                  hintText: S.hintDomainOrId,
+                  labelText: 'Target URL *',
+                  hintText: 'e.g. https://target.example or http://192.168.1.1:8080',
                   hintStyle: const TextStyle(color: Color(0xFF6E7681)),
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
@@ -229,7 +227,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 maxLines: 3,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: S.fieldDescription,
+                  labelText: 'Description (optional)',
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(
@@ -248,7 +246,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
-              S.btnCancel,
+              'Cancel',
               style: const TextStyle(color: AppColors.textSecondary),
             ),
           ),
@@ -262,7 +260,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
             child: Text(
-              S.btnSave,
+              'Save',
               style: const TextStyle(color: Color(0xFF0D1117)),
             ),
           ),
@@ -295,16 +293,16 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: MatrixDialogStyle.outlineDanger(0.28),
-        title: Text(S.btnDelete, style: const TextStyle(color: AppColors.red)),
+        title: Text('Delete', style: const TextStyle(color: AppColors.red)),
         content: Text(
-          S.confirmDeleteProject(project.name),
+          'Delete project "${project.name}"? This will also delete its Webshell and collected data. This action cannot be undone.',
           style: const TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
-              S.btnCancel,
+              'Cancel',
               style: const TextStyle(color: AppColors.textSecondary),
             ),
           ),
@@ -312,7 +310,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
             child: Text(
-              S.btnDelete,
+              'Delete',
               style: const TextStyle(color: Colors.white),
             ),
           ),
@@ -348,7 +346,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    S.webModeWarning,
+                    'Web mode: data is stored in memory only and will be lost on refresh. Use the desktop app for persistent storage.',
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,
@@ -364,7 +362,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
             FilledButton.icon(
               onPressed: _loading ? null : _showCreateDialog,
               icon: const Icon(Icons.add, size: 18),
-              label: Text(S.actionNewProject),
+              label: Text('New project'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -375,7 +373,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
               onPressed: _loading ? null : _loadProjects,
               icon: const Icon(Icons.refresh),
               color: const Color(0xFF8B949E),
-              tooltip: S.actionRefresh,
+              tooltip: 'Refresh',
             ),
           ],
         ),
@@ -398,7 +396,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        S.projectEmptyHint(S.actionNewProject),
+                        'No projects yet. Click "${'New project'}" to get started',
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 14,
@@ -459,7 +457,7 @@ class _ProjectCardState extends State<_ProjectCard> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(
-          S.dialogChooseProjectEntryTitle,
+          'Choose where to open',
           style: AppTextStyles.heading(color: AppColors.primary),
         ),
         content: Column(
@@ -482,7 +480,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                 widget.onEnterWebshell();
               },
               icon: const Icon(Icons.terminal, size: 20),
-              label: Text(S.menuEnterWebshell),
+              label: Text('Open Webshell'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -500,7 +498,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                 widget.onEnterExp();
               },
               icon: const Icon(Icons.bug_report, size: 20),
-              label: Text(S.menuEnterExp),
+              label: Text('Open Exploits'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -518,7 +516,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                 widget.onEnterSuo5();
               },
               icon: const Icon(AppTunnelIcons.outlined, size: 20),
-              label: Text(S.menuEnterSuoTunnel),
+              label: Text('Open suo5'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -553,7 +551,7 @@ class _ProjectCardState extends State<_ProjectCard> {
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(
-              S.btnCancel,
+              'Cancel',
               style: AppTextStyles.body(color: AppColors.textSecondary),
             ),
           ),
@@ -690,10 +688,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                           ],
                           const SizedBox(height: 4),
                           Text(
-                            S.projectCreatedUpdated(
-                              _formatDate(widget.project.createdAt),
-                              _formatDate(widget.project.updatedAt),
-                            ),
+                            'Created ${_formatDate(widget.project.createdAt)} · Updated ${_formatDate(widget.project.updatedAt)}',
                             style: AppTextStyles.caption(
                               color: AppColors.textMuted,
                             ),
@@ -726,7 +721,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              S.menuEnterWebshell,
+                              'Open Webshell',
                               style: AppTextStyles.body(
                                 color: AppColors.textPrimary,
                               ),
@@ -745,7 +740,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              S.menuEnterExp,
+                              'Open Exploits',
                               style: AppTextStyles.body(
                                 color: AppColors.textPrimary,
                               ),
@@ -764,7 +759,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              S.menuEnterSuoTunnel,
+                              'Open suo5',
                               style: AppTextStyles.body(
                                 color: AppColors.textPrimary,
                               ),
@@ -797,13 +792,13 @@ class _ProjectCardState extends State<_ProjectCard> {
                     onPressed: widget.onEdit,
                     icon: const Icon(Icons.edit_outlined),
                     color: AppColors.cyan,
-                    tooltip: S.tooltipEdit,
+                    tooltip: 'Edit',
                   ),
                   IconButton(
                     onPressed: widget.onDelete,
                     icon: const Icon(Icons.delete_outline),
                     color: AppColors.red,
-                    tooltip: S.tooltipDelete,
+                    tooltip: 'Delete',
                   ),
                 ],
               ),

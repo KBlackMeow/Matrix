@@ -5,8 +5,6 @@ import '../../exp/vulhub/misc_http_exp_service.dart';
 import '../../theme/app_theme.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
-import '../../app/localization.dart';
-
 class PhpExpPage extends BaseVulhubExpPage {
   final String? initialTargetUrl;
 
@@ -21,13 +19,13 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
   IconData get pageIcon => Icons.php;
 
   @override
-  String get appBarTitle => S.vulhubPhpTitle;
+  String get appBarTitle => 'PHP 8.1.0-dev Backdoor / CVE-2012-1823 PHP-CGI RCE';
 
   @override
-  String get cardTitle => S.vulhubPhpCardTitle;
+  String get cardTitle => 'PHP RCE Series';
 
   @override
-  String get cardSubtitle => S.vulhubPhpCardSubtitle;
+  String get cardSubtitle => 'PHP 8.1.0-dev User-Agentt backdoor + CVE-2012-1823 PHP-CGI parameter injection';
 
   late final TextEditingController _urlCtrl;
   final _phpPathCtrl = TextEditingController(text: '/index.php');
@@ -59,7 +57,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -71,7 +69,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
           r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到后门',
         );
       } catch (e) {
-        appendLog(S.expLogException(e));
+        appendLog('[!] Error: $e');
       }
     } else {
       appendLog('[*] 检测 CVE-2012-1823 PHP-CGI...');
@@ -83,7 +81,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
               : '[-] 未检测到 PHP-CGI 漏洞',
         );
       } catch (e) {
-        appendLog(S.expLogException(e));
+        appendLog('[!] Error: $e');
       }
     }
     if (mounted) setState(() => running = false);
@@ -91,7 +89,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -102,7 +100,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
         final out = await _backdoorSvc().execRce(cmd);
         appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出');
       } catch (e) {
-        appendLog(S.expLogException(e));
+        appendLog('[!] Error: $e');
       }
     } else {
       appendLog('[*] PHP-CGI 参数注入 执行: $cmd');
@@ -110,7 +108,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
         final out = await _cgiSvc().execRce(cmd);
         appendLog(out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出');
       } catch (e) {
-        appendLog(S.expLogException(e));
+        appendLog('[!] Error: $e');
       }
     }
     if (mounted) setState(() => running = false);
@@ -131,19 +129,19 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle(S.sectionTargetConfig),
-          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
+          vSecTitle('Target config'),
+          vTf(_urlCtrl, 'Target URL', 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(_phpPathCtrl, 'PHP 文件路径', '/index.php'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            S.fieldTimeout,
+            'Timeout (s)',
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionVulnType),
+          vSecTitle('Vulnerability type'),
           Row(
             children: [
               _tabBtn('PHP 8.1.0-dev 后门', 0),
@@ -170,12 +168,12 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
             ),
           ),
           const SizedBox(height: 8),
-          vBtn(S.btnDetectVuln, running ? null : _check),
+          vBtn('Detect vuln', running ? null : _check),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionCmdExec),
-          vTf(_cmdCtrl, S.fieldCommand, 'id'),
+          vSecTitle('Command execution'),
+          vTf(_cmdCtrl, 'Command', 'id'),
           const SizedBox(height: 8),
-          vBtn(S.btnExecCmd, running ? null : _exec),
+          vBtn('Execute command', running ? null : _exec),
         ],
       ),
     );

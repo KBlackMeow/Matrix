@@ -11,8 +11,6 @@ import '../../theme/app_theme.dart';
 import '../reverse_shell_terminal_page.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
-import '../../app/localization.dart';
-
 class SpringExpPage extends BaseVulhubExpPage {
   final String? initialTargetUrl;
 
@@ -26,11 +24,11 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   @override
   IconData get pageIcon => Icons.local_florist;
   @override
-  String get appBarTitle => S.vulhubSpringTitle;
+  String get appBarTitle => 'Spring Framework CVE-2022-22965/22963/CVE-2018-1273/CVE-2017-8046 RCE';
   @override
-  String get cardTitle => S.vulhubSpringCardTitle;
+  String get cardTitle => 'Spring Framework RCE';
   @override
-  String get cardSubtitle => S.vulhubSpringCardSubtitle;
+  String get cardSubtitle => 'Spring4Shell / Spring Cloud Function / Spring Data SpEL injection series';
 
   late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
@@ -57,7 +55,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   Future<void> _check() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -75,7 +73,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
         );
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -84,7 +82,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   Future<void> _checkAll() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -114,7 +112,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
         appendLog('[*] 已自动选择首个命中漏洞: ${firstHit.label}');
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -123,7 +121,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   Future<void> _execRce() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -137,7 +135,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
         appendLog('[-] 无输出（该漏洞可能无直接回显）');
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -146,7 +144,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   Future<void> _getShell() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -177,7 +175,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
         appendLog('[-] GetShell 失败：未发现可访问的 shell 文件');
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -186,7 +184,7 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
   Future<void> _showReverseShellDialog() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final mode = await showReverseShellModeDialog(context);
@@ -268,8 +266,8 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle(S.sectionTargetConfig),
-          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
+          vSecTitle('Target config'),
+          vTf(_urlCtrl, 'Target URL', 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(
             _credCtrl,
@@ -280,12 +278,12 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            S.fieldTimeout,
+            'Timeout (s)',
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionVulnSelect),
+          vSecTitle('Vuln selection'),
           DropdownButtonFormField<SpringVulnType>(
             initialValue: _selected,
             isExpanded: true,
@@ -313,17 +311,17 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
             ],
           ),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionCmdExec),
-          vTf(_cmdCtrl, S.fieldCommand, 'id'),
+          vSecTitle('Command execution'),
+          vTf(_cmdCtrl, 'Command', 'id'),
           const SizedBox(height: 8),
-          vBtn(S.btnExecCmd, running ? null : _execRce),
+          vBtn('Execute command', running ? null : _execRce),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionGetShell),
+          vSecTitle('GetShell (reverse shell)'),
           vTf(_passwordCtrl, '冰蝎密码', AppConstants.defaultShellPassword),
           const SizedBox(height: 8),
           vBtn('写入 WebShell', running ? null : _getShell),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionFullTerminal),
+          vSecTitle('Full terminal'),
           vBtn('启动反弹终端', running ? null : _showReverseShellDialog),
         ],
       ),

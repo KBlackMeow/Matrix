@@ -13,8 +13,6 @@ import '../../theme/app_theme.dart';
 import '../webshell_interactive_page.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
-import '../../app/localization.dart';
-
 class DrupalExpPage extends BaseVulhubExpPage {
   final String? initialTargetUrl;
 
@@ -29,13 +27,13 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
   IconData get pageIcon => Icons.water_drop;
 
   @override
-  String get appBarTitle => S.vulhubDrupalTitle;
+  String get appBarTitle => 'Drupal CVE-2018-7600 (Drupalgeddon2) Form API RCE';
 
   @override
-  String get cardTitle => S.vulhubDrupalCardTitle;
+  String get cardTitle => 'Drupal CVE-2018-7600';
 
   @override
-  String get cardSubtitle => S.vulhubDrupalCardSubtitle;
+  String get cardSubtitle => 'Drupalgeddon2 — Form API #post_render callback PHP code execution';
 
   late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
@@ -57,7 +55,7 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -65,10 +63,10 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
     try {
       final r = await _svc().check();
       appendLog(
-        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : S.expLogNoVulnGeneric,
+        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] No vulnerability detected',
       );
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -76,7 +74,7 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
 
   Future<void> _getShell() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -104,7 +102,7 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
         appendLog('[-] GetShell 失败');
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -268,7 +266,7 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -280,7 +278,7 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
         out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或执行失败',
       );
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -301,27 +299,27 @@ class _DrupalPageState extends BaseVulhubExpPageState<DrupalExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle(S.sectionTargetConfig),
-          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
+          vSecTitle('Target config'),
+          vTf(_urlCtrl, 'Target URL', 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            S.fieldTimeout,
+            'Timeout (s)',
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 8),
-          vBtn(S.btnDetectVuln, running ? null : _check),
+          vBtn('Detect vuln', running ? null : _check),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionCmdExec),
-          vTf(_cmdCtrl, S.fieldCommand, 'id'),
+          vSecTitle('Command execution'),
+          vTf(_cmdCtrl, 'Command', 'id'),
           const SizedBox(height: 8),
-          vBtn(S.btnExecCmd, running ? null : _exec),
+          vBtn('Execute command', running ? null : _exec),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionGetShell),
+          vSecTitle('GetShell (reverse shell)'),
           vTf(_passwordCtrl, 'Shell 密码', AppConstants.defaultShellPassword),
           const SizedBox(height: 8),
-          vBtn(S.btnGetShell, running ? null : _getShell),
+          vBtn('GetShell', running ? null : _getShell),
         ],
       ),
     );
@@ -337,7 +335,7 @@ class _ProjectPickerDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(
-        S.titleSelectProject,
+        'Select project',
         style: AppTextStyles.heading(color: AppColors.primary),
       ),
       content: SizedBox(

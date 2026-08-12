@@ -5,8 +5,6 @@ import '../../exp/vulhub/misc_http_exp_service.dart';
 import '../../theme/app_theme.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
-import '../../app/localization.dart';
-
 class WebLogicExpPage extends BaseVulhubExpPage {
   final String? initialTargetUrl;
 
@@ -21,13 +19,13 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
   IconData get pageIcon => Icons.dns;
 
   @override
-  String get appBarTitle => S.vulhubWeblogicTitle;
+  String get appBarTitle => 'Oracle WebLogic CVE-2019-2725/CVE-2020-14882/CVE-2020-14883 RCE';
 
   @override
-  String get cardTitle => S.vulhubWeblogicCardTitle;
+  String get cardTitle => 'Oracle WebLogic RCE';
 
   @override
-  String get cardSubtitle => S.vulhubWeblogicCardSubtitle;
+  String get cardSubtitle => 'XMLDecoder deserialization + console unauthenticated RCE';
 
   late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
@@ -48,7 +46,7 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -58,7 +56,7 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
         final r = await _svc().checkCve201710271();
         appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到');
       } catch (e) {
-        appendLog(S.expLogException(e));
+        appendLog('[!] Error: $e');
       }
     } else if (_tab == 1) {
       appendLog('[*] 检测 CVE-2020-14882 控制台路径绕过...');
@@ -66,7 +64,7 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
         final r = await _svc().checkCve202014882();
         appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到');
       } catch (e) {
-        appendLog(S.expLogException(e));
+        appendLog('[!] Error: $e');
       }
     }
     if (mounted) setState(() => running = false);
@@ -74,7 +72,7 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -85,7 +83,7 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
         final out = await _svc().execRceCve201710271(cmd);
         appendLog(out != null ? '[+] 响应:\n$out' : '[-] 无响应');
       } catch (e) {
-        appendLog(S.expLogException(e));
+        appendLog('[!] Error: $e');
       }
     } else if (_tab == 1) {
       appendLog('[*] CVE-2020-14882 控制台 RCE: $cmd');
@@ -93,7 +91,7 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
         final out = await _svc().execRceCve202014882(cmd);
         appendLog(out != null ? '[+] 响应:\n$out' : '[-] 无响应');
       } catch (e) {
-        appendLog(S.expLogException(e));
+        appendLog('[!] Error: $e');
       }
     }
     if (mounted) setState(() => running = false);
@@ -113,17 +111,17 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle(S.sectionTargetConfig),
-          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:7001'),
+          vSecTitle('Target config'),
+          vTf(_urlCtrl, 'Target URL', 'http://localhost:7001'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            S.fieldTimeout,
+            'Timeout (s)',
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionCveSelect),
+          vSecTitle('CVE selection'),
           Wrap(
             spacing: 6,
             runSpacing: 4,
@@ -154,12 +152,12 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
             ),
           ),
           const SizedBox(height: 8),
-          vBtn(S.btnDetectVuln, running ? null : _check),
+          vBtn('Detect vuln', running ? null : _check),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionCmdExec),
-          vTf(_cmdCtrl, S.fieldCommand, 'id'),
+          vSecTitle('Command execution'),
+          vTf(_cmdCtrl, 'Command', 'id'),
           const SizedBox(height: 8),
-          vBtn(S.btnExecCmd, running ? null : _exec),
+          vBtn('Execute command', running ? null : _exec),
         ],
       ),
     );

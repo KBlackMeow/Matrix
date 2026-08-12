@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
-import '../app/localization.dart';
 import '../database/database_helper.dart';
 import '../models/frp_profile.dart';
 import '../services/frp_client_service.dart';
@@ -30,20 +29,20 @@ bool _remotePortTakenOnServer(
 ) => all.any((x) => _frpSameServer(x, serverRef) && x.remotePort == port);
 
 String _uniqueDuplicateDisplayName(String baseName, List<FrpProfile> all) {
-  var name = S.frpDupDisplayName(baseName);
+  var name = '$baseName copy';
   if (!all.any((x) => x.name == name)) return name;
   for (var i = 2; ; i++) {
-    name = S.frpDupDisplayNameIndexed(baseName, i);
+    name = '$baseName copy ($i)';
     if (!all.any((x) => x.name == name)) return name;
   }
 }
 
 /// 与同一 frps 上已有配置不冲突的代理名
 String _uniqueDuplicateProxyName(FrpProfile source, List<FrpProfile> all) {
-  final first = S.frpDupProxyFirst(source.proxyName);
+  final first = '${source.proxyName}_copy';
   if (!_proxyNameTakenOnServer(first, source, all)) return first;
   for (var i = 2; ; i++) {
-    final c = S.frpDupProxyIndexed(source.proxyName, i);
+    final c = '${source.proxyName}_copy$i';
     if (!_proxyNameTakenOnServer(c, source, all)) return c;
   }
 }
@@ -169,7 +168,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(S.frpDuplicatedSnack(name, proxyName, remotePort)),
+            content: Text('Duplicated "$name"\nProxy $proxyName · Remote port $remotePort (distinct from original, edit as needed)'),
             duration: const Duration(seconds: 3),
           ),
         );
@@ -178,7 +177,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(S.frpDuplicateFailed(e)),
+            content: Text('Duplicate failed: $e'),
             duration: const Duration(seconds: 3),
           ),
         );
@@ -203,7 +202,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(S.frpMissingServerOrProxy)));
+      ).showSnackBar(SnackBar(content: Text('This profile is missing a server address or proxy name. Edit and save first')));
       return;
     }
 
@@ -220,9 +219,9 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(S.frpDeleteTitle, style: AppTextStyles.heading(size: 16)),
+        title: Text('Delete profile', style: AppTextStyles.heading(size: 16)),
         content: Text(
-          S.frpConfirmDelete(p.name),
+          'Delete "${p.name}"? This action cannot be undone.',
           style: AppTextStyles.caption(
             size: 13,
             color: AppColors.textSecondary,
@@ -232,7 +231,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(
-              S.btnCancel,
+              'Cancel',
               style: AppTextStyles.caption(
                 size: 13,
                 color: AppColors.textMuted,
@@ -242,7 +241,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(
-              S.btnDelete,
+              'Delete',
               style: AppTextStyles.caption(size: 13, color: AppColors.red),
             ),
           ),
@@ -260,7 +259,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(S.frpDeletedSnack(p.name)),
+          content: Text('Deleted "${p.name}"'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -372,7 +371,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        S.frpTunnelTitle,
+                        'FRP Client',
                         style: AppTextStyles.heading(
                           size: 18,
                           color: _statusColor(status),
@@ -391,7 +390,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                       if (isActive && activeName == null) ...[
                         const SizedBox(height: 6),
                         Text(
-                          S.frpActiveNotMatched,
+                          'Tunnel active but does not match any saved profile (e.g. after navigation). Click "Stop" on the right',
                           style: AppTextStyles.caption(
                             size: 11,
                             color: Colors.orange,
@@ -410,7 +409,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                       }
                     },
                     child: Text(
-                      S.frpStopConnection,
+                      'Stop connection',
                       style: AppTextStyles.caption(
                         size: 12,
                         color: AppColors.red,
@@ -441,7 +440,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
           const SizedBox(height: 16),
 
           Text(
-            S.frpSavedConfigs,
+            'Saved profiles',
             style: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
           ),
           const SizedBox(height: 8),
@@ -456,7 +455,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                 border: Border.all(color: AppColors.bgCard),
               ),
               child: Text(
-                S.frpNoConfigs,
+                'No profiles yet. Click "New profile" below to add one.',
                 style: AppTextStyles.caption(
                   size: 12,
                   color: AppColors.textMuted,
@@ -475,7 +474,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
           OutlinedButton.icon(
             onPressed: () => _openEditorDialog(profile: null),
             icon: const Icon(Icons.add, size: 18),
-            label: Text(S.frpNewConfig),
+            label: Text('New profile'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
@@ -526,7 +525,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      S.frpMappingLabel(p.remotePort, p.localAddr, p.localPort),
+                      'Remote port ${p.remotePort} → Local ${p.localAddr}:${p.localPort}',
                       style: AppTextStyles.caption(
                         size: 11,
                         color: AppColors.textMuted,
@@ -535,7 +534,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      S.frpServerLabel(p.serverAddr, p.serverPort),
+                      'frp server ${p.serverAddr}:${p.serverPort}',
                       style: AppTextStyles.caption(
                         size: 10,
                         color: AppColors.textMuted,
@@ -567,7 +566,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                     ? null
                     : () => _startOrStopProfile(p),
                 child: Text(
-                  running ? S.btnStop : S.btnStart,
+                  running ? 'Stop' : 'Start',
                   style: AppTextStyles.caption(
                     size: 12,
                     color: running ? AppColors.red : AppColors.primary,
@@ -585,7 +584,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                 ),
                 onPressed: () => _openEditorDialog(profile: p),
                 child: Text(
-                  S.btnEdit,
+                  'Edit',
                   style: AppTextStyles.caption(
                     size: 12,
                     color: AppColors.primary,
@@ -603,7 +602,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                 ),
                 onPressed: () => _duplicateProfile(p),
                 child: Text(
-                  S.btnDuplicate,
+                  'Duplicate',
                   style: AppTextStyles.caption(
                     size: 12,
                     color: AppColors.textSecondary,
@@ -621,7 +620,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                 ),
                 onPressed: () => _confirmDelete(p),
                 child: Text(
-                  S.btnDelete,
+                  'Delete',
                   style: AppTextStyles.caption(
                     size: 12,
                     color: AppColors.textMuted,
@@ -651,7 +650,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
               const Icon(Icons.terminal, size: 14, color: AppColors.textMuted),
               const SizedBox(width: 6),
               Text(
-                S.frpRunLog,
+                'Run log',
                 style: AppTextStyles.caption(
                   size: 12,
                   color: AppColors.textMuted,
@@ -666,13 +665,13 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(S.frpLogCopiedSnack),
+                        content: Text('Log copied to clipboard'),
                         duration: const Duration(seconds: 2),
                       ),
                     );
                   },
                   child: Text(
-                    S.actionCopy,
+                    'Copy',
                     style: AppTextStyles.caption(
                       size: 11,
                       color: AppColors.primary,
@@ -686,7 +685,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
                     setState(() {});
                   },
                   child: Text(
-                    S.btnClear,
+                    'Clear',
                     style: AppTextStyles.caption(
                       size: 11,
                       color: AppColors.textMuted,
@@ -701,7 +700,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
             child: _frpService.logs.isEmpty
                 ? Center(
                     child: Text(
-                      S.frpNoLogs,
+                      '> No logs yet',
                       style: AppTextStyles.terminal(
                         size: 13,
                         color: AppColors.textMuted,
@@ -763,13 +762,13 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
   String _statusLabel(FrpTunnelStatus s) {
     switch (s) {
       case FrpTunnelStatus.running:
-        return S.frpStatusRunning;
+        return 'Tunnel running · Remote traffic is being forwarded locally';
       case FrpTunnelStatus.connecting:
-        return S.frpStatusConnecting;
+        return 'Connecting...';
       case FrpTunnelStatus.error:
-        return S.frpStatusError;
+        return 'Connection error. Check parameters or logs';
       case FrpTunnelStatus.idle:
-        return S.frpStatusIdle;
+        return 'Ready · Click "Start" in the list to connect the tunnel';
     }
   }
 }
@@ -884,7 +883,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
     final remotePort = int.tryParse(_remotePortCtrl.text.trim()) ?? 6000;
     final localPort = int.tryParse(_localPortCtrl.text.trim()) ?? 4444;
     var name = _nameCtrl.text.trim();
-    if (name.isEmpty) name = S.frpUnnamedConfig;
+    if (name.isEmpty) name = 'Unnamed profile';
     return {
       'name': name,
       'serverAddr': _serverAddrCtrl.text.trim(),
@@ -958,7 +957,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(S.frpSaveFailed(e)),
+            content: Text('Save failed: $e'),
             duration: const Duration(seconds: 3),
           ),
         );
@@ -997,7 +996,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                 children: [
                   Expanded(
                     child: Text(
-                      _isNew ? S.frpNewConfigTitle : S.frpEditConfigTitle,
+                      _isNew ? 'New profile' : 'Edit profile',
                       style: AppTextStyles.heading(
                         size: 17,
                         color: AppColors.textPrimary,
@@ -1008,7 +1007,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: Text(
-                        S.frpRunningNoEdit,
+                        'Cannot edit while running',
                         style: AppTextStyles.caption(
                           size: 10,
                           color: Colors.orange,
@@ -1017,7 +1016,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                     )
                   else
                     Text(
-                      S.frpAutoSave,
+                      'Changes auto-save',
                       style: AppTextStyles.caption(
                         size: 11,
                         color: AppColors.textMuted,
@@ -1027,7 +1026,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                     icon: const Icon(Icons.close, size: 22),
                     color: AppColors.textMuted,
                     onPressed: () => Navigator.of(context).pop(),
-                    tooltip: S.tooltipClose,
+                    tooltip: 'Close',
                   ),
                 ],
               ),
@@ -1041,14 +1040,14 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                   children: [
                     _editorField(
                       controller: _nameCtrl,
-                      label: S.frpConfigName,
-                      hint: S.frpConfigNameHint,
+                      label: 'Profile name',
+                      hint: 'e.g. Office network / Test server',
                       enabled: !locked,
                       onChanged: _maybePersist,
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      S.frpServerSection,
+                      'Server config',
                       style: AppTextStyles.caption(
                         size: 12,
                         color: AppColors.textMuted,
@@ -1061,8 +1060,8 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                           flex: 3,
                           child: _editorField(
                             controller: _serverAddrCtrl,
-                            label: S.frpServerAddr,
-                            hint: S.frpServerAddrHint,
+                            label: 'frp server address',
+                            hint: 'e.g. 1.2.3.4',
                             enabled: !locked,
                             onChanged: _maybePersist,
                           ),
@@ -1071,7 +1070,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                         Expanded(
                           child: _editorField(
                             controller: _serverPortCtrl,
-                            label: S.frpPort,
+                            label: 'Port',
                             hint: '7000',
                             enabled: !locked,
                             numeric: true,
@@ -1087,7 +1086,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      S.frpProxySection,
+                      'Proxy config',
                       style: AppTextStyles.caption(
                         size: 12,
                         color: AppColors.textMuted,
@@ -1099,7 +1098,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                         Expanded(
                           child: _editorField(
                             controller: _proxyNameCtrl,
-                            label: S.frpProxyName,
+                            label: 'Proxy name',
                             hint: 'shell',
                             enabled: !locked,
                             onChanged: _maybePersist,
@@ -1109,7 +1108,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                         Expanded(
                           child: _editorField(
                             controller: _remotePortCtrl,
-                            label: S.frpRemotePort,
+                            label: 'Remote port',
                             hint: '6000',
                             enabled: !locked,
                             numeric: true,
@@ -1125,7 +1124,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                           flex: 3,
                           child: _editorField(
                             controller: _localAddrCtrl,
-                            label: S.frpLocalAddr,
+                            label: 'Local address',
                             hint: '127.0.0.1',
                             enabled: !locked,
                             onChanged: _maybePersist,
@@ -1135,7 +1134,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                         Expanded(
                           child: _editorField(
                             controller: _localPortCtrl,
-                            label: S.frpLocalPort,
+                            label: 'Local port',
                             hint: '4444',
                             enabled: !locked,
                             numeric: true,
@@ -1150,7 +1149,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                       childrenPadding: EdgeInsets.zero,
                       dense: true,
                       title: Text(
-                        S.frpAdvanced,
+                        'Advanced options',
                         style: AppTextStyles.caption(
                           size: 12,
                           color: AppColors.textMuted,
@@ -1160,8 +1159,8 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                         const SizedBox(height: 6),
                         _editorField(
                           controller: _versionCtrl,
-                          label: S.frpVersionLabel,
-                          hint: S.frpVersionHint,
+                          label: 'Client version (leave blank to omit)',
+                          hint: 'e.g. 0.51.3 / 0.61.1',
                           enabled: !locked,
                           onChanged: _maybePersist,
                         ),
@@ -1181,7 +1180,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                S.frpTcpMux,
+                                'TCPMux (yamux multiplexing)',
                                 style: AppTextStyles.caption(
                                   size: 12,
                                   color: AppColors.textSecondary,
@@ -1207,7 +1206,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                S.frpAutoReconnect,
+                                'Auto-reconnect on disconnect (retry after 5 s)',
                                 style: AppTextStyles.caption(
                                   size: 12,
                                   color: AppColors.textSecondary,
@@ -1220,7 +1219,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                         Row(
                           children: [
                             Text(
-                              S.frpAuthAlgorithm,
+                              'Auth algorithm:',
                               style: AppTextStyles.caption(
                                 size: 12,
                                 color: AppColors.textSecondary,
@@ -1246,19 +1245,19 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                               items: [
                                 DropdownMenuItem(
                                   value: FrpAuthMode.md5,
-                                  child: Text(S.frpAuthMd5Label),
+                                  child: Text('MD5 (official default)'),
                                 ),
                                 DropdownMenuItem(
                                   value: FrpAuthMode.hmacSha1,
-                                  child: Text(S.frpAuthHmacSha1Label),
+                                  child: Text('HMAC-SHA1'),
                                 ),
                                 DropdownMenuItem(
                                   value: FrpAuthMode.hmacSha256,
-                                  child: Text(S.frpAuthHmacSha256Label),
+                                  child: Text('HMAC-SHA256'),
                                 ),
                                 DropdownMenuItem(
                                   value: FrpAuthMode.rawToken,
-                                  child: Text(S.frpAuthRawTokenLabel),
+                                  child: Text('Raw Token'),
                                 ),
                               ],
                             ),
@@ -1285,7 +1284,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
       onChanged: onChanged != null ? (_) => onChanged() : null,
       style: AppTextStyles.terminal(size: 13, color: AppColors.textPrimary),
       decoration: InputDecoration(
-        labelText: S.frpToken,
+        labelText: 'Token (optional)',
         labelStyle: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(

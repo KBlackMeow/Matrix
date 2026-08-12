@@ -11,7 +11,6 @@ import '../models/payload.dart';
 import '../models/webshell.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
-import '../app/localization.dart';
 import '../widgets/upload_success_dialog.dart';
 
 // ── 类型配色 / 图标 ──────────────────────────────────────────────────────────
@@ -123,11 +122,11 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
 
       await _db.createPayload(name: name, type: type, content: content);
       if (!mounted) return;
-      _showSnack(S.snackImported(name));
+      _showSnack('Imported $name');
       await _load();
     } catch (e) {
       if (!mounted) return;
-      _showSnack(S.snackImportFailed(e), error: true);
+      _showSnack('Import failed: $e', error: true);
     }
   }
 
@@ -147,22 +146,22 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
         await File(location.path).writeAsString(payload.content);
       }
       if (!mounted) return;
-      _showSnack(S.snackSavedTo(location.path));
+      _showSnack('Saved to ${location.path}');
     } catch (e) {
       if (!mounted) return;
-      _showSnack(S.snackSaveFailed(e), error: true);
+      _showSnack('Save failed: $e', error: true);
     }
   }
 
   Future<void> _copyToClipboard(Payload payload) async {
     if (_isBinaryPayload(payload)) {
       if (!mounted) return;
-      _showSnack(S.snackBinaryCopyUnsupported, error: true);
+      _showSnack('Binary payload cannot be copied as text', error: true);
       return;
     }
     await Clipboard.setData(ClipboardData(text: payload.content));
     if (!mounted) return;
-    _showSnack(S.snackCopied);
+    _showSnack('Copied to clipboard');
   }
 
   Future<void> _copyAsBase64(Payload payload) async {
@@ -172,7 +171,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
         : base64Encode(utf8.encode(payload.content));
     await Clipboard.setData(ClipboardData(text: b64));
     if (!mounted) return;
-    _showSnack(S.snackCopiedBase64);
+    _showSnack('Copied as Base64');
   }
 
   Future<void> _delete(Payload payload) async {
@@ -197,7 +196,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
     }
     if (!mounted) return;
     if (entries.isEmpty) {
-      await showUploadFailureDialog(context, S.snackNoWebshellsAnyProject);
+      await showUploadFailureDialog(context, 'No Webshell found. Add one under Webshell first');
       return;
     }
 
@@ -211,7 +210,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
     if (bytes == null) {
       await showUploadFailureDialog(
         context,
-        S.snackPayloadDecodeFailed(payload.name),
+        'Payload decode failed: ${payload.name}',
       );
       return;
     }
@@ -222,7 +221,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
 
     final service = WebshellService(picked);
     if (!service.supportsFileWrite) {
-      await showUploadFailureDialog(context, S.snackWriteNotSupported);
+      await showUploadFailureDialog(context, 'Current connector does not support file write');
       return;
     }
 
@@ -308,7 +307,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
           '[Matrix][payload_upload] error file=$fileName path=$remotePath '
           'size=${bytes.length} error=$e',
         );
-        await showUploadFailureDialog(context, S.snackUploadFailed(e));
+        await showUploadFailureDialog(context, 'Upload failed: $e');
       }
       return;
     }
@@ -339,14 +338,14 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
     if (ok) {
       await showUploadSuccessDialog(
         context,
-        S.snackPayloadUploadedToRemote(remotePath),
+        'Uploaded to $remotePath',
       );
     } else {
       debugPrint(
         '[Matrix][payload_upload] failed file=$fileName path=$remotePath '
         'size=${bytes.length} usedBinaryPath=$usedBinaryPath',
       );
-      await showUploadFailureDialog(context, S.snackUploadFail);
+      await showUploadFailureDialog(context, 'Upload failed');
     }
   }
 
@@ -423,7 +422,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
               ),
               const SizedBox(width: 5),
               Text(
-                S.payloadCount(_payloads.length),
+                '${_payloads.length} files',
                 style: AppTextStyles.caption(
                   size: 11,
                   color: AppColors.textSecondary,
@@ -435,7 +434,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
         const Spacer(),
         const SizedBox(width: 6),
         // 刷新
-        _TbBtn(icon: Icons.refresh, tooltip: S.actionRefresh, onPressed: _load),
+        _TbBtn(icon: Icons.refresh, tooltip: 'Refresh', onPressed: _load),
         const SizedBox(width: 6),
         // 导入
         FilledButton.icon(
@@ -450,7 +449,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
           ),
           icon: const Icon(Icons.file_upload_outlined, size: 15),
           label: Text(
-            S.quickActionUpload,
+            'Upload',
             style: AppTextStyles.body(size: 13, color: AppColors.bgDark),
           ),
         ),
@@ -474,7 +473,7 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
             ),
             const SizedBox(height: 10),
             Text(
-              S.loading,
+              'Loading...',
               style: AppTextStyles.caption(color: AppColors.textMuted),
             ),
           ],
@@ -494,12 +493,12 @@ class _PayloadManagementPageState extends State<PayloadManagementPage> {
             ),
             const SizedBox(height: 12),
             Text(
-              S.payloadNoneFound,
+              'No payloads found',
               style: AppTextStyles.body(color: AppColors.textMuted),
             ),
             const SizedBox(height: 4),
             Text(
-              S.payloadImportHint,
+              'Import a file to get started',
               style: AppTextStyles.caption(
                 color: AppColors.textMuted.withValues(alpha: 0.6),
               ),
@@ -645,7 +644,7 @@ class _PayloadCardState extends State<_PayloadCard> {
                   top: 6,
                   right: 6,
                   child: Tooltip(
-                    message: S.payloadBuiltinTooltip,
+                    message: 'Built-in default, cannot delete',
                     child: Icon(
                       Icons.lock_outline,
                       size: 12,
@@ -728,7 +727,7 @@ class _PayloadCardState extends State<_PayloadCard> {
                         ),
                         const SizedBox(width: 4),
                         Tooltip(
-                          message: S.tooltipPayloadUploadToWebshellTmp,
+                          message: 'Upload to Webshell /tmp',
                           child: GestureDetector(
                             onTap: () => widget.onUploadToWebshellTmp(),
                             child: Padding(
@@ -797,20 +796,20 @@ class _ConfirmDeleteDialog extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            S.titleDeletePayload,
+            'Delete payload',
             style: AppTextStyles.heading(size: 14, color: AppColors.red),
           ),
         ],
       ),
       content: Text(
-        S.confirmDeletePayload(name),
+        'Delete "$name"?\nThis action cannot be undone.',
         style: AppTextStyles.body(size: 13, color: AppColors.textSecondary),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
           child: Text(
-            S.btnCancel,
+            'Cancel',
             style: AppTextStyles.body(color: AppColors.textSecondary),
           ),
         ),
@@ -823,7 +822,7 @@ class _ConfirmDeleteDialog extends StatelessWidget {
             ),
           ),
           child: Text(
-            S.btnDelete,
+            'Delete',
             style: AppTextStyles.body(color: AppColors.bgDark),
           ),
         ),
@@ -934,27 +933,27 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                   if (!isBinary) ...[
                     _DialogBtn(
                       icon: Icons.copy_outlined,
-                      label: S.actionCopy,
+                      label: 'Copy',
                       onPressed: widget.onCopy,
                     ),
                     const SizedBox(width: 6),
                   ],
                   _DialogBtn(
                     icon: Icons.code,
-                    label: S.actionCopyBase64,
+                    label: 'Copy as Base64',
                     onPressed: widget.onCopyBase64,
                   ),
                   const SizedBox(width: 6),
                   _DialogBtn(
                     icon: Icons.download_outlined,
-                    label: S.actionDownload,
+                    label: 'Download',
                     onPressed: widget.onDownload,
                   ),
                   const SizedBox(width: 6),
                   if (!widget.payload.isDefault) ...[
                     _DialogBtn(
                       icon: Icons.delete_outline,
-                      label: S.btnDelete,
+                      label: 'Delete',
                       color: AppColors.red,
                       onPressed: widget.onDelete,
                     ),
@@ -1045,7 +1044,7 @@ class _PayloadDetailDialogState extends State<_PayloadDetailDialog> {
                               Expanded(
                                 child: Center(
                                   child: Text(
-                                    S.binaryPreviewDisabled,
+                                    'Binary payload detected.\nPreview disabled.',
                                     textAlign: TextAlign.center,
                                     style: AppTextStyles.body(
                                       size: 12,
@@ -1152,7 +1151,7 @@ class _WebshellPickerDialog extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      S.titleSelectWebshellForPayload,
+                      'Select Webshell (upload to /tmp)',
                       style: AppTextStyles.heading(
                         size: 14,
                         color: AppColors.textPrimary,
@@ -1166,7 +1165,7 @@ class _WebshellPickerDialog extends StatelessWidget {
                       size: 18,
                       color: AppColors.textSecondary,
                     ),
-                    tooltip: S.tooltipClose,
+                    tooltip: 'Close',
                   ),
                 ],
               ),
@@ -1260,7 +1259,7 @@ class _PayloadUploadProgressDialog extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        S.uploading,
+                        'Uploading',
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 14,
@@ -1278,7 +1277,7 @@ class _PayloadUploadProgressDialog extends StatelessWidget {
                           minimumSize: const Size(0, 0),
                         ),
                         child: Text(
-                          S.btnCancel,
+                          'Cancel',
                           style: AppTextStyles.caption(
                             color: AppColors.textSecondary,
                             size: 11,

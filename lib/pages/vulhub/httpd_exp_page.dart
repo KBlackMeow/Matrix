@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../app/constants.dart';
-import '../../app/localization.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
 import '../../services/reverse_shell_service.dart';
 import '_vulhub_page_helpers.dart';
@@ -22,13 +21,13 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
   IconData get pageIcon => Icons.http;
 
   @override
-  String get appBarTitle => S.vulhubHttpdTitle;
+  String get appBarTitle => 'Apache HTTP Server CVE-2021-41773 Path Traversal + CGI RCE';
 
   @override
-  String get cardTitle => S.vulhubHttpdCardTitle;
+  String get cardTitle => 'Apache HTTPd CVE-2021-41773';
 
   @override
-  String get cardSubtitle => S.vulhubHttpdCardSubtitle;
+  String get cardSubtitle => 'Path normalization flaw — file read + CGI command execution (Apache 2.4.49)';
 
   late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
@@ -56,7 +55,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -64,10 +63,10 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
     try {
       final r = await _svc().check();
       appendLog(
-        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : S.expLogNoVulnGeneric,
+        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] No vulnerability detected',
       );
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -75,7 +74,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
 
   Future<void> _readFile() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final path = _fileCtrl.text.trim().isEmpty
@@ -89,7 +88,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
         out != null && out.isNotEmpty ? '[+] 文件内容:\n$out' : '[-] 读取失败或文件不存在',
       );
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -97,7 +96,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
 
   Future<void> _execRce() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -109,7 +108,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
         out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出（CGI 可能未启用）',
       );
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -117,7 +116,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
 
   Future<void> _showReverseShellDialog() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final mode = await showReverseShellModeDialog(context);
@@ -126,7 +125,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
     final lhost = _lhostCtrl.text.trim();
     final lport = int.tryParse(_lportCtrl.text.trim()) ?? 4444;
     if (lhost.isEmpty || lport <= 0 || lport > 65535) {
-      appendLog(S.expLogInvalidLhostLport);
+      appendLog('[!] Invalid LHOST/LPORT');
       return;
     }
 
@@ -147,7 +146,7 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
     };
 
     setState(() => running = true);
-    appendLog(S.expLogStartFullTerminalListen(lhost, lport, mode));
+    appendLog('[*] Starting full-terminal listener: $lhost:$lport ($mode)');
     try {
       await _rs.startListening(port: lport);
 
@@ -156,9 +155,9 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
         lport,
         preferScript: mode == 'script',
       );
-      appendLog(ok ? S.expLogReverseSentWaiting : S.expLogSendFailed);
+      appendLog(ok ? '[+] Reverse shell payload sent, waiting for connection...' : '[-] Send failed');
     } catch (e) {
-      appendLog(S.expLogStartFailed(e));
+      appendLog('[!] Failed to start: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -181,43 +180,43 @@ class _HttpdPageState extends BaseVulhubExpPageState<HttpdExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle(S.sectionTargetConfig),
-          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
+          vSecTitle('Target config'),
+          vTf(_urlCtrl, 'Target URL', 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            S.fieldTimeout,
+            'Timeout (s)',
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionPathTraversal),
-          vTf(_fileCtrl, S.fieldFilePath, '/etc/passwd'),
+          vSecTitle('Path traversal file read'),
+          vTf(_fileCtrl, 'File path', '/etc/passwd'),
           const SizedBox(height: 8),
           Row(
             children: [
-              vBtn(S.btnDetectVuln, running ? null : _check),
+              vBtn('Detect vuln', running ? null : _check),
               const SizedBox(width: 8),
-              vBtn(S.btnReadFile, running ? null : _readFile),
+              vBtn('Read file', running ? null : _readFile),
             ],
           ),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionCgiRce),
-          vTf(_cmdCtrl, S.fieldCommand, 'id'),
+          vSecTitle('CGI RCE (requires mod_cgi enabled)'),
+          vTf(_cmdCtrl, 'Command', 'id'),
           const SizedBox(height: 8),
-          vBtn(S.btnExecCmd, running ? null : _execRce),
+          vBtn('Execute command', running ? null : _execRce),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionGetShell),
-          vTf(_lhostCtrl, S.fieldAttackerIp, '127.0.0.1'),
+          vSecTitle('GetShell (reverse shell)'),
+          vTf(_lhostCtrl, 'Attacker IP', '127.0.0.1'),
           const SizedBox(height: 8),
           vTf(
             _lportCtrl,
-            S.fieldAttackerPort,
+            'Attacker port',
             '4444',
             type: TextInputType.number,
           ),
           const SizedBox(height: 8),
-          vBtn(S.btnGetShell, running ? null : _showReverseShellDialog),
+          vBtn('GetShell', running ? null : _showReverseShellDialog),
         ],
       ),
     );

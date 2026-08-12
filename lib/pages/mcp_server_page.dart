@@ -14,7 +14,6 @@ import '../mcp/remote_write_lock.dart';
 import '../mcp/session_pool.dart';
 import '../database/database_helper.dart';
 import '../models/project.dart';
-import '../app/localization.dart';
 import '../theme/app_theme.dart';
 
 /// MCP Server 管理页面 —— 直接在进程内启停 Matrix MCP 服务。
@@ -310,7 +309,7 @@ class _McpServerPageState extends State<McpServerPage> {
                   color: AppColors.textSecondary,
                 ),
                 label: Text(
-                  S.btnSwitchProject,
+                  'Switch project',
                   style: AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
               ),

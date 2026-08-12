@@ -4,8 +4,6 @@ import '../../app/constants.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
-import '../../app/localization.dart';
-
 class NacosExpPage extends BaseVulhubExpPage {
   final String? initialTargetUrl;
 
@@ -20,13 +18,13 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
   IconData get pageIcon => Icons.cloud;
 
   @override
-  String get appBarTitle => S.vulhubNacosTitle;
+  String get appBarTitle => 'Nacos CVE-2021-29441 User-Agent Auth Bypass';
 
   @override
-  String get cardTitle => S.vulhubNacosCardTitle;
+  String get cardTitle => 'Nacos CVE-2021-29441';
 
   @override
-  String get cardSubtitle => S.vulhubNacosCardSubtitle;
+  String get cardSubtitle => 'User-Agent: Nacos-Server bypasses auth. Enumerate/create users (< 1.4.1)';
 
   late final TextEditingController _urlCtrl;
   final _userCtrl = TextEditingController(text: 'attacker');
@@ -50,7 +48,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -58,10 +56,10 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
     try {
       final r = await _svc().check();
       appendLog(
-        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : S.expLogNoVulnGeneric,
+        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] No vulnerability detected',
       );
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -69,7 +67,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
 
   Future<void> _listUsers() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -80,7 +78,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
         out != null && out.isNotEmpty ? '[+] 用户列表:\n$out' : '[-] 未获取到用户列表',
       );
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -88,7 +86,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
 
   Future<void> _createUser() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final user = _userCtrl.text.trim();
@@ -103,7 +101,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
       final out = await _svc().createUser(user, pass);
       appendLog(out != null ? '[+] 响应: $out' : '[-] 创建失败');
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -111,7 +109,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
 
   Future<void> _login() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final user = _userCtrl.text.trim();
@@ -131,7 +129,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
         appendLog('[-] 登录失败，请检查凭据');
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -139,7 +137,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
 
   Future<void> _derbyQuery() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final token = _tokenCtrl.text.trim();
@@ -165,7 +163,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
         appendLog('[+] 响应:\n$out');
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -173,7 +171,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
 
   Future<void> _writeCronShell() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final token = _tokenCtrl.text.trim();
@@ -201,7 +199,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
         appendLog('[*] 等待约 1 分钟触发 cron');
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -226,25 +224,25 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle(S.sectionTargetConfig),
-          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
+          vSecTitle('Target config'),
+          vTf(_urlCtrl, 'Target URL', 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            S.fieldTimeout,
+            'Timeout (s)',
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              vBtn(S.btnDetectVuln, running ? null : _check),
+              vBtn('Detect vuln', running ? null : _check),
               const SizedBox(width: 8),
               vBtn('枚举用户', running ? null : _listUsers),
             ],
           ),
           const SizedBox(height: 16),
-          vSecTitle(S.nacosStep1),
+          vSecTitle('Step 1 — Create / use admin account'),
           vTf(_userCtrl, '用户名', 'attacker'),
           const SizedBox(height: 8),
           vTf(_passCtrl, '密码', 'password123'),
@@ -257,19 +255,19 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
             ],
           ),
           const SizedBox(height: 16),
-          vSecTitle(S.nacosStep2),
+          vSecTitle('Step 2 — Derby SQL RCE'),
           vTf(_tokenCtrl, 'accessToken', '登录后自动填入'),
           const SizedBox(height: 8),
           vTf(_sqlCtrl, '任意 Derby SQL', "SELECT * FROM sys.systables"),
           const SizedBox(height: 8),
           vBtn('执行 SQL', running ? null : _derbyQuery),
           const SizedBox(height: 16),
-          vSecTitle(S.nacosStep3),
+          vSecTitle('Step 3 — Cron reverse shell'),
           vTf(_lhostCtrl, 'LHOST', '192.168.1.1'),
           const SizedBox(height: 8),
           vTf(_lportCtrl, 'LPORT', '4444', type: TextInputType.number),
           const SizedBox(height: 8),
-          vBtn(S.btnGetShell, running ? null : _writeCronShell),
+          vBtn('GetShell', running ? null : _writeCronShell),
         ],
       ),
     );

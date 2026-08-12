@@ -3,7 +3,6 @@ import 'dart:async';
 
 import '../services/reverse_shell_service.dart';
 import '../theme/app_theme.dart';
-import '../app/localization.dart';
 import '../io/terminal_logger.dart';
 import 'reverse_shell_terminal_page.dart';
 
@@ -62,7 +61,7 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      S.terminalTitle,
+                      'Full terminal · Reverse shell sessions',
                       style: AppTextStyles.heading(
                         size: 18,
                         color: AppColors.primary,
@@ -71,8 +70,8 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                     const SizedBox(height: 4),
                     Text(
                       sessions.isEmpty
-                          ? S.noActiveSessions
-                          : S.activeSessionCount(sessions.length),
+                          ? 'No active reverse shell sessions'
+                          : 'Active sessions: ${sessions.length}',
                       style: AppTextStyles.caption(
                         size: 13,
                         color: AppColors.textSecondary,
@@ -92,15 +91,12 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                                   listening &&
                                       bindAddr != null &&
                                       bindPort != null
-                                  ? S.listeningOn(bindAddr, bindPort)
+                                  ? 'Listening: $bindAddr:$bindPort'
                                   : occupied &&
                                         bindAddr != null &&
                                         bindPort != null
-                                  ? S.portOccupiedOn(bindAddr, bindPort)
-                                  : S.notListening(
-                                      _service.lhost,
-                                      _service.lport,
-                                    );
+                                  ? 'Port in use: $bindAddr:$bindPort (may already be listening)'
+                                  : 'Not listening (config: ${_service.lhost}:${_service.lport})';
                               return Text(
                                 text,
                                 style: AppTextStyles.caption(
@@ -123,21 +119,21 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                               context: context,
                               builder: (context) {
                                 return AlertDialog(
-                                  title: Text(S.actionListenConfig),
+                                  title: Text('Listener config'),
                                   content: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       TextField(
                                         controller: ipController,
                                         decoration: InputDecoration(
-                                          labelText: S.fieldLhost,
+                                          labelText: 'Listen IP (LHOST)',
                                         ),
                                       ),
                                       const SizedBox(height: 12),
                                       TextField(
                                         controller: portController,
                                         decoration: InputDecoration(
-                                          labelText: S.fieldLport,
+                                          labelText: 'Listen port (LPORT)',
                                         ),
                                         keyboardType: TextInputType.number,
                                       ),
@@ -147,12 +143,12 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                                     TextButton(
                                       onPressed: () =>
                                           Navigator.of(context).pop(false),
-                                      child: Text(S.btnCancel),
+                                      child: Text('Cancel'),
                                     ),
                                     FilledButton(
                                       onPressed: () =>
                                           Navigator.of(context).pop(true),
-                                      child: Text(S.btnConfirm),
+                                      child: Text('OK'),
                                     ),
                                   ],
                                 );
@@ -174,7 +170,7 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                             }
                           },
                           icon: const Icon(Icons.settings, size: 16),
-                          label: Text(S.actionListenConfig),
+                          label: Text('Listener config'),
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             minimumSize: const Size(0, 32),
@@ -188,7 +184,7 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                               await _service.stopListening();
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(S.btnStopListen)),
+                                  SnackBar(content: Text('Stop listen')),
                                 );
                               }
                               setState(() {});
@@ -200,7 +196,7 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                               );
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(S.snackPortOccupied)),
+                                  SnackBar(content: Text('Port is in use. Release it before starting to listen')),
                                 );
                               }
                               setState(() {});
@@ -215,10 +211,7 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      S.snackListenStarted(
-                                        _service.lport,
-                                        _service.lhost,
-                                      ),
+                                      'Listening on :${_service.lport} (LHOST=${_service.lhost})',
                                     ),
                                   ),
                                 );
@@ -228,7 +221,7 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text(S.snackListenFailed(e)),
+                                    content: Text('Failed to start listener: $e'),
                                   ),
                                 );
                               }
@@ -244,10 +237,10 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                           ),
                           label: Text(
                             _service.isListening
-                                ? S.btnStopListen
+                                ? 'Stop listen'
                                 : (_service.isPortOccupied
-                                      ? S.btnPortOccupied
-                                      : S.btnStartListen),
+                                      ? 'Port in use'
+                                      : 'Start listen'),
                           ),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(0, 32),
@@ -285,7 +278,7 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
           child: sessions.isEmpty
               ? Center(
                   child: Text(
-                    S.noSessionsHint,
+                    '> No sessions. Click "Full terminal" in the Webshell terminal to start a reverse shell.',
                     style: AppTextStyles.terminal(
                       size: 14,
                       color: AppColors.textMuted,
@@ -332,7 +325,7 @@ class _SessionCardState extends State<_SessionCard> {
             if (!s.isAlive) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(S.snackSessionDisconnected),
+                  content: Text('Session disconnected, cannot open terminal'),
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -406,7 +399,7 @@ class _SessionCardState extends State<_SessionCard> {
                       ),
                       if (!s.isAlive)
                         Text(
-                          S.sessionDisconnected,
+                          'Disconnected',
                           style: AppTextStyles.caption(
                             size: 11,
                             color: AppColors.red,

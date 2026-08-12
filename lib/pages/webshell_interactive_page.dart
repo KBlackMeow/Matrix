@@ -11,7 +11,6 @@ import '../core/crypto/payload_obfuscator.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/matrix_console_log.dart';
-import '../app/localization.dart';
 import '../app/main_nav_bus.dart';
 import 'reverse_shell_terminal_page.dart';
 import 'suo_tunnel_proxy_page.dart';
@@ -19,6 +18,7 @@ import 'webshell_interactive_file_manager.dart';
 import 'webshell_interactive_system_priv_esc.dart';
 import 'webshell_interactive_terminal_shared.dart';
 import 'process_list_tab.dart';
+import 'persistence_tab.dart';
 import 'webshell_initial_connection_state.dart';
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
@@ -46,6 +46,19 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
   /// 提权检查为 Linux/bash 场景；Windows（ASP/ASPX）连接器下隐藏。
   bool get _showPrivEscTab =>
       !widget.webshell.connectorType.startsWith('asp');
+
+  /// 持久化在所有具有 shell 执行能力的连接器下显示。
+  bool get _showPersistenceTab => _service.supportsShellExec;
+
+  /// 持久化标签索引（Terminal=0, FileManager=1, SystemInfo=2, [PrivEsc=3], Persist）
+  int _persistTabIndex() {
+    var idx = 3;
+    if (_showPrivEscTab) idx += 1;
+    return idx;
+  }
+
+  int _processTabIndex() =>
+      _persistTabIndex() + (_showPersistenceTab ? 1 : 0);
 
   /// 一键隧道：JSP 由用户选择 suo5 / suo6（冰蝎可内存注入，否则上传对应 jsp）；其它类型上传 suo5。
   bool get _supportsOneClickTunnelAction {
@@ -78,8 +91,12 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
   void initState() {
     super.initState();
     _service = WebshellService(widget.webshell);
-    _tabController =
-        TabController(length: (_showPrivEscTab ? 4 : 3) + 1, vsync: this);
+    _tabController = TabController(
+      length: (_showPrivEscTab ? 4 : 3) +
+          (_showPersistenceTab ? 1 : 0) +
+          1,
+      vsync: this,
+    );
     _completer = TabCompleter(_service);
     final initialConnection =
         WebshellInitialConnectionState.fromPersistedStatus(
@@ -142,7 +159,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       setState(() {
         _isConnected = alive;
         _isChecking = false;
-        _lastPingError = alive ? null : S.pingFailHint;
+        _lastPingError = alive ? null : 'Check: ① Connector type matches the target script; ② URL is accessible in a browser.';
       });
     }
   }
@@ -190,7 +207,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                           child: Text(
                             _lastPingError != null && _lastPingError!.isNotEmpty
                                 ? _lastPingError!
-                                : S.connectionFailed,
+                                : 'Connection failed, command execution may be unreliable',
                             style: AppTextStyles.caption(
                               color: AppColors.red,
                               size: 12,
@@ -203,7 +220,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                         GestureDetector(
                           onTap: _checkConnection,
                           child: Text(
-                            S.btnRetry,
+                            'Retry',
                             style: AppTextStyles.caption(
                               color: AppColors.primary,
                               size: 12,
@@ -250,8 +267,13 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                               skipTraversal: _tabController.index != 3,
                               child: PrivEscTab(service: _service),
                             ),
+                          if (_showPersistenceTab)
+                            FocusScope(
+                              skipTraversal: _tabController.index != _persistTabIndex(),
+                              child: PersistenceTab(service: _service),
+                            ),
                           FocusScope(
-                            skipTraversal: _tabController.index != (_showPrivEscTab ? 4 : 3),
+                            skipTraversal: _tabController.index != _processTabIndex(),
                             child: ProcessListTab(service: _service),
                           ),
                         ],
@@ -286,7 +308,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
               color: AppColors.textSecondary,
               size: 17,
             ),
-            tooltip: S.tooltipBack,
+            tooltip: 'Back',
           ),
           const SizedBox(width: 4),
           // Status dot
@@ -348,10 +370,10 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
             icon: const Icon(Icons.wifi_tethering_rounded, size: 15),
             label: Text(
               _isChecking
-                  ? S.statusChecking
+                  ? 'Checking'
                   : _isConnected
-                  ? S.statusConnected
-                  : S.statusReconnect,
+                  ? 'Connected'
+                  : 'Reconnect',
             ),
             style: TextButton.styleFrom(
               foregroundColor: _isConnected
@@ -419,7 +441,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(
-          S.webshellJspSuoTunnelPickTitle,
+          'Choose tunnel protocol',
           style: AppTextStyles.heading(size: 16),
         ),
         content: Column(
@@ -427,7 +449,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              S.webshellJspSuoTunnelPickBody,
+              'Pick suo5 or suo6 for JSP. With Behinder, memory injection is tried first; on failure, the jsp file is uploaded if the shell is writable.',
               style: AppTextStyles.body(
                 size: 13,
                 color: AppColors.textSecondary,
@@ -440,7 +462,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                 foregroundColor: AppColors.primary,
                 side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
               ),
-              child: Text(S.suoTunnelProtocolSuo5),
+              child: Text('suo5'),
             ),
             const SizedBox(height: 8),
             FilledButton(
@@ -449,14 +471,14 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                 backgroundColor: AppColors.primary.withValues(alpha: 0.22),
                 foregroundColor: AppColors.primary,
               ),
-              child: Text(S.suoTunnelProtocolSuo6),
+              child: Text('suo6'),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, null),
-            child: Text(S.btnCancel, style: AppTextStyles.caption(size: 13)),
+            child: Text('Cancel', style: AppTextStyles.caption(size: 13)),
           ),
         ],
       ),
@@ -481,7 +503,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(S.webshellOneClickTunnelPayloadMissing),
+            content: Text('Tunnel script not in library (e.g. suo5.jsp / suo6.jsp). Sync defaults on the Payloads page'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -493,7 +515,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(S.webshellOneClickTunnelPayloadMissing),
+            content: Text('Tunnel script not in library (e.g. suo5.jsp / suo6.jsp). Sync defaults on the Payloads page'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -513,7 +535,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(S.webshellOneClickTunnelUploadFailed),
+            content: Text('Failed to upload tunnel script beside the webshell'),
             backgroundColor: AppColors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -536,7 +558,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     if (!_isConnected) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(S.webshellOneClickTunnelNeedConn),
+          content: Text('Connect to the shell first'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -546,7 +568,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(S.webshellOneClickTunnelUnavailable),
+            content: Text('Cannot create tunnel for this shell'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -722,7 +744,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (showSnackBar) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(S.suoTunnelProfileCreatedSnack),
+            content: Text('Proxy profile saved'),
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 3),
           ),
@@ -732,7 +754,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(S.errorResult(e)),
+          content: Text('[Error] $e'),
           backgroundColor: AppColors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -763,7 +785,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (showSnackBar) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(S.suoTunnelProfileCreatedSnack),
+            content: Text('Proxy profile saved'),
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 3),
           ),
@@ -773,7 +795,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(S.errorResult(e)),
+          content: Text('[Error] $e'),
           backgroundColor: AppColors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -816,23 +838,28 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
         unselectedLabelColor: AppColors.textSecondary,
         labelStyle: AppTextStyles.body(size: 13),
         tabs: [
-          Tab(icon: const Icon(Icons.terminal, size: 15), text: S.tabTerminal),
+          Tab(icon: const Icon(Icons.terminal, size: 15), text: 'Terminal'),
           Tab(
             icon: const Icon(Icons.folder_open_outlined, size: 15),
-            text: S.tabFileManager,
+            text: 'File manager',
           ),
           Tab(
             icon: const Icon(Icons.dns_outlined, size: 15),
-            text: S.tabSysInfo,
+            text: 'System info',
           ),
           if (_showPrivEscTab)
             Tab(
               icon: const Icon(Icons.shield_outlined, size: 15),
-              text: S.sectionPrivEsc,
+              text: 'Privilege check',
+            ),
+          if (_showPersistenceTab)
+            Tab(
+              icon: const Icon(Icons.link, size: 15),
+              text: 'Persistence',
             ),
           Tab(
             icon: const Icon(Icons.memory, size: 15),
-            text: S.tabProcessList,
+            text: 'Processes',
           ),
         ],
       ),
@@ -978,7 +1005,7 @@ class _TerminalTabState extends State<_TerminalTab>
 
     if (mounted) {
       setState(() {
-        entry.output = output.isEmpty ? S.noOutput : output;
+        entry.output = output.isEmpty ? '(no output)' : output;
         _executing = false;
       });
       // 命令执行后使当前目录缓存失效，确保 touch/mkdir/rm 等操作能被 Tab 补全识别
@@ -1066,7 +1093,7 @@ class _TerminalTabState extends State<_TerminalTab>
               ),
               _toolbarBtn(
                 icon: Icons.delete_sweep_outlined,
-                tooltip: S.tooltipClearTerminal,
+                tooltip: 'Clear terminal',
                 onTap: _entries.isNotEmpty
                     ? () => setState(() => _entries.clear())
                     : null,
@@ -1075,7 +1102,7 @@ class _TerminalTabState extends State<_TerminalTab>
               if (widget.showOneClickTunnel) ...[
                 _toolbarBtn(
                   icon: AppTunnelIcons.outlined,
-                  tooltip: S.tooltipWebshellOneClickTunnel,
+                  tooltip: 'Create suo tunnel',
                   onTap: (widget.oneClickTunnelActionDisabled ||
                           widget.creatingOneClickTunnel)
                       ? null
@@ -1098,7 +1125,7 @@ class _TerminalTabState extends State<_TerminalTab>
                 // 完整终端（反弹 Shell）按钮
                 _toolbarBtn(
                   icon: Icons.open_in_new,
-                  tooltip: S.tooltipFullTerminal,
+                  tooltip: 'Full terminal (reverse shell)',
                   onTap: _showReverseShellDialog,
                 ),
                 const SizedBox(width: 6),
@@ -1136,7 +1163,7 @@ class _TerminalTabState extends State<_TerminalTab>
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text(S.titleSelectTerminalMode),
+              title: Text('Select terminal mode'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1144,9 +1171,9 @@ class _TerminalTabState extends State<_TerminalTab>
                     value: 'script',
                     groupValue: selected,
                     onChanged: (v) => setState(() => selected = v!),
-                    title: Text(S.terminalModeScript),
+                    title: Text('Built-in reverse · script mode'),
                     subtitle: Text(
-                      S.terminalModeScriptDesc,
+                      'Uses script to allocate a pseudo-terminal. Recommended for Unix-like targets',
                       style: const TextStyle(fontSize: 11),
                     ),
                   ),
@@ -1154,9 +1181,9 @@ class _TerminalTabState extends State<_TerminalTab>
                     value: 'bash',
                     groupValue: selected,
                     onChanged: (v) => setState(() => selected = v!),
-                    title: Text(S.terminalModeBash),
+                    title: Text('Built-in reverse · bash mode'),
                     subtitle: Text(
-                      S.terminalModeBashDesc,
+                      'No script dependency. Uses bash -i or /bin/sh -i only',
                       style: const TextStyle(fontSize: 11),
                     ),
                   ),
@@ -1165,11 +1192,11 @@ class _TerminalTabState extends State<_TerminalTab>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(null),
-                  child: Text(S.btnCancel),
+                  child: Text('Cancel'),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.of(context).pop(selected),
-                  child: Text(S.btnConfirm),
+                  child: Text('OK'),
                 ),
               ],
             );
@@ -1211,7 +1238,7 @@ class _TerminalTabState extends State<_TerminalTab>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              S.snackReverseShellSent,
+              'Reverse shell command sent, waiting for connection ...',
               style: const TextStyle(color: Colors.white),
             ),
             backgroundColor: Color(0xFF064D2E), // 暗绿色背景
@@ -1223,7 +1250,7 @@ class _TerminalTabState extends State<_TerminalTab>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              S.snackStartFailed(e),
+              'Failed to start: $e',
               style: const TextStyle(color: Colors.white),
             ),
             backgroundColor: AppColors.red,
@@ -1367,7 +1394,7 @@ class _TerminalTabState extends State<_TerminalTab>
               const Icon(Icons.terminal, color: AppColors.primary, size: 48),
               const SizedBox(height: 16),
               Text(
-                S.terminalEmptyHint,
+                '> Type a command to get started',
                 style: AppTextStyles.terminal(
                   size: 14,
                   color: AppColors.textMuted,
@@ -1375,7 +1402,7 @@ class _TerminalTabState extends State<_TerminalTab>
               ),
               const SizedBox(height: 8),
               Text(
-                S.terminalKeyHint,
+                'Use ↑↓ to navigate history, type clear to reset',
                 style: AppTextStyles.caption(
                   size: 12,
                   color: AppColors.textMuted,
@@ -1429,7 +1456,7 @@ class _TerminalTabState extends State<_TerminalTab>
           ),
           const SizedBox(width: 10),
           Text(
-            S.executing,
+            'Running...',
             style: AppTextStyles.terminal(size: 12, color: AppColors.textMuted),
           ),
         ],
@@ -1599,7 +1626,7 @@ class _TerminalTabState extends State<_TerminalTab>
                   children: [
                     Expanded(
                       child: Text(
-                        S.tabCompletionTitle(total),
+                        'Tab candidates ($total)',
                         style: AppTextStyles.caption(
                           size: 11,
                           color: AppColors.amber,
@@ -1623,7 +1650,7 @@ class _TerminalTabState extends State<_TerminalTab>
                 const SizedBox(height: 6),
                 if (total == 0)
                   Text(
-                    S.noCompletions,
+                    'No candidates',
                     style: AppTextStyles.terminal(
                       size: 12,
                       color: AppColors.textSecondary,

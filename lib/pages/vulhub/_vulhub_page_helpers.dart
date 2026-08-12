@@ -2,7 +2,6 @@
 // Each page file imports this via a part or a direct import.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
-import '../../app/localization.dart';
 import '../../theme/app_theme.dart';
 
 Widget vulhubInfoCard(IconData icon, String title, String subtitle) =>
@@ -80,7 +79,7 @@ Color vulhubLogLineColor(String line) {
 TextSpan vulhubRichLog(String log) {
   if (log.isEmpty) {
     return TextSpan(
-      text: S.expWaiting,
+      text: '> Awaiting action',
       style: const TextStyle(color: AppColors.textMuted, fontFamily: 'Monaco'),
     );
   }
@@ -199,7 +198,7 @@ class _VulhubLogPanel extends StatelessWidget {
                 ),
               ),
               Text(
-                running ? S.statusRunning : S.statusIdle,
+                running ? 'Running' : 'Idle',
                 style: AppTextStyles.caption(
                   size: 11,
                   color: running ? AppColors.primary : AppColors.textSecondary,
@@ -214,14 +213,14 @@ class _VulhubLogPanel extends StatelessWidget {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(S.snackCopied),
+                              content: Text('Copied to clipboard'),
                               duration: const Duration(seconds: 1),
                             ),
                           );
                         }
                       },
                 icon: const Icon(Icons.copy, size: 14),
-                label: Text(S.actionCopy),
+                label: Text('Copy'),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
                   textStyle: const TextStyle(fontSize: 11),
@@ -230,7 +229,7 @@ class _VulhubLogPanel extends StatelessWidget {
               TextButton.icon(
                 onPressed: log.isEmpty ? null : onClearLog,
                 icon: const Icon(Icons.clear_all, size: 14),
-                label: Text(S.btnClear),
+                label: Text('Clear'),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
                   textStyle: const TextStyle(fontSize: 11),
@@ -332,7 +331,7 @@ Future<String?> showReverseShellModeDialog(BuildContext context) {
       String selected = 'script';
       return StatefulBuilder(
         builder: (ctx2, setInner) => AlertDialog(
-          title: Text(S.titleSelectTerminalMode),
+          title: Text('Select terminal mode'),
           content: RadioGroup<String>(
             groupValue: selected,
             onChanged: (v) {
@@ -343,17 +342,17 @@ Future<String?> showReverseShellModeDialog(BuildContext context) {
               children: [
                 RadioListTile<String>(
                   value: 'script',
-                  title: Text(S.terminalModeScript),
+                  title: Text('Built-in reverse · script mode'),
                   subtitle: Text(
-                    S.terminalModeScriptDesc,
+                    'Uses script to allocate a pseudo-terminal. Recommended for Unix-like targets',
                     style: const TextStyle(fontSize: 11),
                   ),
                 ),
                 RadioListTile<String>(
                   value: 'bash',
-                  title: Text(S.terminalModeBash),
+                  title: Text('Built-in reverse · bash mode'),
                   subtitle: Text(
-                    S.terminalModeBashDesc,
+                    'No script dependency. Uses bash -i or /bin/sh -i only',
                     style: const TextStyle(fontSize: 11),
                   ),
                 ),
@@ -363,11 +362,11 @@ Future<String?> showReverseShellModeDialog(BuildContext context) {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx2),
-              child: Text(S.btnCancel),
+              child: Text('Cancel'),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx2, selected),
-              child: Text(S.btnConfirm),
+              child: Text('OK'),
             ),
           ],
         ),

@@ -4,8 +4,6 @@ import '../../app/constants.dart';
 import '../../exp/vulhub/misc_http_exp_service.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
-import '../../app/localization.dart';
-
 class TomcatExpPage extends BaseVulhubExpPage {
   final String? initialTargetUrl;
 
@@ -20,13 +18,13 @@ class _TomcatPageState extends BaseVulhubExpPageState<TomcatExpPage> {
   IconData get pageIcon => Icons.cloud_upload;
 
   @override
-  String get appBarTitle => S.vulhubTomcatTitle;
+  String get appBarTitle => 'Apache Tomcat CVE-2017-12615 PUT Method Arbitrary File Upload RCE';
 
   @override
-  String get cardTitle => S.vulhubTomcatCardTitle;
+  String get cardTitle => 'Apache Tomcat CVE-2017-12615';
 
   @override
-  String get cardSubtitle => S.vulhubTomcatCardSubtitle;
+  String get cardSubtitle => 'Upload JSP Webshell when PUT method is enabled (Tomcat 8.5.19)';
 
   late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
@@ -45,7 +43,7 @@ class _TomcatPageState extends BaseVulhubExpPageState<TomcatExpPage> {
 
   Future<void> _check() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -56,7 +54,7 @@ class _TomcatPageState extends BaseVulhubExpPageState<TomcatExpPage> {
         r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到 PUT 文件写入',
       );
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -64,7 +62,7 @@ class _TomcatPageState extends BaseVulhubExpPageState<TomcatExpPage> {
 
   Future<void> _getShell() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -77,7 +75,7 @@ class _TomcatPageState extends BaseVulhubExpPageState<TomcatExpPage> {
         appendLog('[-] 写入失败（PUT 方法可能未开启）');
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -85,7 +83,7 @@ class _TomcatPageState extends BaseVulhubExpPageState<TomcatExpPage> {
 
   Future<void> _exec() async {
     if (_urlCtrl.text.trim().isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -97,7 +95,7 @@ class _TomcatPageState extends BaseVulhubExpPageState<TomcatExpPage> {
         out != null && out.isNotEmpty ? '[+] 输出:\n$out' : '[-] 无输出或上传失败',
       );
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -117,28 +115,28 @@ class _TomcatPageState extends BaseVulhubExpPageState<TomcatExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle(S.sectionTargetConfig),
-          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
+          vSecTitle('Target config'),
+          vTf(_urlCtrl, 'Target URL', 'http://localhost:8080'),
           const SizedBox(height: 8),
           vTf(
             _timeoutCtrl,
-            S.fieldTimeout,
+            'Timeout (s)',
             '${AppConstants.defaultHttpTimeoutSeconds}',
             type: TextInputType.number,
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              vBtn(S.btnDetectVuln, running ? null : _check),
+              vBtn('Detect vuln', running ? null : _check),
               const SizedBox(width: 8),
-              vBtn(S.btnGetShell, running ? null : _getShell),
+              vBtn('GetShell', running ? null : _getShell),
             ],
           ),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionCmdExecAutoUpload),
-          vTf(_cmdCtrl, S.fieldCommand, 'id'),
+          vSecTitle('Command execution (auto-upload + execute)'),
+          vTf(_cmdCtrl, 'Command', 'id'),
           const SizedBox(height: 8),
-          vBtn(S.btnExecCmd, running ? null : _exec),
+          vBtn('Execute command', running ? null : _exec),
         ],
       ),
     );

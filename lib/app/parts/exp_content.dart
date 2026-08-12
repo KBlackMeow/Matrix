@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../models/project.dart';
 import '../../theme/app_theme.dart';
-import '../localization.dart';
 import 'exp_registry.dart';
 
 class ExpContent extends StatelessWidget {
@@ -53,7 +52,7 @@ class ExpContent extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      S.expManagementScopedTitle(project.name),
+                      'Exploits · ${project.name}',
                       style: AppTextStyles.heading(
                         size: 15,
                         color: AppColors.textPrimary,
@@ -77,7 +76,7 @@ class ExpContent extends StatelessWidget {
                   color: AppColors.textSecondary,
                 ),
                 label: Text(
-                  S.btnSwitchProject,
+                  'Switch project',
                   style: AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
               ),
@@ -89,7 +88,7 @@ class ExpContent extends StatelessWidget {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              S.expManagementHint,
+              'Manage all exploit modules here. Tap an entry to open its exploit interface',
               style: AppTextStyles.caption(
                 size: 13,
                 color: AppColors.textSecondary,
@@ -226,7 +225,7 @@ class _ExpEntryCardState extends State<_ExpEntryCard> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      S.expVersionRequirement(widget.versionRequirement),
+                      'Version requirement: ${widget.versionRequirement}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.caption(

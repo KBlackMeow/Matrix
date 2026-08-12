@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
-import '../app/localization.dart';
-
 class SystemInfoTab extends StatefulWidget {
   final WebshellService service;
 
@@ -89,7 +87,7 @@ class _SystemInfoTabState extends State<SystemInfoTab>
               ),
               const SizedBox(width: 8),
               Text(
-                S.serverInfo,
+                'Server information',
                 style: AppTextStyles.heading(
                   size: 14,
                   color: AppColors.primary,
@@ -99,7 +97,7 @@ class _SystemInfoTabState extends State<SystemInfoTab>
               TextButton.icon(
                 onPressed: _loading ? null : _load,
                 icon: const Icon(Icons.refresh, size: 15),
-                label: Text(S.actionRefresh),
+                label: Text('Refresh'),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
                 ),
@@ -124,14 +122,14 @@ class _SystemInfoTabState extends State<SystemInfoTab>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        S.sysInfoFailed,
+                        'Failed to retrieve system info',
                         style: AppTextStyles.body(
                           color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        S.sysInfoFailedHint,
+                        'Check whether the Webshell can execute remote code/commands normally',
                         style: AppTextStyles.caption(
                           color: AppColors.textMuted,
                         ),
@@ -140,7 +138,7 @@ class _SystemInfoTabState extends State<SystemInfoTab>
                       FilledButton.icon(
                         onPressed: _load,
                         icon: const Icon(Icons.refresh, size: 16),
-                        label: Text(S.btnRetry),
+                        label: Text('Retry'),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: AppColors.bgDark,
@@ -226,33 +224,33 @@ class _InfoGrid extends StatelessWidget {
   String _fieldLabel(String field) {
     switch (field) {
       case 'os':
-        return S.sysInfoFieldOs;
+        return 'OS';
       case 'phpVersion':
-        return S.sysInfoFieldPhpVersion;
+        return 'PHP version';
       case 'runUser':
-        return S.sysInfoFieldRunUser;
+        return 'Runtime user';
       case 'serverIp':
-        return S.sysInfoFieldServerIp;
+        return 'Server IP';
       case 'serverSoftware':
-        return S.sysInfoFieldServerSoftware;
+        return 'Server software';
       case 'docRoot':
-        return S.sysInfoFieldDocRoot;
+        return 'Document root';
       case 'currentDir':
-        return S.sysInfoFieldCurrentDir;
+        return 'Current directory';
       case 'memoryLimit':
-        return S.sysInfoFieldMemoryLimit;
+        return 'Memory limit';
       case 'maxExecutionTime':
-        return S.sysInfoFieldMaxExecutionTime;
+        return 'Max execution time';
       case 'safeMode':
-        return S.sysInfoFieldSafeMode;
+        return 'Safe Mode';
       case 'host':
-        return S.sysInfoFieldHost;
+        return 'Hostname';
       case 'userId':
-        return S.sysInfoFieldUserId;
+        return 'User ID';
       case 'kernelVersion':
-        return S.sysInfoFieldKernelVersion;
+        return 'Kernel version';
       case 'dotnetClr':
-        return S.sysInfoFieldDotnetClr;
+        return '.NET CLR version';
       default:
         return field;
     }
@@ -341,7 +339,7 @@ class _DisabledFunctionsCard extends StatelessWidget {
               const Icon(Icons.block, color: AppColors.red, size: 16),
               const SizedBox(width: 8),
               Text(
-                S.disabledFunctions(funcs.length),
+                'Disabled functions (${funcs.length})',
                 style: AppTextStyles.body(size: 13, color: AppColors.red),
               ),
             ],
@@ -414,7 +412,7 @@ class _ExtensionsCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                S.loadedExtensions(exts.length),
+                'Loaded extensions (${exts.length})',
                 style: AppTextStyles.body(size: 13, color: AppColors.primary),
               ),
             ],

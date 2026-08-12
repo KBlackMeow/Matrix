@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../app/localization.dart';
 import '../../app/main_nav_bus.dart';
 import '../../models/project.dart';
 import '../../pages/frp_tunnel_page.dart';
@@ -186,7 +185,7 @@ class _MainLayoutState extends State<MainLayout> {
           _rebuildDynamicPages();
         });
       },
-      title: S.titleWebshellManager,
+      title: 'Webshell',
       icon: Icons.terminal,
       contentBuilder: (project, onSwitchProject) => WebshellManagementPage(
         project: project,
@@ -216,7 +215,7 @@ class _MainLayoutState extends State<MainLayout> {
           _rebuildDynamicPages();
         });
       },
-      title: S.menuExp,
+      title: 'Exploits',
       icon: Icons.bug_report,
       contentBuilder: (project, onSwitchProject) =>
           exp.ExpContent(project: project, onSwitchProject: onSwitchProject),
@@ -243,7 +242,7 @@ class _MainLayoutState extends State<MainLayout> {
           _rebuildDynamicPages();
         });
       },
-      title: S.titleSuoTunnelManager,
+      title: 'suo5/suo6',
       icon: AppTunnelIcons.outlined,
       contentBuilder: (project, onSwitchProject) => SuoTunnelProxyPage(
         project: project,
@@ -299,21 +298,21 @@ class _MainLayoutState extends State<MainLayout> {
   String _menuLabelForIndex(int index) {
     switch (index) {
       case 0:
-        return S.menuProject;
+        return 'Projects';
       case 1:
-        return S.menuWebshell;
+        return 'Webshell';
       case 2:
-        return S.menuExp;
+        return 'Exploits';
       case 3:
-        return S.menuPayload;
+        return 'Payloads';
       case 4:
-        return S.menuTerminal;
+        return 'Terminal';
       case 5:
-        return S.menuFrp;
+        return 'FRP Client';
       case 6:
-        return S.menuSuoTunnel;
+        return 'suo5/suo6';
       case 7:
-        return S.menuMcp;
+        return 'MCP';
       default:
         return '';
     }
@@ -498,7 +497,7 @@ class _MainLayoutState extends State<MainLayout> {
                     Icons.chevron_right,
                     color: AppColors.textSecondary,
                   ),
-                  tooltip: S.sidebarExpandTooltip,
+                  tooltip: 'Expand menu',
                 ),
               ),
             ),
@@ -689,7 +688,7 @@ class _MainLayoutState extends State<MainLayout> {
                         child: Padding(
                           padding: const EdgeInsets.only(left: 12),
                           child: Text(
-                            S.sidebarCollapse,
+                            'Collapse',
                             style: AppTextStyles.caption(
                               size: 14,
                               color: AppColors.textSecondary,

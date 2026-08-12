@@ -11,7 +11,6 @@ import '../database/database_helper.dart';
 import '../models/payload.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
-import '../app/localization.dart';
 import '../widgets/matrix_syntax_highlight.dart';
 import '../widgets/upload_success_dialog.dart';
 
@@ -72,7 +71,7 @@ class _FileManagerTabState extends State<FileManagerTab>
       _currentPath = path;
       _files = files;
       _loading = false;
-      if (files.isEmpty) _errorMsg = S.dirEmptyOrDenied;
+      if (files.isEmpty) _errorMsg = 'Directory is empty or access denied';
       widget.service.currentDir = path;
     });
   }
@@ -169,11 +168,11 @@ class _FileManagerTabState extends State<FileManagerTab>
 
   Future<void> _uploadFile() async {
     if (!widget.service.supportsFileWrite) {
-      await showUploadFailureDialog(context, S.snackWriteNotSupported);
+      await showUploadFailureDialog(context, 'Current connector does not support file write');
       return;
     }
     final file = await openFile(
-      acceptedTypeGroups: [XTypeGroup(label: S.allFiles)],
+      acceptedTypeGroups: [XTypeGroup(label: 'All files')],
     );
     if (file == null || !mounted) return;
     final bytes = await file.readAsBytes();
@@ -183,14 +182,14 @@ class _FileManagerTabState extends State<FileManagerTab>
 
   Future<void> _uploadPayloadFile() async {
     if (!widget.service.supportsFileWrite) {
-      await showUploadFailureDialog(context, S.snackWriteNotSupported);
+      await showUploadFailureDialog(context, 'Current connector does not support file write');
       return;
     }
 
     final payloads = await _db.getAllPayloads();
     if (!mounted) return;
     if (payloads.isEmpty) {
-      await showUploadFailureDialog(context, S.snackNoPayloads);
+      await showUploadFailureDialog(context, 'No payloads available to upload');
       return;
     }
 
@@ -204,7 +203,7 @@ class _FileManagerTabState extends State<FileManagerTab>
     if (bytes == null) {
       await showUploadFailureDialog(
         context,
-        S.snackPayloadDecodeFailed(selected.name),
+        'Payload decode failed: ${selected.name}',
       );
       return;
     }
@@ -305,7 +304,7 @@ class _FileManagerTabState extends State<FileManagerTab>
         debugPrint(
           '[Matrix][upload] error file=$fileName path=$remotePath size=${bytes.length} error=$e',
         );
-        await showUploadFailureDialog(context, S.snackUploadFailed(e));
+        await showUploadFailureDialog(context, 'Upload failed: $e');
       }
       return;
     }
@@ -327,7 +326,7 @@ class _FileManagerTabState extends State<FileManagerTab>
     popProgress();
     transferred.dispose();
     if (ok) {
-      await showUploadSuccessDialog(context, S.snackUploaded(fileName));
+      await showUploadSuccessDialog(context, 'Uploaded $fileName');
       _loadDirectory(_currentPath);
       widget.onInvalidateCompleterDir(_parent(remotePath));
     } else {
@@ -335,7 +334,7 @@ class _FileManagerTabState extends State<FileManagerTab>
         '[Matrix][upload] failed file=$fileName path=$remotePath size=${bytes.length} '
         'usedBinaryPath=$usedBinaryPath',
       );
-      await showUploadFailureDialog(context, S.snackUploadFail);
+      await showUploadFailureDialog(context, 'Upload failed');
     }
   }
 
@@ -360,7 +359,7 @@ class _FileManagerTabState extends State<FileManagerTab>
     if (_downloading) return;
     if (_downloadDir == null) {
       final dir = await getDirectoryPath(
-        confirmButtonText: S.selectDownloadDir,
+        confirmButtonText: 'Select download folder',
       );
       if (dir == null || !mounted) return;
       setState(() => _downloadDir = dir);
@@ -423,18 +422,18 @@ class _FileManagerTabState extends State<FileManagerTab>
               context: context,
               builder: (_) => AlertDialog(
                 title: Text(
-                  S.obfuscatedFileDialogTitle,
+                  'Obfuscated file detected',
                   style: const TextStyle(color: AppColors.primary),
                 ),
                 content: Text(
-                  S.obfuscatedFileDialogMsg,
+                  'This file contains obfuscated/compressed code. Save the deobfuscated version?',
                   style: const TextStyle(color: AppColors.textSecondary),
                 ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context, false),
                     child: Text(
-                      S.btnSaveAsIs,
+                      'Save as-is',
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
@@ -444,7 +443,7 @@ class _FileManagerTabState extends State<FileManagerTab>
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.bgDark,
                     ),
-                    child: Text(S.btnSaveDeobfuscated),
+                    child: Text('Save deobfuscated'),
                   ),
                 ],
               ),
@@ -467,7 +466,7 @@ class _FileManagerTabState extends State<FileManagerTab>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            S.snackDownloadedTo(localPath),
+            'Saved to $localPath',
             style: const TextStyle(color: Colors.white),
           ),
           backgroundColor: const Color(0xFF064D2E),
@@ -486,7 +485,7 @@ class _FileManagerTabState extends State<FileManagerTab>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            S.snackDownloadFailed(e),
+            'Download failed: $e',
             style: const TextStyle(color: Colors.white),
           ),
           backgroundColor: AppColors.red,
@@ -508,12 +507,12 @@ class _FileManagerTabState extends State<FileManagerTab>
           children: [
             const Icon(Icons.manage_search, color: AppColors.amber, size: 18),
             const SizedBox(width: 8),
-            Text(S.writableDirsDialogTitle, style: const TextStyle(color: AppColors.textPrimary)),
+            Text('Writable Directories', style: const TextStyle(color: AppColors.textPrimary)),
           ],
         ),
         content: dirs.isEmpty
             ? Text(
-                S.writableDirsNoneFound,
+                'No writable directories found',
                 style: const TextStyle(color: AppColors.textSecondary),
               )
             : Column(
@@ -521,7 +520,7 @@ class _FileManagerTabState extends State<FileManagerTab>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    S.writableDirsFoundHint(dirs.length),
+                    'Found ${dirs.length} writable directories. Tap to navigate:',
                     style: AppTextStyles.caption(
                       color: AppColors.textMuted,
                       size: 12,
@@ -567,7 +566,7 @@ class _FileManagerTabState extends State<FileManagerTab>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(S.btnClose),
+            child: Text('Close'),
           ),
         ],
       ),
@@ -579,18 +578,18 @@ class _FileManagerTabState extends State<FileManagerTab>
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          S.titleConfirmDelete,
+          'Confirm delete',
           style: const TextStyle(color: AppColors.red),
         ),
         content: Text(
-          S.confirmDeleteFile(entry.name),
+          'Delete "${entry.name}"? This action cannot be undone.',
           style: const TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
-              S.btnCancel,
+              'Cancel',
               style: const TextStyle(color: AppColors.textSecondary),
             ),
           ),
@@ -598,7 +597,7 @@ class _FileManagerTabState extends State<FileManagerTab>
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
             child: Text(
-              S.tooltipDelete,
+              'Delete',
               style: const TextStyle(color: Colors.white),
             ),
           ),
@@ -612,7 +611,7 @@ class _FileManagerTabState extends State<FileManagerTab>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          ok ? S.snackDeleted(entry.name) : S.snackDeleteFailed,
+          ok ? 'Deleted ${entry.name}' : 'Delete failed',
           style: const TextStyle(color: Colors.white),
         ),
         backgroundColor: ok ? const Color(0xFF064D2E) : AppColors.red,
@@ -642,7 +641,7 @@ class _FileManagerTabState extends State<FileManagerTab>
                     : () => _loadDirectory(_parent(_currentPath)),
                 icon: const Icon(Icons.arrow_upward, size: 16),
                 color: AppColors.textSecondary,
-                tooltip: S.tooltipParentDir,
+                tooltip: 'Parent directory',
               ),
               Expanded(
                 child: Container(
@@ -674,7 +673,7 @@ class _FileManagerTabState extends State<FileManagerTab>
                       : _uploadFile,
                   icon: const Icon(Icons.upload_file, size: 16),
                   color: AppColors.primary,
-                  tooltip: S.tooltipUploadFile,
+                  tooltip: 'Upload file',
                 ),
               if (widget.service.supportsFileWrite)
                 IconButton(
@@ -683,20 +682,20 @@ class _FileManagerTabState extends State<FileManagerTab>
                       : _uploadPayloadFile,
                   icon: const Icon(Icons.inventory_2_outlined, size: 16),
                   color: AppColors.cyan,
-                  tooltip: S.quickActionUpload,
+                  tooltip: 'Upload',
                 ),
               if (widget.service.isWindowsTarget)
                 IconButton(
                   onPressed: _loading ? null : _detectWritableDirs,
                   icon: const Icon(Icons.manage_search, size: 16),
                   color: AppColors.amber,
-                  tooltip: S.tooltipDetectWritableDirs,
+                  tooltip: 'Detect writable directories',
                 ),
               IconButton(
                 onPressed: _loading ? null : () => _loadDirectory(_currentPath),
                 icon: const Icon(Icons.refresh, size: 16),
                 color: AppColors.textSecondary,
-                tooltip: S.actionRefresh,
+                tooltip: 'Refresh',
               ),
             ],
           ),
@@ -717,10 +716,10 @@ class _FileManagerTabState extends State<FileManagerTab>
               child: Row(
                 children: [
                   const SizedBox(width: 28),
-                  _colHeader(S.colName, flex: 5),
-                  if (w > 480) _colHeader(S.colSize, width: 80),
-                  if (w > 560) _colHeader(S.colPermissions, width: 60),
-                  if (w > 640) _colHeader(S.colModified, width: 130),
+                  _colHeader('Name', flex: 5),
+                  if (w > 480) _colHeader('Size', width: 80),
+                  if (w > 560) _colHeader('Perms', width: 60),
+                  if (w > 640) _colHeader('Modified', width: 130),
                   SizedBox(width: w > 480 ? 120 : 100),
                 ],
               ),
@@ -736,7 +735,7 @@ class _FileManagerTabState extends State<FileManagerTab>
               : _files.isEmpty
               ? Center(
                   child: Text(
-                    _errorMsg ?? S.dirEmpty,
+                    _errorMsg ?? 'Directory is empty',
                     style: AppTextStyles.body(color: AppColors.textSecondary),
                   ),
                 )
@@ -890,28 +889,28 @@ class _FileRow extends StatelessWidget {
                         _iconBtn(
                           Icons.visibility_outlined,
                           AppColors.cyan,
-                          S.tooltipView,
+                          'View',
                           onView!,
                         ),
                       if (onEdit != null)
                         _iconBtn(
                           Icons.edit_outlined,
                           AppColors.primary,
-                          S.tooltipEdit,
+                          'Edit',
                           onEdit!,
                         ),
                       if (onDownload != null)
                         _iconBtn(
                           Icons.download_outlined,
                           AppColors.primaryDim,
-                          S.tooltipDownload,
+                          'Download',
                           onDownload!,
                         ),
                       if (onDelete != null)
                         _iconBtn(
                           Icons.delete_outline,
                           AppColors.red,
-                          S.tooltipDelete,
+                          'Delete',
                           onDelete!,
                         ),
                     ],
@@ -1018,7 +1017,7 @@ class _PayloadPickerDialog extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      S.titleSelectPayload,
+                      'Select payload to upload',
                       style: AppTextStyles.heading(
                         size: 14,
                         color: AppColors.textPrimary,
@@ -1032,7 +1031,7 @@ class _PayloadPickerDialog extends StatelessWidget {
                       size: 18,
                       color: AppColors.textSecondary,
                     ),
-                    tooltip: S.tooltipClose,
+                    tooltip: 'Close',
                   ),
                 ],
               ),
@@ -1067,7 +1066,7 @@ class _PayloadPickerDialog extends StatelessWidget {
                     ),
                     subtitle: Text(
                       '${payload.type.toUpperCase()}'
-                      '${payload.isDefault ? ' · ${S.payloadBuiltin}' : ''}'
+                      '${payload.isDefault ? ' · ${'Built-in'}' : ''}'
                       '${isBinary ? ' · Binary' : ''}',
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.caption(
@@ -1133,7 +1132,7 @@ class _TransferProgressDialog extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        isUpload ? S.uploading : S.downloading,
+                        isUpload ? 'Uploading' : 'Downloading',
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 14,
@@ -1151,7 +1150,7 @@ class _TransferProgressDialog extends StatelessWidget {
                           minimumSize: const Size(0, 0),
                         ),
                         child: Text(
-                          S.btnCancel,
+                          'Cancel',
                           style: AppTextStyles.caption(
                             color: AppColors.textSecondary,
                             size: 11,
@@ -1205,7 +1204,7 @@ class _TransferProgressDialog extends StatelessWidget {
                     )
                   else
                     Text(
-                      isUpload ? S.uploadingProgress : S.downloadingProgress,
+                      isUpload ? 'Uploading...' : 'Receiving data, please wait...',
                       style: AppTextStyles.caption(
                         color: AppColors.textSecondary,
                         size: 11,
@@ -1332,8 +1331,8 @@ class _FileViewDialogState extends State<_FileViewDialog> {
                           ? AppColors.primary
                           : AppColors.amber,
                       tooltip: _showDeobfuscated
-                          ? S.tooltipShowObfuscated
-                          : S.tooltipDeobfuscate,
+                          ? 'Show obfuscated source'
+                          : 'Deobfuscate',
                     ),
                   if (!_loading && _content != null)
                     IconButton(
@@ -1345,7 +1344,7 @@ class _FileViewDialogState extends State<_FileViewDialog> {
                         size: 16,
                         color: AppColors.textSecondary,
                       ),
-                      tooltip: S.tooltipCopyContent,
+                      tooltip: 'Copy content',
                     ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
@@ -1433,7 +1432,7 @@ class _FileEditDialogState extends State<_FileEditDialog> {
       widget.onSaved();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(S.snackSaveSuccess),
+          content: Text('Saved successfully'),
           backgroundColor: AppColors.bgCard,
           behavior: SnackBarBehavior.floating,
         ),
@@ -1441,7 +1440,7 @@ class _FileEditDialogState extends State<_FileEditDialog> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(S.snackSaveFailure),
+          content: Text('Save failed'),
           backgroundColor: AppColors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -1490,7 +1489,7 @@ class _FileEditDialogState extends State<_FileEditDialog> {
                   TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: Text(
-                      S.btnCancel,
+                      'Cancel',
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
@@ -1507,7 +1506,7 @@ class _FileEditDialogState extends State<_FileEditDialog> {
                             ),
                           )
                         : const Icon(Icons.save_outlined, size: 16),
-                    label: Text(S.btnSave),
+                    label: Text('Save'),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.bgDark,

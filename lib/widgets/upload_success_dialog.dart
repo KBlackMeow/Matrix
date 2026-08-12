@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../app/localization.dart';
 import '../theme/app_theme.dart';
 
 /// 上传成功后的居中提示（替代底部 SnackBar）
@@ -19,7 +18,7 @@ Future<void> showUploadSuccessDialog(BuildContext context, String message) {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              S.dialogUploadSuccessTitle,
+              'Upload successful',
               style: AppTextStyles.heading(
                 size: 15,
                 color: AppColors.textPrimary,
@@ -43,7 +42,7 @@ Future<void> showUploadSuccessDialog(BuildContext context, String message) {
             ),
           ),
           child: Text(
-            S.btnConfirm,
+            'OK',
             style: AppTextStyles.body(color: AppColors.bgDark),
           ),
         ),
@@ -69,7 +68,7 @@ Future<void> showUploadFailureDialog(BuildContext context, String message) {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              S.dialogUploadFailureTitle,
+              'Upload failed',
               style: AppTextStyles.heading(
                 size: 15,
                 color: AppColors.red.withValues(alpha: 0.95),
@@ -93,7 +92,7 @@ Future<void> showUploadFailureDialog(BuildContext context, String message) {
             ),
           ),
           child: Text(
-            S.btnConfirm,
+            'OK',
             style: AppTextStyles.body(color: AppColors.bgDark),
           ),
         ),
@@ -119,7 +118,7 @@ Future<void> showUploadCancelledDialog(BuildContext context) {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              S.snackUploadCancelled,
+              'Upload cancelled',
               style: AppTextStyles.body(
                 size: 13,
                 color: AppColors.textSecondary,
@@ -139,7 +138,7 @@ Future<void> showUploadCancelledDialog(BuildContext context) {
             ),
           ),
           child: Text(
-            S.btnConfirm,
+            'OK',
             style: AppTextStyles.body(color: AppColors.bgDark),
           ),
         ),

@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
 
-import '../app/localization.dart';
 import '../io/terminal_output_pipe.dart';
 import '../services/reverse_shell_service.dart';
 import '../theme/app_theme.dart';
@@ -286,7 +285,7 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                       color: AppColors.textSecondary,
                       size: 17,
                     ),
-                    tooltip: S.tooltipBack,
+                    tooltip: 'Back',
                   ),
                   const SizedBox(width: 4),
                   const Icon(
@@ -299,8 +298,8 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                     child: Text(
                       widget.session.label != null &&
                               widget.session.label!.isNotEmpty
-                          ? S.terminalFullTitle(widget.session.label!)
-                          : S.terminalFullTitle(widget.session.id),
+                          ? 'Full terminal · ${widget.session.label!}'
+                          : 'Full terminal · ${widget.session.id}',
                       style: AppTextStyles.heading(
                         size: 16,
                         color: AppColors.primary,
@@ -321,7 +320,7 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        S.terminalConnectionClosed,
+                        'Connection closed',
                         style: AppTextStyles.caption(
                           size: 11,
                           color: AppColors.red,
@@ -344,7 +343,7 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
                       color: AppColors.red,
                     ),
                     label: Text(
-                      _connectionClosed ? S.btnClose : S.btnDisconnect,
+                      _connectionClosed ? 'Close' : 'Disconnect',
                       style: AppTextStyles.caption(
                         size: 11,
                         color: AppColors.red,
@@ -403,8 +402,8 @@ class _ReverseShellTerminalPageState extends State<ReverseShellTerminalPage> {
       ),
       items: [
         if (selectedText != null)
-          PopupMenuItem(value: 'copy', child: Text(S.actionCopy)),
-        PopupMenuItem(value: 'paste', child: Text(S.actionPaste)),
+          PopupMenuItem(value: 'copy', child: Text('Copy')),
+        PopupMenuItem(value: 'paste', child: Text('Paste')),
       ],
     );
 

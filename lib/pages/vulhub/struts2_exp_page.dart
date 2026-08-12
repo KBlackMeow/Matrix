@@ -13,8 +13,6 @@ import '../../theme/app_theme.dart';
 import '../webshell_interactive_page.dart';
 import '_vulhub_page_helpers.dart';
 import 'base_vulhub_exp_page.dart';
-import '../../app/localization.dart';
-
 class Struts2ExpPage extends BaseVulhubExpPage {
   final String? initialTargetUrl;
 
@@ -28,11 +26,11 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
   @override
   IconData get pageIcon => Icons.bolt;
   @override
-  String get appBarTitle => S.vulhubStruts2Title;
+  String get appBarTitle => 'Apache Struts2 S2-032/045/053/057/059 RCE';
   @override
-  String get cardTitle => S.vulhubStruts2CardTitle;
+  String get cardTitle => 'Apache Struts2 RCE';
   @override
-  String get cardSubtitle => S.vulhubStruts2CardSubtitle;
+  String get cardSubtitle => 'S2-032 / S2-045 / S2-053 / S2-057 / S2-059 — OGNL expression injection';
 
   late final TextEditingController _urlCtrl;
   final _cmdCtrl = TextEditingController(text: 'id');
@@ -58,7 +56,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
   Future<void> _check() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -75,7 +73,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
         appendLog('[-] 未检测到 ${r.vulnName}');
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -84,7 +82,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
   Future<void> _checkAll() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -119,7 +117,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
         appendLog('[*] 已自动选择首个命中漏洞: ${firstHit.label}');
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -128,7 +126,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
   Future<void> _execRce() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     final cmd = _cmdCtrl.text.trim().isEmpty ? 'id' : _cmdCtrl.text.trim();
@@ -146,7 +144,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
         appendLog('[-] 无输出或执行失败');
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -155,7 +153,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
   Future<void> _getShell() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
-      appendLog(S.expLogEnterTargetUrl);
+      appendLog('[!] Please enter the target URL');
       return;
     }
     setState(() => running = true);
@@ -185,7 +183,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
         await _openWebshellFromResult(shellUrl, password);
       }
     } catch (e) {
-      appendLog(S.expLogException(e));
+      appendLog('[!] Error: $e');
     } finally {
       if (mounted) setState(() => running = false);
     }
@@ -235,7 +233,7 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(
-          S.titleSelectProject,
+          'Select project',
           style: AppTextStyles.heading(color: AppColors.primary),
         ),
         content: SizedBox(
@@ -390,14 +388,14 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vSecTitle(S.sectionTargetConfig),
-          vTf(_urlCtrl, S.fieldTargetUrl, 'http://localhost:8080'),
+          vSecTitle('Target config'),
+          vTf(_urlCtrl, 'Target URL', 'http://localhost:8080'),
           const SizedBox(height: 8),
-          vTf(_timeoutCtrl, S.fieldTimeout, '10', type: TextInputType.number),
+          vTf(_timeoutCtrl, 'Timeout (s)', '10', type: TextInputType.number),
           const SizedBox(height: 8),
           vTf(_pathCtrl, '路径 (005/007/052/053/057)', 'struts2-showcase'),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionVulnSelect),
+          vSecTitle('Vuln selection'),
           DropdownButtonFormField<Struts2VulnType>(
             initialValue: _selected,
             isExpanded: true,
@@ -435,15 +433,15 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
             ],
           ),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionCmdExec),
-          vTf(_cmdCtrl, S.fieldCommand, 'id'),
+          vSecTitle('Command execution'),
+          vTf(_cmdCtrl, 'Command', 'id'),
           const SizedBox(height: 8),
-          vBtn(S.btnExecCmd, running ? null : _execRce),
+          vBtn('Execute command', running ? null : _execRce),
           const SizedBox(height: 16),
-          vSecTitle(S.sectionGetShell),
+          vSecTitle('GetShell (reverse shell)'),
           vTf(_passwordCtrl, '冰蝎密码', 'mAtrix_911'),
           const SizedBox(height: 8),
-          vBtn(S.btnGetShell, running ? null : _getShell),
+          vBtn('GetShell', running ? null : _getShell),
         ],
       ),
     );

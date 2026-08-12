@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
-import '../localization.dart';
-
 class MenuItem {
   final IconData icon;
   final IconData selectedIcon;
@@ -132,12 +130,12 @@ class WorkspaceContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  S.workspaceWelcomeTitle,
+                  '> Welcome to Matrix',
                   style: AppTextStyles.terminal(size: 22, color: AppColors.primary),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  S.workspaceWelcomeSubtitle(title),
+                  'Current page: $title · Let\'s get started',
                   style: AppTextStyles.body(size: 14, color: AppColors.textSecondary),
                 ),
               ],
@@ -146,7 +144,7 @@ class WorkspaceContent extends StatelessWidget {
           const SizedBox(height: 24),
           // 快捷入口
           Text(
-            S.workspaceQuickActions,
+            'Quick actions',
             style: AppTextStyles.heading(size: 16, color: AppColors.primary),
           ),
           const SizedBox(height: 16),
@@ -154,19 +152,19 @@ class WorkspaceContent extends StatelessWidget {
             children: [
               _QuickActionCard(
                 icon: Icons.add_circle_outline,
-                label: S.quickActionNew,
+                label: 'New',
                 color: AppColors.primary,
               ),
               const SizedBox(width: 16),
               _QuickActionCard(
                 icon: Icons.upload_file,
-                label: S.quickActionUpload,
+                label: 'Upload',
                 color: AppColors.cyan,
               ),
               const SizedBox(width: 16),
               _QuickActionCard(
                 icon: Icons.folder_open,
-                label: S.quickActionOpen,
+                label: 'Open',
                 color: AppColors.red,
               ),
             ],
@@ -174,7 +172,7 @@ class WorkspaceContent extends StatelessWidget {
           const SizedBox(height: 32),
           // 最近活动
           Text(
-            S.workspaceRecentActivities,
+            'Recent activity',
             style: AppTextStyles.heading(size: 16, color: AppColors.primary),
           ),
           const SizedBox(height: 16),
@@ -218,11 +216,11 @@ class WorkspaceContent extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              S.recentFileTitle(index + 1),
+                              'Project file ${index + 1}',
                               style: AppTextStyles.body(size: 14, color: AppColors.textPrimary),
                             ),
                             Text(
-                              S.recentHoursAgo(2 + index),
+                              '${2 + index} hours ago',
                               style: AppTextStyles.caption(color: AppColors.textSecondary),
                             ),
                           ],

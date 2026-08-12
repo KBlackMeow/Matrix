@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../database/database_helper.dart';
 import '../models/project.dart';
 import '../theme/app_theme.dart';
-import '../app/localization.dart';
-
 /// 需要选择项目的页面包装器（信息收集、Webshell）
 class ProjectScopedPage extends StatefulWidget {
   final Project? selectedProject;
@@ -92,7 +90,7 @@ class _ProjectScopedPageState extends State<ProjectScopedPage> {
           ),
           const SizedBox(height: 24),
           Text(
-            S.noProjects,
+            'No projects',
             style: AppTextStyles.heading(
               size: 18,
               color: AppColors.textPrimary,
@@ -100,14 +98,14 @@ class _ProjectScopedPageState extends State<ProjectScopedPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            S.noProjectsHint,
+            'Please create a project before using this feature',
             style: AppTextStyles.body(size: 14, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: widget.onNavigateToProjectManagement,
             icon: const Icon(Icons.add, size: 18),
-            label: Text(S.actionGoCreateProject),
+            label: Text('Create project'),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.bgDark,
@@ -136,7 +134,7 @@ class _ProjectScopedPageState extends State<ProjectScopedPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  S.selectProject,
+                  'Select a project',
                   style: AppTextStyles.body(
                     size: 16,
                     color: AppColors.textPrimary,

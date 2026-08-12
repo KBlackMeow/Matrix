@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../app/localization.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/matrix_syntax_highlight.dart';
@@ -34,8 +33,8 @@ class ModeToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: integrated
-          ? S.tooltipSwitchToSeparate
-          : S.tooltipSwitchToIntegrated,
+          ? 'Switch to split mode (bottom input bar)'
+          : 'Switch to integrated mode (terminal-like)',
       child: InkWell(
         onTap: onToggle,
         borderRadius: BorderRadius.circular(6),
@@ -62,7 +61,7 @@ class ModeToggle extends StatelessWidget {
               ),
               const SizedBox(width: 5),
               Text(
-                integrated ? S.modeIntegrated : S.modeSeparate,
+                integrated ? 'Integrated' : 'Split',
                 style: AppTextStyles.caption(
                   size: 11,
                   color: integrated
@@ -543,7 +542,7 @@ class EntryBlock extends StatelessWidget {
           if (entry.output != null)
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 4),
-              child: entry.output == S.noOutput
+              child: entry.output == '(no output)'
                   ? SelectableText(
                       entry.output!,
                       style: matrixCodeTextStyle(height: 1.6),

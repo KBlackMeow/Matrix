@@ -9,7 +9,6 @@ import '../models/project.dart';
 import '../models/webshell.dart';
 import '../services/webshell_connectivity_service.dart';
 import '../theme/app_theme.dart';
-import '../app/localization.dart';
 import 'webshell_interactive_page.dart';
 
 /// Webshell 页面：创建、编辑、删除
@@ -96,7 +95,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
             if (url.isEmpty || pass.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(S.snackFillUrlAndPassword),
+                  content: Text('Please enter the URL and password first'),
                   behavior: SnackBarBehavior.floating,
                   duration: const Duration(seconds: 2),
                 ),
@@ -125,7 +124,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
 
           return AlertDialog(
             title: Text(
-              S.actionAddWebshell,
+              'Add Webshell',
               style: AppTextStyles.heading(color: AppColors.primary),
             ),
             content: SizedBox(
@@ -137,8 +136,8 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   children: [
                     _buildField(
                       controller: urlController,
-                      label: S.fieldWebshellUrl,
-                      hint: S.hintWebshellUrl,
+                      label: 'Webshell URL *',
+                      hint: 'http://example.com/shell.php',
                       autofocus: true,
                     ),
                     const SizedBox(height: 16),
@@ -153,8 +152,8 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                     const SizedBox(height: 16),
                     _buildField(
                       controller: nameController,
-                      label: S.fieldWebshellName,
-                      hint: S.hintWebshellName,
+                      label: 'Alias (optional)',
+                      hint: 'e.g. Admin panel shell',
                     ),
                     const SizedBox(height: 16),
                     _ConnectorRow(
@@ -178,7 +177,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                     Row(
                       children: [
                         Text(
-                          S.labelRequestMethod,
+                          'Request method:',
                           style: AppTextStyles.body(
                             color: AppColors.textSecondary,
                           ),
@@ -202,7 +201,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
                 child: Text(
-                  S.btnCancel,
+                  'Cancel',
                   style: AppTextStyles.body(color: AppColors.textSecondary),
                 ),
               ),
@@ -218,7 +217,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   backgroundColor: AppColors.primary,
                 ),
                 child: Text(
-                  S.btnAdd,
+                  'Add',
                   style: AppTextStyles.body(color: AppColors.bgDark),
                 ),
               ),
@@ -268,7 +267,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
             if (url.isEmpty || pass.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(S.snackFillUrlAndPassword),
+                  content: Text('Please enter the URL and password first'),
                   behavior: SnackBarBehavior.floating,
                   duration: const Duration(seconds: 2),
                 ),
@@ -297,7 +296,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
 
           return AlertDialog(
             title: Text(
-              S.titleEditWebshell,
+              'Edit Webshell',
               style: AppTextStyles.heading(color: AppColors.primary),
             ),
             content: SizedBox(
@@ -309,8 +308,8 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   children: [
                     _buildField(
                       controller: urlController,
-                      label: S.fieldWebshellUrl,
-                      hint: S.hintWebshellUrl,
+                      label: 'Webshell URL *',
+                      hint: 'http://example.com/shell.php',
                       autofocus: true,
                     ),
                     const SizedBox(height: 16),
@@ -325,8 +324,8 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                     const SizedBox(height: 16),
                     _buildField(
                       controller: nameController,
-                      label: S.fieldWebshellName,
-                      hint: S.hintWebshellName,
+                      label: 'Alias (optional)',
+                      hint: 'e.g. Admin panel shell',
                     ),
                     const SizedBox(height: 16),
                     _ConnectorRow(
@@ -345,7 +344,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                     Row(
                       children: [
                         Text(
-                          S.labelRequestMethod,
+                          'Request method:',
                           style: AppTextStyles.body(
                             color: AppColors.textSecondary,
                           ),
@@ -369,7 +368,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
                 child: Text(
-                  S.btnCancel,
+                  'Cancel',
                   style: AppTextStyles.body(color: AppColors.textSecondary),
                 ),
               ),
@@ -385,7 +384,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   backgroundColor: AppColors.primary,
                 ),
                 child: Text(
-                  S.btnSave,
+                  'Save',
                   style: AppTextStyles.body(color: AppColors.bgDark),
                 ),
               ),
@@ -421,16 +420,16 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: MatrixDialogStyle.outlineDanger(0.28),
-        title: Text(S.btnDelete, style: const TextStyle(color: AppColors.red)),
+        title: Text('Delete', style: const TextStyle(color: AppColors.red)),
         content: Text(
-          S.confirmDeleteWebshell(ws.name),
+          'Delete "${ws.name}"? This action cannot be undone.',
           style: const TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
-              S.btnCancel,
+              'Cancel',
               style: const TextStyle(color: AppColors.textSecondary),
             ),
           ),
@@ -438,7 +437,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
             child: Text(
-              S.btnDelete,
+              'Delete',
               style: const TextStyle(color: Colors.white),
             ),
           ),
@@ -500,7 +499,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      S.webshellManagementTitle(widget.project.name),
+                      'Webshell · ${widget.project.name}',
                       style: AppTextStyles.heading(
                         size: 15,
                         color: AppColors.textPrimary,
@@ -524,7 +523,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                   color: AppColors.textSecondary,
                 ),
                 label: Text(
-                  S.btnSwitchProject,
+                  'Switch project',
                   style: AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
               ),
@@ -538,7 +537,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
             FilledButton.icon(
               onPressed: _loading ? null : _showCreateDialog,
               icon: const Icon(Icons.add, size: 18),
-              label: Text(S.actionAddWebshell),
+              label: Text('Add Webshell'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -549,12 +548,12 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
               onPressed: _loading ? null : _loadWebshells,
               icon: const Icon(Icons.refresh),
               color: AppColors.textSecondary,
-              tooltip: S.actionRefresh,
+              tooltip: 'Refresh',
             ),
             const Spacer(),
             if (!_loading)
               Text(
-                S.webshellCount(_webshells.length),
+                '${_webshells.length} total',
                 style: AppTextStyles.caption(color: AppColors.textMuted),
               ),
           ],
@@ -578,7 +577,7 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        S.webshellEmptyHint(S.actionAddWebshell),
+                        'No Webshell yet. Click "${'Add Webshell'}" to get started',
                         style: AppTextStyles.body(
                           color: AppColors.textSecondary,
                         ),
@@ -790,7 +789,7 @@ class _WebshellCardState extends State<_WebshellCard> {
                             );
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(S.snackCopied),
+                                content: Text('Copied to clipboard'),
                                 backgroundColor: AppColors.bgCard,
                                 behavior: SnackBarBehavior.floating,
                                 duration: const Duration(seconds: 1),
@@ -809,7 +808,7 @@ class _WebshellCardState extends State<_WebshellCard> {
                         widget.webshell.password!.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
-                        '${S.webshellPasswordLabel}: ${'•' * widget.webshell.password!.length.clamp(1, 12)}',
+                        '${'Password'}: ${'•' * widget.webshell.password!.length.clamp(1, 12)}',
                         style: AppTextStyles.caption(
                           size: 11,
                           color: AppColors.textMuted,
@@ -841,14 +840,14 @@ class _WebshellCardState extends State<_WebshellCard> {
                         onPressed: widget.onEdit,
                         icon: const Icon(Icons.edit_outlined, size: 18),
                         color: AppColors.cyan,
-                        tooltip: S.tooltipEdit,
+                        tooltip: 'Edit',
                         splashRadius: 18,
                       ),
                       IconButton(
                         onPressed: widget.onDelete,
                         icon: const Icon(Icons.delete_outline, size: 18),
                         color: AppColors.red,
-                        tooltip: S.tooltipDelete,
+                        tooltip: 'Delete',
                         splashRadius: 18,
                       ),
                     ],
@@ -937,7 +936,7 @@ class _MethodToggle extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                S.connectorMethodFixed,
+                'Fixed by connector',
                 style: AppTextStyles.caption(
                   size: 11,
                   color: AppColors.textMuted,
@@ -981,17 +980,17 @@ class _ConnectorTypeDropdown extends StatelessWidget {
   const _ConnectorTypeDropdown({required this.value, required this.onChanged});
 
   List<(String, String)> _connectorOptions() => [
-    ('php_eval', S.connectorUiLabel('php_eval')),
-    ('php_b64rot13', S.connectorUiLabel('php_b64rot13')),
-    ('php_behinder', S.connectorUiLabel('php_behinder')),
-    ('php_passthru', S.connectorUiLabel('php_passthru')),
-    ('jsp_classloader', S.connectorUiLabel('jsp_classloader')),
-    ('jsp_behinder', S.connectorUiLabel('jsp_behinder')),
-    ('jsp_behinder_v2', S.connectorUiLabel('jsp_behinder_v2')),
-    ('jsp_runtime', S.connectorUiLabel('jsp_runtime')),
-    ('asp_wscript', S.connectorUiLabel('asp_wscript')),
-    ('aspx_cmd', S.connectorUiLabel('aspx_cmd')),
-    ('aspx_behinder', S.connectorUiLabel('aspx_behinder')),
+    ('php_eval', '${ConnectorFactory.typeLabel('php_eval').toUpperCase()} · ${ConnectorFactory.shortLabel('php_eval')}'),
+    ('php_b64rot13', '${ConnectorFactory.typeLabel('php_b64rot13').toUpperCase()} · ${ConnectorFactory.shortLabel('php_b64rot13')}'),
+    ('php_behinder', '${ConnectorFactory.typeLabel('php_behinder').toUpperCase()} · ${ConnectorFactory.shortLabel('php_behinder')}'),
+    ('php_passthru', '${ConnectorFactory.typeLabel('php_passthru').toUpperCase()} · ${ConnectorFactory.shortLabel('php_passthru')}'),
+    ('jsp_classloader', '${ConnectorFactory.typeLabel('jsp_classloader').toUpperCase()} · ${ConnectorFactory.shortLabel('jsp_classloader')}'),
+    ('jsp_behinder', '${ConnectorFactory.typeLabel('jsp_behinder').toUpperCase()} · ${ConnectorFactory.shortLabel('jsp_behinder')}'),
+    ('jsp_behinder_v2', '${ConnectorFactory.typeLabel('jsp_behinder_v2').toUpperCase()} · ${ConnectorFactory.shortLabel('jsp_behinder_v2')}'),
+    ('jsp_runtime', '${ConnectorFactory.typeLabel('jsp_runtime').toUpperCase()} · ${ConnectorFactory.shortLabel('jsp_runtime')}'),
+    ('asp_wscript', '${ConnectorFactory.typeLabel('asp_wscript').toUpperCase()} · ${ConnectorFactory.shortLabel('asp_wscript')}'),
+    ('aspx_cmd', '${ConnectorFactory.typeLabel('aspx_cmd').toUpperCase()} · ${ConnectorFactory.shortLabel('aspx_cmd')}'),
+    ('aspx_behinder', '${ConnectorFactory.typeLabel('aspx_behinder').toUpperCase()} · ${ConnectorFactory.shortLabel('aspx_behinder')}'),
   ];
 
   @override
@@ -1012,7 +1011,7 @@ class _ConnectorTypeDropdown extends StatelessWidget {
         DropdownMenuItem<String>(
           value: value,
           child: Text(
-            S.unknownConnector(value),
+            'Unknown: $value',
             style: AppTextStyles.body(color: AppColors.red, size: 13),
           ),
         ),
@@ -1023,7 +1022,7 @@ class _ConnectorTypeDropdown extends StatelessWidget {
       isExpanded: true,
       value: value,
       decoration: InputDecoration(
-        labelText: S.fieldConnectorType,
+        labelText: 'Connector type',
         labelStyle: AppTextStyles.caption(color: AppColors.textSecondary),
         filled: true,
         fillColor: AppColors.bgCard,
@@ -1071,13 +1070,13 @@ class _PasswordParamField extends StatelessWidget {
     final isBehinder =
         connectorType == 'jsp_behinder' || connectorType == 'php_behinder';
     final hint = isBehinder
-        ? S.hintPasswordKey
-        : (defaultParam.isNotEmpty ? S.hintParamName(defaultParam) : '');
+        ? 'Default mAtrix_911, or the 16-char hex of k in the payload'
+        : (defaultParam.isNotEmpty ? 'Parameter name, default: $defaultParam' : '');
 
-    final labelText = isBehinder ? S.fieldPasswordKey : S.fieldParamName;
+    final labelText = isBehinder ? 'Password / key *' : 'Parameter name *';
     final helperText = isBehinder
-        ? S.helperPasswordKey
-        : S.helperParamName(defaultParam);
+        ? 'Connection password (first 16 chars of MD5 as key); or enter the hex value of String k="xxx" from the payload directly'
+        : 'HTTP parameter name for receiving commands in the payload (e.g. \$_POST["$defaultParam"])';
 
     return TextField(
       controller: controller,
@@ -1163,7 +1162,7 @@ class _ConnectorRow extends StatelessWidget {
                     ),
                   )
                 : const Icon(Icons.radar_rounded, size: 16),
-            label: Text(detecting ? S.statusChecking : S.btnAutoDetect),
+            label: Text(detecting ? 'Checking' : 'Auto detect'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
@@ -1211,11 +1210,11 @@ Future<List<_DetectResult>> _autoDetect({
           ? const Duration(seconds: 125)
           : const Duration(seconds: 6);
       final ok = await ConnectorFactory.create(ws).ping().timeout(pingTimeout);
-      return _DetectResult(type, ok, ok ? S.detectPingOk : S.detectPingNo);
+      return _DetectResult(type, ok, ok ? 'Responded' : 'No response');
     } on TimeoutException {
-      return _DetectResult(type, false, S.detectPingTimeout);
+      return _DetectResult(type, false, 'Timeout');
     } catch (_) {
-      return _DetectResult(type, false, S.detectPingConnectFailed);
+      return _DetectResult(type, false, 'Connection failed');
     }
   });
   return Future.wait(futures);
@@ -1256,7 +1255,7 @@ class _DetectResultPanel extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  working > 0 ? S.detectSuccess : S.detectFailed,
+                  working > 0 ? 'Detection complete. Auto-selected the first responsive connector type' : 'No responsive connector found. Check the URL and password',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.caption(

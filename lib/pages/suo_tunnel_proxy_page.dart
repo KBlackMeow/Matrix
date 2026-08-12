@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../app/localization.dart';
 import '../database/database_helper.dart';
 import '../models/project.dart';
 import '../models/suo5_profile.dart';
@@ -132,7 +131,7 @@ class _SuoHandshakeProbeDialogState extends State<_SuoHandshakeProbeDialog> {
               const SizedBox(width: 16),
               Expanded(
                 child: Text(
-                  S.suoProbeHandshakeLoading,
+                  'Testing handshake with server…',
                   style: AppTextStyles.body(size: 14),
                 ),
               ),
@@ -143,12 +142,12 @@ class _SuoHandshakeProbeDialogState extends State<_SuoHandshakeProbeDialog> {
     }
     final ok = _err == null;
     final bodyText =
-        ok ? S.suo5HandshakeOk : S.suo5HandshakeFailed(_err as Object);
+        ok ? 'Handshake OK' : 'Handshake failed: ${_err as Object}';
     return PopScope(
       canPop: false,
       child: AlertDialog(
         title: Text(
-          S.suoHandshakeResultTitle,
+          'Handshake result',
           style: AppTextStyles.heading(
             size: 16,
             color: ok ? AppColors.primary : AppColors.red,
@@ -175,7 +174,7 @@ class _SuoHandshakeProbeDialogState extends State<_SuoHandshakeProbeDialog> {
                   : AppColors.red.withValues(alpha: 0.2),
               foregroundColor: ok ? AppColors.primary : AppColors.red,
             ),
-            child: Text(S.btnConfirm),
+            child: Text('OK'),
           ),
         ],
       ),
@@ -212,8 +211,8 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
     _openCreateSub = SuoTunnelProxyPage._openCreateBus.stream.listen((e) {
       if (!mounted || e.projectId != widget.project.id) return;
       _showEditorDialog(
-        title: S.suoTunnelNewConfigTitle,
-        submitLabel: S.btnAdd,
+        title: 'New proxy',
+        submitLabel: 'Add',
         initialS6: e.defaultSuo6,
         protocolLocked: false,
         wasS6: null,
@@ -326,7 +325,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(S.suo6MissingUrl),
+            content: Text('Please enter the suo6 URL'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -343,7 +342,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(S.suo5MissingUrl),
+            content: Text('Please enter the suo5 URL'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -375,16 +374,16 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(S.btnDelete, style: const TextStyle(color: AppColors.red)),
+        title: Text('Delete', style: const TextStyle(color: AppColors.red)),
         content: Text(
-          e.isS6 ? S.confirmDeleteSuo6(e.name) : S.confirmDeleteSuo5(e.name),
+          e.isS6 ? 'Delete config "${e.name}"?' : 'Delete "${e.name}"? This action cannot be undone.',
           style: const TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(
-              S.btnCancel,
+              'Cancel',
               style: const TextStyle(color: AppColors.textSecondary),
             ),
           ),
@@ -392,7 +391,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
             child: Text(
-              S.btnDelete,
+              'Delete',
               style: const TextStyle(color: Colors.white),
             ),
           ),
@@ -412,8 +411,8 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
 
   Future<void> _showCreateDialog() async {
     await _showEditorDialog(
-      title: S.suoTunnelNewConfigTitle,
-      submitLabel: S.btnAdd,
+      title: 'New proxy',
+      submitLabel: 'Add',
       initialS6: false,
       protocolLocked: false,
       wasS6: null,
@@ -430,8 +429,8 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
         ? (_s6.isRunning(e.p6!.id))
         : (_s5.isRunning(e.p5!.id));
     await _showEditorDialog(
-      title: S.suoTunnelEditConfigTitle,
-      submitLabel: S.btnSave,
+      title: 'Edit proxy',
+      submitLabel: 'Save',
       initialS6: e.isS6,
       protocolLocked: locked,
       wasS6: e.isS6,
@@ -488,7 +487,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.isS6 ? S.suo6InvalidPort : S.suo5InvalidPort),
+          content: Text(result.isS6 ? 'Listen port is invalid' : 'Listen port is invalid'),
         ),
       );
       return;
@@ -498,7 +497,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.isS6 ? S.suo6InvalidUrl : S.suo5InvalidUrl),
+          content: Text(result.isS6 ? 'URL must be http/https' : 'URL must be http/https'),
         ),
       );
       return;
@@ -543,25 +542,25 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
           context: context,
           builder: (c) => AlertDialog(
             title: Text(
-              S.suoTunnelProtocolSwitchTitle,
+              'Change protocol',
               style: AppTextStyles.heading(color: AppColors.primary),
             ),
             content: Text(
-              S.suoTunnelProtocolSwitchBody,
+              'This removes the current profile and creates a new one with the same URL and listen settings. Continue?',
               style: const TextStyle(color: AppColors.textPrimary),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(c, false),
                 child: Text(
-                  S.btnCancel,
+                  'Cancel',
                   style: const TextStyle(color: AppColors.textSecondary),
                 ),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(c, true),
                 child: Text(
-                  S.btnSave,
+                  'Save',
                   style: const TextStyle(color: AppColors.bgDark),
                 ),
               ),
@@ -619,7 +618,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(S.suoTunnelProfileCreatedSnack),
+        content: Text('Proxy profile saved'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -720,14 +719,14 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      S.suoTunnelManagementTitle(widget.project.name),
+                      'suo5/suo6 · ${widget.project.name}',
                       style: AppTextStyles.heading(
                         size: 15,
                         color: AppColors.textPrimary,
                       ),
                     ),
                     Text(
-                      S.suo5HeaderRunningSummary(running + connecting, total),
+                      'Running ${running + connecting} / $total',
                       style: AppTextStyles.caption(size: 13, color: accent),
                     ),
                     if (hasActive) ...[
@@ -737,7 +736,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
                         runSpacing: 4,
                         children: [
                           Text(
-                            '${S.suo5StatActiveConn}: ${_s5.totalActiveConnections + _s6.totalActiveConn}',
+                            '${'Conns'}: ${_s5.totalActiveConnections + _s6.totalActiveConn}',
                             style: AppTextStyles.caption(
                               size: 11,
                               color: AppColors.textMuted,
@@ -771,7 +770,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
                   color: AppColors.textSecondary,
                 ),
                 label: Text(
-                  S.btnSwitchProject,
+                  'Switch project',
                   style: AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
               ),
@@ -784,7 +783,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
             FilledButton.icon(
               onPressed: _loading ? null : _showCreateDialog,
               icon: const Icon(Icons.add, size: 18),
-              label: Text(S.actionAddSuoTunnel),
+              label: Text('Add proxy'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -795,12 +794,12 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
               onPressed: _loading ? null : _loadProfiles,
               icon: const Icon(Icons.refresh),
               color: AppColors.textSecondary,
-              tooltip: S.actionRefresh,
+              tooltip: 'Refresh',
             ),
             const Spacer(),
             if (!_loading)
               Text(
-                S.suoTunnelCount(total),
+                '$total total',
                 style: AppTextStyles.caption(color: AppColors.textMuted),
               ),
           ],
@@ -855,7 +854,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              S.suoTunnelEmptyHint(S.actionAddSuoTunnel),
+              'No profiles. Tap "${'Add proxy'}" to add one.',
               style: AppTextStyles.body(color: AppColors.textSecondary),
             ),
           ],
@@ -897,7 +896,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
               const Icon(Icons.terminal, size: 14, color: AppColors.textMuted),
               const SizedBox(width: 6),
               Text(
-                S.suoTunnelRunLog,
+                'Run log',
                 style: AppTextStyles.caption(
                   size: 12,
                   color: AppColors.textMuted,
@@ -913,13 +912,13 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(S.suo5LogCopiedSnack),
+                        content: Text('Logs copied'),
                         duration: const Duration(seconds: 2),
                       ),
                     );
                   },
                   child: Text(
-                    S.actionCopy,
+                    'Copy',
                     style: AppTextStyles.caption(
                       size: 11,
                       color: AppColors.primary,
@@ -934,7 +933,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
                     setState(() {});
                   },
                   child: Text(
-                    S.btnClear,
+                    'Clear',
                     style: AppTextStyles.caption(
                       size: 11,
                       color: AppColors.textMuted,
@@ -949,7 +948,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
             child: lines.isEmpty
                 ? Center(
                     child: Text(
-                      S.suo5NoLogs,
+                      '> No logs yet',
                       style: AppTextStyles.terminal(
                         size: 13,
                         color: AppColors.textMuted,
@@ -1031,7 +1030,7 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
           ),
           if (locked)
             Text(
-              S.suo5RunningNoEdit,
+              'Cannot edit while running',
               style: AppTextStyles.caption(size: 10, color: Colors.orange),
             ),
         ],
@@ -1044,7 +1043,7 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                S.suoTunnelProtocol,
+                'Protocol',
                 style: AppTextStyles.caption(
                   size: 12,
                   color: AppColors.textSecondary,
@@ -1055,11 +1054,11 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
                 segments: [
                   ButtonSegment<bool>(
                     value: false,
-                    label: Text(S.suoTunnelProtocolSuo5),
+                    label: Text('suo5'),
                   ),
                   ButtonSegment<bool>(
                     value: true,
-                    label: Text(S.suoTunnelProtocolSuo6),
+                    label: Text('suo6'),
                   ),
                 ],
                 selected: {_is6},
@@ -1072,16 +1071,16 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
               const SizedBox(height: 16),
               _tf(
                 widget.urlController,
-                S.suo5TargetUrl,
-                S.suo5TargetUrlHint,
+                'suo5 URL',
+                'https://target/path/suo5.php',
                 autofocus: true,
                 enabled: !locked,
               ),
               const SizedBox(height: 16),
               _tf(
                 widget.nameController,
-                S.suo5ConfigName,
-                S.suo5ConfigNameHint,
+                'Profile name',
+                'A friendly name',
                 enabled: !locked,
               ),
               const SizedBox(height: 16),
@@ -1091,7 +1090,7 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
                     flex: 3,
                     child: _tf(
                       widget.hostController,
-                      S.suo5ListenHost,
+                      'Listen host',
                       '127.0.0.1',
                       enabled: !locked,
                     ),
@@ -1100,7 +1099,7 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
                   Expanded(
                     child: _tf(
                       widget.portController,
-                      S.suo5ListenPort,
+                      'Listen port',
                       '1080',
                       enabled: !locked,
                       number: true,
@@ -1116,7 +1115,7 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: Text(
-            S.btnCancel,
+            'Cancel',
             style: AppTextStyles.body(color: AppColors.textSecondary),
           ),
         ),
@@ -1255,25 +1254,25 @@ class _TunnelEntryCardState extends State<_TunnelEntryCard> {
       switch (widget.s6.sessionFor(widget.entry.p6!.id)?.status ??
           Suo6Status.idle) {
         case Suo6Status.running:
-          return S.suo6StatusRunning;
+          return 'Running';
         case Suo6Status.connecting:
-          return S.suo6StatusConnecting;
+          return 'Connecting';
         case Suo6Status.error:
-          return S.suo6StatusError;
+          return 'Error';
         case Suo6Status.idle:
-          return S.suo6StatusIdle;
+          return 'Idle';
       }
     }
     switch (widget.s5.sessionFor(widget.entry.p5!.id)?.status ??
         Suo5Status.idle) {
       case Suo5Status.running:
-        return S.suo5StatusRunning;
+        return 'Running';
       case Suo5Status.connecting:
-        return S.suo5StatusConnecting;
+        return 'Connecting';
       case Suo5Status.error:
-        return S.suo5StatusError;
+        return 'Error';
       case Suo5Status.idle:
-        return S.suo5StatusIdle;
+        return 'Idle';
     }
   }
 
@@ -1340,8 +1339,8 @@ class _TunnelEntryCardState extends State<_TunnelEntryCard> {
                           const SizedBox(width: 6),
                           _ChipLbl(
                             label: _is6
-                                ? S.suoTunnelProtocolSuo6
-                                : S.suoTunnelProtocolSuo5,
+                                ? 'suo6'
+                                : 'suo5',
                             color: _is6 ? AppColors.primary : AppColors.cyan,
                           ),
                           const SizedBox(width: 6),
@@ -1375,7 +1374,7 @@ class _TunnelEntryCardState extends State<_TunnelEntryCard> {
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(S.snackCopied),
+                                  content: Text('Copied to clipboard'),
                                   behavior: SnackBarBehavior.floating,
                                   duration: const Duration(seconds: 1),
                                 ),
@@ -1408,7 +1407,7 @@ class _TunnelEntryCardState extends State<_TunnelEntryCard> {
                     color: running ? AppColors.red : AppColors.primary,
                   ),
                   label: Text(
-                    running ? S.btnStop : S.btnStart,
+                    running ? 'Stop' : 'Start',
                     style: AppTextStyles.caption(
                       size: 12,
                       color: running ? AppColors.red : AppColors.primary,
@@ -1424,7 +1423,7 @@ class _TunnelEntryCardState extends State<_TunnelEntryCard> {
                       color: AppColors.cyan,
                     ),
                     label: Text(
-                      S.suo5BtnProbe,
+                      'Probe',
                       style: AppTextStyles.caption(
                         size: 12,
                         color: AppColors.cyan,
@@ -1439,7 +1438,7 @@ class _TunnelEntryCardState extends State<_TunnelEntryCard> {
                     color: AppColors.cyan,
                   ),
                   label: Text(
-                    S.btnEdit,
+                    'Edit',
                     style: AppTextStyles.caption(
                       size: 12,
                       color: AppColors.cyan,
@@ -1454,7 +1453,7 @@ class _TunnelEntryCardState extends State<_TunnelEntryCard> {
                     color: AppColors.red,
                   ),
                   label: Text(
-                    S.btnDelete,
+                    'Delete',
                     style: AppTextStyles.caption(
                       size: 12,
                       color: AppColors.red,
@@ -1479,21 +1478,21 @@ class _TunnelEntryCardState extends State<_TunnelEntryCard> {
           spacing: 12,
           children: [
             Text(
-              '${S.suo6StatActiveConn}: ${s.activeConnections}',
+              '${'Conns'}: ${s.activeConnections}',
               style: AppTextStyles.caption(
                 size: 11,
                 color: AppColors.textMuted,
               ),
             ),
             Text(
-              '${S.suo6StatUpload}: ${widget.fmtBytes(s.uploadBytes)}',
+              '${'Upload'}: ${widget.fmtBytes(s.uploadBytes)}',
               style: AppTextStyles.caption(
                 size: 11,
                 color: AppColors.textMuted,
               ),
             ),
             Text(
-              '${S.suo6StatDownload}: ${widget.fmtBytes(s.downloadBytes)}',
+              '${'Download'}: ${widget.fmtBytes(s.downloadBytes)}',
               style: AppTextStyles.caption(
                 size: 11,
                 color: AppColors.textMuted,
@@ -1511,15 +1510,15 @@ class _TunnelEntryCardState extends State<_TunnelEntryCard> {
         spacing: 12,
         children: [
           Text(
-            '${S.suo5StatActiveConn}: ${s.activeConnections}',
+            '${'Conns'}: ${s.activeConnections}',
             style: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
           ),
           Text(
-            '${S.suo5StatUpload}: ${widget.fmtBytes(s.uploadBytes)}',
+            '${'Upload'}: ${widget.fmtBytes(s.uploadBytes)}',
             style: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
           ),
           Text(
-            '${S.suo5StatDownload}: ${widget.fmtBytes(s.downloadBytes)}',
+            '${'Download'}: ${widget.fmtBytes(s.downloadBytes)}',
             style: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
           ),
         ],
