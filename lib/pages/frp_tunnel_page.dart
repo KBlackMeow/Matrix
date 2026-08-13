@@ -474,7 +474,7 @@ class _FrpTunnelPageState extends State<FrpTunnelPage> {
           OutlinedButton.icon(
             onPressed: () => _openEditorDialog(profile: null),
             icon: const Icon(Icons.add, size: 18),
-            label: Text('New profile'),
+            label: Text('New Profile'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
@@ -996,7 +996,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                 children: [
                   Expanded(
                     child: Text(
-                      _isNew ? 'New profile' : 'Edit profile',
+                      _isNew ? 'New Profile' : 'Edit Profile',
                       style: AppTextStyles.heading(
                         size: 17,
                         color: AppColors.textPrimary,
@@ -1040,14 +1040,14 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                   children: [
                     _editorField(
                       controller: _nameCtrl,
-                      label: 'Profile name',
+                      label: 'Profile Name',
                       hint: 'e.g. Office network / Test server',
                       enabled: !locked,
                       onChanged: _maybePersist,
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Server config',
+                      'Server Config',
                       style: AppTextStyles.caption(
                         size: 12,
                         color: AppColors.textMuted,
@@ -1060,7 +1060,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                           flex: 3,
                           child: _editorField(
                             controller: _serverAddrCtrl,
-                            label: 'frp server address',
+                            label: 'frp Server Address',
                             hint: 'e.g. 1.2.3.4',
                             enabled: !locked,
                             onChanged: _maybePersist,
@@ -1086,7 +1086,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Proxy config',
+                      'Proxy Config',
                       style: AppTextStyles.caption(
                         size: 12,
                         color: AppColors.textMuted,
@@ -1098,7 +1098,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                         Expanded(
                           child: _editorField(
                             controller: _proxyNameCtrl,
-                            label: 'Proxy name',
+                            label: 'Proxy Name',
                             hint: 'shell',
                             enabled: !locked,
                             onChanged: _maybePersist,
@@ -1108,7 +1108,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                         Expanded(
                           child: _editorField(
                             controller: _remotePortCtrl,
-                            label: 'Remote port',
+                            label: 'Remote Port',
                             hint: '6000',
                             enabled: !locked,
                             numeric: true,
@@ -1124,7 +1124,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                           flex: 3,
                           child: _editorField(
                             controller: _localAddrCtrl,
-                            label: 'Local address',
+                            label: 'Local Address',
                             hint: '127.0.0.1',
                             enabled: !locked,
                             onChanged: _maybePersist,
@@ -1134,7 +1134,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                         Expanded(
                           child: _editorField(
                             controller: _localPortCtrl,
-                            label: 'Local port',
+                            label: 'Local Port',
                             hint: '4444',
                             enabled: !locked,
                             numeric: true,
@@ -1149,7 +1149,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                       childrenPadding: EdgeInsets.zero,
                       dense: true,
                       title: Text(
-                        'Advanced options',
+                        'Advanced Options',
                         style: AppTextStyles.caption(
                           size: 12,
                           color: AppColors.textMuted,
@@ -1159,7 +1159,7 @@ class _FrpProfileEditorDialogState extends State<_FrpProfileEditorDialog> {
                         const SizedBox(height: 6),
                         _editorField(
                           controller: _versionCtrl,
-                          label: 'Client version (leave blank to omit)',
+                          label: 'Client Version (leave blank to omit)',
                           hint: 'e.g. 0.51.3 / 0.61.1',
                           enabled: !locked,
                           onChanged: _maybePersist,

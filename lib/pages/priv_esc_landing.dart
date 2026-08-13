@@ -62,7 +62,7 @@ const List<LandingMethod> landingMethods = [
   // ── SUID root shell ────────────────────────────────────────────────────────
   LandingMethod(
     id: 'suid_shell',
-    name: 'SUID root shell',
+    name: 'SUID Shell',
     description: '隐藏路径复制 /bin/bash 并设 SUID，之后 /tmp/.{mimic} -p 即 root。',
     params: [
       LandingParam(
@@ -82,7 +82,7 @@ const List<LandingMethod> landingMethods = [
   // ── sudoers NOPASSWD ───────────────────────────────────────────────────────
   LandingMethod(
     id: 'sudoers_nopasswd',
-    name: 'sudoers NOPASSWD',
+    name: 'Sudoers NOPASSWD',
     description: '写入 /etc/sudoers.d 让当前用户免密执行任意命令，sudo -n -i 即 root。',
     params: [
       LandingParam(
@@ -108,7 +108,7 @@ const List<LandingMethod> landingMethods = [
   // ── UID-0 passwd user ──────────────────────────────────────────────────────
   LandingMethod(
     id: 'passwd_user',
-    name: 'UID-0 passwd 用户',
+    name: 'UID-0 Account (passwd)',
     description: '向 /etc/passwd 追加 uid=0 的登录用户，之后 su 登录即 root。',
     params: [
       LandingParam(
@@ -142,7 +142,7 @@ const List<LandingMethod> landingMethods = [
   // ── root authorized_keys ───────────────────────────────────────────────────
   LandingMethod(
     id: 'root_authorized_keys',
-    name: 'root authorized_keys',
+    name: 'Root authorized_keys',
     description: '把公钥注入 /root/.ssh/authorized_keys，SSH 免密登录 root。',
     params: [
       LandingParam(

@@ -367,7 +367,7 @@ class _ProcessListTabState extends State<ProcessListTab>
                     icon: const Icon(Icons.close,
                         size: 16, color: AppColors.red),
                     onPressed: () => _killProcess(p),
-                    tooltip: 'Kill process',
+                    tooltip: 'Kill Process',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
                         minWidth: 24, minHeight: 24),

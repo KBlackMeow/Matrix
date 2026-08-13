@@ -462,7 +462,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                 foregroundColor: AppColors.primary,
                 side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
               ),
-              child: Text('suo5'),
+              child: Text('Suo5'),
             ),
             const SizedBox(height: 8),
             FilledButton(
@@ -471,7 +471,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                 backgroundColor: AppColors.primary.withValues(alpha: 0.22),
                 foregroundColor: AppColors.primary,
               ),
-              child: Text('suo6'),
+              child: Text('Suo6'),
             ),
           ],
         ),
@@ -841,16 +841,16 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
           Tab(icon: const Icon(Icons.terminal, size: 15), text: 'Terminal'),
           Tab(
             icon: const Icon(Icons.folder_open_outlined, size: 15),
-            text: 'File manager',
+            text: 'File Manager',
           ),
           Tab(
             icon: const Icon(Icons.dns_outlined, size: 15),
-            text: 'System info',
+            text: 'System Info',
           ),
           if (_showPrivEscTab)
             Tab(
               icon: const Icon(Icons.shield_outlined, size: 15),
-              text: 'Privilege check',
+              text: 'Privilege Escalation',
             ),
           if (_showPersistenceTab)
             Tab(

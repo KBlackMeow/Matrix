@@ -119,7 +119,7 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                               context: context,
                               builder: (context) {
                                 return AlertDialog(
-                                  title: Text('Listener config'),
+                                  title: Text('Listener Config'),
                                   content: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -133,7 +133,7 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                                       TextField(
                                         controller: portController,
                                         decoration: InputDecoration(
-                                          labelText: 'Listen port (LPORT)',
+                                          labelText: 'Listen Port (LPORT)',
                                         ),
                                         keyboardType: TextInputType.number,
                                       ),
@@ -170,7 +170,7 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                             }
                           },
                           icon: const Icon(Icons.settings, size: 16),
-                          label: Text('Listener config'),
+                          label: Text('Listener Config'),
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             minimumSize: const Size(0, 32),
@@ -184,7 +184,7 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                               await _service.stopListening();
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Stop listen')),
+                                  SnackBar(content: Text('Stop Listen')),
                                 );
                               }
                               setState(() {});
@@ -237,10 +237,10 @@ class _ReverseShellDashboardPageState extends State<ReverseShellDashboardPage> {
                           ),
                           label: Text(
                             _service.isListening
-                                ? 'Stop listen'
+                                ? 'Stop Listen'
                                 : (_service.isPortOccupied
-                                      ? 'Port in use'
-                                      : 'Start listen'),
+                                      ? 'Port in Use'
+                                      : 'Start Listen'),
                           ),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(0, 32),

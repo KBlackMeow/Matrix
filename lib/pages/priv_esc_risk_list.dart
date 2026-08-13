@@ -11,6 +11,7 @@ class PrivEscRiskList extends StatelessWidget {
     this.onExecute,
     this.scanIncomplete = false,
     this.hasScanned = true,
+    this.hidingUnusable = false,
   });
 
   final List<PrivEscRisk> risks;
@@ -19,12 +20,17 @@ class PrivEscRiskList extends StatelessWidget {
   final bool scanIncomplete;
   final bool hasScanned;
 
+  /// True when informational (non-executable) risks are filtered out, so an
+  /// empty list here does not mean "nothing found".
+  final bool hidingUnusable;
+
   @override
   Widget build(BuildContext context) {
     if (risks.isEmpty) {
       return _RiskEmptyState(
         scanIncomplete: scanIncomplete,
         hasScanned: hasScanned,
+        hidingUnusable: hidingUnusable,
       );
     }
 
@@ -168,8 +174,8 @@ class _PrivEscRiskCard extends StatelessWidget {
               risk.level == PrivEscRiskLevel.confirmed &&
               onExecute != null) ...[
             const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
+            Align(
+              alignment: Alignment.centerRight,
               child: FilledButton.icon(
                 onPressed: () => onExecute!(risk),
                 icon: const Icon(Icons.rocket_launch_outlined, size: 16),
@@ -177,7 +183,7 @@ class _PrivEscRiskCard extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.red,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 ),
               ),
             ),
@@ -261,21 +267,28 @@ class _RiskEmptyState extends StatelessWidget {
   const _RiskEmptyState({
     required this.scanIncomplete,
     required this.hasScanned,
+    required this.hidingUnusable,
   });
 
   final bool scanIncomplete;
   final bool hasScanned;
+  final bool hidingUnusable;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 48),
-    child: Center(
-      child: Text(
-        !hasScanned
-            ? '开始扫描后将在这里显示已识别风险。'
-            : (scanIncomplete ? '扫描未完整完成，暂未生成可识别风险。' : '扫描完成，未发现已识别风险。'),
-        style: AppTextStyles.body(size: 13, color: AppColors.textSecondary),
+  Widget build(BuildContext context) {
+    final message = !hasScanned
+        ? '开始扫描后将在这里显示已识别风险。'
+        : hidingUnusable
+        ? '扫描完成，未发现可直接利用的提权路径（信息线索已隐藏）。'
+        : (scanIncomplete ? '扫描未完整完成，暂未生成可识别风险。' : '扫描完成，未发现已识别风险。');
+    return Padding(
+      padding: const EdgeInsets.only(top: 48),
+      child: Center(
+        child: Text(
+          message,
+          style: AppTextStyles.body(size: 13, color: AppColors.textSecondary),
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

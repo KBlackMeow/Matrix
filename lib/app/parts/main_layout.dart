@@ -242,7 +242,7 @@ class _MainLayoutState extends State<MainLayout> {
           _rebuildDynamicPages();
         });
       },
-      title: 'suo5/suo6',
+      title: 'Suo5/Suo6',
       icon: AppTunnelIcons.outlined,
       contentBuilder: (project, onSwitchProject) => SuoTunnelProxyPage(
         project: project,
@@ -306,13 +306,13 @@ class _MainLayoutState extends State<MainLayout> {
       case 3:
         return 'Payloads';
       case 4:
-        return 'Terminal';
+        return 'Reverse Shell';
       case 5:
         return 'FRP Client';
       case 6:
-        return 'suo5/suo6';
+        return 'Suo5/Suo6';
       case 7:
-        return 'MCP';
+        return 'MCP Server';
       default:
         return '';
     }

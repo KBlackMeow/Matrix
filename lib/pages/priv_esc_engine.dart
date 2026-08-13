@@ -165,6 +165,21 @@ class PrivEscScanner {
                     candidate: c,
                   ),
                 );
+              } else {
+                // Proof ran but did not confirm escalation — surface it as an
+                // informational lead instead of silently dropping it, so the
+                // "unusable" option is still listed.
+                risks.add(
+                  PrivEscRisk(
+                    title: vector.title,
+                    evidence:
+                        '${c.evidence} 但无害验证未确认提权，本通道无法直接利用。',
+                    level: PrivEscRiskLevel.informational,
+                    hasDirectPrivilegeProof: false,
+                    checkCommand: proofCmd,
+                    rawOutput: proofOut,
+                  ),
+                );
               }
             } catch (_) {
               incomplete = true;

@@ -73,7 +73,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 autofocus: true,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: 'Project name',
+                  labelText: 'Project Name',
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(
@@ -190,7 +190,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                 autofocus: true,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  labelText: 'Project name',
+                  labelText: 'Project Name',
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(
@@ -362,7 +362,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
             FilledButton.icon(
               onPressed: _loading ? null : _showCreateDialog,
               icon: const Icon(Icons.add, size: 18),
-              label: Text('New project'),
+              label: Text('New Project'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -396,7 +396,7 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No projects yet. Click "${'New project'}" to get started',
+                        'No projects yet. Click "${'New Project'}" to get started',
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 14,
@@ -516,7 +516,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                 widget.onEnterSuo5();
               },
               icon: const Icon(AppTunnelIcons.outlined, size: 20),
-              label: Text('Open suo5'),
+              label: Text('Open Suo5/Suo6'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -534,7 +534,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                 widget.onEnterMcp();
               },
               icon: const Icon(Icons.router_outlined, size: 20),
-              label: const Text('Enter MCP'),
+              label: const Text('Open MCP'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -759,7 +759,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'Open suo5',
+                              'Open Suo5/Suo6',
                               style: AppTextStyles.body(
                                 color: AppColors.textPrimary,
                               ),
@@ -778,7 +778,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'Enter MCP',
+                              'Open MCP',
                               style: AppTextStyles.body(
                                 color: AppColors.textPrimary,
                               ),

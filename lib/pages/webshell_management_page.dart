@@ -1022,7 +1022,7 @@ class _ConnectorTypeDropdown extends StatelessWidget {
       isExpanded: true,
       value: value,
       decoration: InputDecoration(
-        labelText: 'Connector type',
+        labelText: 'Connector Type',
         labelStyle: AppTextStyles.caption(color: AppColors.textSecondary),
         filled: true,
         fillColor: AppColors.bgCard,

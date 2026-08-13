@@ -172,7 +172,7 @@ class _FileManagerTabState extends State<FileManagerTab>
       return;
     }
     final file = await openFile(
-      acceptedTypeGroups: [XTypeGroup(label: 'All files')],
+      acceptedTypeGroups: [XTypeGroup(label: 'All Files')],
     );
     if (file == null || !mounted) return;
     final bytes = await file.readAsBytes();
@@ -443,7 +443,7 @@ class _FileManagerTabState extends State<FileManagerTab>
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.bgDark,
                     ),
-                    child: Text('Save deobfuscated'),
+                    child: Text('Save Deobfuscated'),
                   ),
                 ],
               ),
@@ -641,7 +641,7 @@ class _FileManagerTabState extends State<FileManagerTab>
                     : () => _loadDirectory(_parent(_currentPath)),
                 icon: const Icon(Icons.arrow_upward, size: 16),
                 color: AppColors.textSecondary,
-                tooltip: 'Parent directory',
+                tooltip: 'Parent Directory',
               ),
               Expanded(
                 child: Container(
@@ -673,7 +673,7 @@ class _FileManagerTabState extends State<FileManagerTab>
                       : _uploadFile,
                   icon: const Icon(Icons.upload_file, size: 16),
                   color: AppColors.primary,
-                  tooltip: 'Upload file',
+                  tooltip: 'Upload File',
                 ),
               if (widget.service.supportsFileWrite)
                 IconButton(
@@ -689,7 +689,7 @@ class _FileManagerTabState extends State<FileManagerTab>
                   onPressed: _loading ? null : _detectWritableDirs,
                   icon: const Icon(Icons.manage_search, size: 16),
                   color: AppColors.amber,
-                  tooltip: 'Detect writable directories',
+                  tooltip: 'Detect Writable Directories',
                 ),
               IconButton(
                 onPressed: _loading ? null : () => _loadDirectory(_currentPath),
@@ -1344,7 +1344,7 @@ class _FileViewDialogState extends State<_FileViewDialog> {
                         size: 16,
                         color: AppColors.textSecondary,
                       ),
-                      tooltip: 'Copy content',
+                      tooltip: 'Copy Content',
                     ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),

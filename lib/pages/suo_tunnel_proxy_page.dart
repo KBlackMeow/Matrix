@@ -211,7 +211,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
     _openCreateSub = SuoTunnelProxyPage._openCreateBus.stream.listen((e) {
       if (!mounted || e.projectId != widget.project.id) return;
       _showEditorDialog(
-        title: 'New proxy',
+        title: 'New Proxy',
         submitLabel: 'Add',
         initialS6: e.defaultSuo6,
         protocolLocked: false,
@@ -429,7 +429,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
         ? (_s6.isRunning(e.p6!.id))
         : (_s5.isRunning(e.p5!.id));
     await _showEditorDialog(
-      title: 'Edit proxy',
+      title: 'Edit Proxy',
       submitLabel: 'Save',
       initialS6: e.isS6,
       protocolLocked: locked,
@@ -783,7 +783,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
             FilledButton.icon(
               onPressed: _loading ? null : _showCreateDialog,
               icon: const Icon(Icons.add, size: 18),
-              label: Text('Add proxy'),
+              label: Text('Add Proxy'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -854,7 +854,7 @@ class _SuoTunnelProxyPageState extends State<SuoTunnelProxyPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              'No profiles. Tap "${'Add proxy'}" to add one.',
+              'No profiles. Tap "${'Add Proxy'}" to add one.',
               style: AppTextStyles.body(color: AppColors.textSecondary),
             ),
           ],
@@ -1054,11 +1054,11 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
                 segments: [
                   ButtonSegment<bool>(
                     value: false,
-                    label: Text('suo5'),
+                    label: Text('Suo5'),
                   ),
                   ButtonSegment<bool>(
                     value: true,
-                    label: Text('suo6'),
+                    label: Text('Suo6'),
                   ),
                 ],
                 selected: {_is6},
@@ -1071,7 +1071,7 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
               const SizedBox(height: 16),
               _tf(
                 widget.urlController,
-                'suo5 URL',
+                'Suo5 URL',
                 'https://target/path/suo5.php',
                 autofocus: true,
                 enabled: !locked,
@@ -1079,7 +1079,7 @@ class _TunnelEditorDialogState extends State<_TunnelEditorDialog> {
               const SizedBox(height: 16),
               _tf(
                 widget.nameController,
-                'Profile name',
+                'Profile Name',
                 'A friendly name',
                 enabled: !locked,
               ),
@@ -1339,8 +1339,8 @@ class _TunnelEntryCardState extends State<_TunnelEntryCard> {
                           const SizedBox(width: 6),
                           _ChipLbl(
                             label: _is6
-                                ? 'suo6'
-                                : 'suo5',
+                                ? 'Suo6'
+                                : 'Suo5',
                             color: _is6 ? AppColors.primary : AppColors.cyan,
                           ),
                           const SizedBox(width: 6),

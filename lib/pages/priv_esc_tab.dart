@@ -26,6 +26,18 @@ class _PrivEscTabState extends State<PrivEscTab>
   int _completedChecks = 0;
   String _currentUser = '';
 
+  /// When on (default), only risks with an executable chain (`candidate != null`)
+  /// are shown; informational leads are hidden. When off, they reappear below
+  /// the executable risks (the level grouping already sorts them last).
+  bool _hideUnusable = true;
+
+  List<PrivEscRisk> get _displayRisks {
+    if (!_hideUnusable) return _confirmedRisks;
+    return _confirmedRisks
+        .where((r) => r.candidate != null)
+        .toList(growable: false);
+  }
+
   @override
   bool get wantKeepAlive => true;
 
@@ -114,6 +126,23 @@ class _PrivEscTabState extends State<PrivEscTab>
                 ),
               ],
               const Spacer(),
+              FilterChip(
+                selected: _hideUnusable,
+                onSelected: (v) => setState(() => _hideUnusable = v),
+                label: const Text('隐藏不可用'),
+                labelStyle: AppTextStyles.caption(
+                  size: 11,
+                  color: _hideUnusable
+                      ? AppColors.red
+                      : AppColors.textSecondary,
+                ),
+                selectedColor: AppColors.red.withValues(alpha: 0.15),
+                checkmarkColor: AppColors.red,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              const SizedBox(width: 4),
               if (_confirmedRisks.isNotEmpty)
                 TextButton.icon(
                   onPressed: _runningAll ? null : _clearAll,
@@ -158,9 +187,10 @@ class _PrivEscTabState extends State<PrivEscTab>
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             children: [
               PrivEscRiskList(
-                risks: _confirmedRisks,
+                risks: _displayRisks,
                 scanIncomplete: _scanIncomplete,
                 hasScanned: _scanHasRun,
+                hidingUnusable: _hideUnusable && _confirmedRisks.isNotEmpty,
                 onCopy: (cmd) {
                   Clipboard.setData(ClipboardData(text: cmd));
                   ScaffoldMessenger.of(context).showSnackBar(
