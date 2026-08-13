@@ -186,14 +186,10 @@ class BehinderCrypto {
             return msg;
           }
         }
-        final status = json['status'];
-        if (status is String && status.isNotEmpty) {
-          try {
-            return utf8.decode(base64.decode(status));
-          } catch (_) {
-            return status;
-          }
-        }
+        // 「status」是状态标志，Agent 固定传 "success"（buildJson("success", result)），
+        // 不是命令输出。msg 为空即代表命令无输出，应返回空字符串，
+        // 否则会把 "success" 泄漏到调用方（例如默认路径检测结果）。
+        return '';
       }
     } on FormatException {
       // 不是 JSON → 直接返回

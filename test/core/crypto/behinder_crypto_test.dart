@@ -133,9 +133,13 @@ void main() {
         final json = '{"status":"c3VjY2Vzcw==","msg":"${base64Encode(utf8.encode(output))}"}';
         expect(BehinderCrypto.extractResponse(json), output);
       });
-      test('extracts status when msg missing', () {
-        final json = '{"status":"${base64Encode(utf8.encode("failed"))}"}';
-        expect(BehinderCrypto.extractResponse(json), 'failed');
+      test('returns empty when msg missing (status is not output)', () {
+        final json = '{"status":"${base64Encode(utf8.encode("success"))}"}';
+        expect(BehinderCrypto.extractResponse(json), '');
+      });
+      test('returns empty when msg empty (status=success is not output)', () {
+        final json = '{"status":"${base64Encode(utf8.encode("success"))}","msg":""}';
+        expect(BehinderCrypto.extractResponse(json), '');
       });
       test('plaintext returned as-is', () {
         expect(BehinderCrypto.extractResponse('MATRIX_JSP_PING'), 'MATRIX_JSP_PING');
