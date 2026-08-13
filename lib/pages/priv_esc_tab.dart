@@ -97,11 +97,11 @@ class _PrivEscTabState extends State<PrivEscTab>
           color: AppColors.bgElevated,
           child: Row(
             children: [
-              const Icon(Icons.shield_outlined, color: AppColors.red, size: 16),
+              const Icon(Icons.shield_outlined, color: AppColors.amber, size: 16),
               const SizedBox(width: 8),
               Text(
-                '提权风险扫描',
-                style: AppTextStyles.heading(size: 14, color: AppColors.red),
+                'Privilege Escalation Scan',
+                style: AppTextStyles.heading(size: 14, color: AppColors.amber),
               ),
               if (_runningAll || _scanHasRun) ...[
                 const SizedBox(width: 8),
@@ -111,16 +111,16 @@ class _PrivEscTabState extends State<PrivEscTab>
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.red.withValues(alpha: 0.15),
+                    color: AppColors.amber.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     _runningAll
-                        ? '正在扫描 $_completedChecks / $totalCount'
-                        : '确认 ${_confirmedRisks.length} 个风险点',
+                        ? 'Scanning $_completedChecks / $totalCount'
+                        : '${_confirmedRisks.length} risks confirmed',
                     style: AppTextStyles.caption(
                       size: 11,
-                      color: AppColors.red,
+                      color: AppColors.amber,
                     ),
                   ),
                 ),
@@ -129,15 +129,15 @@ class _PrivEscTabState extends State<PrivEscTab>
               FilterChip(
                 selected: _hideUnusable,
                 onSelected: (v) => setState(() => _hideUnusable = v),
-                label: const Text('隐藏不可用'),
+                label: const Text('Hide Unusable'),
                 labelStyle: AppTextStyles.caption(
                   size: 11,
                   color: _hideUnusable
-                      ? AppColors.red
+                      ? AppColors.primary
                       : AppColors.textSecondary,
                 ),
-                selectedColor: AppColors.red.withValues(alpha: 0.15),
-                checkmarkColor: AppColors.red,
+                selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                checkmarkColor: AppColors.primary,
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -147,7 +147,7 @@ class _PrivEscTabState extends State<PrivEscTab>
                 TextButton.icon(
                   onPressed: _runningAll ? null : _clearAll,
                   icon: const Icon(Icons.delete_sweep_outlined, size: 14),
-                  label: const Text('清空结果'),
+                  label: const Text('Clear Results'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.textSecondary,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -167,10 +167,10 @@ class _PrivEscTabState extends State<PrivEscTab>
                       )
                     : const Icon(Icons.play_arrow_rounded, size: 15),
                 label: Text(
-                  _runningAll ? '扫描中…' : (_scanHasRun ? '重新扫描' : '开始扫描'),
+                  _runningAll ? 'Scanning…' : (_scanHasRun ? 'Re-scan' : 'Start Scan'),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.red,
+                  backgroundColor: AppColors.primaryDeep,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -195,7 +195,7 @@ class _PrivEscTabState extends State<PrivEscTab>
                   Clipboard.setData(ClipboardData(text: cmd));
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('已复制到剪贴板'),
+                      content: const Text('Copied to clipboard'),
                       duration: const Duration(seconds: 1),
                       behavior: SnackBarBehavior.floating,
                     ),
@@ -300,11 +300,11 @@ class _PrivEscExecuteDialogState extends State<_PrivEscExecuteDialog> {
       title: Row(
         children: [
           const Icon(Icons.admin_panel_settings_outlined,
-              color: AppColors.red, size: 20),
+              color: AppColors.primary, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '执行提权链',
+              'Execute Escalation Chain',
               style: AppTextStyles.heading(size: 15),
             ),
           ),
@@ -374,12 +374,12 @@ class _PrivEscExecuteDialogState extends State<_PrivEscExecuteDialog> {
 
               const SizedBox(height: 8),
               _CommandPreview(
-                label: '执行命令（提权 + 落地后门）',
+                label: 'Execute Command (Escalation + Backdoor)',
                 command: chain.deployCommand,
               ),
               const SizedBox(height: 8),
               _CommandPreview(
-                label: '验证命令',
+                label: 'Verify Command',
                 command: chain.verifyCommand,
               ),
 
@@ -394,7 +394,7 @@ class _PrivEscExecuteDialogState extends State<_PrivEscExecuteDialog> {
       actions: [
         TextButton(
           onPressed: _executing ? null : () => Navigator.of(context).pop(),
-          child: const Text('关闭'),
+          child: const Text('Close'),
         ),
         FilledButton.icon(
           onPressed: _executing ? null : _execute,
@@ -408,9 +408,9 @@ class _PrivEscExecuteDialogState extends State<_PrivEscExecuteDialog> {
                   ),
                 )
               : const Icon(Icons.rocket_launch_outlined, size: 16),
-          label: Text(_executing ? '执行中…' : '确认并执行'),
+          label: Text(_executing ? 'Executing…' : 'Confirm & Execute'),
           style: FilledButton.styleFrom(
-            backgroundColor: AppColors.red,
+            backgroundColor: AppColors.primaryDeep,
             foregroundColor: Colors.white,
           ),
         ),
@@ -436,7 +436,7 @@ class _LandingTile extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '落地方式：${landing.name}',
+          'Landing: ${landing.name}',
           style: AppTextStyles.body(size: 13).copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -492,8 +492,8 @@ class _ResultBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = result.fullyVerified ? AppColors.primary : AppColors.red;
     final title = result.fullyVerified
-        ? '✓ 提权成功，root 已落地'
-        : (result.deployOk ? '✗ 落地成功但验证未通过' : '✗ 执行失败');
+        ? '✓ Escalation succeeded — root established'
+        : (result.deployOk ? '✗ Landing succeeded but verification failed' : '✗ Execution failed');
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(10),
@@ -513,16 +513,16 @@ class _ResultBlock extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text('执行输出', style: AppTextStyles.caption(size: 10, color: AppColors.textMuted)),
+          Text('Execution Output', style: AppTextStyles.caption(size: 10, color: AppColors.textMuted)),
           SelectableText(
-            result.deployOutput.isEmpty ? '(空)' : result.deployOutput,
+            result.deployOutput.isEmpty ? '(empty)' : result.deployOutput,
             style: AppTextStyles.terminal(
                 size: 10.5, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 6),
-          Text('验证输出', style: AppTextStyles.caption(size: 10, color: AppColors.textMuted)),
+          Text('Verification Output', style: AppTextStyles.caption(size: 10, color: AppColors.textMuted)),
           SelectableText(
-            result.verifyOutput.isEmpty ? '(空)' : result.verifyOutput,
+            result.verifyOutput.isEmpty ? '(empty)' : result.verifyOutput,
             style: AppTextStyles.terminal(
                 size: 10.5, color: AppColors.textSecondary),
           ),

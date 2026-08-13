@@ -53,7 +53,7 @@ class PrivEscRiskList extends StatelessWidget {
         ],
         if (scanIncomplete)
           Text(
-            '部分检查未完成；展开风险详情可查看可用的检测结果。',
+            'Some scans did not complete; expand a risk to view available detection results.',
             style: AppTextStyles.caption(color: AppColors.textMuted),
           ),
       ],
@@ -70,19 +70,19 @@ class _RiskSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color, icon) = switch (level) {
       PrivEscRiskLevel.confirmed => (
-        '已确认风险',
-        AppColors.red,
-        Icons.error_outline,
+        'Confirmed Risks',
+        AppColors.primary,
+        Icons.check_circle_outline,
       ),
       PrivEscRiskLevel.needsVerification => (
-        '待验证风险',
+        'Pending Verification',
         AppColors.amber,
         Icons.help_outline,
       ),
       PrivEscRiskLevel.informational => (
-        '信息线索',
-        AppColors.textSecondary,
-        Icons.info_outline,
+        'Informational Leads',
+        AppColors.red,
+        Icons.lock_outline,
       ),
     };
     return Row(
@@ -111,9 +111,9 @@ class _PrivEscRiskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (risk.level) {
-      PrivEscRiskLevel.confirmed => AppColors.red,
+      PrivEscRiskLevel.confirmed => AppColors.primary,
       PrivEscRiskLevel.needsVerification => AppColors.amber,
-      PrivEscRiskLevel.informational => AppColors.textSecondary,
+      PrivEscRiskLevel.informational => AppColors.red,
     };
     final copyableCommands =
         (risk.verificationCommands.isEmpty
@@ -146,7 +146,7 @@ class _PrivEscRiskCard extends StatelessWidget {
           Text(risk.evidence, style: AppTextStyles.caption(size: 11)),
           if (copyableCommands.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text('验证命令', style: AppTextStyles.caption(size: 11, color: color)),
+            Text('Verify Command', style: AppTextStyles.caption(size: 11, color: color)),
             const SizedBox(height: 5),
             for (final command in copyableCommands)
               _CommandRow(command: command, color: color, onCopy: onCopy),
@@ -160,12 +160,12 @@ class _PrivEscRiskCard extends StatelessWidget {
               child: ExpansionTile(
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: const EdgeInsets.only(bottom: 4),
-                title: Text('查看检测详情', style: AppTextStyles.caption(size: 11)),
+                title: Text('View Detection Details', style: AppTextStyles.caption(size: 11)),
                 children: [
                   if (risk.checkCommand != null)
-                    _DetailBlock(label: '检测命令', value: risk.checkCommand!),
+                    _DetailBlock(label: 'Scan Command', value: risk.checkCommand!),
                   if (risk.rawOutput != null)
-                    _DetailBlock(label: '检测输出', value: risk.rawOutput!),
+                    _DetailBlock(label: 'Scan Output', value: risk.rawOutput!),
                 ],
               ),
             ),
@@ -179,9 +179,9 @@ class _PrivEscRiskCard extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: () => onExecute!(risk),
                 icon: const Icon(Icons.rocket_launch_outlined, size: 16),
-                label: const Text('生成提权命令链并执行'),
+                label: const Text('Generate & Execute Escalation Chain'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.red,
+                  backgroundColor: AppColors.primaryDeep,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 ),
@@ -225,7 +225,7 @@ class _CommandRow extends StatelessWidget {
         IconButton(
           onPressed: onCopy == null ? null : () => onCopy!(command),
           icon: const Icon(Icons.copy_outlined, size: 16),
-          tooltip: '复制验证命令',
+          tooltip: 'Copy Verify Command',
           visualDensity: VisualDensity.compact,
           color: AppColors.textSecondary,
         ),
@@ -277,10 +277,10 @@ class _RiskEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = !hasScanned
-        ? '开始扫描后将在这里显示已识别风险。'
+        ? 'Run a scan to see identified risks here.'
         : hidingUnusable
-        ? '扫描完成，未发现可直接利用的提权路径（信息线索已隐藏）。'
-        : (scanIncomplete ? '扫描未完整完成，暂未生成可识别风险。' : '扫描完成，未发现已识别风险。');
+        ? 'Scan complete — no directly exploitable escalation paths found (informational leads hidden).'
+        : (scanIncomplete ? 'Scan did not complete; no risks identified yet.' : 'Scan complete — no risks identified.');
     return Padding(
       padding: const EdgeInsets.only(top: 48),
       child: Center(

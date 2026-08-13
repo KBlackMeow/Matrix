@@ -173,7 +173,7 @@ class PrivEscScanner {
                   PrivEscRisk(
                     title: vector.title,
                     evidence:
-                        '${c.evidence} 但无害验证未确认提权，本通道无法直接利用。',
+                        '${c.evidence} but the harmless proof did not confirm escalation; this channel cannot exploit it directly.',
                     level: PrivEscRiskLevel.informational,
                     hasDirectPrivilegeProof: false,
                     checkCommand: proofCmd,

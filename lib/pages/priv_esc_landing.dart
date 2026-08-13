@@ -63,12 +63,12 @@ const List<LandingMethod> landingMethods = [
   LandingMethod(
     id: 'suid_shell',
     name: 'SUID Shell',
-    description: '隐藏路径复制 /bin/bash 并设 SUID，之后 /tmp/.{mimic} -p 即 root。',
+    description: 'Copies /bin/bash to a hidden path and sets SUID; afterwards /tmp/.{mimic} -p gives root.',
     params: [
       LandingParam(
         id: 'mimic',
-        label: '隐藏文件名',
-        hint: '如 kworker、dbus-daemon、systemd-coredump',
+        label: 'Hidden filename',
+        hint: 'e.g. kworker, dbus-daemon, systemd-coredump',
         defaultValue: 'kworker',
       ),
     ],
@@ -83,18 +83,18 @@ const List<LandingMethod> landingMethods = [
   LandingMethod(
     id: 'sudoers_nopasswd',
     name: 'Sudoers NOPASSWD',
-    description: '写入 /etc/sudoers.d 让当前用户免密执行任意命令，sudo -n -i 即 root。',
+    description: 'Writes /etc/sudoers.d to let the current user run any command passwordless; sudo -n -i gives root.',
     params: [
       LandingParam(
         id: 'user',
-        label: '目标用户名',
-        hint: '留空则使用扫描捕获的当前用户',
+        label: 'Target username',
+        hint: 'Leave empty to use the current user captured by the scan',
         defaultValue: '',
       ),
       LandingParam(
         id: 'name',
-        label: '文件名',
-        hint: 'sudoers.d 下的文件名',
+        label: 'Filename',
+        hint: 'Filename under sudoers.d',
         defaultValue: 'zz-mx',
       ),
     ],
@@ -109,24 +109,24 @@ const List<LandingMethod> landingMethods = [
   LandingMethod(
     id: 'passwd_user',
     name: 'UID-0 Account (passwd)',
-    description: '向 /etc/passwd 追加 uid=0 的登录用户，之后 su 登录即 root。',
+    description: 'Appends a uid=0 login user to /etc/passwd; su login afterwards gives root.',
     params: [
       LandingParam(
         id: 'username',
-        label: '用户名',
-        hint: '伪装成系统守护进程，如 messagebus、daemon',
+        label: 'Username',
+        hint: 'Masquerade as a system daemon, e.g. messagebus, daemon',
         defaultValue: 'messagebus',
       ),
       LandingParam(
         id: 'password',
-        label: '密码',
-        hint: '后门用户的登录密码',
+        label: 'Password',
+        hint: 'Login password for the backdoor user',
         defaultValue: 'REPLACE_PASSWORD',
       ),
       LandingParam(
         id: 'salt',
-        label: 'crypt 盐值',
-        hint: '2 字符随机盐',
+        label: 'crypt salt',
+        hint: '2-character random salt',
         defaultValue: 'AA',
       ),
     ],
@@ -143,18 +143,18 @@ const List<LandingMethod> landingMethods = [
   LandingMethod(
     id: 'root_authorized_keys',
     name: 'Root authorized_keys',
-    description: '把公钥注入 /root/.ssh/authorized_keys，SSH 免密登录 root。',
+    description: 'Injects a public key into /root/.ssh/authorized_keys for passwordless SSH login as root.',
     params: [
       LandingParam(
         id: 'pubkey',
-        label: 'SSH 公钥',
+        label: 'SSH public key',
         hint: 'ssh-rsa AAAA… user@host',
         defaultValue: '',
       ),
       LandingParam(
         id: 'fingerprint',
-        label: '公钥指纹片段',
-        hint: '用于验证/回滚的唯一片段，如最后一段注释',
+        label: 'Public key fingerprint fragment',
+        hint: 'Unique fragment for verify/rollback, e.g. the last comment',
         defaultValue: '',
       ),
     ],

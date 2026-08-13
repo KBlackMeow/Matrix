@@ -267,10 +267,10 @@ class _PersistenceTabState extends State<PersistenceTab>
                         ),
                       )
                     : const Icon(Icons.play_arrow_rounded, size: 15),
-                label: Text(_runningAll ? 'Checking All…' : 'Check All'),
+                label: Text(_runningAll ? 'Scanning All…' : 'Scan All'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.amber,
-                  foregroundColor: Colors.black,
+                  backgroundColor: AppColors.primaryDeep,
+                  foregroundColor: Colors.white,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   textStyle: AppTextStyles.body(size: 13),
@@ -290,7 +290,7 @@ class _PersistenceTabState extends State<PersistenceTab>
                   child: Center(
                     child: Text(
                       checkDone == 0
-                          ? 'Run "Check all" to see which methods are usable on this target.'
+                          ? 'Run "Scan all" to see which methods are usable on this target.'
                           : 'No deployable methods found on this target.',
                       textAlign: TextAlign.center,
                       style: AppTextStyles.body(
@@ -507,7 +507,7 @@ class _PersistMethodWidget extends StatelessWidget {
                           ),
                         ),
                         child: Text(
-                          hasDetection ? 'Re-check' : 'Check',
+                          hasDetection ? 'Re-scan' : 'Scan',
                           style: AppTextStyles.caption(size: 10, color: color),
                         ),
                       ),
@@ -529,10 +529,10 @@ class _PersistMethodWidget extends StatelessWidget {
                     style: AppTextStyles.caption(size: 11)),
                 children: [
                   _DetailBlock(
-                      label: 'Check Command', value: method.checkCommand),
+                      label: 'Scan Command', value: method.checkCommand),
                   if (detectionResult?.rawOutput != null)
                     _DetailBlock(
-                        label: 'Check Output',
+                        label: 'Scan Output',
                         value: detectionResult!.rawOutput!),
                 ],
               ),
@@ -552,7 +552,7 @@ class _PersistMethodWidget extends StatelessWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: isBlocked
                     ? AppColors.textMuted.withValues(alpha: 0.5)
-                    : AppColors.red,
+                    : AppColors.primaryDeep,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               ),
@@ -612,7 +612,7 @@ class _PersistMethodWidget extends StatelessWidget {
     if (detectionResult != null &&
         detectionResult!.verdict == DetectionVerdict.error) {
       return _StatusChip(
-        label: 'Check Failed',
+        label: 'Scan Failed',
         color: AppColors.red,
         icon: Icons.error_outline,
       );
@@ -906,7 +906,7 @@ class _PersistDeployDialogState extends State<_PersistDeployDialog> {
             style: AppTextStyles.body(size: 13, color: Colors.white),
           ),
           style: FilledButton.styleFrom(
-            backgroundColor: AppColors.red,
+            backgroundColor: AppColors.primaryDeep,
             foregroundColor: Colors.white,
           ),
         ),

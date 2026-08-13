@@ -6,6 +6,8 @@ class AppColors {
   // 主色 - 柔和终端绿（比纯 #00FF41 护眼，更接近真实 CRT）
   static const Color primary = Color(0xFF00E676);
   static const Color primaryDim = Color(0xFF69F0AE);
+  // 按钮/执行动作专用：比 primary 更深、更沉稳的绿，避免大块按钮刺眼
+  static const Color primaryDeep = Color(0xFF00C853);
 
   // 背景
   static const Color bgDark = Color(0xFF0A0E14);
