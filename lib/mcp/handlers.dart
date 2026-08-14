@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:path/path.dart' as p;
 
+import '../connectors/connector_factory.dart';
 import '../models/webshell.dart';
 import '../services/webshell_connectivity_service.dart';
 import 'db.dart';
@@ -30,6 +31,7 @@ void registerAllTools(
 }) {
   final log = onActivity;
   _registerShellList(server, db, projectId, log);
+  _registerShellConnectors(server, log);
   _registerShellAdd(server, db, projectId, log);
   _registerShellUse(server, pool, db, projectId, log);
   _registerShellRemove(server, pool, db, projectId, log);
@@ -189,6 +191,26 @@ void _registerShellList(
   );
 }
 
+void _registerShellConnectors(
+  McpServer server,
+  McpActivityLogger? log,
+) {
+  server.registerTool(
+    'shell_connectors',
+    description:
+        '列出全部可用的 WebShell 连接器类型及其使用方式、适用场景与能力，'
+        '用于在新增 WebShell 时选择正确的 connector_type',
+    inputSchema: JsonSchema.object(properties: {}, required: []),
+    callback: _wrap('shell_connectors', (args, extra) async {
+      try {
+        return _json({'connectors': ConnectorFactory.catalog()});
+      } catch (e) {
+        return _error('$e');
+      }
+    }, log),
+  );
+}
+
 void _registerShellAdd(
   McpServer server,
   McpDatabase db,
@@ -206,8 +228,11 @@ void _registerShellAdd(
         'type': JsonSchema.string(description: '脚本类型：php, jsp, asp, aspx'),
         'connector_type': JsonSchema.string(
           description:
-              '连接器类型。PHP: php_eval, php_b64rot13, php_behinder, php_passthru；'
-              'JSP: jsp_classloader, jsp_behinder, jsp_runtime；ASP: asp_wscript; ASPX: aspx_cmd',
+              '连接器类型，完整用法与适用场景见 shell_connectors 工具。'
+              'PHP: php_eval(代码注入)/php_b64rot13(混淆)/php_behinder(加密)/php_passthru(命令)；'
+              'JSP: jsp_classloader(agent)/jsp_behinder(加密)/jsp_behinder_v2(动态字节码)/jsp_runtime(命令)；'
+              'ASP: asp_wscript(命令)；'
+              'ASPX: aspx_cmd(命令)/aspx_behinder(加密)',
         ),
         'method': JsonSchema.string(description: 'HTTP 方法：GET 或 POST'),
       },

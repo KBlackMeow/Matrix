@@ -79,5 +79,34 @@ void main() {
       expect(ConnectorFactory.typeLabel('php_eval'), equals('php'));
       expect(ConnectorFactory.typeLabel('php_passthru'), equals('php'));
     });
+
+    test('catalog returns 11 flat entries with usage/scenario metadata', () {
+      final catalog = ConnectorFactory.catalog();
+      expect(catalog, hasLength(11));
+      final byType = {
+        for (final e in catalog) e['type'] as String: e,
+      };
+      expect(byType.keys, equals(ConnectorFactory.allTypes.toSet()));
+      for (final type in ConnectorFactory.allTypes) {
+        final entry = byType[type];
+        expect(entry, isNotNull, reason: 'catalog 缺少 $type');
+        expect(entry!['usage'], isNotEmpty);
+        expect(entry['scenario'], isNotEmpty);
+        expect(entry['capabilities'], isNotEmpty);
+      }
+    });
+
+    test('catalog capabilities match create().capabilities', () {
+      final byType = {
+        for (final e in ConnectorFactory.catalog()) e['type'] as String: e,
+      };
+      for (final type in ConnectorFactory.allTypes) {
+        final connector = ConnectorFactory.create(_fakeWebshell(type));
+        expect(
+          (byType[type]!['capabilities'] as List).toSet(),
+          equals(connector.capabilities.map((c) => c.name).toSet()),
+        );
+      }
+    });
   });
 }
