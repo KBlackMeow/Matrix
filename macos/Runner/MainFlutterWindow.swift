@@ -41,13 +41,9 @@ class MainFlutterWindow: NSWindow {
       var isStale = false
       let url = try URL(
         resolvingBookmarkData: bookmark,
-        options: [.withSecurityScope],
+        options: [],
         relativeTo: nil,
         bookmarkDataIsStale: &isStale)
-      guard url.startAccessingSecurityScopedResource() else {
-        result(FlutterError(code: "workspace_access_denied", message: "无法访问已授权的 Matrix 工作区", details: nil))
-        return
-      }
       workspaceURL = url
       if isStale {
         try saveBookmark(for: url)
@@ -77,10 +73,6 @@ class MainFlutterWindow: NSWindow {
 
       do {
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        guard url.startAccessingSecurityScopedResource() else {
-          result(FlutterError(code: "workspace_access_denied", message: "无法获取所选目录的访问授权", details: nil))
-          return
-        }
         self?.workspaceURL = url
         try self?.saveBookmark(for: url)
         result(url.path)
@@ -92,14 +84,13 @@ class MainFlutterWindow: NSWindow {
 
   private func saveBookmark(for url: URL) throws {
     let bookmark = try url.bookmarkData(
-      options: [.withSecurityScope],
+      options: [],
       includingResourceValuesForKeys: nil,
       relativeTo: nil)
     UserDefaults.standard.set(bookmark, forKey: workspaceBookmarkKey)
   }
 
-  /// NSHomeDirectory() resolves to the Container in a sandboxed app. The POSIX
-  /// account entry preserves the real user home used as the picker default.
+  /// Uses the real account home as the picker default.
   private var realHomeURL: URL {
     if let account = getpwuid(getuid()) {
       return URL(fileURLWithPath: String(cString: account.pointee.pw_dir), isDirectory: true)

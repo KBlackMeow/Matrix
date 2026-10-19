@@ -38,7 +38,19 @@ void main() {
     );
   });
 
-  test('rejects absolute upload paths', () async {
+  test('resolves an explicit absolute upload path', () async {
+    final outside = await Directory.systemTemp.createTemp('matrix_direct_file_');
+    addTearDown(() => outside.delete(recursive: true));
+    final file = File(p.join(outside.path, 'outside-workspace.txt'));
+    await file.writeAsString('direct path');
+
+    expect(
+      await workspace.resolveUploadFile(file.path),
+      await file.resolveSymbolicLinks(),
+    );
+  });
+
+  test('rejects a non-existent absolute upload path', () async {
     await expectLater(
       () => workspace.resolveUploadFile('/tmp/secret.txt'),
       throwsA(isA<LocalWorkspacePathException>()),

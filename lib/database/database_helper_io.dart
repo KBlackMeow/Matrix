@@ -21,6 +21,8 @@ import '../models/frp_profile.dart';
 import '../models/suo5_profile.dart';
 import '../models/suo6_profile.dart';
 import '../services/frp_client_service.dart';
+import 'legacy_sandbox_migrator.dart';
+import 'matrix_storage.dart';
 
 /// 桌面/移动端 SQLite 实现
 class DatabaseHelperIo {
@@ -50,8 +52,9 @@ class DatabaseHelperIo {
   }
 
   Future<Database> _initDatabase() async {
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final path = join(documentsDirectory.path, 'matrix.db');
+    final storageDirectory = await getMatrixStorageDirectory();
+    final path = join(storageDirectory.path, 'matrix.db');
+    await _migrateLegacySandboxData(storageDirectory.path, path);
 
     return openDatabase(
       path,
@@ -59,6 +62,62 @@ class DatabaseHelperIo {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _migrateLegacySandboxData(
+    String documentsPath,
+    String databasePath,
+  ) async {
+    if (!Platform.isMacOS) return;
+    final homePath = Platform.environment['HOME'];
+    if (homePath == null || homePath.isEmpty) return;
+    final legacyDocumentsPath = join(
+      homePath,
+      'Library',
+      'Containers',
+      'com.example.matrix',
+      'Data',
+      'Documents',
+    );
+    final destinationExists = await File(databasePath).exists();
+    final canReplaceDestination =
+        destinationExists && await _isPristineDestination(databasePath);
+    final oldDocumentsPath = (await getApplicationDocumentsDirectory()).path;
+    for (final sourcePath in [legacyDocumentsPath, oldDocumentsPath]) {
+      if (normalize(sourcePath) == normalize(documentsPath)) continue;
+      final migrated = await LegacySandboxMigrator.migrateFrom(
+        sourceDirectory: sourcePath,
+        destinationDirectory: documentsPath,
+        replaceDestination: canReplaceDestination,
+      );
+      if (migrated) return;
+    }
+  }
+
+  Future<bool> _isPristineDestination(String databasePath) async {
+    Database? database;
+    try {
+      database = await openDatabase(databasePath, readOnly: true);
+      const userDataTables = [
+        'projects',
+        'webshells',
+        'frp_profiles',
+        'suo5_profiles',
+        'suo6_profiles',
+      ];
+      for (final table in userDataTables) {
+        final rows = await database.rawQuery('SELECT 1 FROM $table LIMIT 1');
+        if (rows.isNotEmpty) return false;
+      }
+      final userPayloads = await database.rawQuery(
+        'SELECT 1 FROM payloads WHERE is_default = 0 LIMIT 1',
+      );
+      return userPayloads.isEmpty;
+    } catch (_) {
+      return false;
+    } finally {
+      await database?.close();
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -217,8 +276,8 @@ class DatabaseHelperIo {
         )
       ''');
 
-      final docsDir = await getApplicationDocumentsDirectory();
-      final payloadsDir = Directory('${docsDir.path}/mx_store');
+      final storageDir = await getMatrixStorageDirectory();
+      final payloadsDir = Directory('${storageDir.path}/mx_store');
       if (!payloadsDir.existsSync()) await payloadsDir.create(recursive: true);
 
       for (final row in rows) {
@@ -366,8 +425,8 @@ class DatabaseHelperIo {
   static const _kSalt = 'mx_payload_s3cr3t_2026';
 
   Future<Directory> _payloadsDir() async {
-    final docs = await getApplicationDocumentsDirectory();
-    final dir = Directory('${docs.path}/mx_store');
+    final storageDir = await getMatrixStorageDirectory();
+    final dir = Directory('${storageDir.path}/mx_store');
     if (!dir.existsSync()) await dir.create(recursive: true);
     return dir;
   }

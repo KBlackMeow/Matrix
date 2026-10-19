@@ -544,16 +544,16 @@ void _registerFileUpload(
   server.registerTool(
     'file_upload',
     description:
-        '上传本地工作区 uploads 目录中的文件到目标机器（自动判断文本/二进制路径）。'
-        '需要上传的文件必须先放入 ${workspace.uploadsPath}；'
-        '请先调用 local_uploads_list 确认可用文件，再将返回的相对路径作为 upload_path。',
+        '上传本地文件到目标机器（自动判断文本/二进制路径）。'
+        'upload_path 使用相对路径时从 ${workspace.uploadsPath} 读取；'
+        '也可传入本机文件的绝对路径以读取该具体文件。',
     inputSchema: JsonSchema.object(
       properties: {
         'shell_id': JsonSchema.integer(
           description: 'WebShell ID（已设置默认 shell 时可省略）',
         ),
         'upload_path': JsonSchema.string(
-          description: '相对于 ~/matrix_home/uploads/ 的本地文件路径',
+          description: '本地文件路径：相对路径基于 uploads/，或直接传入绝对路径',
         ),
         'remote_path': JsonSchema.string(description: '目标机器上的写入路径'),
       },

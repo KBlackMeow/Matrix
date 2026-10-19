@@ -27,8 +27,9 @@ class McpDatabase {
         Platform.environment['HOME'] ??
         Platform.environment['USERPROFILE'] ??
         '/tmp';
-    // macOS sandboxed first, then unsandboxed
+    // Current macOS storage first, then legacy locations.
     final candidates = [
+      p.join(home, '.matrix', 'matrix.db'),
       p.join(
         home,
         'Library',
@@ -55,7 +56,8 @@ class McpDatabase {
         '或先启动 Matrix 桌面应用以创建数据库。\n'
         '默认搜索位置:\n'
         '  - macOS Sandbox: ~/Library/Containers/com.example.matrix/Data/Documents/matrix.db\n'
-        '  - macOS/Linux:   ~/Documents/matrix.db',
+        '  - macOS:         ~/.matrix/matrix.db\n'
+        '  - Legacy:        ~/Documents/matrix.db',
       );
     }
     // MCP must not share sqflite's path-level singleton with the Flutter app:

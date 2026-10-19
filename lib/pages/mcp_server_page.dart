@@ -4,8 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mcp_dart/mcp_dart.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../mcp/db.dart';
 import '../mcp/handlers.dart';
@@ -13,6 +11,7 @@ import '../mcp/local_workspace.dart';
 import '../mcp/remote_write_lock.dart';
 import '../mcp/session_pool.dart';
 import '../database/database_helper.dart';
+import '../database/matrix_storage.dart';
 import '../models/project.dart';
 import '../theme/app_theme.dart';
 
@@ -100,8 +99,7 @@ class _McpServerPageState extends State<McpServerPage> {
     await _dbHelper.setMetaValue(_metaKeyPort, '$port');
 
     try {
-      final docsDir = await getApplicationDocumentsDirectory();
-      final dbPath = p.join(docsDir.path, 'matrix.db');
+      final dbPath = await getMatrixDatabasePath();
       _addLog('[MCP] 数据库: $dbPath');
 
       _mcpDb = McpDatabase(dbPath);

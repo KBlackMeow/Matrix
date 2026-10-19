@@ -4,8 +4,8 @@ import 'package:path/path.dart' as p;
 
 /// Persistent, user-owned files available to the MCP server.
 ///
-/// MCP callers can only address paths relative to [uploadsPath] or
-/// [downloadsPath]; arbitrary host paths are never accepted.
+/// MCP callers can address files relative to [uploadsPath]. For explicit local
+/// file selections, absolute paths are also accepted for read-only uploads.
 class LocalWorkspace {
   LocalWorkspace(String rootPath) : _rootPath = p.normalize(rootPath);
 
@@ -39,8 +39,21 @@ class LocalWorkspace {
     await _resolvedDirectoryInsideRoot(downloadsPath);
   }
 
-  /// Resolves an existing upload file from an MCP-relative path.
+  /// Resolves an existing local file for upload.
+  ///
+  /// Relative paths stay scoped to [uploadsPath] for backwards compatibility.
+  /// An absolute path is an explicit user-supplied file location and is allowed
+  /// outside the workspace; it is resolved before use so the actual file is
+  /// uploaded rather than a symbolic-link entry.
   Future<String> resolveUploadFile(String relativePath) async {
+    if (p.isAbsolute(relativePath)) {
+      final file = File(p.normalize(relativePath));
+      if (!await file.exists()) {
+        throw LocalWorkspacePathException('本地文件不存在: $relativePath');
+      }
+      return file.resolveSymbolicLinks();
+    }
+
     final candidate = _relativeCandidate(uploadsPath, relativePath);
     final file = File(candidate);
     if (!await file.exists()) {

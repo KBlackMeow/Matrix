@@ -1,0 +1,12 @@
+# Build artifacts — 让 Claude Code 的文件搜索/索引跳过这些可再生的产物
+build/
+.dart_tool/
+dist/
+
+# 平台级构建产物
+ios/Pods/
+macos/Pods/
+android/.gradle/
+
+# 遗留 worktree（若再次出现）
+.claude/worktrees/
