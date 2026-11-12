@@ -170,6 +170,10 @@ void _registerShellList(
                 'url': ws.url,
                 'type': ws.type,
                 'connector_type': ws.connectorType,
+                if (ConnectorFactory.isGodzilla(ws.connectorType))
+                  'cryption': ws.cryption.isEmpty
+                      ? ConnectorFactory.defaultCryption(ws.connectorType)
+                      : ws.cryption,
                 'project_name':
                     rows.firstWhere((r) => r['id'] == ws.id)['project_name'] ??
                     '',
@@ -224,15 +228,29 @@ void _registerShellAdd(
       properties: {
         'name': JsonSchema.string(description: 'WebShell 名称'),
         'url': JsonSchema.string(description: '目标 URL'),
-        'password': JsonSchema.string(description: '连接密码'),
+        'password': JsonSchema.string(
+          description: '连接密码；Godzilla 连接器里它是 HTTP 参数名（不是 secretKey）',
+        ),
+        'secret_key': JsonSchema.string(
+          description: 'Godzilla 密钥（secretKey），默认 key。仅 Godzilla 连接器使用。',
+        ),
+        'cryption': JsonSchema.string(
+          description:
+              'Godzilla 加密器：PHP_XOR_BASE64 / PHP_XOR_RAW / PHP_EVAL_XOR_BASE64 / '
+              'JAVA_AES_BASE64 / JAVA_AES_RAW / CSHAP_AES_BASE64 / CSHAP_AES_RAW / '
+              'ASP_BASE64 / ASP_RAW / ASP_XOR_BASE64 / ASP_XOR_RAW。'
+              '连接器只表示架构+协议，加密器单独选；省略时用该架构默认值。',
+        ),
         'type': JsonSchema.string(description: '脚本类型：php, jsp, asp, aspx'),
         'connector_type': JsonSchema.string(
           description:
               '连接器类型，完整用法与适用场景见 shell_connectors 工具。'
               'PHP: php_eval(代码注入)/php_b64rot13(混淆)/php_behinder(加密)/php_passthru(命令)；'
-              'JSP: jsp_classloader(agent)/jsp_behinder(加密)/jsp_behinder_v2(动态字节码)/jsp_runtime(命令)；'
-              'ASP: asp_wscript(命令)；'
-              'ASPX: aspx_cmd(命令)/aspx_behinder(加密)',
+              'JSP: jsp_classloader(agent)/jsp_behinder(加密)/jsp_behinder_v2(动态字节码)/jsp_runtime(命令)/jsp_godzilla(Godzilla AES)；'
+              'ASP: asp_wscript(命令)/asp_godzilla(Godzilla XOR)；'
+              'ASPX: aspx_cmd(命令)/aspx_behinder(加密)/aspx_godzilla(Godzilla AES)；'
+              'Godzilla（架构+协议，加密器单独选）：php_godzilla/jsp_godzilla/aspx_godzilla/asp_godzilla。'
+              'Godzilla 连接器需要 password + secret_key（+ 可选 cryption）。',
         ),
         'method': JsonSchema.string(description: 'HTTP 方法：GET 或 POST'),
       },
@@ -240,13 +258,25 @@ void _registerShellAdd(
     ),
     callback: _wrap('shell_add', (args, extra) async {
       try {
+        final connectorType =
+            (args['connector_type'] as String?) ?? 'php_eval';
+        final rawCryption = (args['cryption'] as String?) ?? '';
+        final invalid =
+            ConnectorFactory.cryptionValidationError(connectorType, rawCryption);
+        if (invalid != null) return _error(invalid);
+        final cryption = rawCryption.trim().isEmpty
+            ? (ConnectorFactory.defaultCryption(connectorType) ?? '')
+            : rawCryption.trim().toUpperCase();
+
         final ws = await db.createWebshell(
           projectId: projectId,
           name: args['name'] as String,
           url: args['url'] as String,
           password: args['password'] as String,
+          secretKey: (args['secret_key'] as String?) ?? 'key',
+          cryption: cryption,
           type: (args['type'] as String?) ?? 'php',
-          connectorType: (args['connector_type'] as String?) ?? 'php_eval',
+          connectorType: connectorType,
           method: (args['method'] as String?) ?? 'POST',
         );
         return _json({
@@ -255,6 +285,10 @@ void _registerShellAdd(
           'url': ws.url,
           'type': ws.type,
           'connector_type': ws.connectorType,
+          if (ConnectorFactory.isGodzilla(ws.connectorType)) ...{
+            'secret_key': ws.secretKey,
+            'cryption': ws.cryption,
+          },
           'message': 'WebShell 已创建',
         });
       } catch (e) {

@@ -58,7 +58,7 @@ class DatabaseHelperIo {
 
     return openDatabase(
       path,
-      version: 13,
+      version: 15,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -139,6 +139,8 @@ class DatabaseHelperIo {
         name TEXT NOT NULL,
         url TEXT NOT NULL,
         password TEXT,
+        secret_key TEXT NOT NULL DEFAULT 'key',
+        cryption TEXT NOT NULL DEFAULT '',
         type TEXT NOT NULL DEFAULT 'php',
         method TEXT,
         status INTEGER DEFAULT 1,
@@ -231,15 +233,73 @@ class DatabaseHelperIo {
     );
   }
 
+  /// 幂等加列：列已存在则跳过。
+  ///
+  /// 历史遗留：某些用户的库里列已经存在，但 `user_version` 仍停在旧值
+  /// （升级中途崩溃 / 手改过库），直接 `ALTER TABLE` 会报
+  /// `duplicate column name` 并让启动循环失败。
+  static Future<bool> columnExists(
+    Database db,
+    String table,
+    String column,
+  ) async {
+    final rows = await db.rawQuery('PRAGMA table_info($table)');
+    return rows.any((row) => (row['name'] as String?) == column);
+  }
+
+  static Future<void> ensureColumn(
+    Database db,
+    String table,
+    String column,
+    String definition,
+  ) async {
+    if (await columnExists(db, table, column)) return;
+    await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
+  }
+
+
+  /// 把旧的“连接器类型 = 加密器”（如 `php_godzilla_raw`）拆成
+  /// “架构连接器 + 独立加密器”。
+  ///
+  /// 只处理带 `_godzilla_` 后缀的旧类型，且不会覆盖已有的 `cryption`，
+  /// 避免把用户已经选好的加密器清空。
+  static Future<void> migrateLegacyGodzillaConnectorTypes(Database db) async {
+    await db.execute(r'''
+      UPDATE webshells
+      SET cryption = CASE connector_type
+            WHEN 'php_godzilla_raw' THEN 'PHP_XOR_RAW'
+            WHEN 'php_godzilla_eval' THEN 'PHP_EVAL_XOR_BASE64'
+            WHEN 'jsp_godzilla_raw' THEN 'JAVA_AES_RAW'
+            WHEN 'aspx_godzilla_raw' THEN 'CSHAP_AES_RAW'
+            WHEN 'asp_godzilla_raw' THEN 'ASP_XOR_RAW'
+            WHEN 'asp_godzilla_b64' THEN 'ASP_BASE64'
+            WHEN 'asp_godzilla_plainraw' THEN 'ASP_RAW'
+            ELSE cryption
+          END,
+          connector_type = substr(
+            connector_type,
+            1,
+            instr(connector_type, '_godzilla_') + 8
+          )
+      WHERE instr(connector_type, '_godzilla_') > 0
+    ''');
+  }
+
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      await db.execute(
-        'ALTER TABLE projects ADD COLUMN domain TEXT NOT NULL DEFAULT ""',
+      await ensureColumn(
+        db,
+        'projects',
+        'domain',
+        'TEXT NOT NULL DEFAULT ""',
       );
     }
     if (oldVersion < 3) {
-      await db.execute(
-        "ALTER TABLE webshells ADD COLUMN type TEXT NOT NULL DEFAULT 'php'",
+      await ensureColumn(
+        db,
+        'webshells',
+        'type',
+        "TEXT NOT NULL DEFAULT 'php'",
       );
     }
     if (oldVersion < 4) {
@@ -306,13 +366,19 @@ class DatabaseHelperIo {
       await db.execute(
         'CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
       );
-      await db.execute(
-        'ALTER TABLE payloads ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0',
+      await ensureColumn(
+        db,
+        'payloads',
+        'is_default',
+        'INTEGER NOT NULL DEFAULT 0',
       );
     }
     if (oldVersion < 8) {
-      await db.execute(
-        "ALTER TABLE webshells ADD COLUMN connector_type TEXT NOT NULL DEFAULT 'php_eval'",
+      await ensureColumn(
+        db,
+        'webshells',
+        'connector_type',
+        "TEXT NOT NULL DEFAULT 'php_eval'",
       );
       // 旧 JSP 类型自动映射到 jsp_classloader
       await db.execute(
@@ -388,6 +454,23 @@ class DatabaseHelperIo {
       await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_suo6_project ON suo6_profiles(project_id)',
       );
+    }
+    if (oldVersion < 14) {
+      await ensureColumn(
+        db,
+        'webshells',
+        'secret_key',
+        "TEXT NOT NULL DEFAULT 'key'",
+      );
+    }
+    if (oldVersion < 15) {
+      await ensureColumn(
+        db,
+        'webshells',
+        'cryption',
+        "TEXT NOT NULL DEFAULT ''",
+      );
+      await migrateLegacyGodzillaConnectorTypes(db);
     }
   }
 
@@ -484,6 +567,8 @@ class DatabaseHelperIo {
     required String name,
     required String url,
     String? password,
+    String secretKey = 'key',
+    String cryption = '',
     String method = 'POST',
     String type = 'php',
     String connectorType = 'php_eval',
@@ -493,6 +578,8 @@ class DatabaseHelperIo {
       name: name,
       url: url,
       password: password,
+      secretKey: secretKey,
+      cryption: cryption,
       method: method,
       type: type,
       connectorType: connectorType,
@@ -651,6 +738,8 @@ Future<Webshell> createWebshell(
   required String name,
   required String url,
   String? password,
+  String secretKey = 'key',
+  String cryption = '',
   String method = 'POST',
   String type = 'php',
   String connectorType = 'php_eval',
@@ -659,6 +748,8 @@ Future<Webshell> createWebshell(
   name: name,
   url: url,
   password: password,
+  secretKey: secretKey,
+  cryption: cryption,
   method: method,
   type: type,
   connectorType: connectorType,

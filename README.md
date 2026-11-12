@@ -24,10 +24,18 @@ Matrix is a cross-platform desktop application for managing WebShells and carryi
 
 | Target | Connectors |
 | --- | --- |
-| PHP | Eval, Base64 + ROT13, Behinder-compatible encrypted payloads, and passthru command shells |
-| JSP | ClassLoader agent, Behinder-compatible AES payloads, dynamic-bytecode Behinder v2, and Runtime command shells |
-| ASP | WScript command shells |
-| ASPX | Command shells and Behinder-compatible encrypted payloads |
+| PHP | Eval, Base64 + ROT13, Behinder-compatible encrypted payloads, passthru command shells, and Godzilla-compatible XOR payloads (BASE64 and RAW) |
+| JSP | ClassLoader agent, Behinder-compatible AES payloads, dynamic-bytecode Behinder v2, Runtime command shells, and Godzilla-compatible AES payloads (BASE64 and RAW) |
+| ASP | WScript command shells and Godzilla-compatible XOR payloads (BASE64 and RAW) |
+| ASPX | Command shells, Behinder-compatible encrypted payloads, and Godzilla-compatible AES payloads (BASE64 and RAW) |
+
+Godzilla connectors (`php_godzilla`, `jsp_godzilla`, `aspx_godzilla`, `asp_godzilla`) describe only the architecture and protocol, exactly like the original — the **cryption** is a separate field. They need both the connection password (the HTTP parameter name) and the Godzilla secret key, because the wire key is `MD5(secretKey)[0:16]`. No `godzilla.jar` is required at runtime: the protocol is implemented in Dart and the target-side payload engine ships in `data/godzilla/` (see `tool/godzilla_engine/` for the sources and `build.sh` to rebuild them).
+
+**Bundled shells.** The payload library ships eight ready-to-use Godzilla shells (password `mAtrix_911`, secret key `key`): `godzilla_php_xor_base64.php`, `godzilla_php_xor_raw.php`, `godzilla_php_eval_xor_base64.php`, `godzilla_jsp_aes_base64.jsp`, `godzilla_jsp_aes_raw.jsp`, `godzilla_aspx_aes_base64.aspx`, `godzilla_asp_xor_base64.asp` and `godzilla_asp_raw.asp`. Upload one to a writable directory, then add a WebShell with the matching architecture connector and cryption. Pair each cryption with a shell of the same cryption — a `PHP_XOR_RAW` shell will not talk to a `PHP_XOR_BASE64` client.
+
+**Transport security.** Godzilla's protocol puts the connection password in the clear as the HTTP parameter name, the XOR variants are only obfuscation, and `ASP_BASE64` / `ASP_RAW` are not encrypted at all. Use Godzilla connectors over HTTPS only. The secret key and wire key never appear in the request body (the eval variant was hardened for this reason).
+
+Three upstream cryptions are not implemented because they need different server stubs: `CSHAP_ASMX_AES_BASE64` (SOAP `.asmx` endpoint), `CSHAP_EVAL_AES_BASE64` (JScript `eval`), and `ASP_EVAL_BASE64` (hex-obfuscated double `Execute`). The shells can be re-rendered from source with `dart run tool/godzilla_engine/render_default_shells.dart`; the target-side payload engines are rebuilt with `tool/godzilla_engine/build.sh`.
 
 ### Interactive WebShell Workspace
 
@@ -95,6 +103,7 @@ Available actions vary by module and can include detection, command execution, p
 - Start or stop an MCP server inside Matrix for the selected project.
 - Use a configurable local port with Streamable HTTP at `/mcp`.
 - Expose WebShell configuration, command execution, remote file operations, upload and download workflows, system information, environment variables, and process management to compatible AI assistants.
+- Godzilla connectors are fully scriptable: `shell_connectors` lists each architecture connector together with its valid `cryptions` and the default one, and `shell_add` accepts `secret_key` plus `cryption` (invalid combinations are rejected with the allowed list).
 - Isolate connection sessions, serialize conflicting remote writes, restrict WebShell records to the active project, and display calls in an activity log.
 - Bind only to `127.0.0.1` and `localhost` rather than exposing the service to the network.
 

@@ -20,7 +20,7 @@ Webshell _fakeWebshell(String connectorType) {
 void main() {
   group('ConnectorFactory', () {
     test('allTypes contains expected connector types', () {
-      expect(ConnectorFactory.allTypes, hasLength(11));
+      expect(ConnectorFactory.allTypes, hasLength(15));
       expect(
         ConnectorFactory.allTypes,
         equals([
@@ -35,6 +35,10 @@ void main() {
           'asp_wscript',
           'aspx_cmd',
           'aspx_behinder',
+          'php_godzilla',
+          'jsp_godzilla',
+          'aspx_godzilla',
+          'asp_godzilla',
         ]),
       );
     });
@@ -61,6 +65,10 @@ void main() {
       expect(ConnectorFactory.fixedMethod('php_b64rot13'), equals('POST'));
       expect(ConnectorFactory.fixedMethod('jsp_behinder_v2'), equals('POST'));
       expect(ConnectorFactory.fixedMethod('aspx_behinder'), equals('POST'));
+      expect(ConnectorFactory.fixedMethod('php_godzilla'), equals('POST'));
+      expect(ConnectorFactory.fixedMethod('jsp_godzilla'), equals('POST'));
+      expect(ConnectorFactory.fixedMethod('aspx_godzilla'), equals('POST'));
+      expect(ConnectorFactory.fixedMethod('asp_godzilla'), equals('POST'));
     });
 
     test('fixedMethod null for user-selectable-method connectors', () {
@@ -78,11 +86,15 @@ void main() {
       expect(ConnectorFactory.typeLabel('asp_wscript'), equals('asp'));
       expect(ConnectorFactory.typeLabel('php_eval'), equals('php'));
       expect(ConnectorFactory.typeLabel('php_passthru'), equals('php'));
+      expect(ConnectorFactory.typeLabel('php_godzilla'), equals('php'));
+      expect(ConnectorFactory.typeLabel('jsp_godzilla'), equals('jsp'));
+      expect(ConnectorFactory.typeLabel('aspx_godzilla'), equals('aspx'));
+      expect(ConnectorFactory.typeLabel('asp_godzilla'), equals('asp'));
     });
 
-    test('catalog returns 11 flat entries with usage/scenario metadata', () {
+    test('catalog returns 15 flat entries with usage/scenario metadata', () {
       final catalog = ConnectorFactory.catalog();
-      expect(catalog, hasLength(11));
+      expect(catalog, hasLength(15));
       final byType = {
         for (final e in catalog) e['type'] as String: e,
       };
@@ -107,6 +119,68 @@ void main() {
           equals(connector.capabilities.map((c) => c.name).toSet()),
         );
       }
+    });
+  });
+
+  group('Godzilla 加密器（MCP 目录）', () {
+    test('catalog 暴露每个 Godzilla 连接器的加密器与默认值', () {
+      final byType = {
+        for (final e in ConnectorFactory.catalog()) e['type'] as String: e,
+      };
+      const expected = {
+        'php_godzilla': [
+          'PHP_XOR_BASE64',
+          'PHP_XOR_RAW',
+          'PHP_EVAL_XOR_BASE64',
+        ],
+        'jsp_godzilla': ['JAVA_AES_BASE64', 'JAVA_AES_RAW'],
+        'aspx_godzilla': ['CSHAP_AES_BASE64', 'CSHAP_AES_RAW'],
+        'asp_godzilla': [
+          'ASP_XOR_BASE64',
+          'ASP_BASE64',
+          'ASP_RAW',
+          'ASP_XOR_RAW',
+        ],
+      };
+      expected.forEach((type, ids) {
+        final entry = byType[type]!;
+        final cryptions = (entry['cryptions'] as List)
+            .map((c) => (c as Map)['id'] as String)
+            .toList();
+        expect(cryptions, ids, reason: type);
+        expect(entry['default_cryption'], ids.first);
+      });
+
+      // 非 Godzilla 连接器不暴露 cryptions。
+      expect(byType['php_eval']!.containsKey('cryptions'), isFalse);
+    });
+
+    test('cryption 校验：合法 / 跨架构 / 非 Godzilla', () {
+      expect(
+        ConnectorFactory.cryptionValidationError('php_godzilla', 'PHP_XOR_RAW'),
+        isNull,
+      );
+      expect(
+        ConnectorFactory.cryptionValidationError('php_godzilla', 'php_xor_raw'),
+        isNull,
+        reason: '大小写不敏感',
+      );
+      expect(
+        ConnectorFactory.cryptionValidationError('php_godzilla', ''),
+        isNull,
+        reason: '空值表示用默认',
+      );
+      expect(
+        ConnectorFactory.cryptionValidationError(
+          'php_godzilla',
+          'JAVA_AES_RAW',
+        ),
+        contains('不适用于'),
+      );
+      expect(
+        ConnectorFactory.cryptionValidationError('php_eval', 'PHP_XOR_BASE64'),
+        contains('不是 Godzilla 连接器'),
+      );
     });
   });
 }

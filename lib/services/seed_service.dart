@@ -10,7 +10,7 @@ import '../models/payload.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 16;
+  static const _kCurrentVersion = 17;
   static const _binaryContentPrefix = '__MATRIX_BINARY_B64__:';
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
@@ -278,6 +278,73 @@ class SeedService {
       sinceVersion: 8,
       isBinary: true,
     ),
+    // ── Godzilla 标准马（内置默认，密码 mAtrix_911 / 密钥 key）────────────
+    // 与连接器配套：连接器 = 架构 + 协议，加密器在 WebShell 里单独选。
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/godzilla/godzilla_php_xor_base64.php',
+      name: 'godzilla_php_xor_base64.php',
+      type: 'php',
+      description: 'Godzilla PHP 马（PHP_XOR_BASE64），默认密码 mAtrix_911 / 密钥 key',
+      tags: 'godzilla,php,xor,base64,godzilla-standard',
+      sinceVersion: 17,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/godzilla/godzilla_php_xor_raw.php',
+      name: 'godzilla_php_xor_raw.php',
+      type: 'php',
+      description: 'Godzilla PHP 马（PHP_XOR_RAW），裸密文',
+      tags: 'godzilla,php,xor,raw,godzilla-standard',
+      sinceVersion: 17,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/godzilla/godzilla_php_eval_xor_base64.php',
+      name: 'godzilla_php_eval_xor_base64.php',
+      type: 'php',
+      description: 'Godzilla PHP eval 马（PHP_EVAL_XOR_BASE64），一句话 eval 壳',
+      tags: 'godzilla,php,eval,xor,base64,godzilla-standard',
+      sinceVersion: 17,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/godzilla/godzilla_jsp_aes_base64.jsp',
+      name: 'godzilla_jsp_aes_base64.jsp',
+      type: 'jsp',
+      description: 'Godzilla JSP 马（JAVA_AES_BASE64），默认密码 mAtrix_911 / 密钥 key',
+      tags: 'godzilla,jsp,aes,base64,godzilla-standard',
+      sinceVersion: 17,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/godzilla/godzilla_jsp_aes_raw.jsp',
+      name: 'godzilla_jsp_aes_raw.jsp',
+      type: 'jsp',
+      description: 'Godzilla JSP 马（JAVA_AES_RAW），裸密文',
+      tags: 'godzilla,jsp,aes,raw,godzilla-standard',
+      sinceVersion: 17,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/godzilla/godzilla_aspx_aes_base64.aspx',
+      name: 'godzilla_aspx_aes_base64.aspx',
+      type: 'aspx',
+      description: 'Godzilla ASPX 马（CSHAP_AES_BASE64），AES/CBC(key=IV)',
+      tags: 'godzilla,aspx,aes,base64,godzilla-standard',
+      sinceVersion: 17,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/godzilla/godzilla_asp_xor_base64.asp',
+      name: 'godzilla_asp_xor_base64.asp',
+      type: 'asp',
+      description: 'Godzilla ASP 马（ASP_XOR_BASE64），XOR + base64',
+      tags: 'godzilla,asp,xor,base64,godzilla-standard',
+      sinceVersion: 17,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/godzilla/godzilla_asp_raw.asp',
+      name: 'godzilla_asp_raw.asp',
+      type: 'asp',
+      description: 'Godzilla ASP 马（ASP_RAW），裸 body',
+      tags: 'godzilla,asp,raw,godzilla-standard',
+      sinceVersion: 17,
+    ),
+
   ];
 
   /// 需要更新内容的已有默认 payload（修复 bug 或改进实现）
@@ -446,7 +513,18 @@ class SeedService {
         await db.updatePayload(
           p.copyWith(content: expected, updatedAt: DateTime.now()),
         );
-      } catch (_) {}
+        developer.log(
+          'Refreshed default payload from assets: ${p.name}',
+          name: 'SeedService',
+        );
+      } catch (e, st) {
+        developer.log(
+          'Failed to refresh default payload: ${p.name}',
+          name: 'SeedService',
+          error: e,
+          stackTrace: st,
+        );
+      }
     }
 
     // 3) 移除已从内置列表下架的默认 payload（数据库行 + 本地文件，见 PayloadDao.deletePayload）

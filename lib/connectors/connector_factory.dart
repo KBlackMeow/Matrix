@@ -12,6 +12,8 @@ import 'jsp_runtime_connector.dart';
 import 'asp_wscript_connector.dart';
 import 'aspx_behinder_connector.dart';
 import 'aspx_cmd_connector.dart';
+import 'godzilla/godzilla_connector.dart';
+import 'godzilla/godzilla_variant.dart';
 
 typedef _ConnectorBuilder = ShellConnector Function(Webshell webshell);
 
@@ -165,6 +167,51 @@ class ConnectorFactory {
       scenario: '需要加密通信的 ASP.NET 目标',
       builder: AspxBehinderConnector.new,
     ),
+
+    _ConnectorDefinition(
+      type: 'php_godzilla',
+      typeLabel: 'php',
+      shortLabel: 'PHP-GZ',
+      payloadHint: 'Godzilla PHP 马（加密器在 Cryption 里单独选）',
+      defaultParam: AppConstants.defaultShellPassword,
+      fixedMethod: 'POST',
+      usage: '标准 Godzilla PHP 马；加密方式由 Cryption（加密器）决定',
+      scenario: '连接标准 Godzilla PHP 马（密码 + 密钥 + 加密器）',
+      builder: _godzillaBuilder,
+    ),
+    _ConnectorDefinition(
+      type: 'jsp_godzilla',
+      typeLabel: 'jsp',
+      shortLabel: 'JSP-GZ',
+      payloadHint: 'Godzilla JSP 马（加密器在 Cryption 里单独选）',
+      defaultParam: AppConstants.defaultShellPassword,
+      fixedMethod: 'POST',
+      usage: '标准 Godzilla JSP 马；加密方式由 Cryption（加密器）决定',
+      scenario: '连接标准 Godzilla JSP 马（密码 + 密钥 + 加密器）',
+      builder: _godzillaBuilder,
+    ),
+    _ConnectorDefinition(
+      type: 'aspx_godzilla',
+      typeLabel: 'aspx',
+      shortLabel: 'ASPX-GZ',
+      payloadHint: 'Godzilla ASPX 马（加密器在 Cryption 里单独选）',
+      defaultParam: AppConstants.defaultShellPassword,
+      fixedMethod: 'POST',
+      usage: '标准 Godzilla ASPX 马；加密方式由 Cryption（加密器）决定',
+      scenario: '连接标准 Godzilla ASPX 马（密码 + 密钥 + 加密器）',
+      builder: _godzillaBuilder,
+    ),
+    _ConnectorDefinition(
+      type: 'asp_godzilla',
+      typeLabel: 'asp',
+      shortLabel: 'ASP-GZ',
+      payloadHint: 'Godzilla ASP 马（加密器在 Cryption 里单独选）',
+      defaultParam: AppConstants.defaultShellPassword,
+      fixedMethod: 'POST',
+      usage: '标准 Godzilla ASP 马；加密方式由 Cryption（加密器）决定',
+      scenario: '连接标准 Godzilla ASP 马（密码 + 密钥 + 加密器）',
+      builder: _godzillaBuilder,
+    ),
   ];
 
   static final Map<String, _ConnectorDefinition> _definitionsByType = {
@@ -181,10 +228,29 @@ class ConnectorFactory {
     return 'php';
   }
 
+  /// Godzilla：连接器只表示「架构 + 协议」，加密器来自 `webshell.cryption`。
+  static ShellConnector _godzillaBuilder(Webshell webshell) {
+    final variant = GodzillaVariant.resolveFor(
+      webshell.connectorType,
+      webshell.cryption,
+    );
+    return GodzillaConnector(webshell, variant);
+  }
+
   static ShellConnector create(Webshell webshell) {
     final definition = _def(webshell.connectorType);
     if (definition != null) return definition.builder(webshell);
     return PhpEvalConnector(webshell); // fallback
+  }
+
+  /// 某连接器可选的全部加密器（非 Godzilla 返回空）。
+  static List<GodzillaVariant> cryptionsFor(String connectorType) =>
+      GodzillaVariant.forConnector(connectorType);
+
+  /// 默认加密器 ID（非 Godzilla 返回 null）。
+  static String? defaultCryption(String connectorType) {
+    final list = GodzillaVariant.forConnector(connectorType);
+    return list.isEmpty ? null : list.first.cryptionId;
   }
 
   /// 从 connectorType 推导显示用的 type 标签（php / jsp / asp / aspx）
@@ -214,6 +280,12 @@ class ConnectorFactory {
   static bool defaultSuo6TunnelProtocol(String connectorType) =>
       connectorType.startsWith('jsp');
 
+  /// 是否为 Godzilla 连接器（含 `*_godzilla_raw`）。
+  ///
+  /// 注意：不能用 `endsWith('_godzilla')`，RAW 变体以 `_raw` 结尾。
+  static bool isGodzilla(String connectorType) =>
+      connectorType.contains('godzilla');
+
   static final List<String> allTypes = _definitions
       .map((d) => d.type)
       .toList(growable: false);
@@ -236,8 +308,27 @@ class ConnectorFactory {
         updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
       );
 
+  /// 校验 cryption 是否属于该连接器；返回 null 表示合法。
+  static String? cryptionValidationError(
+    String connectorType,
+    String cryption,
+  ) {
+    if (!isGodzilla(connectorType)) {
+      return cryption.trim().isEmpty
+          ? null
+          : '连接器 $connectorType 不是 Godzilla 连接器，不接受 cryption';
+    }
+    if (cryption.trim().isEmpty) return null; // 用默认
+    final allowed = cryptionsFor(connectorType)
+        .map((v) => v.cryptionId)
+        .toList();
+    if (allowed.contains(cryption.trim().toUpperCase())) return null;
+    return 'cryption "$cryption" 不适用于 $connectorType；可选值：${allowed.join(', ')}';
+  }
+
   static Map<String, dynamic> _typeEntry(_ConnectorDefinition d) {
     final connector = d.builder(_probe(d.type));
+    final cryptions = cryptionsFor(d.type);
     return {
       'type': d.type,
       'type_label': d.typeLabel,
@@ -248,6 +339,32 @@ class ConnectorFactory {
       'usage': d.usage,
       'scenario': d.scenario,
       'capabilities': connector.capabilities.map((c) => c.name).toList(),
+      if (cryptions.isNotEmpty) ...{
+        'default_cryption': cryptions.first.cryptionId,
+        'cryptions': [
+          for (final v in cryptions)
+            {
+              'id': v.cryptionId,
+              'wire': v.wire.name,
+              'note': _cryptionNote(v),
+            },
+        ],
+      },
     };
+  }
+
+  static String _cryptionNote(GodzillaVariant v) {
+    switch (v.wire) {
+      case GodzillaWire.formBase64:
+        return v.cipher == GodzillaCipher.none
+            ? 'base64 表单，无加密'
+            : 'base64 表单 + 标记响应';
+      case GodzillaWire.raw:
+        return v.cipher == GodzillaCipher.none
+            ? '裸 body，无加密、无标记'
+            : '裸密文 body（无 base64、无标记）';
+      case GodzillaWire.evalBase64:
+        return '一句话 eval 壳，每次请求动态装载';
+    }
   }
 }

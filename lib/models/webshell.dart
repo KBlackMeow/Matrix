@@ -5,6 +5,18 @@ class Webshell {
   final String name;
   final String url;
   final String? password;
+  /// Godzilla 的“密钥”字段（secretKey），与连接密码分离。
+  ///
+  /// - 连接密码（[password]）用作 HTTP 参数名；
+  /// - 密钥用于派生 `key16 = MD5(secretKey)[0:16]`。
+  ///
+  /// 非 Godzilla 连接器忽略此字段。
+  final String secretKey;
+  /// Godzilla 的加密器 ID（`PHP_XOR_BASE64` 等）。
+  ///
+  /// 连接器只表示「架构 + 协议」，加密器独立选择；为空时回退到该架构
+  /// 的默认（BASE64）变体。
+  final String cryption;
   /// 显示用类型标签：php / jsp / asp
   final String type;
   /// 请求方法：GET / POST
@@ -24,6 +36,8 @@ class Webshell {
     required this.name,
     required this.url,
     this.password,
+    this.secretKey = 'key',
+    this.cryption = '',
     this.type = 'php',
     this.method = 'POST',
     this.status = 1,
@@ -39,6 +53,8 @@ class Webshell {
       'name': name,
       'url': url,
       'password': password,
+      'secret_key': secretKey,
+      'cryption': cryption,
       'type': type,
       'method': method,
       'status': status,
@@ -59,6 +75,8 @@ class Webshell {
       name: map['name'] as String,
       url: map['url'] as String,
       password: map['password'] as String?,
+      secretKey: (map['secret_key'] as String?) ?? 'key',
+      cryption: (map['cryption'] as String?) ?? '',
       type: storedType,
       method: (map['method'] as String?) ?? 'POST',
       status: (map['status'] as int?) ?? 1,
@@ -74,6 +92,8 @@ class Webshell {
     String? name,
     String? url,
     String? password,
+    String? secretKey,
+    String? cryption,
     String? type,
     String? method,
     int? status,
@@ -87,6 +107,8 @@ class Webshell {
       name: name ?? this.name,
       url: url ?? this.url,
       password: password ?? this.password,
+      secretKey: secretKey ?? this.secretKey,
+      cryption: cryption ?? this.cryption,
       type: type ?? this.type,
       method: method ?? this.method,
       status: status ?? this.status,

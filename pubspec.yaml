@@ -102,8 +102,11 @@ flutter:
   assets:
     - data/
     - data/behinder_csharp/
+    - data/godzilla/
     - data/mem_shell/
     - assets/icon/
+    - assets/defaults/payloads/godzilla/
+    - assets/defaults/payloads/godzilla_shells/
     - assets/defaults/payloads/webshell/
     - assets/defaults/payloads/copy-fail/
     - assets/defaults/payloads/suo5/

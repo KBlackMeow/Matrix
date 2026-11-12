@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../connectors/connector_factory.dart';
+import '../connectors/godzilla/godzilla_variant.dart';
 import '../database/database_helper.dart';
 import '../models/project.dart';
 import '../models/webshell.dart';
@@ -16,10 +17,14 @@ class WebshellManagementPage extends StatefulWidget {
   final Project project;
   final VoidCallback onSwitchProject;
 
+  /// 仅测试用：注入 WebShell 列表加载器，避免单元测试拉起 sqflite。
+  final Future<List<Webshell>> Function(int projectId)? loadWebshells;
+
   const WebshellManagementPage({
     super.key,
     required this.project,
     required this.onSwitchProject,
+    this.loadWebshells,
   });
 
   @override
@@ -47,7 +52,17 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
 
   Future<void> _loadWebshells() async {
     setState(() => _loading = true);
-    final list = await _db.getWebshellsByProject(widget.project.id);
+    List<Webshell> list;
+    try {
+      final loader = widget.loadWebshells;
+      list = loader != null
+          ? await loader(widget.project.id)
+          : await _db.getWebshellsByProject(widget.project.id);
+    } catch (_) {
+      // 存储不可用时页面仍应可用（例如单元测试环境没有 sqflite 插件）。
+      list = const [];
+    }
+    if (!mounted) return;
     setState(() {
       _webshells = list;
       _loading = false;
@@ -78,9 +93,11 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
   Future<void> _showCreateDialog() async {
     final urlController = TextEditingController();
     final passwordController = TextEditingController();
+    final secretKeyController = TextEditingController(text: 'key');
     final nameController = TextEditingController();
     String selectedMethod = 'POST';
     String selectedConnectorType = 'php_eval';
+    String selectedCryption = '';
     bool obscurePassword = true;
     bool detecting = false;
     List<_DetectResult>? detectResults;
@@ -110,6 +127,9 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
               url: url,
               password: pass,
               method: selectedMethod,
+              secretKey: secretKeyController.text,
+              cryption: selectedCryption,
+              onlyConnectorType: selectedConnectorType,
             );
             final first = results.firstWhere(
               (r) => r.ok,
@@ -141,21 +161,6 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                       autofocus: true,
                     ),
                     const SizedBox(height: 16),
-                    _PasswordParamField(
-                      controller: passwordController,
-                      obscureText: obscurePassword,
-                      connectorType: selectedConnectorType,
-                      onToggleObscure: () => setDialogState(
-                        () => obscurePassword = !obscurePassword,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildField(
-                      controller: nameController,
-                      label: 'Alias (optional)',
-                      hint: 'e.g. Admin panel shell',
-                    ),
-                    const SizedBox(height: 16),
                     _ConnectorRow(
                       value: selectedConnectorType,
                       detecting: detecting,
@@ -168,13 +173,59 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                           final def = ConnectorFactory.defaultParam(v);
                           if (def.isNotEmpty) passwordController.text = def;
                         }
+                        if (ConnectorFactory.isGodzilla(v)) {
+                          if (secretKeyController.text.trim().isEmpty) {
+                            secretKeyController.text = 'key';
+                          }
+                          final allowed = ConnectorFactory.cryptionsFor(v)
+                              .map((c) => c.cryptionId)
+                              .toList();
+                          if (!allowed.contains(selectedCryption)) {
+                            selectedCryption = allowed.isEmpty
+                                ? ''
+                                : allowed.first;
+                          }
+                        }
                       }),
                       onDetect: runDetect,
                     ),
+                    if (ConnectorFactory.isGodzilla(selectedConnectorType)) ...[
+                      const SizedBox(height: 12),
+                      _GodzillaCryptionField(
+                        key: ValueKey(selectedConnectorType),
+                        connectorType: selectedConnectorType,
+                        cryptionId: selectedCryption,
+                        onChanged: (id) =>
+                            setDialogState(() => selectedCryption = id),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    _PasswordParamField(
+                      controller: passwordController,
+                      obscureText: obscurePassword,
+                      connectorType: selectedConnectorType,
+                      onToggleObscure: () => setDialogState(
+                        () => obscurePassword = !obscurePassword,
+                      ),
+                    ),
+                    if (ConnectorFactory.isGodzilla(selectedConnectorType)) ...[
+                      const SizedBox(height: 16),
+                      _SecretKeyField(controller: secretKeyController),
+                    ],
+                    const SizedBox(height: 16),
+                    _buildField(
+                      controller: nameController,
+                      label: 'Alias (optional)',
+                      hint: 'e.g. Admin panel shell',
+                    ),
+                    const SizedBox(height: 16),
                     if (detectResults != null)
                       _DetectResultPanel(results: detectResults!),
                     const SizedBox(height: 16),
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           'Request method:',
@@ -182,7 +233,6 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                             color: AppColors.textSecondary,
                           ),
                         ),
-                        const SizedBox(width: 12),
                         _MethodToggle(
                           value: selectedMethod,
                           lockedMethod: ConnectorFactory.fixedMethod(
@@ -239,6 +289,10 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
         name: name,
         url: url,
         password: passwordController.text,
+        secretKey: secretKeyController.text.trim().isEmpty
+            ? 'key'
+            : secretKeyController.text.trim(),
+        cryption: selectedCryption,
         method: selectedMethod,
         type: ConnectorFactory.typeLabel(selectedConnectorType),
         connectorType: selectedConnectorType,
@@ -250,9 +304,11 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
   Future<void> _showEditDialog(Webshell ws) async {
     final urlController = TextEditingController(text: ws.url);
     final passwordController = TextEditingController(text: ws.password ?? '');
+    final secretKeyController = TextEditingController(text: ws.secretKey);
     final nameController = TextEditingController(text: ws.name);
     String selectedMethod = ws.method;
     String selectedConnectorType = ws.connectorType;
+    String selectedCryption = ws.cryption;
     bool obscurePassword = true;
     bool detecting = false;
     List<_DetectResult>? detectResults;
@@ -282,6 +338,9 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
               url: url,
               password: pass,
               method: selectedMethod,
+              secretKey: secretKeyController.text,
+              cryption: selectedCryption,
+              onlyConnectorType: selectedConnectorType,
             );
             final first = results.firstWhere(
               (r) => r.ok,
@@ -313,6 +372,40 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                       autofocus: true,
                     ),
                     const SizedBox(height: 16),
+                    _ConnectorRow(
+                      value: selectedConnectorType,
+                      detecting: detecting,
+                      onChanged: (v) => setDialogState(() {
+                        selectedConnectorType = v;
+                        final fixed = ConnectorFactory.fixedMethod(v);
+                        if (fixed != null) selectedMethod = fixed;
+                        if (ConnectorFactory.isGodzilla(v)) {
+                          if (secretKeyController.text.trim().isEmpty) {
+                            secretKeyController.text = 'key';
+                          }
+                          final allowed = ConnectorFactory.cryptionsFor(v)
+                              .map((c) => c.cryptionId)
+                              .toList();
+                          if (!allowed.contains(selectedCryption)) {
+                            selectedCryption = allowed.isEmpty
+                                ? ''
+                                : allowed.first;
+                          }
+                        }
+                      }),
+                      onDetect: runDetect,
+                    ),
+                    if (ConnectorFactory.isGodzilla(selectedConnectorType)) ...[
+                      const SizedBox(height: 12),
+                      _GodzillaCryptionField(
+                        key: ValueKey(selectedConnectorType),
+                        connectorType: selectedConnectorType,
+                        cryptionId: selectedCryption,
+                        onChanged: (id) =>
+                            setDialogState(() => selectedCryption = id),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
                     _PasswordParamField(
                       controller: passwordController,
                       obscureText: obscurePassword,
@@ -321,6 +414,10 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                         () => obscurePassword = !obscurePassword,
                       ),
                     ),
+                    if (ConnectorFactory.isGodzilla(selectedConnectorType)) ...[
+                      const SizedBox(height: 16),
+                      _SecretKeyField(controller: secretKeyController),
+                    ],
                     const SizedBox(height: 16),
                     _buildField(
                       controller: nameController,
@@ -328,20 +425,13 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                       hint: 'e.g. Admin panel shell',
                     ),
                     const SizedBox(height: 16),
-                    _ConnectorRow(
-                      value: selectedConnectorType,
-                      detecting: detecting,
-                      onChanged: (v) => setDialogState(() {
-                        selectedConnectorType = v;
-                        final fixed = ConnectorFactory.fixedMethod(v);
-                        if (fixed != null) selectedMethod = fixed;
-                      }),
-                      onDetect: runDetect,
-                    ),
                     if (detectResults != null)
                       _DetectResultPanel(results: detectResults!),
                     const SizedBox(height: 16),
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           'Request method:',
@@ -349,7 +439,6 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
                             color: AppColors.textSecondary,
                           ),
                         ),
-                        const SizedBox(width: 12),
                         _MethodToggle(
                           value: selectedMethod,
                           lockedMethod: ConnectorFactory.fixedMethod(
@@ -406,6 +495,10 @@ class _WebshellManagementPageState extends State<WebshellManagementPage> {
           name: name,
           url: url,
           password: passwordController.text,
+          secretKey: secretKeyController.text.trim().isEmpty
+              ? 'key'
+              : secretKeyController.text.trim(),
+          cryption: selectedCryption,
           type: ConnectorFactory.typeLabel(selectedConnectorType),
           method: selectedMethod,
           connectorType: selectedConnectorType,
@@ -980,18 +1073,13 @@ class _ConnectorTypeDropdown extends StatelessWidget {
   const _ConnectorTypeDropdown({required this.value, required this.onChanged});
 
   List<(String, String)> _connectorOptions() => [
-    ('php_eval', '${ConnectorFactory.typeLabel('php_eval').toUpperCase()} · ${ConnectorFactory.shortLabel('php_eval')}'),
-    ('php_b64rot13', '${ConnectorFactory.typeLabel('php_b64rot13').toUpperCase()} · ${ConnectorFactory.shortLabel('php_b64rot13')}'),
-    ('php_behinder', '${ConnectorFactory.typeLabel('php_behinder').toUpperCase()} · ${ConnectorFactory.shortLabel('php_behinder')}'),
-    ('php_passthru', '${ConnectorFactory.typeLabel('php_passthru').toUpperCase()} · ${ConnectorFactory.shortLabel('php_passthru')}'),
-    ('jsp_classloader', '${ConnectorFactory.typeLabel('jsp_classloader').toUpperCase()} · ${ConnectorFactory.shortLabel('jsp_classloader')}'),
-    ('jsp_behinder', '${ConnectorFactory.typeLabel('jsp_behinder').toUpperCase()} · ${ConnectorFactory.shortLabel('jsp_behinder')}'),
-    ('jsp_behinder_v2', '${ConnectorFactory.typeLabel('jsp_behinder_v2').toUpperCase()} · ${ConnectorFactory.shortLabel('jsp_behinder_v2')}'),
-    ('jsp_runtime', '${ConnectorFactory.typeLabel('jsp_runtime').toUpperCase()} · ${ConnectorFactory.shortLabel('jsp_runtime')}'),
-    ('asp_wscript', '${ConnectorFactory.typeLabel('asp_wscript').toUpperCase()} · ${ConnectorFactory.shortLabel('asp_wscript')}'),
-    ('aspx_cmd', '${ConnectorFactory.typeLabel('aspx_cmd').toUpperCase()} · ${ConnectorFactory.shortLabel('aspx_cmd')}'),
-    ('aspx_behinder', '${ConnectorFactory.typeLabel('aspx_behinder').toUpperCase()} · ${ConnectorFactory.shortLabel('aspx_behinder')}'),
+    for (final type in ConnectorFactory.allTypes) (type, _connectorLabel(type)),
   ];
+
+  /// 连接器只显示「架构 · 协议」，加密器由下面的 Cryption 下拉单独选择。
+  static String _connectorLabel(String type) =>
+      '${ConnectorFactory.typeLabel(type).toUpperCase()} · '
+      '${ConnectorFactory.shortLabel(type)}';
 
   @override
   Widget build(BuildContext context) {
@@ -1019,8 +1107,11 @@ class _ConnectorTypeDropdown extends StatelessWidget {
     }
 
     return DropdownButtonFormField<String>(
+      // 用 key 强制重建，配合 initialValue 让外部（自动检测/加密器选择）
+      // 改变 value 时下拉框同步刷新。
+      key: ValueKey(value),
       isExpanded: true,
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(
         labelText: 'Connector Type',
         labelStyle: AppTextStyles.caption(color: AppColors.textSecondary),
@@ -1051,6 +1142,112 @@ class _ConnectorTypeDropdown extends StatelessWidget {
 
 // ─── 密码/参数名字段（根据 connector 显示上下文提示）────────────────────────────
 
+class _GodzillaCryptionField extends StatelessWidget {
+  final String connectorType;
+  final String cryptionId;
+  final ValueChanged<String> onChanged;
+
+  const _GodzillaCryptionField({
+    super.key,
+    required this.connectorType,
+    required this.cryptionId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final options = ConnectorFactory.cryptionsFor(connectorType);
+    if (options.isEmpty) return const SizedBox.shrink();
+    final current = options.firstWhere(
+      (v) => v.cryptionId == cryptionId,
+      orElse: () => options.first,
+    );
+    return DropdownButtonFormField<String>(
+      initialValue: current.cryptionId,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'Cryption (加密器)',
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        helperText: _note(current),
+        helperStyle: AppTextStyles.caption(
+          color: AppColors.textMuted,
+          size: 11,
+        ),
+        filled: true,
+        fillColor: AppColors.bgCard,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      items: [
+        for (final variant in options)
+          DropdownMenuItem<String>(
+            value: variant.cryptionId,
+            child: Text(
+              variant.cryptionId,
+              style: AppTextStyles.body(color: AppColors.textPrimary, size: 13),
+            ),
+          ),
+      ],
+      onChanged: (value) {
+        if (value != null) onChanged(value);
+      },
+    );
+  }
+
+  static String _note(GodzillaVariant variant) {
+    switch (variant.wire) {
+      case GodzillaWire.formBase64:
+        return variant.cipher == GodzillaCipher.none
+            ? 'base64 表单，无加密'
+            : 'base64 表单 + 标记响应';
+      case GodzillaWire.raw:
+        return variant.cipher == GodzillaCipher.none
+            ? '裸 body，无加密、无标记'
+            : '裸密文 body（无 base64、无标记）';
+      case GodzillaWire.evalBase64:
+        return '一句话 eval 壳，每次请求动态装载';
+    }
+  }
+}
+
+class _SecretKeyField extends StatelessWidget {
+  final TextEditingController controller;
+
+  const _SecretKeyField({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(
+        color: AppColors.textPrimary,
+        fontFamily: 'monospace',
+      ),
+      decoration: InputDecoration(
+        labelText: 'Godzilla key (secretKey) *',
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        hintText: 'Default: key',
+        hintStyle: AppTextStyles.caption(color: AppColors.textMuted, size: 12),
+        helperText:
+            'Godzilla 的“密钥”字段，和上面的连接密码不是同一个值；'
+            'key16 = MD5(secretKey)[0:16]。密码是 HTTP 参数名。',
+        helperStyle: AppTextStyles.caption(
+          color: AppColors.textMuted,
+          size: 11,
+        ),
+        helperMaxLines: 2,
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(
+            color: AppColors.primary.withValues(alpha: 0.5),
+          ),
+        ),
+        focusedBorder: const OutlineInputBorder(
+          borderSide: BorderSide(color: AppColors.primary),
+        ),
+      ),
+    );
+  }
+}
+
 class _PasswordParamField extends StatelessWidget {
   final TextEditingController controller;
   final bool obscureText;
@@ -1069,13 +1266,20 @@ class _PasswordParamField extends StatelessWidget {
     final defaultParam = ConnectorFactory.defaultParam(connectorType);
     final isBehinder =
         connectorType == 'jsp_behinder' || connectorType == 'php_behinder';
+    final isGodzilla = ConnectorFactory.isGodzilla(connectorType);
     final hint = isBehinder
         ? 'Default mAtrix_911, or the 16-char hex of k in the payload'
-        : (defaultParam.isNotEmpty ? 'Parameter name, default: $defaultParam' : '');
+        : (defaultParam.isNotEmpty ? 'Default: $defaultParam' : '');
 
-    final labelText = isBehinder ? 'Password / key *' : 'Parameter name *';
+    final labelText = isBehinder
+        ? 'Password / key *'
+        : isGodzilla
+        ? 'Password (参数名) *'
+        : 'Parameter name *';
     final helperText = isBehinder
         ? 'Connection password (first 16 chars of MD5 as key); or enter the hex value of String k="xxx" from the payload directly'
+        : isGodzilla
+        ? 'Godzilla 的“密码”：既是 HTTP 参数名，也参与响应标记计算。密钥（secretKey）在下方单独填写。'
         : 'HTTP parameter name for receiving commands in the payload (e.g. \$_POST["$defaultParam"])';
 
     return TextField(
@@ -1190,8 +1394,20 @@ Future<List<_DetectResult>> _autoDetect({
   required String url,
   required String password,
   required String method,
+  String secretKey = 'key',
+  String cryption = '',
+  String? onlyConnectorType,
 }) async {
-  final futures = ConnectorFactory.allTypes.map((type) async {
+  // 选择了 Godzilla 连接器时，直接探测该连接器（用户已经填了 Godzilla
+  // 特有字段：密码 + 密钥），不再把 11 个普通连接器全部试一遍。
+  final types = (onlyConnectorType != null &&
+          ConnectorFactory.isGodzilla(onlyConnectorType))
+      ? <String>[onlyConnectorType]
+      : ConnectorFactory.allTypes
+          .where((type) => !ConnectorFactory.isGodzilla(type))
+          .toList(growable: false);
+
+  final futures = types.map((type) async {
     try {
       final ws = Webshell(
         id: 0,
@@ -1199,16 +1415,22 @@ Future<List<_DetectResult>> _autoDetect({
         name: '_probe',
         url: url,
         password: password,
+        secretKey: secretKey,
+        cryption: cryption,
         type: ConnectorFactory.typeLabel(type),
         method: method,
         connectorType: type,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      // ClassLoader 马首包需上传整段 agent + defineClass，远超 6s
-      final pingTimeout = type == 'jsp_classloader'
-          ? const Duration(seconds: 125)
-          : const Duration(seconds: 6);
+      // ClassLoader 马首包需上传整段 agent + defineClass，远超 6s；
+      // Godzilla JSP 首包还要播种 34KB 引擎。
+      final pingTimeout = switch (type) {
+        'jsp_classloader' => const Duration(seconds: 125),
+        'jsp_godzilla' => const Duration(seconds: 20),
+        _ when ConnectorFactory.isGodzilla(type) => const Duration(seconds: 15),
+        _ => const Duration(seconds: 6),
+      };
       final ok = await ConnectorFactory.create(ws).ping().timeout(pingTimeout);
       return _DetectResult(type, ok, ok ? 'Responded' : 'No response');
     } on TimeoutException {
