@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter/services.dart' show rootBundle;
+import '../../core/asset_loader.dart';
 import 'package:http/http.dart' as http;
 
 import 'shiro_crypto.dart';
@@ -139,7 +139,7 @@ class ShiroMemShellService {
   static Future<Uint8List> _loadB64Asset(String assetPath) async {
     String b64;
     try {
-      b64 = (await rootBundle.loadString(assetPath)).trim();
+      b64 = (await loadAssetString(assetPath)).trim();
     } catch (_) {
       try {
         final f = File(assetPath);

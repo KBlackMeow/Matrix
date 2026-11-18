@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../pages/exp/universal_exploit_page.dart';
 import '../../pages/thinkphp_exp_page.dart';
 import '../../pages/vulhub/drupal_exp_page.dart';
 import '../../pages/vulhub/httpd_exp_page.dart';
@@ -35,6 +36,14 @@ class ExpEntry {
 
 /// 入口卡片列表。延迟为 getter，保证语言切换后立即重建文案。
 List<ExpEntry> get expEntries => [
+  ExpEntry(
+    icon: Icons.hub,
+    title: 'Universal Exploit Console',
+    subtitle: 'One template for every module: Check / Exec / GetShell',
+    versionRequirement: 'All supported CVEs',
+    tag: 'Multi · Unified',
+    pageBuilder: (url) => UniversalExploitPage(initialTargetUrl: url),
+  ),
   ExpEntry(
     icon: Icons.cookie,
     title: 'Apache Shiro CVE-2016-4437',

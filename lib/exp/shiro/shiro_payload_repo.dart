@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:typed_data';
 
-import 'package:flutter/services.dart' show rootBundle;
+import '../../core/asset_loader.dart';
 
 /// 负责从项目根目录下的 `data/` 读取 Shiro 相关的字典 / Payload。
 ///
@@ -20,7 +20,7 @@ class ShiroPayloadRepo {
     String b64;
     // 优先从 Flutter 资源中读取（打包后的场景）
     try {
-      b64 = (await rootBundle.loadString('data/$fileName')).trim();
+      b64 = (await loadAssetString('data/$fileName')).trim();
     } catch (_) {
       // 回退到直接从工作目录读取（开发时直接放在项目根 data/ 下）
       try {
@@ -40,7 +40,7 @@ class ShiroPayloadRepo {
   Future<String> loadPayloadB64String(String fileName) async {
     String b64;
     try {
-      b64 = (await rootBundle.loadString('data/$fileName')).trim();
+      b64 = (await loadAssetString('data/$fileName')).trim();
     } catch (_) {
       try {
         final file = io.File('data/$fileName');
@@ -67,7 +67,7 @@ class ShiroPayloadRepo {
   Future<List<String>> loadKeys() async {
     String content;
     try {
-      content = await rootBundle.loadString('data/shiro_keys.txt');
+      content = await loadAssetString('data/shiro_keys.txt');
     } catch (_) {
       try {
         final file = io.File('data/shiro_keys.txt');
