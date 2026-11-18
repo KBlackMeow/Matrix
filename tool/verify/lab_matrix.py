@@ -56,6 +56,9 @@ def project_of(lab):
     # 每个靶场独立 compute 项目名：否则服务名相同的靶场会复用同一个容器
     # （MySQL/Tomcat 的容器名都是 struts2/web/...），导致"打错靶场"。
     slug = lab.replace("/", "-").replace("CVE-", "").lower()
+    # Docker 项目名只允许 [a-z0-9_-] 且不能以符号开头（"8.1"/"5.0.23" 含点号）
+    slug = re.sub(r"[^a-z0-9_-]", "-", slug)
+    slug = re.sub(r"-+", "-", slug).strip("-")
     return "mxlab-" + slug
 
 

