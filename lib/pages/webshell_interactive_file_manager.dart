@@ -232,6 +232,10 @@ class _FileManagerTabState extends State<FileManagerTab>
   Future<void> _uploadBytes(String fileName, Uint8List bytes) async {
     if (!mounted) return;
     final remotePath = _join(_currentPath, fileName);
+    // 原子上传：先写 <目标>.mxpart，成功后再 mv 成目标文件。
+    // 取消或失败时清理临时文件，避免目标端留下半截（甚至可执行的）文件。
+    final canStage = widget.service.supportsShellExec;
+    final stagingPath = canStage ? '$remotePath.mxpart' : remotePath;
     final transferred = ValueNotifier<int>(0);
     _uploadCancelled = false;
     bool ok = false;
@@ -259,7 +263,7 @@ class _FileManagerTabState extends State<FileManagerTab>
         final content = utf8.decode(bytes);
         ok = await _withWriteLock(
           remotePath,
-          () => widget.service.writeFile(remotePath, content),
+          () => widget.service.writeFile(stagingPath, content),
         );
       } else {
         usedBinaryPath = true; // 二进制文件或大文件（>100KB）走分块
@@ -285,7 +289,7 @@ class _FileManagerTabState extends State<FileManagerTab>
         ok = await _withWriteLock(
           remotePath,
           () => widget.service.writeFileBinaryWithProgress(
-            remotePath,
+            stagingPath,
             bytes,
             (sent, _) {
               if (!mounted) return;
@@ -299,6 +303,11 @@ class _FileManagerTabState extends State<FileManagerTab>
       }
     } catch (e) {
       popProgress();
+      if (canStage) {
+        try {
+          await widget.service.deleteFile(stagingPath);
+        } catch (_) {}
+      }
       if (!mounted) {
         transferred.dispose();
         return;
@@ -319,10 +328,22 @@ class _FileManagerTabState extends State<FileManagerTab>
     // 若文本路径失败且文件看起来是文本，尝试回退到二进制写入（更稳，避免命令长度限制）。
     if (!ok && !usedBinaryPath) {
       try {
-        ok = await widget.service.writeFileBinary(remotePath, bytes);
+        ok = await widget.service.writeFileBinary(stagingPath, bytes);
       } catch (_) {
         // ignore, 保持原有失败提示
       }
+    }
+    if (ok && canStage) {
+      ok = await widget.service.renameFile(stagingPath, remotePath);
+      if (!ok) {
+        try {
+          await widget.service.deleteFile(stagingPath);
+        } catch (_) {}
+      }
+    } else if (!ok && canStage) {
+      try {
+        await widget.service.deleteFile(stagingPath);
+      } catch (_) {}
     }
 
     if (!mounted) {

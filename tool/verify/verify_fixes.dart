@@ -26,6 +26,7 @@ import '../../lib/core/crypto/credential_cipher.dart';
 import '../../lib/database/storage_permissions.dart';
 import '../../lib/mcp/log_redaction.dart';
 import '../../lib/services/remote_write_lock.dart';
+import '../../lib/utils/url_safety.dart';
 
 int _failed = 0;
 int _passed = 0;
@@ -48,6 +49,9 @@ Future<void> main() async {
 
   print('== TtlCache ==');
   await _testTtlCache();
+
+  print('== URL safety ==');
+  _testUrlSafety();
 
   print('== Log redaction ==');
   _testRedaction();
@@ -364,4 +368,21 @@ void _testThinkphpResult() {
   _check(hit.vulnerable && !hit.failed, 'ThinkPHP 命中：vulnerable=true/failed=false');
   _check(!miss.vulnerable && !miss.failed, 'ThinkPHP 未命中不等于探测失败');
   _check(!fail.vulnerable && fail.failed, 'ThinkPHP 探测失败是独立状态');
+}
+
+void _testUrlSafety() {
+  _check(
+    stripUrlCredentials('http://user:pass@host/path') == 'http://host/path',
+    '剪贴板/复制：去掉 userinfo',
+  );
+  _check(
+    stripUrlCredentials('http://host/path?x=1') == 'http://host/path?x=1',
+    '无凭据时 URL 保持不变',
+  );
+  _check(
+    redactUrlForLog('https://u:p@host:8443/a/b?token=1#frag') ==
+        'https://host:8443/a/b',
+    '日志：丢弃 userinfo/query/fragment',
+  );
+  _check(redactUrlForLog('not a url') == '(invalid url)', '非法 URL 不输出原文');
 }

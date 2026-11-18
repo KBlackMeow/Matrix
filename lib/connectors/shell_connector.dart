@@ -69,6 +69,30 @@ abstract class ShellConnector {
     onProgress(bytes.length, bytes.length);
     return ok;
   }
+  /// 重命名/移动远端文件（默认用 shell 的 `mv -f` / `move /Y`）。
+  ///
+  /// 用于"先写临时文件、成功再改名"的原子上传：取消或失败时目标目录里
+  /// 不会留下半截文件。不支持 shell 的连接器返回 false，调用方可回退直写。
+  Future<bool> renameFile(String from, String to) async {
+    if (!supportsShellExec) return false;
+    final isWindows = webshell.connectorType.startsWith('asp');
+    final cmd = isWindows
+        ? 'move /Y ${_winQuote(from)} ${_winQuote(to)} & echo __MX_MV_OK__'
+        : 'mv -f ${_shQuote(from)} ${_shQuote(to)} && echo __MX_MV_OK__';
+    try {
+      final out = await executeCommand(
+        cmd,
+      ).timeout(const Duration(seconds: 15));
+      return out.contains('__MX_MV_OK__');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static String _shQuote(String v) => "'${v.replaceAll("'", "'\\''")}'";
+
+  static String _winQuote(String v) => '"${v.replaceAll('"', '""')}"';
+
   Future<Map<String, String>> getSystemInfo();
   Future<List<({String name, bool isDir})>> listNamesForCompletion(String path);
   Future<String> getHomeDir();

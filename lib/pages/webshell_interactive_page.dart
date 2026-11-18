@@ -10,6 +10,7 @@ import '../services/reverse_shell_service.dart';
 import '../core/crypto/payload_obfuscator.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/url_safety.dart';
 import '../utils/matrix_console_log.dart';
 import '../app/main_nav_bus.dart';
 import 'reverse_shell_terminal_page.dart';
@@ -104,14 +105,14 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
       pingLogPrinted = true;
       matrixConsoleLog(
         '[ping] ok=false type=${widget.webshell.connectorType} '
-        'url=${widget.webshell.url} err=$e',
+        'url=${redactUrlForLog(widget.webshell.url)} err=$e',
       );
       debugPrint('[ping] stack: $st');
     }
     if (!alive && !pingLogPrinted) {
       matrixConsoleLog(
         '[ping] ok=false type=${widget.webshell.connectorType} '
-        'url=${widget.webshell.url}',
+        'url=${redactUrlForLog(widget.webshell.url)}',
       );
     }
     if (!alive && _service.supportsShellExec) {
@@ -124,7 +125,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
           alive = true;
           matrixConsoleLog(
             '[ping] ok=true type=${widget.webshell.connectorType} '
-            'url=${widget.webshell.url} via=exec_fallback',
+            'url=${redactUrlForLog(widget.webshell.url)} via=exec_fallback',
           );
         }
       } catch (_) {

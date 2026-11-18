@@ -112,6 +112,10 @@ class WebshellService {
 
   Future<bool> deleteFile(String path) => _connector.deleteFile(path);
 
+  /// 远端重命名（原子上传用）；连接器不支持时返回 false。
+  Future<bool> renameFile(String from, String to) =>
+      _connector.renameFile(from, to);
+
   Future<Uint8List> readFileBinary(String path) =>
       _connector.readFileBinary(path);
 

@@ -10,6 +10,7 @@ import '../models/project.dart';
 import '../models/webshell.dart';
 import '../services/webshell_connectivity_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/url_safety.dart';
 import 'webshell_interactive_page.dart';
 
 /// Webshell 页面：创建、编辑、删除
@@ -878,7 +879,7 @@ class _WebshellCardState extends State<_WebshellCard> {
                         InkWell(
                           onTap: () {
                             Clipboard.setData(
-                              ClipboardData(text: widget.webshell.url),
+                              ClipboardData(text: stripUrlCredentials(widget.webshell.url)),
                             );
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
