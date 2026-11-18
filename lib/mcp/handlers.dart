@@ -10,6 +10,7 @@ import '../models/webshell.dart';
 import '../services/webshell_connectivity_service.dart';
 import 'db.dart';
 import 'local_workspace.dart';
+import 'log_redaction.dart';
 import 'remote_write_lock.dart';
 import 'session_pool.dart';
 
@@ -80,16 +81,9 @@ int? _optShellId(Map<String, dynamic> args) => args['shell_id'] as int?;
 
 void _logCall(McpActivityLogger? log, String tool, Map<String, dynamic> args) {
   if (log == null) return;
-  final details = args.entries
-      .where((entry) => entry.key != 'password')
-      .map((entry) {
-        if (entry.key == 'content') {
-          return 'content=<${'${entry.value}'.length} chars>';
-        }
-        return '${entry.key}=${_trunc('${entry.value}', 200)}';
-      })
-      .join(', ');
-  log('→ $tool($details)');
+  // 统一脱敏：password / secret_key / token / cookie 不出现在活动日志里，
+  // content 只记录长度（此前只过滤了 password，Godzilla 密钥会原样入日志）。
+  log('→ $tool(${describeToolArguments(args)})');
 }
 
 void _logResult(McpActivityLogger? log, String tool, int ms, String summary) {

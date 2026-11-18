@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import '../core/crypto/payload_obfuscator.dart';
 import '../database/database_helper.dart';
 import '../models/payload.dart';
+import '../services/remote_write_lock.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/matrix_syntax_highlight.dart';
@@ -255,7 +256,10 @@ class _FileManagerTabState extends State<FileManagerTab>
       if (!useBinaryPath) {
         setState(() => _uploading = true);
         final content = utf8.decode(bytes);
-        ok = await widget.service.writeFile(remotePath, content);
+        ok = await _withWriteLock(
+          remotePath,
+          () => widget.service.writeFile(remotePath, content),
+        );
       } else {
         usedBinaryPath = true; // 二进制文件或大文件（>100KB）走分块
         setState(() => _uploading = true);
@@ -277,16 +281,19 @@ class _FileManagerTabState extends State<FileManagerTab>
             },
           ),
         );
-        ok = await widget.service.writeFileBinaryWithProgress(
+        ok = await _withWriteLock(
           remotePath,
-          bytes,
-          (sent, _) {
-            if (!mounted) return;
-            if (_uploadCancelled) {
-              throw _TransferCancelled();
-            }
-            transferred.value = sent;
-          },
+          () => widget.service.writeFileBinaryWithProgress(
+            remotePath,
+            bytes,
+            (sent, _) {
+              if (!mounted) return;
+              if (_uploadCancelled) {
+                throw _TransferCancelled();
+              }
+              transferred.value = sent;
+            },
+          ),
         );
       }
     } catch (e) {
@@ -573,6 +580,20 @@ class _FileManagerTabState extends State<FileManagerTab>
     );
   }
 
+  /// 与 MCP 工具共用同一把写锁：同一远端路径的上传/写入/删除串行执行。
+  ///
+  /// 之前 UI 与 MCP 各持一把锁，二者同时写同一文件会互相覆盖。
+  Future<T> _withWriteLock<T>(
+    String remotePath,
+    Future<T> Function() operation,
+  ) {
+    return RemoteWriteLockCoordinator.shared.synchronize(
+      shellUrl: widget.service.webshell.url,
+      remotePath: remotePath,
+      operation: operation,
+    );
+  }
+
   Future<void> _deleteFile(FileEntry entry) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -606,7 +627,10 @@ class _FileManagerTabState extends State<FileManagerTab>
     );
     if (confirm != true) return;
     final deletedPath = _join(_currentPath, entry.name);
-    final ok = await widget.service.deleteFile(deletedPath);
+    final ok = await _withWriteLock(
+      deletedPath,
+      () => widget.service.deleteFile(deletedPath),
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1424,7 +1448,12 @@ class _FileEditDialogState extends State<_FileEditDialog> {
 
   Future<void> _save() async {
     setState(() => _saving = true);
-    final ok = await widget.service.writeFile(widget.path, _codeController.text);
+    final ok = await RemoteWriteLockCoordinator.shared.synchronize(
+      shellUrl: widget.service.webshell.url,
+      remotePath: widget.path,
+      operation: () =>
+          widget.service.writeFile(widget.path, _codeController.text),
+    );
     if (!mounted) return;
     setState(() => _saving = false);
     if (ok) {

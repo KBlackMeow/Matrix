@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'app/app.dart';
 import 'database/database_helper.dart';
 import 'database/database_init.dart';
+import 'database/matrix_storage.dart';
 import 'services/seed_service.dart';
 
 /// macOS 下偶发引擎与框架按键表不一致，会在 Debug 触发 HardwareKeyboard 断言；
@@ -32,6 +33,8 @@ void main() async {
   }
   // _installMatrixDebugPrint();
   initDatabase(); // 初始化 SQLite（桌面端使用 FFI）
+  // 本地数据目录 0700 / 数据库 0600：凭据是明文存储，至少限制同机可读性。
+  await hardenMatrixStorage();
   runApp(const MyApp());
   // seed 在后台运行，不阻塞 UI 启动
   SeedService.seed(DatabaseHelper());

@@ -40,7 +40,8 @@ class _McpServerPageState extends State<McpServerPage> {
   final _dbHelper = DatabaseHelper();
 
   McpDatabase? _mcpDb;
-  final _writeLocks = RemoteWriteLockCoordinator();
+  // 与 UI 文件管理器共用同一把写锁，避免同目标路径并发覆盖。
+  final _writeLocks = RemoteWriteLockCoordinator.shared;
   LocalWorkspace? _workspace;
   final Map<String, SessionPool> _connectionPools = {};
   StreamableMcpServer? _httpServer;
