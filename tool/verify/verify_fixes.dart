@@ -16,6 +16,7 @@ import 'dart:math';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../lib/database/io/credential_migration.dart';
+import '../../lib/exp/thinkphp/thinkphp_exp_service.dart';
 import '../../lib/exp/vulhub/services/exp_result.dart';
 import '../../lib/exp/vulhub/services/rce_encoder.dart';
 
@@ -63,6 +64,9 @@ Future<void> main() async {
 
   print('== ExpResult semantics ==');
   _testExpResult();
+
+  print('== ThinkphpResult semantics ==');
+  _testThinkphpResult();
 
   print('== Credential cipher ==');
   _testCipher();
@@ -350,4 +354,14 @@ void _testExpResult() {
   _check(vuln.vulnerable && !vuln.failed, '命中：vulnerable=true/failed=false');
   _check(!miss.vulnerable && !miss.failed, '未命中不等于探测失败');
   _check(!fail.vulnerable && fail.failed, '探测失败是独立状态');
+}
+
+void _testThinkphpResult() {
+  final hit = ThinkphpResult(true, 'TP-5', 'payload');
+  final miss = ThinkphpResult(false, 'TP-5', '');
+  final fail = ThinkphpResult.probeFailed('TP-5', 'timeout');
+
+  _check(hit.vulnerable && !hit.failed, 'ThinkPHP 命中：vulnerable=true/failed=false');
+  _check(!miss.vulnerable && !miss.failed, 'ThinkPHP 未命中不等于探测失败');
+  _check(!fail.vulnerable && fail.failed, 'ThinkPHP 探测失败是独立状态');
 }

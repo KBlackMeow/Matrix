@@ -247,8 +247,27 @@ tomcat-check http://127.0.0.1:9 →  vulnerable=false failed=false   （错误�
 | `tomcat-check` | failed=true | vulnerable=true |
 | `spring-check` | failed=true | vulnerable=true |
 
-> ThinkPHP 的 `ThinkphpResult` 仍是二元结果（未加 failed），其 8 个检测在网络失败时
-> 仍报"未发现"，列为遗留项。
+> ThinkPHP 已补齐（见下节）：12 个检测在网络失败时返回 `failed=true`。
+
+## 第三轮：ThinkPHP 三态补齐
+
+`ThinkphpResult` 增加 `failed` / `probeFailed`，`thinkphp_v5_exp` 与
+`thinkphp_exp_service` 共 12 个检测统一改造为：
+
+```
+记录 anyResponse（拿到过任一响应）与 lastError（最后一次异常）
+→ 全部失败且从未拿到响应 ⇒ vulnerable=false, failed=true
+→ 否则按原逻辑判别
+```
+
+页面（`thinkphp_exp_page.dart`）单检/批量两处都增加了 `[!] 探测失败` 分支。
+
+靶场复测（`vulhub/thinkphp:5.0.23`）：
+
+| 场景 | 结果 |
+| --- | --- |
+| 真实靶场 | `tp5023 vulnerable=true failed=false`，其余 5 个正确为 false |
+| 关闭端口 `127.0.0.1:9` | 6 个检测全部 `failed=true`，detail 带 `Connection refused` |
 
 ## 做得好的地方（避免只报坏消息）
 

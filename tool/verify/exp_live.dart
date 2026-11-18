@@ -76,7 +76,7 @@ Future<void> main(List<String> args) async {
       for (final e in checks.entries) {
         final r = await e.value();
         print('  ${e.key.padRight(14)} vulnerable=${r.vulnerable} '
-            'name=${r.vulnName} detail=${r.detail}');
+            'failed=${r.failed} name=${r.vulnName} detail=${r.detail}');
       }
       break;
     case 'thinkphp-exec':

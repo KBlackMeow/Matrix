@@ -196,7 +196,9 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
         ),
       );
       final r = await svc.checkSingle(type);
-      if (r.vulnerable) {
+      if (r.failed) {
+        _appendLog('[!] 探测失败: ${r.detail}');
+      } else if (r.vulnerable) {
         _appendLog('[+] 存在漏洞: ${r.vulnName}');
         _appendLog('[i] ${r.detail}');
         setState(() {
@@ -255,7 +257,9 @@ class _ThinkphpExpCardState extends State<_ThinkphpExpCard> {
       ThinkphpVulnType? firstHit;
       for (var i = 0; i < results.length; i++) {
         final r = results[i];
-        if (r.vulnerable) {
+        if (r.failed) {
+          _appendLog('[!] ${r.vulnName} 探测失败: ${r.detail}');
+        } else if (r.vulnerable) {
           _appendLog('[+] ${r.vulnName}');
           _appendLog('[i] ${r.detail}');
           final t = rceTypes[i];
