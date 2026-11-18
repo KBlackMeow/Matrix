@@ -19,6 +19,14 @@ class MultipartFormFile {
   final String content;
 }
 
+/// 探测类请求在无法拿到响应时抛出，让调用方把"没测通"与"目标不存在漏洞"区分开。
+class HttpProbeException implements Exception {
+  HttpProbeException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
 class MatrixHttpClient {
   MatrixHttpClient({
     required this.baseUrl,
@@ -48,6 +56,20 @@ class MatrixHttpClient {
     final io = HttpClient()
       ..badCertificateCallback = (_, __, ___) => true;
     return IOClient(io);
+  }
+
+  /// 与 [get] 相同，但网络层失败（连接拒绝/超时/TLS）时抛出 [HttpProbeException]。
+  ///
+  /// 注意：HTTP 4xx/5xx 不算失败——它们仍是可判定的响应。
+  Future<HttpResult> getOrThrow(
+    String path, {
+    Map<String, String>? headers,
+  }) async {
+    final result = await get(path, headers: headers);
+    if (!result.isOk) {
+      throw HttpProbeException(result.error?.toString() ?? 'no response');
+    }
+    return result;
   }
 
   Future<HttpResult> get(
@@ -92,6 +114,25 @@ class MatrixHttpClient {
     } finally {
       client.close();
     }
+  }
+
+  /// 与 [post] 相同，但网络层失败时抛出 [HttpProbeException]。
+  Future<HttpResult> postOrThrow(
+    String path, {
+    Map<String, String>? headers,
+    String? body,
+    Map<String, String>? form,
+  }) async {
+    final result = await post(
+      path,
+      headers: headers,
+      body: body,
+      form: form,
+    );
+    if (!result.isOk) {
+      throw HttpProbeException(result.error?.toString() ?? 'no response');
+    }
+    return result;
   }
 
   Future<HttpResult> post(

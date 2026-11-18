@@ -216,6 +216,40 @@ macOS/Linux 上 `SystemEncoding` 即 UTF-8；WebLogic 控制台若返回 GBK 或
 | S2-057 `check` | true | true |
 | S2-057 `exec('id')` | — | `uid=0(root)` |
 
+## 第二轮靶场联调（ThinkPHP / PHP-CGI / Tomcat / Shiro）
+
+| 模块 | 靶场 | 结果 |
+| --- | --- | --- |
+| ThinkPHP 5.0 | `vulhub/thinkphp:5.0.23` | `checkTp5023=true`（其余 5 个检测正确为 false）；`exeRce('id')` → `uid=33(www-data)` |
+| PHP-CGI | `vulhub/php:5.4.1-cgi` | `check=true`；`execRce('id')` → `uid=33(www-data)`（验证 F2 的 PHP 单引号修复） |
+| Tomcat PUT | `vulhub/tomcat:8.5.19`（readonly=false） | `check=true`（写 JSP 并回显）；`getShell()` 返回 `/mAtrix_t_shell.jsp` |
+| Shiro | `vulhub/shiro:1.2.4` | `checkIsShiro=true` |
+
+### F1 的第二个漏洞：HTTP 客户端把网络错误吞成"空响应"
+
+`MatrixHttpClient.get/post` 捕获 `SocketException/Timeout/Handshake` 后**返回带 `error` 的
+HttpResult 而不是抛出异常**，于是 `catch` 分支永远不会触发：
+
+```
+php-check  http://127.0.0.1:9  →  vulnerable=false failed=false   （错误）
+tomcat-check http://127.0.0.1:9 →  vulnerable=false failed=false   （错误）
+```
+
+**修复**：新增 `getOrThrow()` / `postOrThrow()`（仅在传输层失败时抛 `HttpProbeException`，
+4xx/5xx 仍按正常响应处理），exp 内 24 处探测调用改用它；Tomcat 的 `put` 无 orThrow 包装，
+改为显式检查 `isOk`。
+
+复测：
+
+| 用例 | 关闭端口 | 真实靶场 |
+| --- | --- | --- |
+| `php-check` | failed=true | vulnerable=true |
+| `tomcat-check` | failed=true | vulnerable=true |
+| `spring-check` | failed=true | vulnerable=true |
+
+> ThinkPHP 的 `ThinkphpResult` 仍是二元结果（未加 failed），其 8 个检测在网络失败时
+> 仍报"未发现"，列为遗留项。
+
 ## 做得好的地方（避免只报坏消息）
 
 - ThinkPHP 的命令参数做了 `Uri.encodeComponent`（`thinkphp_v5_exp.dart:180/189`），没有裸拼；

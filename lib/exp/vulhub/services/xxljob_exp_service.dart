@@ -37,7 +37,7 @@ class XxlJobExpService {
         'broadcastIndex': 0,
         'broadcastTotal': 0,
       });
-      final res = await _httpClient.post(
+      final res = await _httpClient.postOrThrow(
         '$_base/run',
         headers: {'Content-Type': 'application/json'},
         body: payload,
@@ -68,7 +68,7 @@ class XxlJobExpService {
         'broadcastIndex': 0,
         'broadcastTotal': 0,
       });
-      final res = await _httpClient.post(
+      final res = await _httpClient.postOrThrow(
         '$_base/run',
         headers: {'Content-Type': 'application/json'},
         body: payload,

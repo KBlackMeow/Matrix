@@ -19,6 +19,8 @@ import '../../lib/exp/vulhub/services/runtime_services.dart';
 import '../../lib/exp/vulhub/services/exp_result.dart';
 import '../../lib/exp/vulhub/spring_exp_service.dart';
 import '../../lib/exp/vulhub/struts2_exp_service.dart';
+import '../../lib/exp/thinkphp/thinkphp_exp_service.dart';
+import '../../lib/exp/shiro/shiro_exp_service.dart';
 
 Future<void> main(List<String> args) async {
   if (args.length < 2) {
@@ -37,6 +39,12 @@ Future<void> main(List<String> args) async {
     case 'php-exec':
       print(await PhpBackdoorExpService(baseUrl: url).execRce(cmd));
       break;
+    case 'phpcgi-check':
+      _show(await PhpCgiExpService(baseUrl: url).check());
+      break;
+    case 'phpcgi-exec':
+      print(await PhpCgiExpService(baseUrl: url).execRce(cmd));
+      break;
     case 'spring-check':
       _show(await SpringExpService(url: url).checkSpringCloudFunction());
       break;
@@ -54,6 +62,37 @@ Future<void> main(List<String> args) async {
       break;
     case 's2057-exec':
       print(await Struts2ExpService(url: url).execS2057(cmd));
+      break;
+    case 'thinkphp-check':
+      final svc = ThinkphpExpService(url: url);
+      final checks = <String, Future<ThinkphpResult> Function()>{
+        'tp50': svc.checkTp50,
+        'tp5010': svc.checkTp5010,
+        'tp5022_5129': svc.checkTp5022_5129,
+        'tp5023': svc.checkTp5023,
+        'tp5024_5130': svc.checkTp5024_5130,
+        'tp3': svc.checkTp3,
+      };
+      for (final e in checks.entries) {
+        final r = await e.value();
+        print('  ${e.key.padRight(14)} vulnerable=${r.vulnerable} '
+            'name=${r.vulnName} detail=${r.detail}');
+      }
+      break;
+    case 'thinkphp-exec':
+      final out = await ThinkphpExpService(
+        url: url,
+      ).exeRce(ThinkphpVulnType.tp5023, cmd);
+      print(out);
+      break;
+    case 'tomcat-check':
+      _show(await TomcatExpService(baseUrl: url).check());
+      break;
+    case 'tomcat-getshell':
+      print(await TomcatExpService(baseUrl: url).getShell());
+      break;
+    case 'shiro-check':
+      print('isShiro=${await ShiroExpService(url: url).checkIsShiro()}');
       break;
     default:
       print('unknown case: $mode');

