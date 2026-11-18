@@ -13,7 +13,12 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+import '../../lib/database/io/credential_migration.dart';
+
 import '../../lib/core/async/serial_queue.dart';
+import '../../lib/core/crypto/credential_cipher.dart';
 import '../../lib/database/storage_permissions.dart';
 import '../../lib/mcp/log_redaction.dart';
 import '../../lib/services/remote_write_lock.dart';
@@ -46,6 +51,12 @@ Future<void> main() async {
 
   print('== Remote write lock ==');
   await _testWriteLock();
+
+  print('== Credential cipher ==');
+  _testCipher();
+
+  print('== Legacy credential migration ==');
+  await _testCredentialMigration();
 
   print('\npassed=$_passed failed=$_failed');
   if (_failed > 0) exitCode = 1;
@@ -193,4 +204,86 @@ Future<void> _testWriteLock() async {
     ),
   ]);
   _check(maxConcurrent == 2, '不同远端路径可并行', maxConcurrent);
+}
+
+void _testCipher() {
+  final key = List<int>.generate(32, (i) => i);
+  final cipher = CredentialCipher.withKey(key);
+
+  final sealed = cipher.encrypt('mAtrix_911');
+  _check(sealed.startsWith(CredentialCipher.prefix), '密文带 enc:v1: 前缀');
+  _check(cipher.decrypt(sealed) == 'mAtrix_911', '可解密还原');
+  _check(cipher.encrypt('same') != cipher.encrypt('same'), '随机 IV：同明文不同密文');
+  _check(cipher.decrypt('legacy-plain') == 'legacy-plain', '历史明文直通');
+
+  final other = CredentialCipher.withKey(List<int>.generate(32, (i) => 255 - i));
+  _check(other.decrypt(sealed) == sealed, '错误密钥不返回明文');
+
+  final tampered = '${sealed.substring(0, sealed.length - 6)}AAAA=';
+  _check(cipher.decrypt(tampered) != 'mAtrix_911', '密文被篡改不返回明文');
+
+  CredentialCipher.setInstance(null);
+  _check(CredentialCipher.encryptIfReady('plain') == 'plain', '未初始化时直通');
+  CredentialCipher.setInstance(cipher);
+  final once = CredentialCipher.encryptIfReady('x');
+  _check(CredentialCipher.encryptIfReady(once) == once, '密文二次加密幂等');
+  CredentialCipher.setInstance(null);
+}
+
+Future<void> _testCredentialMigration() async {
+  final cipher = CredentialCipher.withKey(List<int>.generate(32, (i) => 7 + i));
+  CredentialCipher.setInstance(cipher);
+  sqfliteFfiInit();
+  final db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
+  try {
+    await db.execute(
+      'CREATE TABLE webshells (id INTEGER PRIMARY KEY, password TEXT, secret_key TEXT)',
+    );
+    await db.execute(
+      'CREATE TABLE frp_profiles (id INTEGER PRIMARY KEY, token TEXT)',
+    );
+    await db.insert('webshells', <String, Object?>{
+      'id': 1,
+      'password': 'p@ss',
+      'secret_key': 'key',
+    });
+    await db.insert('webshells', <String, Object?>{
+      'id': 2,
+      'password': null,
+      'secret_key': 'k2',
+    });
+    await db.insert('frp_profiles', <String, Object?>{
+      'id': 1,
+      'token': 'frp-token',
+    });
+
+    final changed = await encryptLegacyCredentialsIn(db);
+    _check(changed == 3, '迁移 3 条记录', changed);
+
+    final ws = await db.query('webshells', orderBy: 'id');
+    _check(
+      (ws[0]['password'] as String).startsWith(CredentialCipher.prefix),
+      'password 已加密',
+    );
+    _check(
+      CredentialCipher.decryptIfReady(ws[0]['password'] as String) == 'p@ss',
+      'password 可还原',
+    );
+    _check(ws[1]['password'] == null, 'NULL 保持 NULL');
+    _check(
+      CredentialCipher.decryptIfReady(ws[1]['secret_key'] as String) == 'k2',
+      'secret_key 可还原',
+    );
+    final frp = await db.query('frp_profiles');
+    _check(
+      CredentialCipher.decryptIfReady(frp[0]['token'] as String) == 'frp-token',
+      'token 可还原',
+    );
+
+    final again = await encryptLegacyCredentialsIn(db);
+    _check(again == 0, '重复迁移幂等', again);
+  } finally {
+    await db.close();
+    CredentialCipher.setInstance(null);
+  }
 }
