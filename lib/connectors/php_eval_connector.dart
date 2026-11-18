@@ -95,10 +95,15 @@ class PhpEvalConnector extends ShellConnector {
         ? 'cd ${_sq(workingDir)} && '
         : '';
     final b64 = base64.encode(utf8.encode('$cd$cmd'));
+    // 先判断 shell_exec 是否可用，再二选一执行。
+    // 不能用 `$o===null` 判断：shell_exec() 在命令“没有任何输出”时同样返回 null
+    // （rm / mkdir / touch / cp / chmod… 都是静默命令），此时回退 system() 会把
+    // 同一条命令再执行一次——这就是“一条命令执行两遍”的根因。
     final r = await sendPhpCode(
       "\$c=base64_decode('$b64');"
-      r"$o=@shell_exec($c.' 2>&1');"
-      r"if($o===null){$o=@system($c);}echo $o;",
+      r"$df=preg_split('/[\s,]+/',(string)@ini_get('disable_functions'),-1,PREG_SPLIT_NO_EMPTY);"
+      r"if(function_exists('shell_exec')&&!in_array('shell_exec',$df,true)){echo (string)@shell_exec($c.' 2>&1');}"
+      r"else{@system($c.' 2>&1');}",
     );
     return r.trim();
   }

