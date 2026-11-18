@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/async/ttl_cache.dart';
 import '../services/webshell_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/matrix_syntax_highlight.dart';
@@ -97,6 +98,16 @@ class TabCompleter {
   List<String> _envVars = [];
   String _homeDir = '';
 
+  /// 目录列表缓存：同一目录 30s 内不重复远端列目录。
+  final TtlCache<String, List<({String name, bool isDir})>> _dirCache =
+      TtlCache<String, List<({String name, bool isDir})>>(
+        const Duration(seconds: 30),
+      );
+
+  /// 命令列表缓存：PATH 扫描较重，10 分钟内复用。
+  final TtlCache<String, List<String>> _commandCache =
+      TtlCache<String, List<String>>(const Duration(minutes: 10));
+
   // 当前补全循环状态
   List<String> _matches = [];
   int _matchIdx = 0;
@@ -122,16 +133,26 @@ class TabCompleter {
     _atLcp = false;
   }
 
-  Future<void> fetchEnvVars() async {
+  /// 一次请求同时取回 HOME 与环境变量（失败时连接器内部回退为两次）。
+  Future<void> warmUp() async {
     try {
-      _envVars = await service.listEnvVarNames();
+      final data = await service.warmUpEnvironment();
+      _homeDir = data.home;
+      _envVars = data.envNames;
     } catch (_) {}
   }
 
-  Future<void> fetchHomeDir() async {
-    try {
-      _homeDir = await service.getHomeDir();
-    } catch (_) {}
+  /// 目录内容变化后使缓存失效（写文件/删除/执行命令后调用）。
+  void invalidateDir(String dir) => _dirCache.invalidate(dir);
+
+  void invalidateAllDirs() => _dirCache.clear();
+
+  /// 带缓存的命令列表：同一会话内 PATH 扫描只做一次。
+  Future<List<String>> _availableCommands(String workingDir) {
+    return _commandCache.fetch(
+      '',
+      () => fetchAvailableCommands(workingDir),
+    );
   }
 
   /// 仅基于目标 PATH 扫描可执行文件，构建命令补全列表（无硬编码兜底）
@@ -234,9 +255,12 @@ class TabCompleter {
   }
 
   Future<List<({String name, bool isDir})>> _listDirLive(String dir) async {
+    final cached = _dirCache.get(dir);
+    if (cached != null) return cached;
     try {
       final out = await service.listNamesForCompletion(dir);
       out.sort((a, b) => a.name.compareTo(b.name));
+      _dirCache.put(dir, out);
       return out;
     } catch (_) {
       return [];
@@ -280,7 +304,7 @@ class TabCompleter {
     if (token.isEmpty) {
       final all = <String>[];
       if (isCmd) {
-        final liveCmds = await fetchAvailableCommands(cwd);
+        final liveCmds = await _availableCommands(cwd);
         all.addAll(liveCmds.map((c) => '$c '));
       }
       final cwdEntries = await _listDirLive(cwd);
@@ -305,7 +329,7 @@ class TabCompleter {
     final isPathLike =
         token.contains('/') || token.startsWith('~') || token.startsWith('.');
     if (isCmd && !isPathLike) {
-      final cmdM = (await fetchAvailableCommands(
+      final cmdM = (await _availableCommands(
         cwd,
       )).where((c) => c.startsWith(token)).map((c) => '$c ').toList();
       final fileM = (await _listDirLive(cwd))

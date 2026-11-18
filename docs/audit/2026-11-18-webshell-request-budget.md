@@ -135,7 +135,36 @@
 | 3 | S5 + S8（探测收敛 + 记住加密模式） | 低 | 打开少 3–5 次请求 |
 | 4 | S1 + S2（agent/DLL 驻留） | 高（协议层） | 上行 −90%，需目标端配合 |
 
-## 7. 未验证项
+## 7. 实测对比（Docker：PHP 7.2/Apache + Tomcat 8.5）
+
+用 `tool/verify/request_profile.dart` 在连接器与目标之间插入计数代理，
+同一交互序列（打开工作区 → 3 条命令 → 2 轮 Tab）实测：
+
+| 目标 | 改造前 | 改造后 | 变化 |
+| --- | --- | --- | --- |
+| PHP `php_eval` | 11 请求 / 7,590 B | **8 请求 / 6,980 B** | −27% 请求 |
+| JSP `jsp_runtime` | 11 请求 / 2,948 B | **8 请求 / 2,402 B** | −27% 请求 |
+
+逐项：
+
+| 步骤 | 改造前 | 改造后 |
+| --- | --- | --- |
+| 打开（ping + 脚本目录 + 预热） | 5 请求 | **3 请求**（预热合并为 1） |
+| 第 2 轮 Tab（目录 + 命令） | 2 请求 | **0 请求**（TTL 缓存命中） |
+| 单条命令 | 1 请求 | 1 请求（不变） |
+
+附带发现：PHP 的脚本目录探测单次上传 **4,076 B**（`php_eval` 复合探测载荷），
+是打开阶段最大的一笔上行；JSP 走 sysinfo 只有 708 B。
+
+复现：
+
+```bash
+# 目标：Apache+PHP 与 Tomcat 各起一个容器，放入内置 shell
+dart tool/verify/request_profile.dart php_eval http://127.0.0.1:18080/shell.php mAtrix_911 POST new
+dart tool/verify/request_profile.dart jsp_runtime http://127.0.0.1:18081/mx/shell.jsp mAtrix_911 GET new
+```
+
+## 8. 未验证项
 
 - 无运行时抓包：请求次数来自代码路径，实际可能因重试/超时分支更多（只多不少）。
 - `godzilla` 的每条命令 body 体积未逐字节复算（按 13,671 B 资产 + 装载器估算）。

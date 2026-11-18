@@ -18,6 +18,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../../lib/database/io/credential_migration.dart';
 
 import '../../lib/core/async/serial_queue.dart';
+import '../../lib/core/async/ttl_cache.dart';
 import '../../lib/core/crypto/credential_cipher.dart';
 import '../../lib/database/storage_permissions.dart';
 import '../../lib/mcp/log_redaction.dart';
@@ -41,6 +42,9 @@ Future<void> main() async {
   await _testSerialQueue();
   await _testKeyedQueue();
   await _testExceptionDoesNotStall();
+
+  print('== TtlCache ==');
+  await _testTtlCache();
 
   print('== Log redaction ==');
   _testRedaction();
@@ -286,4 +290,20 @@ Future<void> _testCredentialMigration() async {
     await db.close();
     CredentialCipher.setInstance(null);
   }
+}
+
+Future<void> _testTtlCache() async {
+  final cache = TtlCache<String, int>(const Duration(milliseconds: 40));
+  _check(cache.get('k') == null, '未命中返回 null');
+  cache.put('k', 1);
+  _check(cache.get('k') == 1, '命中返回值');
+  _check(await cache.fetch('k', () async => 2) == 1, 'fetch 命中不调用 loader');
+  await Future<void>.delayed(const Duration(milliseconds: 60));
+  _check(cache.get('k') == null, '过期后失效');
+  cache.put('a', 9);
+  cache.invalidate('a');
+  _check(cache.get('a') == null, 'invalidate 生效');
+  cache.put('x', 1);
+  cache.clear();
+  _check(cache.length == 0, 'clear 清空');
 }

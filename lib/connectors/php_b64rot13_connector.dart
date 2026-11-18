@@ -15,6 +15,9 @@ import 'php_eval_connector.dart';
 class PhpB64Rot13Connector extends PhpEvalConnector {
   PhpB64Rot13Connector(super.webshell);
 
+  /// 复用连接（keep-alive），避免每条命令重新握手。
+  late final http.Client _client = http.Client();
+
   @override
   Future<String> sendPhpCode(String phpCode) async {
     try {
@@ -25,7 +28,7 @@ class PhpB64Rot13Connector extends PhpEvalConnector {
           : AppConstants.defaultShellPassword;
       final encoded = base64.encode(utf8.encode(phpCode));
 
-      final response = await http
+      final response = await _client
           .post(
             uri,
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},

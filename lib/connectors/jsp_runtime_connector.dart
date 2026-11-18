@@ -18,6 +18,9 @@ import '../utils/encoding_utils.dart';
 class JspRuntimeConnector extends ShellExecConnector {
   JspRuntimeConnector(super.webshell);
 
+  /// 复用连接（keep-alive），避免每条命令重新握手。
+  late final http.Client _client = http.Client();
+
   @override
   Set<ConnectorCapability> get capabilities => const {
         ConnectorCapability.shellExec,
@@ -50,7 +53,7 @@ class JspRuntimeConnector extends ShellExecConnector {
       final uri = Uri.parse(webshell.url);
       final payload = _transportWrappedScript(_cmdForJsp(cmd));
 
-      final response = await http
+      final response = await _client
           .post(
             uri,
             headers: {

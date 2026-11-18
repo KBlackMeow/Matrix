@@ -254,6 +254,7 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                             skipTraversal: _tabController.index != 1,
                             child: FileManagerTab(
                               service: _service,
+                              onDirectoryChanged: _completer.invalidateDir,
                             ),
                           ),
                           FocusScope(
@@ -930,10 +931,9 @@ class _TerminalTabState extends State<_TerminalTab>
           widget.service.webshell.connectorType.startsWith('asp');
       if (mounted) setState(() => _currentDir = dir);
       _isWindowsShell = isWinPath || isWindowsConnector;
-      // 并发预热：环境变量、HOME、可用命令（同时发出）
-      _completer.fetchEnvVars();
-      _completer.fetchHomeDir();
-      _completer.fetchAvailableCommands(dir);
+      // 预热：HOME + 环境变量合成一次请求；命令列表改为首次 Tab 时按需加载
+      // （PATH 扫描是重命令，且旧代码在打开时白扫一次、结果还被丢弃）。
+      _completer.warmUp();
     } catch (_) {
       // 初始目录探测失败时保持默认值，不阻断终端使用；后续命令仍可执行。
     }
@@ -982,6 +982,7 @@ class _TerminalTabState extends State<_TerminalTab>
     }
 
     var output = '';
+    final execDir = _currentDir;
     try {
       final execResult = await widget.service.executeCommand(
         sendCmd,
@@ -1009,6 +1010,8 @@ class _TerminalTabState extends State<_TerminalTab>
       output = '[Error] $e';
     } finally {
       _executing = false;
+      // 命令可能改动当前目录内容（touch/rm/mkdir…），使补全缓存失效一次。
+      _completer.invalidateDir(execDir);
       if (mounted) {
         setState(() {
           entry.output = output.isEmpty ? '(no output)' : output;

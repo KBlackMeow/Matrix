@@ -16,6 +16,9 @@ import 'shell_connector.dart';
 class PhpEvalConnector extends ShellConnector {
   PhpEvalConnector(super.webshell);
 
+  /// 复用连接（keep-alive），避免每条命令重新握手。
+  late final http.Client _client = http.Client();
+
   String? _lastShellScriptDirDiagnostic;
   int? _lastHttpResponseStatus;
   int? _lastHttpResponseBodyBytes;
@@ -42,11 +45,11 @@ class PhpEvalConnector extends ShellConnector {
       if (webshell.method == 'GET') {
         final params = Map<String, String>.from(uri.queryParameters);
         params[pass] = phpCode;
-        response = await http
+        response = await _client
             .get(uri.replace(queryParameters: params))
             .timeout(const Duration(seconds: 25));
       } else {
-        response = await http
+        response = await _client
             .post(
               uri,
               headers: {'Content-Type': 'application/x-www-form-urlencoded'},

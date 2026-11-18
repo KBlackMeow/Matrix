@@ -20,9 +20,13 @@ import '../widgets/upload_success_dialog.dart';
 class FileManagerTab extends StatefulWidget {
   final WebshellService service;
 
+  /// 目标目录内容变化后回调（让终端 Tab 补全缓存失效）。
+  final void Function(String dir) onDirectoryChanged;
+
   const FileManagerTab({
     super.key,
     required this.service,
+    required this.onDirectoryChanged,
   });
 
   @override
@@ -330,6 +334,7 @@ class _FileManagerTabState extends State<FileManagerTab>
     popProgress();
     transferred.dispose();
     if (ok) {
+      widget.onDirectoryChanged(_parent(remotePath));
       await showUploadSuccessDialog(context, 'Uploaded $fileName');
       _loadDirectory(_currentPath);
     } else {
@@ -627,6 +632,7 @@ class _FileManagerTabState extends State<FileManagerTab>
       deletedPath,
       () => widget.service.deleteFile(deletedPath),
     );
+    if (ok) widget.onDirectoryChanged(_parent(deletedPath));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

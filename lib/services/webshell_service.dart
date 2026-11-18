@@ -163,6 +163,10 @@ class WebshellService {
 
   Future<List<String>> listEnvVarNames() => _connector.listEnvVarNames();
 
+  /// 一次请求取回 HOME + 环境变量名（连接器内部合并，失败自动回退两次）。
+  Future<({String home, List<String> envNames})> warmUpEnvironment() =>
+      _connector.warmUpEnvironment();
+
   /// 尝试通过当前连接器在目标上启动反弹 Shell。
   ///
   /// 默认依赖 [ShellConnector.startReverseShell] 的实现：

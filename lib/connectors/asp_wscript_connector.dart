@@ -19,6 +19,9 @@ class AspWscriptConnector extends ShellExecConnector {
     currentDir = r'C:\';
   }
 
+  /// 复用连接（keep-alive），避免每条命令重新握手。
+  late final http.Client _client = http.Client();
+
   @override
   Set<ConnectorCapability> get capabilities => const {
         ConnectorCapability.shellExec,
@@ -36,7 +39,7 @@ class AspWscriptConnector extends ShellExecConnector {
       http.Response response;
 
       if (webshell.method == 'POST') {
-        response = await http
+        response = await _client
             .post(
               uri,
               headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -47,7 +50,7 @@ class AspWscriptConnector extends ShellExecConnector {
         // ASP 默认 GET
         final params = Map<String, String>.from(uri.queryParameters);
         params[_param] = cmd;
-        response = await http
+        response = await _client
             .get(uri.replace(queryParameters: params))
             .timeout(const Duration(seconds: 30));
       }

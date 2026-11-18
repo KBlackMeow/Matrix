@@ -74,6 +74,68 @@ abstract class ShellConnector {
   Future<String> getHomeDir();
   Future<List<String>> listEnvVarNames();
 
+  /// 一次请求同时取回 HOME 与环境变量名。
+  ///
+  /// 打开工作区时原本要发两次请求（`home` + `envnames`）；能合并的连接器
+  /// 走一条组合命令，合并失败再回退为两次独立调用，行为与旧版一致。
+  Future<({String home, List<String> envNames})> warmUpEnvironment() async {
+    const marker = '__MATRIX_HOME__';
+    final isWindows = webshell.connectorType.startsWith('asp');
+    if (supportsShellExec) {
+      try {
+        final cmd = isWindows
+            // cmd.exe：`set` 输出 NAME=value
+            ? 'echo $marker%USERPROFILE% & set'
+            // POSIX：HOME 打标记；`compgen -e` 更快，不可用时退回 `env`
+            : 'printf "$marker%s\\n" "\$HOME"; '
+                  '(command -v compgen >/dev/null 2>&1 && compgen -e || env | cut -d= -f1) | sort';
+        final out = await executeCommand(
+          cmd,
+        ).timeout(const Duration(seconds: 6));
+        final parsed = _parseWarmUpOutput(out, marker, isWindows);
+        if (parsed != null) return parsed;
+      } catch (_) {
+        // 落到下面的旧路径。
+      }
+    }
+    var home = '';
+    var names = <String>[];
+    try {
+      home = (await getHomeDir()).trim();
+    } catch (_) {}
+    try {
+      names = await listEnvVarNames();
+    } catch (_) {}
+    return (home: home, envNames: names);
+  }
+
+  static ({String home, List<String> envNames})? _parseWarmUpOutput(
+    String output,
+    String marker,
+    bool isWindows,
+  ) {
+    String? home;
+    final names = <String>[];
+    for (final raw in output.split(RegExp(r'\r?\n'))) {
+      final line = raw.trim();
+      if (line.isEmpty || line.startsWith('[')) continue;
+      if (line.startsWith(marker)) {
+        home = line.substring(marker.length).trim();
+        continue;
+      }
+      if (isWindows) {
+        final eq = line.indexOf('=');
+        if (eq <= 0) continue;
+        names.add(line.substring(0, eq));
+      } else {
+        names.add(line);
+      }
+    }
+    if (home == null && names.isEmpty) return null;
+    names.sort();
+    return (home: home ?? '', envNames: names);
+  }
+
   /// 尝试通过当前连接器在目标上启动反弹 Shell。
   ///
   /// [preferScript] = true 时：

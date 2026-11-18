@@ -161,25 +161,24 @@ echo encrypt(json_encode(\$result));
 
   @override
   Future<bool> ping() async {
-    try {
-      _useCbc = false;
-      var r = await _sendPhp(
-        "echo 'MATRIX_PHP_PING';",
-      ).timeout(const Duration(seconds: 15));
-      if (r.contains('MATRIX_PHP_PING')) {
-        _lastPingDiagnostic = null;
-        return true;
+    // 先按上次协商成功的模式探测；只有失败才翻转一次并记住结果。
+    // 旧实现每次都从 ECB 重来，对需要 CBC 的目标每次 ping 都要多打一次请求。
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final r = await _sendPhp(
+          "echo 'MATRIX_PHP_PING';",
+        ).timeout(const Duration(seconds: 15));
+        if (r.contains('MATRIX_PHP_PING')) {
+          _lastPingDiagnostic = null;
+          return true;
+        }
+        _lastPingDiagnostic = r;
+      } catch (e) {
+        _lastPingDiagnostic = e.toString();
       }
-      _useCbc = true;
-      r = await _sendPhp(
-        "echo 'MATRIX_PHP_PING';",
-      ).timeout(const Duration(seconds: 15));
-      _lastPingDiagnostic = r.contains('MATRIX_PHP_PING') ? null : r;
-      return r.contains('MATRIX_PHP_PING');
-    } catch (e) {
-      _lastPingDiagnostic = e.toString();
-      return false;
+      if (attempt == 0) _useCbc = !_useCbc;
     }
+    return false;
   }
 
   static String _sq(String s) => "'${s.replaceAll("'", "'\\''")}'";
