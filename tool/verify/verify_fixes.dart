@@ -16,6 +16,8 @@ import 'dart:math';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../lib/database/io/credential_migration.dart';
+import '../../lib/exp/vulhub/services/exp_result.dart';
+import '../../lib/exp/vulhub/services/rce_encoder.dart';
 
 import '../../lib/core/async/serial_queue.dart';
 import '../../lib/core/async/ttl_cache.dart';
@@ -55,6 +57,12 @@ Future<void> main() async {
 
   print('== Remote write lock ==');
   await _testWriteLock();
+
+  print('== RCE payload encoders ==');
+  _testRceEncoder();
+
+  print('== ExpResult semantics ==');
+  _testExpResult();
 
   print('== Credential cipher ==');
   _testCipher();
@@ -306,4 +314,40 @@ Future<void> _testTtlCache() async {
   cache.put('x', 1);
   cache.clear();
   _check(cache.length == 0, 'clear 清空');
+}
+
+void _testRceEncoder() {
+  // PHP 单引号串不做变量插值：$ 必须原样保留，只有 \ 和 ' 需要转义。
+  _check(
+    RceEncoder.phpSingleQuoted(r'echo $HOME') == r'echo $HOME',
+    'phpSingleQuoted 保留 \$',
+  );
+  _check(
+    RceEncoder.phpSingleQuoted("it's") == r"it\'s",
+    'phpSingleQuoted 转义单引号',
+    RceEncoder.phpSingleQuoted("it's"),
+  );
+  _check(
+    RceEncoder.phpSingleQuoted(r'a\b') == r'a\\b',
+    'phpSingleQuoted 转义反斜杠',
+    RceEncoder.phpSingleQuoted(r'a\b'),
+  );
+  _check(
+    RceEncoder.escapeDoubleQuoted('a"b') == r'a\"b',
+    'escapeDoubleQuoted 转义双引号',
+  );
+  _check(
+    RceEncoder.escapeDoubleQuoted(r'a\b') == r'a\\b',
+    'escapeDoubleQuoted 转义反斜杠',
+  );
+}
+
+void _testExpResult() {
+  const vuln = ExpResult(true, 'CVE-X', 'hit');
+  const miss = ExpResult(false, 'CVE-X', '');
+  const fail = ExpResult.probeFailed('CVE-X', 'timeout');
+
+  _check(vuln.vulnerable && !vuln.failed, '命中：vulnerable=true/failed=false');
+  _check(!miss.vulnerable && !miss.failed, '未命中不等于探测失败');
+  _check(!fail.vulnerable && fail.failed, '探测失败是独立状态');
 }

@@ -23,6 +23,8 @@ exp 模块**没有"被远程利用"的风险**（它本来就是攻击方），�
 | F7 | `SystemEncoding()` 解码非 UTF-8 响应会抛异常 | 低 |
 | F8 | struts2 24 处静默 `catch (_)` | 低 |
 | F9 | 4,501 行只有 1 个测试 | 低 |
+| F10 | Spring Cloud Function 检测漏报（靶场实测） | **高** |
+| F11 | S2-059 命令执行在靶场返回 null | 中 |
 
 ---
 
@@ -181,6 +183,39 @@ macOS/Linux 上 `SystemEncoding` 即 UTF-8；WebLogic 控制台若返回 GBK 或
 
 ---
 
+## F10【高】Spring CVE-2022-22963 检测在真实靶场漏报
+
+靶场：`vulhub/spring-cloud-function:3.2.2`（`/Users/illya/Projects/vulhub/spring/CVE-2022-22963`）
+
+- 手动验证**确实可利用**：`T(java.lang.Runtime).getRuntime().exec("touch /tmp/pwned")` → 容器内 `/tmp/pwned` 生成；
+- 但原检测返回 `vulnerable=false`：载荷 `233*233` 被当作"函数名"路由，服务端回 **500 + 通用 JSON**，响应体里没有任何 SpEL 关键字。
+
+**修复**：改成**时间侧信道**——注入 `...exec("sleep 3").waitFor()` 并对比基线耗时。
+注意 `Runtime.exec` 本身是非阻塞的，必须 `waitFor()`（实测：不带 waitFor 3ms，带 waitFor 3127ms）。
+
+修复后实测：`vulnerable=true`，`延迟 3016ms（基线 93ms）`。
+
+## F11【中】S2-059 命令执行在靶场返回 null
+
+销售环境：`vulhub/struts2:2.5.16`。检测（数学运算）通过，但 `execS2059('echo S2059_OK')` 返回 `null`：
+响应里 `<a id="">` 为空，说明沙箱绕过 + `exec("...")` 组合在该版本未生效。
+
+**建议**：改用 Base64 传命令（Spring 侧已验证可行），或按版本区分 payload；暂列为后续项。
+
+## 靶场联调结果（2026-11-18）
+
+| 用例 | 修复前 | 修复后 |
+| --- | --- | --- |
+| PHP 8.1 后门 `check` | true | true |
+| PHP `execRce('echo $HOME')` | 空（PHP 插值） | `/root` |
+| PHP `execRce('echo "a b" \| tr a-z A-Z')` | — | `A B` |
+| Spring `check` | **false（漏报）** | **true（延迟 3016ms）** |
+| Spring `exec('touch "/tmp/matrix exec"')` | 未生成文件 | 文件生成 |
+| S2-059 `check` | true | true |
+| S2-059 `exec` | null | null（待适配，F11） |
+| S2-057 `check` | true | true |
+| S2-057 `exec('id')` | — | `uid=0(root)` |
+
 ## 做得好的地方（避免只报坏消息）
 
 - ThinkPHP 的命令参数做了 `Uri.encodeComponent`（`thinkphp_v5_exp.dart:180/189`），没有裸拼；
@@ -197,3 +232,4 @@ macOS/Linux 上 `SystemEncoding` 即 UTF-8；WebLogic 控制台若返回 GBK 或
 | 3 | F5 协议/前缀 | 低 | HTTPS 目标可用 |
 | 4 | F6/F7 | 低 | 一致性 + 编码健壮性 |
 | 5 | F8/F9 | 低 | 可观测性 + 回归保护 |
+| 6 | F11 | 中 | S2-059 执行链适配 |
