@@ -20,6 +20,10 @@ import '../../lib/exp/vulhub/services/exp_result.dart';
 import '../../lib/exp/vulhub/spring_exp_service.dart';
 import '../../lib/exp/vulhub/struts2_exp_service.dart';
 import '../../lib/exp/thinkphp/thinkphp_exp_service.dart';
+import '../../lib/exp/vulhub/services/apache_family_services.dart';
+import '../../lib/exp/vulhub/services/nacos_exp_service.dart';
+import '../../lib/exp/vulhub/services/web_stack_services.dart';
+import '../../lib/exp/vulhub/services/xxljob_exp_service.dart';
 import '../../lib/exp/shiro/shiro_exp_service.dart';
 
 Future<void> main(List<String> args) async {
@@ -72,6 +76,13 @@ Future<void> main(List<String> args) async {
         'tp5023': svc.checkTp5023,
         'tp5024_5130': svc.checkTp5024_5130,
         'tp3': svc.checkTp3,
+        'tp2': svc.checkTp2,
+        'tp3Module': svc.checkTp3Module,
+        'tp3ModuleTypo': svc.checkTp3ModuleTypo,
+        'tp3LogRce': svc.checkTp3LogRce,
+        'tp5023Debug': svc.checkTp5023Debug,
+        'tp5ViewDisplay': svc.checkTp5ViewDisplay,
+        'tp5MethodFilter': svc.checkTp5MethodFilter,
       };
       for (final e in checks.entries) {
         final r = await e.value();
@@ -93,6 +104,57 @@ Future<void> main(List<String> args) async {
       break;
     case 'shiro-check':
       print('isShiro=${await ShiroExpService(url: url).checkIsShiro()}');
+      break;
+    case 's2005-check':
+      _show(await Struts2ExpService(url: url).checkS2005());
+      break;
+    case 's2007-check':
+      _show(await Struts2ExpService(url: url).checkS2007());
+      break;
+    case 's2032-check':
+      _show(await Struts2ExpService(url: url).checkS2032());
+      break;
+    case 's2045-check':
+      _show(await Struts2ExpService(url: url).checkS2045());
+      break;
+    case 's2052-check':
+      _show(await Struts2ExpService(url: url).checkS2052());
+      break;
+    case 's2053-check':
+      _show(await Struts2ExpService(url: url).checkS2053());
+      break;
+    case 'spring-4977':
+      _show(await SpringExpService(url: url).checkSpringSecurityOauth());
+      break;
+    case 'spring-8046':
+      _show(await SpringExpService(url: url).checkSpringDataRest());
+      break;
+    case 'spring-1273':
+      _show(await SpringExpService(url: url).checkSpringDataCommons());
+      break;
+    case 'spring-22963':
+      _show(await SpringExpService(url: url).checkSpringCloudFunction());
+      break;
+    case 'spring-22965':
+      _show(await SpringExpService(url: url).checkSpring4Shell());
+      break;
+    case 'httpd-check':
+      _show(await ApacheHttpdExpService(baseUrl: url).check());
+      break;
+    case 'drupal-check':
+      _show(await DrupalExpService(baseUrl: url).check());
+      break;
+    case 'nacos-check':
+      _show(await NacosExpService(baseUrl: url).check());
+      break;
+    case 'xxljob-check':
+      _show(await XxlJobExpService(baseUrl: url).check());
+      break;
+    case 'weblogic-10271':
+      _show(await WebLogicExpService(baseUrl: url).checkCve201710271());
+      break;
+    case 'weblogic-14882':
+      _show(await WebLogicExpService(baseUrl: url).checkCve202014882());
       break;
     default:
       print('unknown case: $mode');
