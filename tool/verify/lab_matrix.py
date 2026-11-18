@@ -52,9 +52,16 @@ def run(cmd, cwd=None, timeout=600, check=False):
     )
 
 
-def published_ports():
+def project_of(lab):
+    # 每个靶场独立 compute 项目名：否则服务名相同的靶场会复用同一个容器
+    # （MySQL/Tomcat 的容器名都是 struts2/web/...），导致"打错靶场"。
+    slug = lab.replace("/", "-").replace("CVE-", "").lower()
+    return "mxlab-" + slug
+
+
+def published_ports(project):
     out = run(["docker", "ps", "--filter",
-               "label=com.docker.compose.project=mxlab",
+               f"label=com.docker.compose.project={project}",
                "--format", "{{.Ports}}"]).stdout
     ports = []
     for line in out.splitlines():
@@ -77,26 +84,26 @@ def wait_http(port, timeout=180):
 
 def compose_up(lab):
     path = os.path.join(VULHUB, lab)
-    # 清掉同名 project 的残留容器，避免端口被占
-    proj = os.path.basename(lab)
-    run(["docker", "rm", "-f", *run(
-        ["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={proj}"]
-    ).stdout.split()], timeout=120)
-    r = run(["docker", "compose", "-p", "mxlab", "up", "-d"], cwd=path, timeout=1800)
+    proj = project_of(lab)
+    ids = run(["docker", "ps", "-aq", "--filter",
+               f"label=com.docker.compose.project={proj}"]).stdout.split()
+    if ids:
+        run(["docker", "rm", "-f", *ids], timeout=120)
+    r = run(["docker", "compose", "-p", proj, "up", "-d"], cwd=path, timeout=1800)
     if r.returncode != 0:
-        r = run(["docker", "compose", "-p", "mxlab", "up", "-d", "--build"],
+        r = run(["docker", "compose", "-p", proj, "up", "-d", "--build"],
                 cwd=path, timeout=1800)
     return r
 
 
 def compose_down(lab):
     path = os.path.join(VULHUB, lab)
-    run(["docker", "compose", "-p", "mxlab", "down", "-v", "--remove-orphans"],
+    run(["docker", "compose", "-p", project_of(lab), "down", "-v", "--remove-orphans"],
         cwd=path, timeout=300)
 
 
-def pick_port():
-    ports = published_ports()
+def pick_port(project):
+    ports = published_ports(project)
     if 8848 in ports:
         return 8848
     if not ports:
@@ -126,7 +133,7 @@ def main():
         deadline = time.time() + 240
         forced = _ if isinstance(_, int) else None
         while time.time() < deadline:
-            port = forced or pick_port()
+            port = forced or pick_port(project_of(lab))
             if port and wait_http(port, timeout=5):
                 break
             port = None
@@ -154,6 +161,8 @@ def main():
             joined = " | ".join(out)
             hit = next((l.strip() for l in out if "vulnerable=true" in l), "")
             skip = next((l.strip() for l in out if "failed=true" in l), "")
+            if not hit and "isshiro=true" in joined.lower():
+                hit = next(l for l in out if "isShiro=true" in l)
             status = "VULN" if hit else ("SKIP" if skip else "CLEAN")
             results.append({"lab": lab, "case": case, "url": url,
                             "status": status,
