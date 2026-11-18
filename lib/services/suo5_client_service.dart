@@ -63,7 +63,23 @@ class Suo5Session {
   /// 由 [Suo5ClientService] 注入：单条日志生成时上抛 (时间, 原始消息)
   void Function(DateTime when, String message)? onLog;
 
-  Future<void> start(Suo5Config config) async {
+  /// 启动中的 Future：并发点按"启动/重启"时复用同一次启动，
+  /// 避免 stop→start 交错造成重复 bind（Address already in use）与句柄泄漏。
+  Future<void>? _startInFlight;
+
+  Future<void> start(Suo5Config config) {
+    final inFlight = _startInFlight;
+    if (inFlight != null) return inFlight;
+    if (_status == Suo5Status.connecting ||
+        _status == Suo5Status.running) {
+      return Future<void>.value();
+    }
+    final future = _startInternal(config);
+    _startInFlight = future;
+    return future.whenComplete(() => _startInFlight = null);
+  }
+
+  Future<void> _startInternal(Suo5Config config) async {
     if (_status == Suo5Status.connecting || _status == Suo5Status.running) return;
     _setStatus(Suo5Status.connecting);
     _logs.clear();
