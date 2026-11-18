@@ -19,12 +19,10 @@ import '../widgets/upload_success_dialog.dart';
 
 class FileManagerTab extends StatefulWidget {
   final WebshellService service;
-  final void Function(String dir) onInvalidateCompleterDir;
 
   const FileManagerTab({
     super.key,
     required this.service,
-    required this.onInvalidateCompleterDir,
   });
 
   @override
@@ -161,7 +159,6 @@ class _FileManagerTabState extends State<FileManagerTab>
         initialContent: content,
         onSaved: () {
           _loadDirectory(_currentPath);
-          widget.onInvalidateCompleterDir(_parent(path));
         },
       ),
     );
@@ -335,7 +332,6 @@ class _FileManagerTabState extends State<FileManagerTab>
     if (ok) {
       await showUploadSuccessDialog(context, 'Uploaded $fileName');
       _loadDirectory(_currentPath);
-      widget.onInvalidateCompleterDir(_parent(remotePath));
     } else {
       debugPrint(
         '[Matrix][upload] failed file=$fileName path=$remotePath size=${bytes.length} '
@@ -644,7 +640,6 @@ class _FileManagerTabState extends State<FileManagerTab>
     );
     if (ok) {
       _loadDirectory(_currentPath);
-      widget.onInvalidateCompleterDir(_parent(deletedPath));
     }
   }
 

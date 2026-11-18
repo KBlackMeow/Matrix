@@ -254,8 +254,6 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                             skipTraversal: _tabController.index != 1,
                             child: FileManagerTab(
                               service: _service,
-                              onInvalidateCompleterDir:
-                                  _completer.invalidateDir,
                             ),
                           ),
                           FocusScope(
@@ -932,8 +930,7 @@ class _TerminalTabState extends State<_TerminalTab>
           widget.service.webshell.connectorType.startsWith('asp');
       if (mounted) setState(() => _currentDir = dir);
       _isWindowsShell = isWinPath || isWindowsConnector;
-      // 并发预热：目录列表、环境变量、HOME、可用命令（同时发出）
-      _completer.warmDir(dir);
+      // 并发预热：环境变量、HOME、可用命令（同时发出）
       _completer.fetchEnvVars();
       _completer.fetchHomeDir();
       _completer.fetchAvailableCommands(dir);
@@ -1002,11 +999,7 @@ class _TerminalTabState extends State<_TerminalTab>
           output = lines.take(markerIdx).join('\n').trim();
           final newDir = lines.skip(markerIdx + 1).join('\n').trim();
           if (newDir.isNotEmpty && mounted) {
-            final prevDir = _currentDir;
             setState(() => _currentDir = newDir);
-            // cd 后使旧目录缓存失效（旧目录内可能有文件变动）
-            _completer.invalidateDir(prevDir);
-            _completer.warmDir(newDir);
           }
         }
       }
@@ -1020,8 +1013,6 @@ class _TerminalTabState extends State<_TerminalTab>
         setState(() {
           entry.output = output.isEmpty ? '(no output)' : output;
         });
-        // 命令执行后使当前目录缓存失效，确保 touch/mkdir/rm 等操作能被 Tab 补全识别
-        _completer.invalidateDir(_currentDir);
         _scrollToBottom(animated: true); // 平滑滚动到最新输出
         // 执行完毕后恢复焦点
         WidgetsBinding.instance.addPostFrameCallback((_) {

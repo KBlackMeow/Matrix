@@ -122,11 +122,6 @@ class TabCompleter {
     _atLcp = false;
   }
 
-  Future<void> warmDir(String dir, {bool force = false}) async {}
-
-  /// 使指定目录的缓存失效，写入新文件后调用以便 Tab 补全能识别新文件
-  void invalidateDir(String dir) {}
-
   Future<void> fetchEnvVars() async {
     try {
       _envVars = await service.listEnvVarNames();
@@ -169,7 +164,7 @@ class TabCompleter {
     return path;
   }
 
-  // 将 rawDir（token 中 / 前的部分）解析为绝对路径，用于 warmDir
+  // 将 rawDir（token 中 / 前的部分）解析为绝对路径
   String _resolveDir(String raw, String cwd) {
     final exp = _expandHome(raw);
     if (exp.startsWith('/')) return exp;
