@@ -15,10 +15,9 @@ import '../app/main_nav_bus.dart';
 import 'reverse_shell_terminal_page.dart';
 import 'suo_tunnel_proxy_page.dart';
 import 'webshell_interactive_file_manager.dart';
-import 'webshell_interactive_system_priv_esc.dart';
+import 'system_info_tab.dart';
 import 'webshell_interactive_terminal_shared.dart';
 import 'process_list_tab.dart';
-import 'persistence_tab.dart';
 import 'webshell_initial_connection_state.dart';
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
@@ -43,22 +42,6 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
   bool _creatingOneClickTunnel = false;
   String? _lastPingError;
 
-  /// 提权检查为 Linux/bash 场景；Windows（ASP/ASPX）连接器下隐藏。
-  bool get _showPrivEscTab =>
-      !widget.webshell.connectorType.startsWith('asp');
-
-  /// 持久化在所有具有 shell 执行能力的连接器下显示。
-  bool get _showPersistenceTab => _service.supportsShellExec;
-
-  /// 持久化标签索引（Terminal=0, FileManager=1, SystemInfo=2, [PrivEsc=3], Persist）
-  int _persistTabIndex() {
-    var idx = 3;
-    if (_showPrivEscTab) idx += 1;
-    return idx;
-  }
-
-  int _processTabIndex() =>
-      _persistTabIndex() + (_showPersistenceTab ? 1 : 0);
 
   /// 一键隧道：JSP 由用户选择 suo5 / suo6（冰蝎可内存注入，否则上传对应 jsp）；其它类型上传 suo5。
   bool get _supportsOneClickTunnelAction {
@@ -92,9 +75,8 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     super.initState();
     _service = WebshellService(widget.webshell);
     _tabController = TabController(
-      length: (_showPrivEscTab ? 4 : 3) +
-          (_showPersistenceTab ? 1 : 0) +
-          1,
+      // Terminal / File Manager / System Info / Processes
+      length: 4,
       vsync: this,
     );
     _completer = TabCompleter(_service);
@@ -261,18 +243,8 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                             skipTraversal: _tabController.index != 2,
                             child: SystemInfoTab(service: _service),
                           ),
-                          if (_showPrivEscTab)
-                            FocusScope(
-                              skipTraversal: _tabController.index != 3,
-                              child: PrivEscTab(service: _service),
-                            ),
-                          if (_showPersistenceTab)
-                            FocusScope(
-                              skipTraversal: _tabController.index != _persistTabIndex(),
-                              child: PersistenceTab(service: _service),
-                            ),
                           FocusScope(
-                            skipTraversal: _tabController.index != _processTabIndex(),
+                            skipTraversal: _tabController.index != 3,
                             child: ProcessListTab(service: _service),
                           ),
                         ],
@@ -846,16 +818,6 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
             icon: const Icon(Icons.dns_outlined, size: 15),
             text: 'System Info',
           ),
-          if (_showPrivEscTab)
-            Tab(
-              icon: const Icon(Icons.shield_outlined, size: 15),
-              text: 'Privilege Escalation',
-            ),
-          if (_showPersistenceTab)
-            Tab(
-              icon: const Icon(Icons.link, size: 15),
-              text: 'Persistence',
-            ),
           Tab(
             icon: const Icon(Icons.memory, size: 15),
             text: 'Processes',
