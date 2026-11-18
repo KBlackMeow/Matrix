@@ -71,6 +71,7 @@ class ShellDeployer {
     required ShellKind kind,
     String? preferredDirectory,
     String? serverHint,
+    bool blind = false,
     Duration timeout = const Duration(seconds: 10),
   }) async {
     final name = _token('mx_');
@@ -88,8 +89,11 @@ class ShellDeployer {
 
     for (final dir in candidates) {
       final path = '${dir.path}/$fileName';
-      final written = await _writeUnix(exec, path, b64);
-      if (!written) continue;
+      if (blind) {
+        await _writeUnix(exec, path, b64); // 盲打：写不写成功只能靠 HTTP 验证
+      } else if (!await _writeUnix(exec, path, b64)) {
+        continue;
+      }
       final session = await _verify(
         origin: origin,
         urlPath: '${dir.urlPrefix}$fileName',

