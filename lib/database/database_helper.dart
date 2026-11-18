@@ -17,6 +17,9 @@ class DatabaseHelper {
 
   DatabaseHelper._internal();
 
+  /// 把历史明文凭据就地加密（幂等）。
+  Future<int> encryptLegacyCredentials() => impl.encryptLegacyCredentials();
+
   Future<Project> createProject(
     String name, {
     required String domain,

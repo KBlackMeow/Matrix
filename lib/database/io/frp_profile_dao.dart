@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../models/frp_profile.dart';
+import '../../core/crypto/credential_cipher.dart';
 import '../../services/frp_client_service.dart';
 
 class FrpProfileDao {
@@ -27,7 +28,7 @@ class FrpProfileDao {
       'name': name,
       'server_addr': serverAddr,
       'server_port': serverPort,
-      'token': token,
+      'token': CredentialCipher.encryptIfReady(token),
       'proxy_name': proxyName,
       'remote_port': remotePort,
       'local_addr': localAddr,
@@ -78,7 +79,7 @@ class FrpProfileDao {
         'name': name,
         'server_addr': serverAddr,
         'server_port': serverPort,
-        'token': token,
+        'token': CredentialCipher.encryptIfReady(token),
         'proxy_name': proxyName,
         'remote_port': remotePort,
         'local_addr': localAddr,

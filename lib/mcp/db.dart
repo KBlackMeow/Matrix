@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../core/crypto/credential_cipher.dart';
 import '../models/webshell.dart';
 
 /// MCP Server 专用的最小化数据库帮助类。
@@ -127,8 +128,8 @@ class McpDatabase {
       'project_id': projectId,
       'name': name,
       'url': url,
-      'password': password,
-      'secret_key': secretKey,
+      'password': CredentialCipher.encryptIfReady(password),
+      'secret_key': CredentialCipher.encryptIfReady(secretKey),
       'cryption': cryption,
       'type': type,
       'method': method,

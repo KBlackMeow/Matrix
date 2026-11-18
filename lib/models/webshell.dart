@@ -1,3 +1,5 @@
+import '../core/crypto/credential_cipher.dart';
+
 /// Webshell 模型
 class Webshell {
   final int id;
@@ -52,8 +54,8 @@ class Webshell {
       'project_id': projectId,
       'name': name,
       'url': url,
-      'password': password,
-      'secret_key': secretKey,
+      'password': CredentialCipher.encryptIfReady(password),
+      'secret_key': CredentialCipher.encryptIfReady(secretKey),
       'cryption': cryption,
       'type': type,
       'method': method,
@@ -74,8 +76,10 @@ class Webshell {
       projectId: map['project_id'] as int,
       name: map['name'] as String,
       url: map['url'] as String,
-      password: map['password'] as String?,
-      secretKey: (map['secret_key'] as String?) ?? 'key',
+      password: CredentialCipher.decryptIfReady(map['password'] as String?),
+      secretKey: CredentialCipher.decryptIfReady(
+        (map['secret_key'] as String?) ?? 'key',
+      )!,
       cryption: (map['cryption'] as String?) ?? '',
       type: storedType,
       method: (map['method'] as String?) ?? 'POST',

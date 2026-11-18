@@ -24,6 +24,7 @@ import '../services/frp_client_service.dart';
 import 'legacy_sandbox_migrator.dart';
 import 'matrix_storage.dart';
 import 'storage_permissions.dart';
+import 'io/credential_migration.dart';
 
 /// 桌面/移动端 SQLite 实现
 class DatabaseHelperIo {
@@ -747,6 +748,12 @@ class DatabaseHelperIo {
 }
 
 final _io = DatabaseHelperIo();
+
+/// 把历史明文凭据就地加密（幂等）；加密器未就绪时直接返回 0。
+Future<int> encryptLegacyCredentials() async {
+  final db = await _io.database;
+  return encryptLegacyCredentialsIn(db);
+}
 
 Future<Project> createProject(
   String name, {

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app/app.dart';
+import 'core/crypto/credential_cipher.dart';
 import 'database/database_helper.dart';
 import 'database/database_init.dart';
 import 'database/matrix_storage.dart';
@@ -33,9 +34,15 @@ void main() async {
   }
   // _installMatrixDebugPrint();
   initDatabase(); // 初始化 SQLite（桌面端使用 FFI）
-  // 本地数据目录 0700 / 数据库 0600：凭据是明文存储，至少限制同机可读性。
+  // 凭据主密钥：优先 Keychain，退回 ~/.matrix/credentials.key（0600）。
+  await CredentialCipher.initialize();
+  // 本地数据目录 0700 / 数据库 0600，限制同机其它用户读取。
   await hardenMatrixStorage();
   runApp(const MyApp());
+  // 历史明文凭据迁移到加密格式；幂等，失败不影响启动。
+  unawaited(
+    DatabaseHelper().encryptLegacyCredentials().catchError((Object _) => 0),
+  );
   // seed 在后台运行，不阻塞 UI 启动
   SeedService.seed(DatabaseHelper());
 }

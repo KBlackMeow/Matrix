@@ -256,3 +256,6 @@ Future<int> deleteSuo6Profile(int id) async {
   _suo6Profiles.removeWhere((p) => p.id == id);
   return before - _suo6Profiles.length;
 }
+
+/// Web 端无本地数据库，无需迁移。
+Future<int> encryptLegacyCredentials() async => 0;

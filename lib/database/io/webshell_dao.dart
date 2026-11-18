@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../../core/crypto/credential_cipher.dart';
 import '../../models/webshell.dart';
 
 class WebshellDao {
@@ -24,8 +25,8 @@ class WebshellDao {
       'project_id': projectId,
       'name': name,
       'url': url,
-      'password': password,
-      'secret_key': secretKey,
+      'password': CredentialCipher.encryptIfReady(password),
+      'secret_key': CredentialCipher.encryptIfReady(secretKey),
       'cryption': cryption,
       'type': type,
       'method': method,
@@ -69,8 +70,8 @@ class WebshellDao {
       {
         'name': webshell.name,
         'url': webshell.url,
-        'password': webshell.password,
-        'secret_key': webshell.secretKey,
+        'password': CredentialCipher.encryptIfReady(webshell.password),
+        'secret_key': CredentialCipher.encryptIfReady(webshell.secretKey),
         'cryption': webshell.cryption,
         'type': webshell.type,
         'method': webshell.method,

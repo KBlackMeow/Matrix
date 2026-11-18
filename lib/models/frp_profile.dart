@@ -1,3 +1,4 @@
+import '../core/crypto/credential_cipher.dart';
 import '../services/frp_client_service.dart';
 
 class FrpProfile {
@@ -51,7 +52,7 @@ class FrpProfile {
         name: m['name'] as String,
         serverAddr: m['server_addr'] as String,
         serverPort: m['server_port'] as int,
-        token: (m['token'] as String?) ?? '',
+        token: CredentialCipher.decryptIfReady((m['token'] as String?) ?? '')!,
         proxyName: m['proxy_name'] as String,
         remotePort: m['remote_port'] as int,
         localAddr: (m['local_addr'] as String?) ?? '127.0.0.1',
