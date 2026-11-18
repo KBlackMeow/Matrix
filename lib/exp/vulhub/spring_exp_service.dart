@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'services/exp_result.dart';
+import 'services/waf_detect.dart';
 
 enum SpringVulnType {
   springCloudFunction(
@@ -134,6 +135,12 @@ class SpringExpService {
           .timeout(timeout);
       probe.stop();
 
+      if (looksLikeWafBlock(detect.statusCode, detect.body)) {
+        return ExpResult.probeFailed(
+          name,
+          '疑似被 WAF 拦截 (HTTP ${detect.statusCode})',
+        );
+      }
       final deltaMs = probe.elapsedMilliseconds - baseline.elapsedMilliseconds;
       if (deltaMs >= 2000) {
         return ExpResult(

@@ -274,6 +274,39 @@ tomcat-check http://127.0.0.1:9 →  vulnerable=false failed=false   （错误�
 | 真实靶场 | `tp5023 vulnerable=true failed=false`，其余 5 个正确为 false |
 | 关闭端口 `127.0.0.1:9` | 6 个检测全部 `failed=true`，detail 带 `Connection refused` |
 
+## WAF 加固环境下的通用性优化（2026-11-18）
+
+工具：`tool/verify/waf_proxy.dart`（先 URL 解码再匹配，可 `--preset=strict|keywords`）。
+
+- `strict`：语义特征全拦（`%{`、`${`、`ognl`、`runtime`、`_method=__construct`、
+  `spring.cloud.function.routing-expression`、`user-agentt` 等）
+- `keywords`：只拦危险函数/类名（`getruntime`、`processbuilder`、`base64_decode`、
+  `system(`、`shell_exec`、`eval(`、`assert(`）
+
+暴露的短板与对应优化：
+
+| 场景 | 优化前 | 优化后 |
+| --- | --- | --- |
+| strict：php-check | `false`（当成"未发现"） | `failed=true`，detail "疑似被 WAF 拦截 (HTTP 403)" |
+| strict：s2059-check | `false` | `failed=true` WAF |
+| strict：spring-check | `false` | `failed=true` WAF |
+| keywords：php-check | `false`（`system(` 被拦） | `true`（变量函数绕过） |
+| keywords：php-exec | 把 WAF 403 页面当命令输出 | `/root`（绕过 + 输出校验） |
+| keywords：s2059-exec | `null`（静默失败） | `[Blocked] 命令未执行：疑似被 WAF 拦截` |
+| keywords：spring-check | `false` | `failed=true` WAF（`getRuntime` 无通用绕过，如实上报） |
+
+新增能力：
+
+1. `waf_detect.dart`：拦截识别（状态码 + 强文案），结果进入 `probeFailed` 分支；
+2. 命令执行响应校验：命中拦截页时返回 `[Blocked]`，不再把 WAF 页面当回显；
+3. PHP 载荷关键词规避：`'sys'.'tem'` / `'shell'.'_exec'` / `'base'.'64_decode'`
+   变量函数，语义不变，只躲"字面量匹配"型规则；
+4. 无法绕过时（OGNL/SpEL 的 `getRuntime`、Tomcat 的 PUT 方法）明确报告被拦截，
+   而不是假装"目标安全"。
+
+> 注：`Class.forName('java.lang.Run'+'time')` 的反射绕过在 Struts2 OGNL 沙箱下
+> 不可用（实测无回显），因此 S2-059 在关键词型 WAF 下选择如实上报。
+
 ## 做得好的地方（避免只报坏消息）
 
 - ThinkPHP 的命令参数做了 `Uri.encodeComponent`（`thinkphp_v5_exp.dart:180/189`），没有裸拼；

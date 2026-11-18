@@ -18,6 +18,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../../lib/database/io/credential_migration.dart';
 import '../../lib/exp/thinkphp/thinkphp_exp_service.dart';
 import '../../lib/exp/vulhub/services/exp_result.dart';
+import '../../lib/exp/vulhub/services/waf_detect.dart';
 import '../../lib/exp/vulhub/services/rce_encoder.dart';
 
 import '../../lib/core/async/serial_queue.dart';
@@ -68,6 +69,9 @@ Future<void> main() async {
 
   print('== ExpResult semantics ==');
   _testExpResult();
+
+  print('== WAF detection ==');
+  _testWafDetect();
 
   print('== ThinkphpResult semantics ==');
   _testThinkphpResult();
@@ -385,4 +389,16 @@ void _testUrlSafety() {
     '日志：丢弃 userinfo/query/fragment',
   );
   _check(redactUrlForLog('not a url') == '(invalid url)', '非法 URL 不输出原文');
+}
+
+void _testWafDetect() {
+  _check(looksLikeWafBlock(403, ''), '403 空响应按 WAF 拦截处理');
+  _check(
+    looksLikeWafBlock(200, '<h1>Blocked by WAF</h1>'),
+    'WAF 文案优先于状态码',
+  );
+  _check(!looksLikeWafBlock(200, 'hello world'), '正常响应不误判');
+  _check(!looksLikeWafBlock(500, 'exception'), '500 业务错误不算 WAF');
+  _check(looksLikeBlockedBody('403 Forbidden'), '执行结果能识别拦截页');
+  _check(!looksLikeBlockedBody('uid=0(root)'), '正常命令输出不算拦截');
 }

