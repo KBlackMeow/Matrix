@@ -71,8 +71,16 @@ class WebshellService {
 
   /// 终端 / 文件管理器打开时的初始目录。
   ///
-  /// 优先脚本目录；全部探测失败时使用目标进程当前工作目录（`pwd` / `getcwd`）。
-  /// 同一 [WebshellService] 实例内只完整解析一次。
+  /// 终端/文件管理器的初始目录：直接取目标进程当前工作目录（`pwd` / `getcwd`）。
+  ///
+  /// 打开工作区时**不再**探测 "webshell 脚本所在目录"：
+  /// - 那是一次额外请求，PHP 侧复合探测载荷约 4 KB，容易触发目标 WAF；
+  /// - JSP 侧失败时还会继续跑多级 `find`，打开变慢；
+  /// - 用户期望的初始目录通常就是进程 cwd。
+  ///
+  /// 需要脚本目录的场景（例如把隧道脚本传到 webshell 同级目录）仍可显式调用
+  /// [getShellScriptDirectory]。
+  /// 同一 [WebshellService] 实例内只解析一次。
   Future<String> getInitialWorkingDirectory() async {
     final memo = _memoInitialWorkingDir;
     if (memo != null) return memo;
@@ -89,11 +97,6 @@ class WebshellService {
   }
 
   Future<String> _resolveInitialWorkingDirectoryOnce() async {
-    final scriptDir = await getShellScriptDirectory();
-    if (scriptDir != null && scriptDir.isNotEmpty) {
-      _connector.currentDir = scriptDir;
-      return scriptDir;
-    }
     final cwd = await getCurrentDir();
     _connector.currentDir = cwd;
     return cwd;

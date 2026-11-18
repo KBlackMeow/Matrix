@@ -32,6 +32,8 @@
 | L1 凭据落盘 | ✅ 已修复 | 见下方 | AES-256-CBC+HMAC 加密 `webshells.password/secret_key`、`frp_profiles.token`；密钥优先 macOS Keychain，退回 `~/.matrix/credentials.key`(0600)；历史明文由启动迁移就地加密（幂等） |
 | L2 MCP 日志泄漏 | ✅ 已修复 | `a8a76e8` | password/secret_key/token/cookie 统一遮蔽，content 只记长度 |
 | C7 SUO5 启停竞态 | ✅ 已修复 | 见下方 | `start()` 增加 `_startInFlight`，并发点按复用同一次启动，杜绝重复 bind |
+| 请求预算（S3/S4/S7） | ✅ 已修复 | `ca300c3` | 打开 5→3 请求、重复 Tab 2→0 请求（Docker 实测） |
+| 目录探测 | ✅ 已取消 | 见下方 | 打开工作区不再探测脚本目录，仅 `pwd`；PHP 打开上行 4.7KB→0.7KB |
 | C8 上传取消残留 | ⏳ 未修 | — | 建议 `.part` + 原子 rename |
 | L3 TLS 跳过 | ⏳ 未修 | — | 需要产品层决策（显式 insecure 开关） |
 | L6 监听默认 0.0.0.0 | ⏳ 未修 | — | 改默认值需评估远程回连场景 |
