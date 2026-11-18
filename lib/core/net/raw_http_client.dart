@@ -35,6 +35,27 @@ class RawHttpClient {
   final Duration timeout;
   final bool allowBadCertificate;
 
+  static String _decodeChunked(String body) {
+    final out = StringBuffer();
+    var i = 0;
+    while (i < body.length) {
+      final nl = body.indexOf('\r\n', i);
+      if (nl < 0) break;
+      final sizeText = body.substring(i, nl).split(';').first.trim();
+      final size = int.tryParse(sizeText, radix: 16);
+      if (size == null || size == 0) break;
+      final start = nl + 2;
+      final end = start + size;
+      if (end > body.length) {
+        out.write(body.substring(start));
+        break;
+      }
+      out.write(body.substring(start, end));
+      i = end + 2;
+    }
+    return out.toString();
+  }
+
   Future<RawHttpResponse?> send({
     required String baseUrl,
     required RawHttpRequest request,
@@ -84,7 +105,12 @@ class RawHttpClient {
           .toList();
       final text = utf8.decode(bytes, allowMalformed: true);
       final idx = text.indexOf('\r\n\r\n');
-      final body = idx >= 0 ? text.substring(idx + 4) : text;
+      final headerText = idx >= 0 ? text.substring(0, idx) : '';
+      var body = idx >= 0 ? text.substring(idx + 4) : text;
+      // 分块传输：显式解码，否则调用方会把 "2d" / "0" 当成命令输出。
+      if (headerText.toLowerCase().contains('transfer-encoding: chunked')) {
+        body = _decodeChunked(body);
+      }
       return RawHttpResponse(raw: text, body: body);
     } on TimeoutException {
       return null;
