@@ -46,8 +46,10 @@ class XxlJobExpService {
       if (res.statusCode == 200 && body.contains('200')) {
         return ExpResult(true, 'XXL-JOB 未授权 RCE', '执行器接口未授权，命令提交成功');
       }
-    } catch (_) {}
-    return const ExpResult(false, 'XXL-JOB 未授权 RCE', '');
+    } catch (e) {
+      return ExpResult.probeFailed('XXL-JOB 未授权 RCE', '探测失败: $e');
+    }
+    return ExpResult(false, 'XXL-JOB 未授权 RCE', '');
   }
 
   Future<String?> execRce(String cmd) async {

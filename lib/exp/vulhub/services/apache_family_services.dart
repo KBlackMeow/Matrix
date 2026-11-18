@@ -48,8 +48,10 @@ class ApacheHttpdExpService {
           return ExpResult(true, 'CVE-2021-41773', '路径穿越成功，读取到 /etc/passwd');
         }
       }
-    } catch (_) {}
-    return const ExpResult(false, 'CVE-2021-41773', '');
+    } catch (e) {
+      return ExpResult.probeFailed('CVE-2021-41773', '探测失败: $e');
+    }
+    return ExpResult(false, 'CVE-2021-41773', '');
   }
 
   Future<String?> readFile(String filePath) async {

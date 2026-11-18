@@ -62,7 +62,9 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
     appendLog('[*] 检测 ${_selected.label}...');
     try {
       final r = await _svc().checkSingle(_selected);
-      if (r.vulnerable) {
+      if (r.failed) {
+        appendLog('[!] 探测失败: ${r.detail}');
+      } else if (r.vulnerable) {
         appendLog('[+] ${r.vulnName}: ${r.detail}');
       } else {
         final detail = r.detail.trim();
@@ -93,7 +95,9 @@ class _SpringPageState extends BaseVulhubExpPageState<SpringExpPage> {
       for (final t in SpringVulnType.values) {
         appendLog('[*] 检测 ${t.label}...');
         final r = await svc.checkSingle(t);
-        if (r.vulnerable) {
+        if (r.failed) {
+          appendLog('[!] ${r.vulnName} 探测失败: ${r.detail}');
+        } else if (r.vulnerable) {
           appendLog('[+] ${r.vulnName}: ${r.detail}');
         } else {
           final detail = r.detail.trim();

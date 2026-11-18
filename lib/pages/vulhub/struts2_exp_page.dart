@@ -66,7 +66,9 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
         _selected,
         path: _pathCtrl.text.trim(),
       );
-      if (r.vulnerable) {
+      if (r.failed) {
+        appendLog('[!] 探测失败: ${r.detail}');
+      } else if (r.vulnerable) {
         appendLog('[+] 存在漏洞: ${r.vulnName}');
         appendLog('[i] ${r.detail}');
       } else {
@@ -98,7 +100,9 @@ class _Struts2PageState extends BaseVulhubExpPageState<Struts2ExpPage> {
           _ => path,
         };
         final r = await svc.checkSingle(t, path: effectivePath);
-        if (r.vulnerable) {
+        if (r.failed) {
+          appendLog('[!] ${r.vulnName} 探测失败: ${r.detail}');
+        } else if (r.vulnerable) {
           appendLog('[+] ${r.vulnName}: ${r.detail}');
           firstHit ??= t;
         } else {

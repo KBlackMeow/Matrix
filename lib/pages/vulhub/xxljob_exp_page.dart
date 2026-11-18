@@ -48,7 +48,7 @@ class _XxlJobPageState extends BaseVulhubExpPageState<XxlJobExpPage> {
     try {
       final r = await _svc().check();
       appendLog(
-        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到或已修复',
+        expResultLine(r, notDetected: '[-] 未检测到或已修复'),
       );
     } catch (e) {
       appendLog('[!] Error: $e');

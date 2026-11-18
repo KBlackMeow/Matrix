@@ -56,7 +56,7 @@ class _NacosPageState extends BaseVulhubExpPageState<NacosExpPage> {
     try {
       final r = await _svc().check();
       appendLog(
-        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] No vulnerability detected',
+        expResultLine(r, notDetected: '[-] No vulnerability detected'),
       );
     } catch (e) {
       appendLog('[!] Error: $e');

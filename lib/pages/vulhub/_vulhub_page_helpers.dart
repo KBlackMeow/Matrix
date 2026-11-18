@@ -2,6 +2,7 @@
 // Each page file imports this via a part or a direct import.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import '../../exp/vulhub/services/exp_result.dart';
 import '../../theme/app_theme.dart';
 
 Widget vulhubInfoCard(IconData icon, String title, String subtitle) =>
@@ -373,4 +374,15 @@ Future<String?> showReverseShellModeDialog(BuildContext context) {
       );
     },
   );
+}
+
+/// 把检测结果渲染成一行日志。
+///
+/// 三态语义：`[!]` 探测失败（网络/超时/证书），`[+]` 命中，`[-]` 探测完成且未命中。
+/// 旧实现把前两者合并成 `[-]`，会把"没打通"显示成"目标安全"。
+String expResultLine(ExpResult r, {String notDetected = '[-] No vulnerability detected'}) {
+  if (r.failed) return '[!] Probe failed: ${r.detail}';
+  if (r.vulnerable) return '[+] ${r.vulnName}: ${r.detail}';
+  final detail = r.detail.trim();
+  return detail.isEmpty ? notDetected : '$notDetected | $detail';
 }

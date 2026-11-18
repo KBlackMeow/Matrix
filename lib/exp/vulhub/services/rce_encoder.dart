@@ -16,6 +16,15 @@ class RceEncoder {
     return 'echo $b64|base64 -d|sh';
   }
 
+  /// Escapes a command for a **PHP single-quoted** string literal:
+  /// `system('…')` / `shell_exec('…')`.
+  ///
+  /// PHP 不会在单引号串里做变量插值，因此 `$HOME`、`$1` 能原样到达 shell；
+  /// 只需转义 `\` 与 `'`。这是 PHP 载荷的首选方式，避免
+  /// `system("echo $HOME")` 被 PHP 当成变量插值（实测会变成 `echo `）。
+  static String phpSingleQuoted(String cmd) =>
+      cmd.replaceAll(r'\', r'\\').replaceAll("'", r"\'");
+
   /// Escapes backslashes and double quotes for embedding inside a
   /// double-quoted string literal (FreeMarker, PHP `shell_exec("…")`,
   /// Druid JavaScript engine).

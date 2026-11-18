@@ -99,8 +99,10 @@ class DrupalExpService {
           '端点响应，Form API #post_render 注入可能存在',
         );
       }
-    } catch (_) {}
-    return const ExpResult(false, 'CVE-2018-7600 (Drupalgeddon2)', '');
+    } catch (e) {
+      return ExpResult.probeFailed('CVE-2018-7600 (Drupalgeddon2)', '探测失败: $e');
+    }
+    return ExpResult(false, 'CVE-2018-7600 (Drupalgeddon2)', '');
   }
 
   String _buildSafeCommand(String cmd) {
@@ -218,8 +220,10 @@ class FlaskSstiExpService {
           'SSTI 存在，233×233=54289 验证通过',
         );
       }
-    } catch (_) {}
-    return const ExpResult(false, 'Flask/Jinja2 SSTI', '');
+    } catch (e) {
+      return ExpResult.probeFailed('Flask/Jinja2 SSTI', '探测失败: $e');
+    }
+    return ExpResult(false, 'Flask/Jinja2 SSTI', '');
   }
 
   // 将字符串拆成 Jinja2 字符级拼接，绕过命令关键字过滤

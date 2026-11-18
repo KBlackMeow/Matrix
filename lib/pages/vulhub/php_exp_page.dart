@@ -66,7 +66,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
       try {
         final r = await _backdoorSvc().check();
         appendLog(
-          r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到后门',
+          expResultLine(r, notDetected: '[-] 未检测到后门'),
         );
       } catch (e) {
         appendLog('[!] Error: $e');
@@ -76,9 +76,7 @@ class _PhpPageState extends BaseVulhubExpPageState<PhpExpPage> {
       try {
         final r = await _cgiSvc().check();
         appendLog(
-          r.vulnerable
-              ? '[+] ${r.vulnName}: ${r.detail}'
-              : '[-] 未检测到 PHP-CGI 漏洞',
+          expResultLine(r, notDetected: '[-] 未检测到 PHP-CGI 漏洞'),
         );
       } catch (e) {
         appendLog('[!] Error: $e');

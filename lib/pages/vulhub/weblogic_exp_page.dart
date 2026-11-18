@@ -54,7 +54,7 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
       appendLog('[*] 检测 CVE-2017-10271 XMLDecoder 端点...');
       try {
         final r = await _svc().checkCve201710271();
-        appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到');
+        appendLog(expResultLine(r, notDetected: '[-] 未检测到'));
       } catch (e) {
         appendLog('[!] Error: $e');
       }
@@ -62,7 +62,7 @@ class _WebLogicPageState extends BaseVulhubExpPageState<WebLogicExpPage> {
       appendLog('[*] 检测 CVE-2020-14882 控制台路径绕过...');
       try {
         final r = await _svc().checkCve202014882();
-        appendLog(r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到');
+        appendLog(expResultLine(r, notDetected: '[-] 未检测到'));
       } catch (e) {
         appendLog('[!] Error: $e');
       }

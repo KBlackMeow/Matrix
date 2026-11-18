@@ -36,8 +36,10 @@ class NacosExpService {
           '认证绕过成功，获取用户列表:\n${res.body ?? ''}',
         );
       }
-    } catch (_) {}
-    return const ExpResult(false, 'CVE-2021-29441', '');
+    } catch (e) {
+      return ExpResult.probeFailed('CVE-2021-29441', '探测失败: $e');
+    }
+    return ExpResult(false, 'CVE-2021-29441', '');
   }
 
   Future<String?> listUsers() async {

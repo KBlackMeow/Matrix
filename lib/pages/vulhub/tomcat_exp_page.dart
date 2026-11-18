@@ -51,7 +51,7 @@ class _TomcatPageState extends BaseVulhubExpPageState<TomcatExpPage> {
     try {
       final r = await _svc().check();
       appendLog(
-        r.vulnerable ? '[+] ${r.vulnName}: ${r.detail}' : '[-] 未检测到 PUT 文件写入',
+        expResultLine(r, notDetected: '[-] 未检测到 PUT 文件写入'),
       );
     } catch (e) {
       appendLog('[!] Error: $e');
