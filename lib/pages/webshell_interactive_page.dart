@@ -923,19 +923,23 @@ class _TerminalTabState extends State<_TerminalTab>
   }
 
   Future<void> _initDir() async {
-    final dir = await widget.service.getInitialWorkingDirectory();
-    final lower = dir.trim().toLowerCase();
-    final isWinPath = RegExp(r'^[a-z]:[\\/]').hasMatch(lower) ||
-        lower.startsWith(r'\\');
-    final isWindowsConnector =
-        widget.service.webshell.connectorType.startsWith('asp');
-    if (mounted) setState(() => _currentDir = dir);
-    _isWindowsShell = isWinPath || isWindowsConnector;
-    // 并发预热：目录列表、环境变量、HOME、可用命令（同时发出）
-    _completer.warmDir(dir);
-    _completer.fetchEnvVars();
-    _completer.fetchHomeDir();
-    _completer.fetchAvailableCommands(dir);
+    try {
+      final dir = await widget.service.getInitialWorkingDirectory();
+      final lower = dir.trim().toLowerCase();
+      final isWinPath =
+          RegExp(r'^[a-z]:[\\/]').hasMatch(lower) || lower.startsWith(r'\\');
+      final isWindowsConnector =
+          widget.service.webshell.connectorType.startsWith('asp');
+      if (mounted) setState(() => _currentDir = dir);
+      _isWindowsShell = isWinPath || isWindowsConnector;
+      // 并发预热：目录列表、环境变量、HOME、可用命令（同时发出）
+      _completer.warmDir(dir);
+      _completer.fetchEnvVars();
+      _completer.fetchHomeDir();
+      _completer.fetchAvailableCommands(dir);
+    } catch (_) {
+      // 初始目录探测失败时保持默认值，不阻断终端使用；后续命令仍可执行。
+    }
   }
 
   Future<void> _execute(String raw) async {
@@ -980,41 +984,50 @@ class _TerminalTabState extends State<_TerminalTab>
       sendCmd = augmentLsToLongListingForShell(cmd, isWindowsShell: _isWindowsShell);
     }
 
-    final execResult = await widget.service.executeCommand(
-      sendCmd,
-      workingDir: _currentDir,
-    );
+    var output = '';
+    try {
+      final execResult = await widget.service.executeCommand(
+        sendCmd,
+        workingDir: _currentDir,
+      );
 
-    // 解析 cd 后的新目录
-    String output = execResult;
-    if (isCd) {
-      final lines = execResult.split(RegExp(r'\r?\n'));
-      final markerIdx = lines.lastIndexWhere((line) => line.trim() == cwdMarker);
-      if (markerIdx >= 0) {
-        output = lines.take(markerIdx).join('\n').trim();
-        final newDir = lines.skip(markerIdx + 1).join('\n').trim();
-        if (newDir.isNotEmpty && mounted) {
-          final prevDir = _currentDir;
-          setState(() => _currentDir = newDir);
-          // cd 后使旧目录缓存失效（旧目录内可能有文件变动）
-          _completer.invalidateDir(prevDir);
-          _completer.warmDir(newDir);
+      // 解析 cd 后的新目录
+      output = execResult;
+      if (isCd) {
+        final lines = execResult.split(RegExp(r'\r?\n'));
+        final markerIdx = lines.lastIndexWhere(
+          (line) => line.trim() == cwdMarker,
+        );
+        if (markerIdx >= 0) {
+          output = lines.take(markerIdx).join('\n').trim();
+          final newDir = lines.skip(markerIdx + 1).join('\n').trim();
+          if (newDir.isNotEmpty && mounted) {
+            final prevDir = _currentDir;
+            setState(() => _currentDir = newDir);
+            // cd 后使旧目录缓存失效（旧目录内可能有文件变动）
+            _completer.invalidateDir(prevDir);
+            _completer.warmDir(newDir);
+          }
         }
       }
-    }
-
-    if (mounted) {
-      setState(() {
-        entry.output = output.isEmpty ? '(no output)' : output;
-        _executing = false;
-      });
-      // 命令执行后使当前目录缓存失效，确保 touch/mkdir/rm 等操作能被 Tab 补全识别
-      _completer.invalidateDir(_currentDir);
-      _scrollToBottom(animated: true); // 平滑滚动到最新输出
-      // 执行完毕后恢复焦点
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _inputFocus.requestFocus();
-      });
+    } catch (e) {
+      // 任何异常都必须落到输出区并释放执行锁：否则 _executing 永远为 true，
+      // 输入框会保持 readOnly，后续命令全部被 `if (_executing) return;` 丢弃。
+      output = '[Error] $e';
+    } finally {
+      _executing = false;
+      if (mounted) {
+        setState(() {
+          entry.output = output.isEmpty ? '(no output)' : output;
+        });
+        // 命令执行后使当前目录缓存失效，确保 touch/mkdir/rm 等操作能被 Tab 补全识别
+        _completer.invalidateDir(_currentDir);
+        _scrollToBottom(animated: true); // 平滑滚动到最新输出
+        // 执行完毕后恢复焦点
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _inputFocus.requestFocus();
+        });
+      }
     }
   }
 
