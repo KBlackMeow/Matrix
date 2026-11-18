@@ -23,6 +23,7 @@ import '../models/suo6_profile.dart';
 import '../services/frp_client_service.dart';
 import 'legacy_sandbox_migrator.dart';
 import 'matrix_storage.dart';
+import 'storage_permissions.dart';
 
 /// 桌面/移动端 SQLite 实现
 class DatabaseHelperIo {
@@ -45,23 +46,51 @@ class DatabaseHelperIo {
   late final Suo6ProfileDao _suo6ProfileDao = Suo6ProfileDao(() => database);
   late final MetaDao _metaDao = MetaDao(() => database);
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+  /// 打开中的 Future：并发首次访问只打开一次数据库。
+  ///
+  /// 旧写法 `if (_database != null) ... _database = await _initDatabase();`
+  /// 在启动阶段多个页面同时取库时会开出两个连接，导致迁移/种子并发、
+  /// 甚至 `database is locked`。
+  Future<Database>? _databaseFuture;
+
+  Future<Database> get database {
+    final opened = _database;
+    if (opened != null) return Future<Database>.value(opened);
+    return _databaseFuture ??= _initDatabase().then(
+      (db) {
+        _database = db;
+        return db;
+      },
+      onError: (Object error, StackTrace stack) {
+        // 打开失败允许下次重试，不缓存失败结果。
+        _databaseFuture = null;
+        return Future<Database>.error(error, stack);
+      },
+    );
   }
 
   Future<Database> _initDatabase() async {
     final storageDirectory = await getMatrixStorageDirectory();
     final path = join(storageDirectory.path, 'matrix.db');
     await _migrateLegacySandboxData(storageDirectory.path, path);
+    // 打开前先收敛目录权限，打开后再收敛 db/WAL/SHM 文件权限。
+    await hardenPermissions(
+      dirPath: storageDirectory.path,
+      fileNames: matrixDatabaseArtifacts,
+    );
 
-    return openDatabase(
+    final db = await openDatabase(
       path,
       version: 15,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+    // 打开后再次收敛：此时 WAL/SHM 伴随文件已存在。
+    await hardenPermissions(
+      dirPath: storageDirectory.path,
+      fileNames: matrixDatabaseArtifacts,
+    );
+    return db;
   }
 
   Future<void> _migrateLegacySandboxData(

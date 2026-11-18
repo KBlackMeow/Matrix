@@ -27,15 +27,29 @@ class SessionPool {
   ///
   /// 首次调用时从数据库读取 WebShell 配置并实例化连接器；
   /// 后续调用复用已缓存的实例。
-  Future<WebshellService> get(int shellId) async {
-    if (_sessions.containsKey(shellId)) return _sessions[shellId]!;
+  ///
+  /// 并发安全：缓存的是"创建中的 Future"而不是实例本身。多个 MCP 请求同时
+  /// 首次访问同一 shell_id 时只会创建一次连接器（否则会重复握手、两套 Cookie，
+  /// 先创建的实例被覆盖后无法释放）。
+  Future<WebshellService> get(int shellId) {
+    final cached = _sessions[shellId];
+    if (cached != null) return Future<WebshellService>.value(cached);
 
-    final ws = await _lookup(shellId);
-    if (ws == null) throw Exception('WebShell $shellId 不存在');
-    final svc = WebshellService(ws);
-    _sessions[shellId] = svc;
-    return svc;
+    return _creating.putIfAbsent(shellId, () async {
+      try {
+        final ws = await _lookup(shellId);
+        if (ws == null) throw Exception('WebShell $shellId 不存在');
+        final svc = WebshellService(ws);
+        _sessions[shellId] = svc;
+        return svc;
+      } finally {
+        _creating.remove(shellId);
+      }
+    });
   }
+
+  /// 创建中的实例（防止并发首次访问重复建连）。
+  final Map<int, Future<WebshellService>> _creating = {};
 
   /// 移除并关闭指定 session（可选用于清理连接）。
   void evict(int shellId) {

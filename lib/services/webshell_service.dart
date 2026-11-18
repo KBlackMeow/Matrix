@@ -55,18 +55,37 @@ class WebshellService {
   ///
   /// 解析顺序（PHP/JSP）：`SCRIPT_FILENAME` / sysinfo / `find` / 常见部署目录扫描。
   /// 同一 [WebshellService] 实例内只执行一次远端探测。
-  Future<String?> getShellScriptDirectory() {
-    _memoShellScriptDir ??= _connector.getShellScriptDir();
-    return _memoShellScriptDir!;
+  Future<String?> getShellScriptDirectory() async {
+    final memo = _memoShellScriptDir;
+    if (memo != null) return memo;
+    final future = _connector.getShellScriptDir();
+    _memoShellScriptDir = future;
+    try {
+      return await future;
+    } catch (_) {
+      // 失败结果不缓存：一次网络抖动不应让该会话永久无法探测脚本目录。
+      if (identical(_memoShellScriptDir, future)) _memoShellScriptDir = null;
+      rethrow;
+    }
   }
 
   /// 终端 / 文件管理器打开时的初始目录。
   ///
   /// 优先脚本目录；全部探测失败时使用目标进程当前工作目录（`pwd` / `getcwd`）。
   /// 同一 [WebshellService] 实例内只完整解析一次。
-  Future<String> getInitialWorkingDirectory() {
-    _memoInitialWorkingDir ??= _resolveInitialWorkingDirectoryOnce();
-    return _memoInitialWorkingDir!;
+  Future<String> getInitialWorkingDirectory() async {
+    final memo = _memoInitialWorkingDir;
+    if (memo != null) return memo;
+    final future = _resolveInitialWorkingDirectoryOnce();
+    _memoInitialWorkingDir = future;
+    try {
+      return await future;
+    } catch (_) {
+      if (identical(_memoInitialWorkingDir, future)) {
+        _memoInitialWorkingDir = null;
+      }
+      rethrow;
+    }
   }
 
   Future<String> _resolveInitialWorkingDirectoryOnce() async {
