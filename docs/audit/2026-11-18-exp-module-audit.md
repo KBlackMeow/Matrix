@@ -19,12 +19,12 @@ exp 模块**没有"被远程利用"的风险**（它本来就是攻击方），�
 | F3 | Spring Cloud Function SpEL 直接拼接命令 | 中 |
 | F4 | S2-059 只转义引号，漏反斜杠 | 中 |
 | F5 | S2-057 硬编码 `http://`、丢弃 base path | 中 |
-| F6 | WebLogic 检测无条件关闭 TLS 校验 | 中 |
+| F6 | WebLogic 检测无条件关闭 TLS 校验 | ✅ 已修复 |
 | F7 | `SystemEncoding()` 解码非 UTF-8 响应会抛异常 | 低 |
 | F8 | struts2 24 处静默 `catch (_)` | 低 |
 | F9 | 4,501 行只有 1 个测试 | 低 |
 | F10 | Spring Cloud Function 检测漏报（靶场实测） | **高** |
-| F11 | S2-059 命令执行在靶场返回 null | 中 |
+| F11 | S2-059 命令执行在靶场返回 null | ✅ 已修复 |
 
 ---
 
@@ -152,7 +152,8 @@ final client = HttpClient()..badCertificateCallback = (_, __, _) => true;
 该检测只读 Location/响应体，完全可以用正常校验；关闭后 HTTPS 目标可被中间人伪造"存在/不存在"。
 其余检测都走 `MatrixHttpClient(allowBadCertificate: false)`，此处不一致。
 
-**修复**：默认开启校验；自签名场景显式传入开关。
+**修复（2026-11-18）**：默认严格校验；仅当握手失败（自签证书）时放宽重试一次，
+并在 detail 标注"已放宽证书校验"，不再静默接受任意证书。
 
 ---
 
@@ -169,10 +170,11 @@ macOS/Linux 上 `SystemEncoding` 即 UTF-8；WebLogic 控制台若返回 GBK 或
 
 ---
 
-## F8【低】struts2 24 处静默 `catch (_)`
+## F8【低】struts2 24 处静默 `catch (_)`（已评估，保留）
 
-`struts2_exp_service.dart` 内 24 处空 catch，探测/利用失败时无任何日志，用户只能看到最终"未发现"。
-建议至少把异常摘要写进 `onLog` 或返回的 detail。
+单条 payload 失败后继续尝试下一个路径属于预期行为；全部路径失败时，
+检测结果现在会返回 `probeFailed` 并带上最后一次异常（F1 修复的一部分）。
+exec 路径仍返回 null（命令执行本身没有可靠的错误通道），保留现状。
 
 ---
 
@@ -200,7 +202,10 @@ macOS/Linux 上 `SystemEncoding` 即 UTF-8；WebLogic 控制台若返回 GBK 或
 销售环境：`vulhub/struts2:2.5.16`。检测（数学运算）通过，但 `execS2059('echo S2059_OK')` 返回 `null`：
 响应里 `<a id="">` 为空，说明沙箱绕过 + `exec("...")` 组合在该版本未生效。
 
-**建议**：改用 Base64 传命令（Spring 侧已验证可行），或按版本区分 payload；暂列为后续项。
+**修复（2026-11-18）**：改为官方 PoC 的**两步**打法——先清空容器级
+`excludedClasses/excludedPackageNames`（每实例一次），再在同一请求内
+`setMemberAccess(DEFAULT_MEMBER_ACCESS)` 后 `exec`。全新 Tomcat 实测：
+`id` → `uid=0(root)`，后续调用 `uname -a` 正常。
 
 ## 靶场联调结果（2026-11-18）
 
