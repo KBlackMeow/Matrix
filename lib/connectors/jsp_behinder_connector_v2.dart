@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:http/http.dart' as http;
 
+import '../core/async/serial_queue.dart';
 import '../core/crypto/behinder_crypto.dart';
 import '../core/crypto/jvm_bytecode.dart';
 import '../models/file_entry.dart';
@@ -33,6 +34,9 @@ class JspBehinderConnectorV2 extends ShellConnector {
   late final http.Client _client = http.Client();
   final Map<String, String> _cookies = {};
   bool _sessionEstablished = false;
+
+  /// 同 URL 共享的串行队列：JSP Session 并发会串号/丢 Cookie。
+  late final SerialQueue _sendQueue = SerialQueue.forKey(webshell.url);
 
   String get _key => BehinderCrypto.deriveKey(webshell.password);
 
@@ -66,7 +70,9 @@ class JspBehinderConnectorV2 extends ShellConnector {
     if (_sessionEstablished) return;
     try {
       final uri = Uri.parse(webshell.url);
-      final r = await _client.get(uri).timeout(const Duration(seconds: 10));
+      final r = await _sendQueue.run(
+        () => _client.get(uri).timeout(const Duration(seconds: 10)),
+      );
       _updateCookies(r);
     } catch (_) {}
     _sessionEstablished = true;
@@ -115,9 +121,11 @@ class JspBehinderConnectorV2 extends ShellConnector {
       final uri = Uri.parse(webshell.url);
       final headers = _requestHeaders();
 
-      final response = await _client
-          .post(uri, headers: headers, body: bodyBytes)
-          .timeout(timeout);
+      final response = await _sendQueue.run(
+        () => _client
+            .post(uri, headers: headers, body: bodyBytes)
+            .timeout(timeout),
+      );
 
       _updateCookies(response);
 

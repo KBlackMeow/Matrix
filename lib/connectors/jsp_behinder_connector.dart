@@ -9,6 +9,7 @@ import '../core/debug_log.dart';
 import '../core/asset_loader.dart';
 import 'package:http/http.dart' as http;
 
+import '../core/async/serial_queue.dart';
 import '../core/crypto/behinder_crypto.dart';
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
@@ -28,6 +29,13 @@ class JspBehinderConnector extends ShellConnector {
 
   late final http.Client _client = http.Client();
   final Map<String, String> _cookies = {};
+
+  /// 同一 WebShell 的请求串行化。
+  ///
+  /// JSP Session 型 Shell 依赖 `JSESSIONID`：并发 POST 会互相覆盖 Cookie、
+  /// 服务端会话串号，偶发 200 + 空 body。用 key = URL 共享队列，保证 UI 与 MCP
+  /// 等不同入口对同一目标也串行。
+  late final SerialQueue _sendQueue = SerialQueue.forKey(webshell.url);
   late final String _execKey = _randomHex32();
 
   static String _randomHex32() {
@@ -107,7 +115,9 @@ class JspBehinderConnector extends ShellConnector {
     if (_sessionEstablished) return;
     try {
       final uri = Uri.parse(webshell.url);
-      final r = await _client.get(uri).timeout(const Duration(seconds: 10));
+      final r = await _sendQueue.run(
+        () => _client.get(uri).timeout(const Duration(seconds: 10)),
+      );
       _updateCookies(r);
       _sessionEstablished = true;
     } catch (_) {
@@ -154,9 +164,11 @@ class JspBehinderConnector extends ShellConnector {
       headers['User-Agent'] =
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36';
 
-      final response = await _client
-          .post(uri, headers: headers, body: bodyBytes)
-          .timeout(const Duration(seconds: 25));
+      final response = await _sendQueue.run(
+        () => _client
+            .post(uri, headers: headers, body: bodyBytes)
+            .timeout(const Duration(seconds: 25)),
+      );
 
       _updateCookies(response);
       if (response.statusCode == 200) {
@@ -613,9 +625,11 @@ class JspBehinderConnector extends ShellConnector {
             .join('; ');
       }
 
-      final response = await _client
-          .post(uri, headers: headers, body: bodyBytes)
-          .timeout(const Duration(seconds: 25));
+      final response = await _sendQueue.run(
+        () => _client
+            .post(uri, headers: headers, body: bodyBytes)
+            .timeout(const Duration(seconds: 25)),
+      );
       _updateCookies(response);
 
       if (response.statusCode == 200) {
@@ -677,9 +691,11 @@ class JspBehinderConnector extends ShellConnector {
             .join('; ');
       }
 
-      final response = await _client
-          .post(uri, headers: headers, body: bodyBytes)
-          .timeout(const Duration(seconds: 25));
+      final response = await _sendQueue.run(
+        () => _client
+            .post(uri, headers: headers, body: bodyBytes)
+            .timeout(const Duration(seconds: 25)),
+      );
       _updateCookies(response);
 
       if (response.statusCode == 200) {

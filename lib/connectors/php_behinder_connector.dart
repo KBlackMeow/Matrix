@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:http/http.dart' as http;
 
+import '../core/async/serial_queue.dart';
 import '../core/crypto/behinder_crypto.dart';
 import 'shell_script_dir_probe.dart';
 import '../models/file_entry.dart';
@@ -80,20 +81,12 @@ class PhpBehinderConnector extends ShellConnector {
   }
 
   /// 冰蝎依赖 Session；并发 POST 易出现 **200 + 空 body**。所有 `_sendPhp` 串行执行。
-  Future<void> _phpSendGate = Future.value();
+  /// 使用按 URL 共享的队列，使 UI 与 MCP 等不同入口对同一目标也互斥。
+  late final SerialQueue _phpSendGate = SerialQueue.forKey(webshell.url);
 
   /// 冰蝎 PHP 格式：encrypt("C|php_code")，C.__invoke 执行 eval
-  Future<String> _sendPhp(String phpCode) async {
-    final prev = _phpSendGate;
-    final done = Completer<void>();
-    _phpSendGate = done.future;
-    await prev;
-    try {
-      return await _sendPhpUnlocked(phpCode);
-    } finally {
-      done.complete();
-    }
-  }
+  Future<String> _sendPhp(String phpCode) =>
+      _phpSendGate.run(() => _sendPhpUnlocked(phpCode));
 
   /// 标准 Behinder 响应加密函数，对应 TransProtocol `php_aes` 的 Encrypt。
   static const _encryptFunc = r'''
