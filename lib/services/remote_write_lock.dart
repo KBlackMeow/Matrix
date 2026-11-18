@@ -50,12 +50,17 @@ class RemoteWriteLockCoordinator {
   }
 
   static Future<String> _lookupHostId(String shellUrl) async {
-    final host = Uri.parse(shellUrl).host;
-    if (host.isEmpty) throw FormatException('WebShell URL 缺少主机名: $shellUrl');
-    final addresses = await InternetAddress.lookup(host);
-    if (addresses.isEmpty) return host.toLowerCase();
-    addresses.sort((a, b) => a.address.compareTo(b.address));
-    return addresses.first.address;
+    final host = Uri.tryParse(shellUrl)?.host ?? '';
+    if (host.isEmpty) return shellUrl.toLowerCase();
+    try {
+      final addresses = await InternetAddress.lookup(host);
+      if (addresses.isEmpty) return host.toLowerCase();
+      addresses.sort((a, b) => a.address.compareTo(b.address));
+      return addresses.first.address;
+    } catch (_) {
+      // DNS 解析失败不能阻断写操作：退化为按主机名串行。
+      return host.toLowerCase();
+    }
   }
 
   static String _normalizeRemotePath(String path) =>

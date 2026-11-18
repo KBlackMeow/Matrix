@@ -16,6 +16,7 @@ import 'dart:math';
 import '../../lib/core/async/serial_queue.dart';
 import '../../lib/database/storage_permissions.dart';
 import '../../lib/mcp/log_redaction.dart';
+import '../../lib/services/remote_write_lock.dart';
 
 int _failed = 0;
 int _passed = 0;
@@ -42,6 +43,9 @@ Future<void> main() async {
   print('== Storage permissions ==');
 
   await _testPermissions();
+
+  print('== Remote write lock ==');
+  await _testWriteLock();
 
   print('\npassed=$_passed failed=$_failed');
   if (_failed > 0) exitCode = 1;
@@ -111,8 +115,7 @@ void _testRedaction() {
   _check(isSensitiveArgument('Secret_Key'), '大小写不敏感');
 }
 
-Future<void> _testPermissions() async {
-  final dir = await Directory.systemTemp.createTemp('matrix_perm_test');
+Future<void> _testPermissions() async {  final dir = await Directory.systemTemp.createTemp('matrix_perm_test');
   try {
     final db = File('${dir.path}/matrix.db');
     await db.writeAsString('x');
@@ -139,4 +142,55 @@ Future<void> _testPermissions() async {
   } finally {
     await dir.delete(recursive: true);
   }
+}
+
+Future<void> _testWriteLock() async {
+  final lock = RemoteWriteLockCoordinator();
+  final order = <String>[];
+
+  Future<void> op(String name, int delayMs) async {
+    await lock.synchronize(
+      // 不可解析的主机名：验证 DNS 失败不会阻断写操作（退化为主机名串行）。
+      shellUrl: 'http://matrix.invalid/shell.php',
+      remotePath: '/var/www/shell.php',
+      operation: () async {
+        order.add('$name-start');
+        await Future<void>.delayed(Duration(milliseconds: delayMs));
+        order.add('$name-end');
+      },
+    );
+  }
+
+  await Future.wait([op('a', 30), op('b', 5)]);
+  _check(
+    order.join(',') == 'a-start,a-end,b-start,b-end',
+    '同 host+path 的写操作串行且不交叠',
+    order.join(','),
+  );
+
+  var concurrent = 0;
+  var maxConcurrent = 0;
+  await Future.wait([
+    lock.synchronize(
+      shellUrl: 'http://matrix.invalid/shell.php',
+      remotePath: '/var/www/other.php',
+      operation: () async {
+        concurrent++;
+        maxConcurrent = max(maxConcurrent, concurrent);
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        concurrent--;
+      },
+    ),
+    lock.synchronize(
+      shellUrl: 'http://matrix.invalid/shell.php',
+      remotePath: '/var/www/shell.php',
+      operation: () async {
+        concurrent++;
+        maxConcurrent = max(maxConcurrent, concurrent);
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        concurrent--;
+      },
+    ),
+  ]);
+  _check(maxConcurrent == 2, '不同远端路径可并行', maxConcurrent);
 }

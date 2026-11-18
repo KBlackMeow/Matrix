@@ -26,10 +26,10 @@
 | C1 终端卡死 | ✅ 已修复 | `0d8fffd` | `_execute` 改为 try/catch/finally，异常落到输出区并必复位 `_executing` |
 | C2 失败永久缓存 | ✅ 已修复 | `6dd8adf` | 探测失败清空 memo，下次调用可重试 |
 | C3 会话并发 | ✅ 已修复 | `167ac18` | 新增 `SerialQueue`（按 URL 共享），JSP-BHD / JSP-BHD2 / ASPX-BHD / PHP-BHD 全部串行 |
-| C4 写锁不一致 | ✅ 已修复 | `a8a76e8` | 锁上移 `services/`，UI 上传/写入/删除与 MCP 共用 `shared` 实例 |
+| C4 写锁不一致 | ✅ 已修复 | `a8a76e8` | 锁上移 `services/`，UI 上传/写入/删除与 MCP 共用 `shared` 实例；host 解析失败时退化为主机名，不阻断写入 |
 | C5 SessionPool 竞态 | ✅ 已修复 | `6dd8adf` | 缓存创建中的 Future |
 | C6 DB 双开 | ✅ 已修复 | `6dd8adf` | 缓存打开中的 Future，失败可重试 |
-| L1 凭据落盘 | ⚠️ 部分修复 | `a8a76e8` | 目录 0700 / db 0600 已收敛；**静态加密（Keychain/sqlcipher）仍未做** |
+| L1 凭据落盘 | ⚠️ 部分修复 | `a8a76e8` | 目录 0700 / db 0600 已收敛（当前构建未启用 App Sandbox，`chmod` 可用；若将来开启沙箱需改原生通道）；**静态加密（Keychain/sqlcipher）仍未做** |
 | L2 MCP 日志泄漏 | ✅ 已修复 | `a8a76e8` | password/secret_key/token/cookie 统一遮蔽，content 只记长度 |
 | C7 SUO5 启停竞态 | ⏳ 未修 | — | 建议下一批处理 |
 | C8 上传取消残留 | ⏳ 未修 | — | 建议 `.part` + 原子 rename |
@@ -40,7 +40,7 @@
 验证方式：
 
 - `dart analyze lib`：本次改动无新增 error / warning（剩余为既有 info 与 `jvm_bytecode` 既有 unused 告警）
-- `dart run tool/verify/verify_fixes.dart`：**15/15 通过**（串行队列互斥与 FIFO、异常不阻塞、按 key 共享、日志脱敏、权限 0700/0600）
+- `dart run tool/verify/verify_fixes.dart`：**17/17 通过**（串行队列互斥与 FIFO、异常不阻塞、按 key 共享、日志脱敏、权限 0700/0600、写锁同路径串行/异路径并行 + DNS 失败降级）
 - 说明：本机 Flutter CLI 受文件沙箱限制（无法写 `$FLUTTER_ROOT/bin/cache`），因此未执行 `flutter test`；UI 侧改动以静态分析 + 纯 Dart 组件测试覆盖，未做真机/真目标联调。
 
 ---
