@@ -103,3 +103,47 @@ connect: uid=0(root) gid=0(root) groups=0(root)
 shell: [jsp] http://127.0.0.1:18080/mx_c38187a.jsp — 写入 /usr/src/src/main/webapp/mx_c38187a.jsp
 connect: uid=0(root) gid=0(root) groups=0(root)
 ```
+
+## 8. 对抗式加固（自动化获取 Shell 的各种条件）
+
+`ShellDeployer` 针对真实目标的差异做了以下处理：
+
+| 条件 | 处理 |
+| --- | --- |
+| 目录不可写 | 先 `test -w` 探测，跳过不可写目录 |
+| 同名文件已存在 | 随机文件名 + `test -e` 检查，默认不覆盖 |
+| 无 `base64`（镜像精简/被 WAF 拦） | 回退到纯 shell 八进制 `printf` 写入（不依赖外部工具） |
+| 无 `xxd`/`php`/`python3` | 按 base64 → 八进制 → xxd → php → python → powershell 顺序尝试 |
+| 注入通道有长度限制 | base64 载荷按 1200 字符分块追加 |
+| 中间件不是 Tomcat | `find` 探测 `webapp/webapps/ROOT/htdocs/www/...`，实测命中 Jetty 的 `src/main/webapp` |
+| URL 前缀不确定 | 每个目录同时尝试 `/` 与 `/<目录名>/` |
+| 写入被 WAF 拦截 | **写后校验** `test -s`，避免"echo 成功但文件没写"的假阳性 |
+| 最终验证失败 | 删除已写文件（`cleanupOnFailure`），不留垃圾 |
+| 目标被打挂 | 全局请求预算（默认 24 次） |
+
+同时给连接器加了回退：`ShellExecConnector.executeCommand` 发现被 WAF 拦（403/拦截页）时，
+改用直接命令执行，而不是整条命令不可用。
+
+### 对抗实测
+
+**场景：WAF 拦截 `base64` 关键词**（PHP 8.1.0-dev 靶场 + WAF 代理）
+
+修复前：
+```
+shell: (null)
+BLOCK GET /index.php rule=base64
+```
+修复后：
+```
+check: [+] PHP 8.1.0-dev 后门
+exec : uid=0(root) ...
+shell: [php] http://127.0.0.1:18180/mx_68003e94.php — 写入 /var/www/html/mx_68003e94.php
+connect: uid=0(root) gid=0(root) groups=0(root)
+```
+
+**回归场景**：Jetty（S2-045）与 PHP 正常链路保持可用。
+
+## 9. 一键自动化
+
+统一控制台新增 **「一键取 Shell」**：检测 → 若命中（或探测受阻）→ 自动获取 WebShell →
+自动入库并跳转工作区，全程无需二次点击。

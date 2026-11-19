@@ -139,7 +139,27 @@ abstract class ShellExecConnector extends ShellConnector {
     // stdin 喂脚本仍会解析 ()；常见 rm 单路径先 sq；其余仍用 base64 避免其它元字符经 HTTP 出问题
     final script = quoteRmOperandIfNeeded(cmd);
     final b64 = base64.encode(utf8.encode(script));
-    return sendRawCommand('${cd}echo ${sq(b64)} | base64 -d | bash 2>&1');
+    final wrapped = await sendRawCommand(
+      '${cd}echo ${sq(b64)} | base64 -d | bash 2>&1',
+    );
+    // 关键词型 WAF 会直接拦掉含 base64 的请求（403/拦截页），
+    // 此时回退为直接执行——代价是元字符可能受影响，但比整条命令不可用强。
+    if (_looksBlocked(wrapped)) {
+      final plain = await sendRawCommand('$cd$script 2>&1');
+      if (plain.trim().isNotEmpty) return plain;
+    }
+    return wrapped;
+  }
+
+  static bool _looksBlocked(String out) {
+    final t = out.trim();
+    if (t.isEmpty) return true;
+    if (t.startsWith('[HTTP 4')) return true;
+    final lower = t.toLowerCase();
+    return lower.contains('blocked by') ||
+        lower.contains('waf') ||
+        lower.contains('forbidden') ||
+        lower.contains('access denied');
   }
 
   @override
