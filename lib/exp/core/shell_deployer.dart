@@ -106,6 +106,9 @@ class ShellDeployer {
           url: session.url,
           password: 'c',
           kind: kind.name,
+          connectorType: _connectorFor(kind),
+          type: _typeFor(kind),
+          method: 'GET',
           note: '写入 $path',
         );
       }
@@ -128,12 +131,29 @@ class ShellDeployer {
           url: session.url,
           password: 'c',
           kind: kind.name,
+          connectorType: _connectorFor(kind),
+          type: _typeFor(kind),
+          method: 'GET',
           note: '写入 $path',
         );
       }
     }
     return null;
   }
+
+  static String _connectorFor(ShellKind kind) => switch (kind) {
+    ShellKind.php => 'php_passthru',
+    ShellKind.jsp => 'jsp_runtime',
+    ShellKind.aspx => 'aspx_cmd',
+    ShellKind.asp => 'asp_wscript',
+  };
+
+  static String _typeFor(ShellKind kind) => switch (kind) {
+    ShellKind.php => 'php',
+    ShellKind.jsp => 'jsp',
+    ShellKind.aspx => 'asp',
+    ShellKind.asp => 'asp',
+  };
 
   static String _origin(String targetUrl) {
     final u = Uri.tryParse(targetUrl);

@@ -333,6 +333,9 @@ ExploitModule _tomcatModule() => SimpleExploitModule(
       url: url,
       password: 'cmd',
       kind: 'jsp',
+      connectorType: 'jsp_runtime',
+      type: 'jsp',
+      method: 'GET',
       note: 'Tomcat PUT 原生 shell',
     );
   },
@@ -442,6 +445,9 @@ List<ExploitModule> _thinkphpModules() {
         url: url,
         password: 'c',
         kind: 'php',
+        connectorType: 'php_passthru',
+        type: 'php',
+        method: 'GET',
         note: 'ThinkPHP 原生写马',
       );
     },
@@ -528,6 +534,9 @@ ExploitModule _shiroModule() => SimpleExploitModule(
       url: base.replace(path: path, query: null).toString(),
       password: password,
       kind: 'memshell',
+      connectorType: 'jsp_behinder',
+      type: 'jsp',
+      method: 'POST',
       note: 'Shiro 内存马（Behinder filter），key=$key',
     );
   },
@@ -566,7 +575,14 @@ ExploitModule _zentaoModule() => SimpleExploitModule(
       url: base,
     ).getShell(shellContent: _phpShell);
     if (url == null) return null;
-    return ShellSession(url: url, password: 'c', kind: 'php');
+    return ShellSession(
+      url: url,
+      password: 'c',
+      kind: 'php',
+      connectorType: 'php_passthru',
+      type: 'php',
+      method: 'GET',
+    );
   },
 );
 

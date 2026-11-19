@@ -11,6 +11,8 @@ import 'dart:io';
 
 import '../../lib/exp/core/exploit_module.dart';
 import '../../lib/exp/core/module_registry.dart';
+import '../../lib/models/webshell.dart';
+import '../../lib/services/webshell_service.dart';
 
 Future<void> main(List<String> args) async {
   if (args.isEmpty || args.first == '--list') {
@@ -47,5 +49,22 @@ Future<void> main(List<String> args) async {
   if (wantShell && module.supports(ExploitCapability.getShell)) {
     final shell = await module.getShell(target);
     print('shell: ${shell == null ? "(null)" : shell.summary}');
+    if (shell != null) {
+      // 验证"自动跳转后能连上"：用 shell 自带的连接器执行一条命令
+      final ws = Webshell(
+        id: 0,
+        projectId: 0,
+        name: 'smoke',
+        url: shell.url,
+        password: shell.password,
+        type: shell.type,
+        method: shell.method,
+        connectorType: shell.connectorType,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      final out = await WebshellService(ws).executeCommand('id');
+      print('connect: ${out.trim()}');
+    }
   }
 }
