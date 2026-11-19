@@ -62,13 +62,36 @@ PASS: vulnerable h2c accepted over-credit; patched control rejected it
 2. 结果：nginx 日志出现 `worker_connections are not enough, reusing connections`（drain 已触发），
    但 1.31.8 与 1.31.9 均未出现 `signal 11` / `segfault`，行为差分未显现。
 
-### 3.3 结论
+### 3.3 状态级复现（x86 原生环境，已确认）
+
+在 ja30（x86_64, Ubuntu 20.04）上从源码编译插桩版 1.31.8 / 1.31.9，
+在 `ngx_http_v2_create_stream()` 的修复语句前后打印 `idle/reusable/processing`：
+
+```
+# 1.31.8
+MXDBG reusable_set incomplete=1
+MXDBG create_stream idle=1 reusable=1 processing=1   <-- 连接仍被标记 reusable
+MXDBG drain pick idle=1 reusable=1                    <-- drain 选中该连接
+
+# 1.31.9（修复语句之后）
+MXDBG create_stream idle=1 reusable=1 processing=1
+MXDBG after_fix idle=1 reusable=0 processing=1        <-- 修复生效
+```
+
+关键点：必须把 HEADERS **拆在帧头内部**（只发 1 字节帧头），
+nginx 才会先 `ngx_reusable_connection(c,1)`、再在 read_handler 中创建 stream；
+拆在 payload 里则 stream 先创建，不会进入 bug 状态。
+
+### 3.4 结论
 
 - 受影响/修复版本与补丁代码已确认（1.31.8 无修复、1.31.9 有修复）。
 - **未能在本环境复现 worker 崩溃**：该漏洞需要精确的“连接池耗尽 + reusable 状态 + GOAWAY 分配失败 +
   upstream 请求在途”竞态；公开资料没有可直接运行的可靠 PoC（Censys 也只给出结论，未发布 123633 适配器；
   ThreatCluster 报道称当时无公开 PoC）。
-- 因此本次只能确认“版本受影响 + 补丁存在”，不能声称已复现 UAF/DoS。
+- 因此本次确认到“版本受影响 + 补丁存在 + 根因状态（reusable-with-streams）可复现”，
+  但不能声称已复现 worker 崩溃 / UAF。
+- 崩溃还差最后一步：让 `h2c->frames` 达到 10000，使 drain 时的 GOAWAY 帧分配失败
+  （Rapid7 用 60–119 GiB 流量完成），本环境未走通。
 
 ## 4. 复现命令汇总
 
