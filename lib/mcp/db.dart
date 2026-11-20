@@ -154,6 +154,51 @@ class McpDatabase {
     );
   }
 
+  // ── Payload 读取 ──────────────────────────────────────────────────────────
+
+  /// 列出 Payload 库条目的元数据，不读取文件正文。
+  Future<List<Map<String, dynamic>>> listPayloadRows() async {
+    final db = await database;
+    return db.query(
+      'payloads',
+      columns: [
+        'id',
+        'name',
+        'type',
+        'file_path',
+        'is_default',
+        'description',
+        'tags',
+        'created_at',
+        'updated_at',
+      ],
+      orderBy: 'name COLLATE NOCASE ASC, id ASC',
+    );
+  }
+
+  /// 按 ID 读取一条 Payload 元数据。
+  Future<Map<String, dynamic>?> getPayloadRow(int id) async {
+    final db = await database;
+    final rows = await db.query(
+      'payloads',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// 按名称读取 Payload 元数据；同名的默认条目与导入条目可能同时存在。
+  Future<List<Map<String, dynamic>>> findPayloadRowsByName(String name) async {
+    final db = await database;
+    return db.query(
+      'payloads',
+      where: 'name = ?',
+      whereArgs: [name],
+      orderBy: 'id ASC',
+    );
+  }
+
   Future<void> close() async {
     await _db?.close();
     _db = null;

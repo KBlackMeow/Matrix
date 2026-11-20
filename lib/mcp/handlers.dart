@@ -11,6 +11,7 @@ import '../services/webshell_connectivity_service.dart';
 import 'db.dart';
 import 'local_workspace.dart';
 import 'log_redaction.dart';
+import 'payload_files.dart';
 import 'remote_write_lock.dart';
 import 'session_pool.dart';
 
@@ -44,6 +45,8 @@ void registerAllTools(
   _registerLocalDownloadsList(server, workspace, log);
   _registerFileUpload(server, pool, workspace, writeLocks, log);
   _registerFileDownload(server, pool, workspace, log);
+  _registerPayloadList(server, db, log);
+  _registerPayloadDownload(server, db, workspace, log);
   _registerFileDelete(server, pool, writeLocks, log);
   _registerSystemInfo(server, pool, log);
   _registerHomeDir(server, pool, log);
@@ -670,6 +673,165 @@ void _registerFileDownload(
           'remote_path': remotePath,
           'local_path': await workspace.relativeToRoot(localPath),
           'size': bytes.length,
+          'message': '已保存到本地下载目录',
+        });
+      } catch (e) {
+        return _error('$e');
+      }
+    }, log),
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Payload 库
+// ═══════════════════════════════════════════════════════════════════════════════
+
+void _registerPayloadList(
+  McpServer server,
+  McpDatabase db,
+  McpActivityLogger? log,
+) {
+  server.registerTool(
+    'payload_list',
+    description:
+        '列出 Matrix Payload 库中的条目（内置与导入的 WebShell、隧道和辅助 payload）。'
+        '只返回元数据，不读取文件正文；配合 payload_download 导出文件。',
+    inputSchema: JsonSchema.object(properties: {}, required: []),
+    callback: _wrap('payload_list', (args, extra) async {
+      try {
+        final rows = await db.listPayloadRows();
+        final payloads = await Future.wait(
+          rows.map((row) async {
+            final filePath = (row['file_path'] as String?) ?? '';
+            var fileExists = false;
+            int? size;
+            if (filePath.isNotEmpty) {
+              try {
+                final stat = await File(filePath).stat();
+                if (stat.type == FileSystemEntityType.file) {
+                  fileExists = true;
+                  size = stat.size;
+                }
+              } catch (_) {
+                // 文件损坏/无权限时仍返回条目，由 file_exists 标记不可下载。
+              }
+            }
+            return {
+              'id': row['id'],
+              'name': row['name'],
+              'type': (row['type'] as String?) ?? 'other',
+              'is_default': ((row['is_default'] as int?) ?? 0) == 1,
+              'size': size,
+              'description': row['description'],
+              'tags': row['tags'],
+              'file_exists': fileExists,
+            };
+          }),
+        );
+        return _json({'count': payloads.length, 'payloads': payloads});
+      } catch (e) {
+        return _error('$e');
+      }
+    }, log),
+  );
+}
+
+void _registerPayloadDownload(
+  McpServer server,
+  McpDatabase db,
+  LocalWorkspace workspace,
+  McpActivityLogger? log,
+) {
+  server.registerTool(
+    'payload_download',
+    description:
+        '把 Matrix Payload 库中的条目下载到本地工作区 downloads 目录'
+        '（目录绝对路径：${workspace.downloadsPath}）。'
+        'payload_id 与 name 二选一，重名时必须使用 payload_id。'
+        '二进制 payload 会自动从 Base64 还原；目标文件默认不覆盖。',
+    inputSchema: JsonSchema.object(
+      properties: {
+        'payload_id': JsonSchema.integer(
+          description: 'Payload ID（与 name 二选一，优先使用）',
+        ),
+        'name': JsonSchema.string(
+          description: 'Payload 名称（与 payload_id 二选一；同名多条时请改用 payload_id）',
+        ),
+        'download_path': JsonSchema.string(
+          description: '可选：相对于 downloads/ 的保存路径；默认使用 payload 名称',
+        ),
+        'overwrite': JsonSchema.boolean(
+          description: '目标文件已存在时是否覆盖，默认 false',
+          defaultValue: false,
+        ),
+      },
+      required: [],
+    ),
+    callback: _wrap('payload_download', (args, extra) async {
+      try {
+        final requestedId = args['payload_id'] as int?;
+        final requestedName = (args['name'] as String?)?.trim() ?? '';
+        if (requestedId == null && requestedName.isEmpty) {
+          return _error('必须提供 payload_id 或 name');
+        }
+
+        Map<String, dynamic> row;
+        if (requestedId != null) {
+          final found = await db.getPayloadRow(requestedId);
+          if (found == null) return _error('Payload #$requestedId 不存在');
+          row = found;
+        } else {
+          final matches = await db.findPayloadRowsByName(requestedName);
+          if (matches.isEmpty) {
+            return _error('Payload "$requestedName" 不存在');
+          }
+          if (matches.length > 1) {
+            final candidates = matches
+                .map(
+                  (match) => {
+                    'id': match['id'],
+                    'name': match['name'],
+                    'is_default': ((match['is_default'] as int?) ?? 0) == 1,
+                  },
+                )
+                .toList();
+            return _error(
+              'Payload "$requestedName" 有 ${matches.length} 条同名记录，'
+              '请改用 payload_id：${jsonEncode(candidates)}',
+            );
+          }
+          row = matches.first;
+        }
+
+        final id = row['id'] as int;
+        final payloadName = (row['name'] as String?) ?? '';
+        final payloadType = (row['type'] as String?) ?? 'other';
+        final filePath = (row['file_path'] as String?) ?? '';
+
+        final requestedPath = (args['download_path'] as String?)?.trim() ?? '';
+        final relativePath = requestedPath.isEmpty
+            ? defaultPayloadDownloadName(id: id, name: payloadName)
+            : requestedPath;
+        final localPath = await workspace.resolveDownloadDestination(
+          relativePath,
+        );
+
+        final overwrite = (args['overwrite'] as bool?) ?? false;
+        final existed = await File(localPath).exists();
+        if (existed && !overwrite) {
+          return _error('本地文件已存在：$localPath；如需覆盖请传 overwrite: true');
+        }
+
+        final bytes = await readPayloadFileBytes(filePath);
+        await File(localPath).writeAsBytes(bytes, flush: true);
+
+        return _json({
+          'payload_id': id,
+          'name': payloadName,
+          'type': payloadType,
+          'local_path': await workspace.relativeToRoot(localPath),
+          'size': bytes.length,
+          'overwritten': existed,
           'message': '已保存到本地下载目录',
         });
       } catch (e) {

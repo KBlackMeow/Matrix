@@ -75,6 +75,23 @@ void main() {
     );
   });
 
+  test('rejects a symlink download destination', () async {
+    final outside = await Directory.systemTemp.createTemp(
+      'matrix_download_target_',
+    );
+    addTearDown(() => outside.delete(recursive: true));
+    final target = File(p.join(outside.path, 'outside.txt'));
+    await target.writeAsString('outside');
+
+    final link = Link(p.join(workspace.downloadsPath, 'link.txt'));
+    await link.create(target.path);
+
+    await expectLater(
+      () => workspace.resolveDownloadDestination('link.txt'),
+      throwsA(isA<LocalWorkspacePathException>()),
+    );
+  });
+
   test('lists upload files by paths relative to uploads directory', () async {
     await Directory(p.join(workspace.uploadsPath, 'tools')).create();
     await File(

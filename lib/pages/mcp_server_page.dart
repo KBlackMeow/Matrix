@@ -118,7 +118,7 @@ class _McpServerPageState extends State<McpServerPage> {
           _connectionPools[connectionId] = pool;
 
           final s = McpServer(
-            Implementation(name: 'matrix-mcp', version: '1.2.0'),
+            Implementation(name: 'matrix-mcp', version: '1.3.0'),
             options: McpServerOptions(
               capabilities: ServerCapabilities(
                 tools: ServerCapabilitiesTools(),

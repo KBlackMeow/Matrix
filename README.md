@@ -142,6 +142,7 @@ The MCP server uses Streamable HTTP and provides tools for:
 - Listing, adding, selecting, and removing WebShell configurations
 - Executing commands on a selected WebShell
 - Listing, reading, writing, uploading, downloading, and deleting files
+- Listing payload-library entries and exporting a payload to a local file
 - Reading system information, the home directory, and environment variables
 - Listing and terminating processes
 

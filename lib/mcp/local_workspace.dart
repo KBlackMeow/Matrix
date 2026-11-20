@@ -77,7 +77,14 @@ class LocalWorkspace {
       await _resolvedDirectoryInsideRoot(downloadsPath),
       resolvedParent,
     );
-    return p.join(resolvedParent, p.basename(candidate));
+    final destination = p.join(resolvedParent, p.basename(candidate));
+    // A symlink at the final component would let the write escape the
+    // workspace even though the parent directory is verified.
+    if (await FileSystemEntity.type(destination, followLinks: false) ==
+        FileSystemEntityType.link) {
+      throw LocalWorkspacePathException('下载目标不能是符号链接: $destination');
+    }
+    return destination;
   }
 
   Future<List<LocalWorkspaceEntry>> _list(String base) async {
