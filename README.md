@@ -1,6 +1,6 @@
 # Matrix
 
-Matrix is a cross-platform desktop application for managing WebShells and carrying out authorized security assessments. It brings target organization, interactive access, payload management, exploit checks, tunneling, reverse shells, and AI-assisted operations into one workspace.
+Matrix is a cross-platform desktop application for managing WebShells and carrying out authorized security assessments. It brings target organization, interactive access, payload management, tunneling, reverse shells, and AI-assisted operations into one workspace.
 
 > [!WARNING]
 > Matrix is intended only for systems you own or are explicitly authorized to test. Unauthorized access is illegal and may cause serious harm.
@@ -11,8 +11,8 @@ Matrix is a cross-platform desktop application for managing WebShells and carryi
 
 - Create, edit, and delete projects for separate assessment scopes.
 - Store a target URL and project description.
-- Keep WebShells, exploit targets, SUO tunnel profiles, and MCP access scoped to the selected project.
-- Open a project's WebShell, exploit, tunnel, or MCP workspace directly from the project list.
+- Keep WebShells, SUO tunnel profiles, and MCP access scoped to the selected project.
+- Open a project's WebShell, tunnel, or MCP workspace directly from the project list.
 
 ### WebShell Management
 
@@ -62,34 +62,13 @@ Some operations depend on the target operating system and connector capabilities
 - Upload a selected payload to a WebShell temporary directory with progress and cancellation support.
 - Keep bundled defaults protected while allowing imported payloads to be deleted.
 
-### Exploit Modules
-
-Matrix groups its supported checks and exploitation workflows by project. Current modules include:
-
-| Target | Covered vulnerabilities or workflows |
-| --- | --- |
-| Apache Shiro | CVE-2016-4437, `rememberMe` detection, key testing, payload injection, and supported memory-shell workflows |
-| ThinkPHP | CVE-2018-20062, CVE-2019-9082, CNVD-2022-86535, command execution, and supported GetShell workflows |
-| ZenTao | CVE-2024-24216 detection and supported repository-configuration WebShell workflow |
-| Apache Struts2 | S2-032, S2-045, S2-053, S2-057, and S2-059 |
-| Spring Framework | CVE-2022-22963, CVE-2022-22965, CVE-2018-1273, and CVE-2017-8046 |
-| Apache HTTP Server | CVE-2021-41773 |
-| Drupal | CVE-2018-7600, also known as Drupalgeddon 2 |
-| PHP | PHP 8.1.0-dev `User-Agentt` backdoor and CVE-2012-1823 PHP-CGI argument injection |
-| Apache Tomcat | CVE-2017-12615 |
-| Oracle WebLogic | CVE-2017-10271 and CVE-2020-14882 |
-| XXL-JOB | Supported XXL-JOB access and command-execution checks |
-| Nacos | CVE-2021-29441 |
-
-Available actions vary by module and can include detection, command execution, payload delivery, and reverse-shell startup. A module being listed does not mean every target version or deployment is exploitable.
-
 ### Reverse-Shell Terminal
 
 - Configure and start or stop a local listener.
 - Track multiple active and disconnected sessions.
 - Open each connected session in a full xterm-based terminal.
 - Use script-backed pseudo-terminal mode on compatible Unix-like targets or a Bash/shell fallback where `script` is unavailable.
-- Reuse the configured listener from WebShell and exploit workflows.
+- Reuse the configured listener from WebShell workflows.
 
 ### Intranet Tunneling
 
@@ -137,7 +116,7 @@ You can also build Matrix from source using the instructions below.
 2. Select the project and open **Webshell**.
 3. Add a WebShell URL, password, script type, connector type, and HTTP method.
 4. Check its connection status, then open it to access the terminal, file manager, system information, and process list.
-5. Use **Payloads**, **Exploits**, **Terminal**, **FRP Client**, or **suo5/suo6** as required by the engagement.
+5. Use **Payloads**, **Terminal**, **FRP Client**, or **suo5/suo6** as required by the engagement.
 
 Matrix keeps actions scoped to the selected project where applicable. Verify the active project and target before running any operation.
 

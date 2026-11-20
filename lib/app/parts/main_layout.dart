@@ -14,7 +14,6 @@ import '../../pages/reverse_shell_dashboard_page.dart';
 import '../../pages/suo_tunnel_proxy_page.dart';
 import '../../pages/webshell_management_page.dart';
 import '../../theme/app_theme.dart';
-import 'exp_content.dart' as exp;
 import 'layout_widgets.dart';
 
 /// 主布局：左侧菜单栏 + 右侧工作区
@@ -41,12 +40,10 @@ class _MainLayoutState extends State<MainLayout> {
   //   • 而 const 单例的子页面树会被 Flutter 视为「未变化」从而跳过重建，导致语言切换后子页面文本不刷新。
   late ProjectManagementPage _projectPage;
   late ProjectScopedPage _webshellPage;
-  late ProjectScopedPage _expPage;
   late ProjectScopedPage _suoTunnelPage;
   late ProjectScopedPage _mcpPage;
   late RepaintBoundary _projectBoundary;
   late RepaintBoundary _webshellBoundary;
-  late RepaintBoundary _expBoundary;
   late RepaintBoundary _suoTunnelBoundary;
   late RepaintBoundary _mcpBoundary;
   late List<Widget> _staticPages;
@@ -62,11 +59,6 @@ class _MainLayoutState extends State<MainLayout> {
       icon: Icons.terminal_outlined,
       label: '',
       selectedIcon: Icons.terminal,
-    ),
-    MenuItem(
-      icon: Icons.bug_report_outlined,
-      label: '',
-      selectedIcon: Icons.bug_report,
     ),
     MenuItem(icon: Icons.code_outlined, label: '', selectedIcon: Icons.code),
     MenuItem(
@@ -112,20 +104,13 @@ class _MainLayoutState extends State<MainLayout> {
 
   void _goTunnelManagerTab() {
     if (!mounted) return;
-    setState(() => _selectedIndex = 6);
+    setState(() => _selectedIndex = 5);
     SuoTunnelProxyPage.notifyRefresh();
   }
 
   void _rebuildDynamicPages() {
     _projectPage = ProjectManagementPage(
       selectedProject: _selectedProject,
-      onEnterExp: (project) {
-        setState(() {
-          _selectedProject = project;
-          _selectedIndex = 2;
-          _rebuildDynamicPages();
-        });
-      },
       onEnterWebshell: (project) {
         setState(() {
           _selectedProject = project;
@@ -136,14 +121,14 @@ class _MainLayoutState extends State<MainLayout> {
       onEnterSuo5: (project) {
         setState(() {
           _selectedProject = project;
-          _selectedIndex = 6;
+          _selectedIndex = 5;
           _rebuildDynamicPages();
         });
       },
       onEnterMcp: (project) {
         setState(() {
           _selectedProject = project;
-          _selectedIndex = 7;
+          _selectedIndex = 6;
           _rebuildDynamicPages();
         });
       },
@@ -194,33 +179,6 @@ class _MainLayoutState extends State<MainLayout> {
     );
     _projectBoundary = RepaintBoundary(child: _projectPage);
     _webshellBoundary = RepaintBoundary(child: _webshellPage);
-    _expPage = ProjectScopedPage(
-      selectedProject: _selectedProject,
-      onSelectProject: (p) {
-        setState(() {
-          _selectedProject = p;
-          _rebuildDynamicPages();
-        });
-      },
-      onClearProject: () {
-        setState(() {
-          _selectedProject = null;
-          _rebuildDynamicPages();
-        });
-      },
-      onNavigateToProjectManagement: () {
-        setState(() {
-          _selectedIndex = 0;
-          _selectedProject = null;
-          _rebuildDynamicPages();
-        });
-      },
-      title: 'Exploits',
-      icon: Icons.bug_report,
-      contentBuilder: (project, onSwitchProject) =>
-          exp.ExpContent(project: project, onSwitchProject: onSwitchProject),
-    );
-    _expBoundary = RepaintBoundary(child: _expPage);
     _suoTunnelPage = ProjectScopedPage(
       selectedProject: _selectedProject,
       onSelectProject: (p) {
@@ -280,7 +238,6 @@ class _MainLayoutState extends State<MainLayout> {
     // 注意：每次都 new 一份非 const 实例，确保语言变化时 Flutter 会下钻 build()
     // （const 单例会被 widget 比对识为未变更，从而跳过子树重建）。
     _staticPages = <Widget>[
-      _expBoundary,
       RepaintBoundary(child: PayloadManagementPage()),
       RepaintBoundary(child: ReverseShellDashboardPage()),
       RepaintBoundary(child: FrpTunnelPage()),
@@ -292,7 +249,7 @@ class _MainLayoutState extends State<MainLayout> {
 
   void _handleMenuTap(int index) {
     setState(() => _selectedIndex = index);
-    if (index == 6) SuoTunnelProxyPage.notifyRefresh();
+    if (index == 5) SuoTunnelProxyPage.notifyRefresh();
   }
 
   String _menuLabelForIndex(int index) {
@@ -302,16 +259,14 @@ class _MainLayoutState extends State<MainLayout> {
       case 1:
         return 'Webshell';
       case 2:
-        return 'Exploits';
-      case 3:
         return 'Payloads';
-      case 4:
+      case 3:
         return 'Reverse Shell';
-      case 5:
+      case 4:
         return 'FRP Client';
-      case 6:
+      case 5:
         return 'Suo5/Suo6';
-      case 7:
+      case 6:
         return 'MCP Server';
       default:
         return '';

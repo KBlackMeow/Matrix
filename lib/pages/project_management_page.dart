@@ -8,7 +8,6 @@ import '../theme/app_theme.dart';
 class ProjectManagementPage extends StatefulWidget {
   final Project? selectedProject;
   final void Function(Project project) onEnterWebshell;
-  final void Function(Project project) onEnterExp;
   final void Function(Project project) onEnterSuo5;
   final void Function(Project project) onEnterMcp;
   final void Function(Project project)? onProjectUpdated;
@@ -18,7 +17,6 @@ class ProjectManagementPage extends StatefulWidget {
     super.key,
     this.selectedProject,
     required this.onEnterWebshell,
-    required this.onEnterExp,
     required this.onEnterSuo5,
     required this.onEnterMcp,
     this.onProjectUpdated,
@@ -414,7 +412,6 @@ class _ProjectManagementPageState extends State<ProjectManagementPage> {
                       onEdit: () => _showEditDialog(project),
                       onDelete: () => _showDeleteConfirm(project),
                       onEnterWebshell: () => widget.onEnterWebshell(project),
-                      onEnterExp: () => widget.onEnterExp(project),
                       onEnterSuo5: () => widget.onEnterSuo5(project),
                       onEnterMcp: () => widget.onEnterMcp(project),
                     );
@@ -431,7 +428,6 @@ class _ProjectCard extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback? onDelete;
   final VoidCallback onEnterWebshell;
-  final VoidCallback onEnterExp;
   final VoidCallback onEnterSuo5;
   final VoidCallback onEnterMcp;
 
@@ -440,7 +436,6 @@ class _ProjectCard extends StatefulWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onEnterWebshell,
-    required this.onEnterExp,
     required this.onEnterSuo5,
     required this.onEnterMcp,
   });
@@ -481,24 +476,6 @@ class _ProjectCardState extends State<_ProjectCard> {
               },
               icon: const Icon(Icons.terminal, size: 20),
               label: Text('Open Webshell'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.bgDark,
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                widget.onEnterExp();
-              },
-              icon: const Icon(Icons.bug_report, size: 20),
-              label: Text('Open Exploits'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.bgDark,
@@ -705,7 +682,6 @@ class _ProjectCardState extends State<_ProjectCard> {
                     color: AppColors.bgCard,
                     onSelected: (value) {
                       if (value == 'webshell') widget.onEnterWebshell();
-                      if (value == 'exp') widget.onEnterExp();
                       if (value == 'tunnel') widget.onEnterSuo5();
                       if (value == 'mcp') widget.onEnterMcp();
                     },
@@ -722,25 +698,6 @@ class _ProjectCardState extends State<_ProjectCard> {
                             const SizedBox(width: 12),
                             Text(
                               'Open Webshell',
-                              style: AppTextStyles.body(
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'exp',
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.bug_report,
-                              color: AppColors.primary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Open Exploits',
                               style: AppTextStyles.body(
                                 color: AppColors.textPrimary,
                               ),

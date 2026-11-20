@@ -103,7 +103,6 @@ flutter:
     - data/
     - data/behinder_csharp/
     - data/godzilla/
-    - data/mem_shell/
     - assets/icon/
     - assets/defaults/payloads/godzilla/
     - assets/defaults/payloads/godzilla_shells/
