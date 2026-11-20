@@ -4,6 +4,8 @@
 /// 二者都拿不到漏洞特征，但结论完全不同——前者是"没测通"。
 library;
 
+import 'exp_result.dart';
+
 /// 是否像被 WAF / 安全设备拦截。
 ///
 /// 判定依据：
@@ -42,4 +44,14 @@ bool looksLikeBlockedBody(String? body) {
     '安全拦截',
   ];
   return markers.any(b.contains);
+}
+
+/// 统一的"被拦就报探测失败"出口。
+///
+/// 各 check 的写法差异很大（package:http / StreamedResponse / 自定义 client），
+/// 但结论只有一句：被拦 ≠ 没漏洞。用这个函数把判定收敛成一行，
+/// 避免每个 check 各写一遍、然后漏掉几个（历史上漏了 11 个）。
+ExpResult? wafBlockedResult(String name, int? status, String? body) {
+  if (!looksLikeWafBlock(status, body)) return null;
+  return ExpResult.probeFailed(name, '疑似被 WAF 拦截 (HTTP $status)');
 }

