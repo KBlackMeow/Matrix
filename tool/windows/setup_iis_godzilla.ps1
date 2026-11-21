@@ -169,8 +169,14 @@ Write-Host "  目录: $SitePath"
 # ── 3. 复制壳 ────────────────────────────────────────────────────────────────
 Write-Host "`n[3/5] 复制 Godzilla 壳"
 $shells = @(
+    'godzilla_aspx_aes_base64.aspx',
+    'godzilla_aspx_aes_raw.aspx',
     'godzilla_csharp_asmx_aes_base64.asmx',
     'godzilla_csharp_eval_aes_base64.aspx',
+    'godzilla_asp_base64.asp',
+    'godzilla_asp_raw.asp',
+    'godzilla_asp_xor_base64.asp',
+    'godzilla_asp_xor_raw.asp',
     'godzilla_asp_eval_base64.asp'
 )
 foreach ($shell in $shells) {

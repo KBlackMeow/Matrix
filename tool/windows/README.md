@@ -1,11 +1,11 @@
 # Local IIS lab for Godzilla shells
 
-This script enables IIS and deploys the three upstream Godzilla shells used by
-Matrix:
+This script enables IIS and deploys the Windows shells used by Matrix:
 
-- `CSHAP_ASMX_AES_BASE64` (`.asmx`)
-- `CSHAP_EVAL_AES_BASE64` (`.aspx`)
-- `ASP_EVAL_BASE64` (`.asp`)
+- Godzilla ASPX: AES Base64 / AES Raw / ASMX / C# Eval
+- Godzilla ASP: Base64 / Raw / XOR Base64 / XOR Raw / Eval
+- Behinder ASPX, ASPX CMD, ASP WScript
+- SUO5 ASPX (deployed separately)
 
 ## Requirements
 
@@ -53,9 +53,19 @@ Useful options:
 
 | URL | connector | cryption |
 | --- | --- | --- |
-| `http://localhost:8080/godzilla_csharp_asmx_aes_base64.asmx` | `aspx_godzilla` | `CSHAP_ASMX_AES_BASE64` |
-| `http://localhost:8080/godzilla_csharp_eval_aes_base64.aspx` | `aspx_godzilla` | `CSHAP_EVAL_AES_BASE64` |
-| `http://localhost:8080/godzilla_asp_eval_base64.asp` | `asp_godzilla` | `ASP_EVAL_BASE64` |
+| `godzilla_aspx_aes_base64.aspx` | `aspx_godzilla` | `CSHAP_AES_BASE64` |
+| `godzilla_aspx_aes_raw.aspx` | `aspx_godzilla` | `CSHAP_AES_RAW` |
+| `godzilla_csharp_asmx_aes_base64.asmx` | `aspx_godzilla` | `CSHAP_ASMX_AES_BASE64` |
+| `godzilla_csharp_eval_aes_base64.aspx` | `aspx_godzilla` | `CSHAP_EVAL_AES_BASE64` |
+| `godzilla_asp_base64.asp` | `asp_godzilla` | `ASP_BASE64` |
+| `godzilla_asp_raw.asp` | `asp_godzilla` | `ASP_RAW` |
+| `godzilla_asp_xor_base64.asp` | `asp_godzilla` | `ASP_XOR_BASE64` |
+| `godzilla_asp_xor_raw.asp` | `asp_godzilla` | `ASP_XOR_RAW` |
+| `godzilla_asp_eval_base64.asp` | `asp_godzilla` | `ASP_EVAL_BASE64` |
+| `aspx_behinder.aspx` | `aspx_behinder` | — |
+| `aspx_cmd_post.aspx` | `aspx_cmd` | — |
+| `asp_wscript_get.asp` | `asp_wscript` | — |
+| `suo5.aspx` | SUO5 代理 | — |
 
 Default password: `mAtrix_911`; secret key: `key`.
 

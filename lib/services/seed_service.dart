@@ -10,7 +10,7 @@ import '../models/payload.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 19;
+  static const _kCurrentVersion = 20;
   static const _binaryContentPrefix = '__MATRIX_BINARY_B64__:';
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
@@ -380,6 +380,30 @@ class SeedService {
       description: 'Godzilla ASPX 马（CSHAP_EVAL_AES_BASE64），JScript eval 一句话壳',
       tags: 'godzilla,aspx,eval,aes,base64,godzilla-standard',
       sinceVersion: 19,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/godzilla/godzilla_aspx_aes_raw.aspx',
+      name: 'godzilla_aspx_aes_raw.aspx',
+      type: 'aspx',
+      description: 'Godzilla ASPX 马（CSHAP_AES_RAW），AES/CBC 裸密文',
+      tags: 'godzilla,aspx,aes,raw,godzilla-standard',
+      sinceVersion: 20,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/godzilla/godzilla_asp_base64.asp',
+      name: 'godzilla_asp_base64.asp',
+      type: 'asp',
+      description: 'Godzilla ASP 马（ASP_BASE64），仅 Base64，无加密',
+      tags: 'godzilla,asp,base64,godzilla-standard',
+      sinceVersion: 20,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/godzilla/godzilla_asp_xor_raw.asp',
+      name: 'godzilla_asp_xor_raw.asp',
+      type: 'asp',
+      description: 'Godzilla ASP 马（ASP_XOR_RAW），XOR 裸密文',
+      tags: 'godzilla,asp,xor,raw,godzilla-standard',
+      sinceVersion: 20,
     ),
     _PayloadDef(
       asset: 'assets/defaults/payloads/godzilla/godzilla_asp_eval_base64.asp',

@@ -16,7 +16,10 @@ Function MxXor(ByVal vData, ByVal vKey, ByVal vBinary)
     stream.Charset = "iso-8859-1"
     stream.Open
     For i = 1 To size
-        stream.WriteText ChrW(AscB(MidB(vData, i, 1)) Xor Asc(Mid(vKey, (i Mod keySize) + 1, 1)))
+        Dim b, k
+        b = AscB(MidB(vData, i, 1)) And &HFF
+        k = Asc(Mid(vKey, (i Mod keySize) + 1, 1))
+        stream.WriteText ChrW((b Xor k) And &HFF)
     Next
     stream.Position = 0
     If vBinary Then
