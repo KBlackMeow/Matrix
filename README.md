@@ -48,7 +48,6 @@ Each saved WebShell opens into an operational workspace with:
 - **Payload upload** — Select an item from the payload library and upload it to the current remote directory.
 - **Payload obfuscation** — Obfuscate supported payloads before upload and recognize or deobfuscate supported content when viewing files.
 - **System information** — Inspect operating-system, runtime, user, hostname, server address, document root, working directory, and related host details returned by the target.
-- **Process management** — List running processes and terminate a selected process when supported.
 - **Reverse shell** — Configure a listener and send a built-in script, Bash, or shell command to open a full interactive terminal.
 - **One-click tunneling** — Upload or inject a compatible SUO5/SUO6 payload and create a tunnel profile from the active WebShell.
 
@@ -117,7 +116,7 @@ You can also build Matrix from source using the instructions below.
 1. Open **Projects** and create a project for the authorized assessment.
 2. Select the project and open **Webshell**.
 3. Add a WebShell URL, password, script type, connector type, and HTTP method.
-4. Check its connection status, then open it to access the terminal, file manager, system information, and process list.
+4. Check its connection status, then open it to access the terminal, file manager, and system information.
 5. Use **Payloads**, **Terminal**, **FRP Client**, or **suo5/suo6** as required by the engagement.
 
 Matrix keeps actions scoped to the selected project where applicable. Verify the active project and target before running any operation.

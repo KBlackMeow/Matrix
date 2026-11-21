@@ -18,7 +18,6 @@ import 'suo_tunnel_proxy_page.dart';
 import 'webshell_interactive_file_manager.dart';
 import 'system_info_tab.dart';
 import 'webshell_interactive_terminal_shared.dart';
-import 'process_list_tab.dart';
 import 'webshell_initial_connection_state.dart';
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
@@ -76,8 +75,8 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
     super.initState();
     _service = WebshellService(widget.webshell);
     _tabController = TabController(
-      // Terminal / File Manager / System Info / Processes
-      length: 4,
+      // Terminal / File Manager / System Info
+      length: 3,
       vsync: this,
     );
     _completer = TabCompleter(_service);
@@ -243,10 +242,6 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
                           FocusScope(
                             skipTraversal: _tabController.index != 2,
                             child: SystemInfoTab(service: _service),
-                          ),
-                          FocusScope(
-                            skipTraversal: _tabController.index != 3,
-                            child: ProcessListTab(service: _service),
                           ),
                         ],
                       );
@@ -818,10 +813,6 @@ class _WebshellInteractivePageState extends State<WebshellInteractivePage>
           Tab(
             icon: const Icon(Icons.dns_outlined, size: 15),
             text: 'System Info',
-          ),
-          Tab(
-            icon: const Icon(Icons.memory, size: 15),
-            text: 'Processes',
           ),
         ],
       ),
