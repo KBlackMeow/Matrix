@@ -378,12 +378,12 @@ abstract class GodzillaConnectorBase extends ShellConnector {
   static const int _kMaxSingleWrite = 2 * 1024 * 1024;
   static const int _kChunkSize = 1024 * 1024;
 
-  /// 经典 ASP 的 request.Form 默认上限是 200000 字节；用 64 KB 分块，
+  /// 经典 ASP 的 request.Form 默认上限是 200000 字节；用 32 KB 分块，
   /// 给 base64/参数编码留出余量。
   int get _effectiveMaxSingleWrite =>
-      variant.connectorType == 'asp_godzilla' ? 64 * 1024 : _kMaxSingleWrite;
+      variant.connectorType == 'asp_godzilla' ? 32 * 1024 : _kMaxSingleWrite;
   int get _effectiveChunkSize =>
-      variant.connectorType == 'asp_godzilla' ? 64 * 1024 : _kChunkSize;
+      variant.connectorType == 'asp_godzilla' ? 32 * 1024 : _kChunkSize;
 
   @override
   Future<bool> writeFileBinaryWithProgress(
