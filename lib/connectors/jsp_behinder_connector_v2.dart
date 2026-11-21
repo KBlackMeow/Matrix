@@ -291,10 +291,17 @@ class JspBehinderConnectorV2 extends ShellConnector {
 
   @override
   Future<String> readFile(String path) async {
-    // Use buildCat for text files — it returns base64-decoded content via JSON
+    // buildCat 的 payload 返回 base64(file)，旧实现直接当文本返回，
+    // 导致文件预览/编辑显示 Base64。
     final r = await _sendPayload(_f.buildCat(path));
     if (r.startsWith('[文件不存在')) return r;
-    return r;
+    try {
+      return decodeWithFallback(
+        base64.decode(r.trim().replaceAll(RegExp(r'\s'), '')),
+      );
+    } catch (_) {
+      return r;
+    }
   }
 
   @override
