@@ -49,9 +49,9 @@ End Function
             response.Write("{findStrLeft}")
             if not IsEmpty(result) then
                 if IsArray(result) then
-                    response.Write Base64Encode(decryption(result,true))
-                else
                     response.Write Base64Encode(result)
+                else
+                    response.Write Base64Encode(decryption(result,true))
                 end if
             end if
             response.Write("{findStrRight}")
