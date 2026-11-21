@@ -68,5 +68,42 @@ void main() {
     final reply = await socket.first.timeout(const Duration(seconds: 5));
     expect(String.fromCharCodes(reply), 'matrix-frp');
     await socket.close();
+
+    await frp.stop();
+    expect(frp.status, FrpTunnelStatus.idle);
+  });
+
+  test('FRP wrong token fails without hanging', () async {
+    final server = _env('MATRIX_FRP_SERVER');
+    final port = int.tryParse(_env('MATRIX_FRP_PORT') ?? '');
+    if (server == null || port == null) {
+      markTestSkipped('set MATRIX_FRP_SERVER/PORT');
+      return;
+    }
+    final frp = FrpClientService();
+    frp.autoReconnect = false;
+    addTearDown(frp.stop);
+    await frp.start(
+      FrpTunnelConfig(
+        serverAddr: server,
+        serverPort: port,
+        token: 'definitely-wrong-token',
+        proxyName: 'mx-bad-${DateTime.now().microsecondsSinceEpoch}',
+        remotePort: 19999,
+        localPort: 19998,
+        version: _env('MATRIX_FRP_VERSION') ?? '0.72.0',
+      ),
+    );
+    final deadline = DateTime.now().add(const Duration(seconds: 8));
+    while (DateTime.now().isBefore(deadline) &&
+        frp.status == FrpTunnelStatus.connecting) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    expect(
+      frp.status,
+      isNot(FrpTunnelStatus.connecting),
+      reason: frp.logs.join('\n'),
+    );
+    expect(frp.logs.join('\n'), contains('登录失败'));
   });
 }

@@ -64,12 +64,20 @@ Deploy `assets/defaults/payloads/suo5/*` and `assets/defaults/payloads/suo6/*`
 to PHP/Tomcat, then run:
 
 ```bash
+# deploy a small static file as the SOCKS target
+printf 'SUO_TARGET_OK' >/tmp/suo_target.txt
+docker cp /tmp/suo_target.txt mx-suo-php:/var/www/html/suo_target.txt
+docker cp /tmp/suo_target.txt mx-suo-tomcat:/usr/local/tomcat/webapps/ROOT/suo_target.txt
+
 MATRIX_SUO5_URL=http://127.0.0.1:18098/suo5.php \
 MATRIX_SUO5_TARGET=127.0.0.1:80 \
+MATRIX_SUO5_PATH=/suo_target.txt \
 MATRIX_SUO5_JSP_URL=http://127.0.0.1:18097/suo5.jsp \
 MATRIX_SUO5_JSP_TARGET=127.0.0.1:8080 \
+MATRIX_SUO5_JSP_PATH=/suo_target.txt \
 MATRIX_SUO6_URL=http://127.0.0.1:18097/suo6.jsp \
 MATRIX_SUO6_TARGET=127.0.0.1:8080 \
+MATRIX_SUO6_PATH=/suo_target.txt \
 flutter test test/services/suo_integration_test.dart
 ```
 
