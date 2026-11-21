@@ -19,6 +19,9 @@ const _targets = <GodzillaCryption, String>{
   GodzillaCryption.csharpAesBase64: 'godzilla_aspx_aes_base64.aspx',
   GodzillaCryption.aspXorBase64: 'godzilla_asp_xor_base64.asp',
   GodzillaCryption.aspRaw: 'godzilla_asp_raw.asp',
+  GodzillaCryption.csharpAsmxAesBase64: 'godzilla_csharp_asmx_aes_base64.asmx',
+  GodzillaCryption.csharpEvalAesBase64: 'godzilla_csharp_eval_aes_base64.aspx',
+  GodzillaCryption.aspEvalBase64: 'godzilla_asp_eval_base64.asp',
 };
 
 Future<void> main() async {

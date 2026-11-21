@@ -19,17 +19,22 @@ const _defaults = <String, String>{
   'assets/defaults/payloads/godzilla/godzilla_asp_xor_base64.asp':
       'ASP_XOR_BASE64',
   'assets/defaults/payloads/godzilla/godzilla_asp_raw.asp': 'ASP_RAW',
+  'assets/defaults/payloads/godzilla/godzilla_csharp_asmx_aes_base64.asmx':
+      'CSHAP_ASMX_AES_BASE64',
+  'assets/defaults/payloads/godzilla/godzilla_csharp_eval_aes_base64.aspx':
+      'CSHAP_EVAL_AES_BASE64',
+  'assets/defaults/payloads/godzilla/godzilla_asp_eval_base64.asp':
+      'ASP_EVAL_BASE64',
 };
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('内置默认 Godzilla 马', () {
-    test('覆盖 4 种架构、8 个常用加密器', () {
-      expect(_defaults, hasLength(8));
-      final extensions =
-          _defaults.keys.map((p) => p.split('.').last).toSet();
-      expect(extensions, {'php', 'jsp', 'aspx', 'asp'});
+    test('覆盖 4 种架构、11 个常用加密器', () {
+      expect(_defaults, hasLength(11));
+      final extensions = _defaults.keys.map((p) => p.split('.').last).toSet();
+      expect(extensions, {'php', 'jsp', 'aspx', 'asmx', 'asp'});
     });
 
     for (final entry in _defaults.entries) {
@@ -42,18 +47,27 @@ void main() {
             : !entry.value.contains('EVAL');
         final expectsPassword = !entry.value.endsWith('_RAW');
         if (expectsKey16) {
-          expect(content, contains('3c6e0b8a9c15224a'),
-              reason: '${entry.value} 应内置 key16');
+          expect(
+            content,
+            contains('3c6e0b8a9c15224a'),
+            reason: '${entry.value} 应内置 key16',
+          );
         }
         if (expectsPassword) {
-          expect(content, contains('mAtrix_911'),
-              reason: '${entry.value} 应内置默认密码');
+          expect(
+            content,
+            contains('mAtrix_911'),
+            reason: '${entry.value} 应内置默认密码',
+          );
         }
         expect(RegExp(r'\{\{[A-Z_]+\}\}').hasMatch(content), isFalse);
         // PHP 壳必须闭合（用户反馈过“看起来没结束”）。
         if (entry.key.endsWith('.php')) {
-          expect(content.trimRight().endsWith('?>'), isTrue,
-              reason: '${entry.key} 应以 ?> 闭合');
+          expect(
+            content.trimRight().endsWith('?>'),
+            isTrue,
+            reason: '${entry.key} 应以 ?> 闭合',
+          );
         }
       });
     }

@@ -95,9 +95,7 @@ void main() {
     test('catalog returns 15 flat entries with usage/scenario metadata', () {
       final catalog = ConnectorFactory.catalog();
       expect(catalog, hasLength(15));
-      final byType = {
-        for (final e in catalog) e['type'] as String: e,
-      };
+      final byType = {for (final e in catalog) e['type'] as String: e};
       expect(byType.keys, equals(ConnectorFactory.allTypes.toSet()));
       for (final type in ConnectorFactory.allTypes) {
         final entry = byType[type];
@@ -134,12 +132,18 @@ void main() {
           'PHP_EVAL_XOR_BASE64',
         ],
         'jsp_godzilla': ['JAVA_AES_BASE64', 'JAVA_AES_RAW'],
-        'aspx_godzilla': ['CSHAP_AES_BASE64', 'CSHAP_AES_RAW'],
+        'aspx_godzilla': [
+          'CSHAP_AES_BASE64',
+          'CSHAP_AES_RAW',
+          'CSHAP_ASMX_AES_BASE64',
+          'CSHAP_EVAL_AES_BASE64',
+        ],
         'asp_godzilla': [
           'ASP_XOR_BASE64',
           'ASP_BASE64',
           'ASP_RAW',
           'ASP_XOR_RAW',
+          'ASP_EVAL_BASE64',
         ],
       };
       expected.forEach((type, ids) {

@@ -365,6 +365,12 @@ class ConnectorFactory {
             : '裸密文 body（无 base64、无标记）';
       case GodzillaWire.evalBase64:
         return '一句话 eval 壳，每次请求动态装载';
+      case GodzillaWire.asmxBase64:
+        return 'SOAP XML 请求，AES/CBC + 标记响应';
+      case GodzillaWire.csharpEval:
+        return 'JScript eval 装载器，AES/CBC + 标记响应';
+      case GodzillaWire.aspEval:
+        return '十六进制 eval 装载器 + Base64，无加密';
     }
   }
 }

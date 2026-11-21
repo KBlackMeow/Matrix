@@ -28,7 +28,8 @@ enum GodzillaCryption {
     id: 'PHP_EVAL_XOR_BASE64',
     language: 'php',
     connectorType: 'php_godzilla',
-    asset: 'assets/defaults/payloads/godzilla_shells/php_eval_xor_base64.php.tpl',
+    asset:
+        'assets/defaults/payloads/godzilla_shells/php_eval_xor_base64.php.tpl',
     suggestedFileName: 'shell.php',
     note: '一句话 eval 壳：每次请求由客户端动态装载，无会话依赖',
   ),
@@ -95,6 +96,31 @@ enum GodzillaCryption {
     asset: 'assets/defaults/payloads/godzilla_shells/asp_xor_raw.asp.tpl',
     suggestedFileName: 'shell.asp',
     note: '裸密文 body（无 base64、无标记）',
+  ),
+  csharpAsmxAesBase64(
+    id: 'CSHAP_ASMX_AES_BASE64',
+    language: 'aspx',
+    connectorType: 'aspx_godzilla',
+    asset: 'assets/defaults/payloads/godzilla_shells/asmx_shell.asmx.tpl',
+    suggestedFileName: 'shell.asmx',
+    note: 'ASMX SOAP 端点，AES/CBC（key=IV），需部署到 IIS WebService',
+  ),
+  csharpEvalAesBase64(
+    id: 'CSHAP_EVAL_AES_BASE64',
+    language: 'aspx',
+    connectorType: 'aspx_godzilla',
+    asset:
+        'assets/defaults/payloads/godzilla_shells/csharp_eval_shell.aspx.tpl',
+    suggestedFileName: 'shell.aspx',
+    note: 'JScript eval 一句话壳，每次请求动态装载 C#',
+  ),
+  aspEvalBase64(
+    id: 'ASP_EVAL_BASE64',
+    language: 'asp',
+    connectorType: 'asp_godzilla',
+    asset: 'assets/defaults/payloads/godzilla_shells/asp_eval_shell.asp.tpl',
+    suggestedFileName: 'shell.asp',
+    note: 'ASP eval 壳，十六进制装载器 + Base64（无加密）',
   );
 
   const GodzillaCryption({
@@ -169,9 +195,7 @@ class GodzillaShellGenerator {
       throw GodzillaShellGeneratorException('连接密码不能为空');
     }
     if (!_passwordPattern.hasMatch(password)) {
-      throw GodzillaShellGeneratorException(
-        '连接密码只能包含字母、数字、下划线、点和短横线（1-64 位）',
-      );
+      throw GodzillaShellGeneratorException('连接密码只能包含字母、数字、下划线、点和短横线（1-64 位）');
     }
   }
 
@@ -184,9 +208,7 @@ class GodzillaShellGenerator {
     final key16 = GodzillaCrypto.deriveKey16(secretKey);
     final template = await loadAssetString(cryption.asset);
     if (template.trim().isEmpty) {
-      throw GodzillaShellGeneratorException(
-        '缺少模板资产 ${cryption.asset}',
-      );
+      throw GodzillaShellGeneratorException('缺少模板资产 ${cryption.asset}');
     }
 
     var content = template;
@@ -222,6 +244,14 @@ class GodzillaShellGenerator {
             .replaceAll('{{KEY16}}', key16)
             .replaceAll('{{MARK_LEFT}}', markers.left)
             .replaceAll('{{MARK_RIGHT}}', markers.right);
+      case GodzillaCryption.csharpAsmxAesBase64:
+        content = content
+            .replaceAll('{pass}', password)
+            .replaceAll('{secretKey}', key16);
+      case GodzillaCryption.csharpEvalAesBase64:
+        content = content.replaceAll('{pass}', password);
+      case GodzillaCryption.aspEvalBase64:
+        content = content.replaceAll('{pass}', password);
     }
 
     // Windows 换行更贴近 Godzilla 原版生成结果，也方便直接保存到目标。

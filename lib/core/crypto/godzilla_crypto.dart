@@ -221,7 +221,10 @@ class GodzillaCrypto {
       }
       if (cipherBytes.isEmpty || cipherBytes.length % 16 != 0) {
         // XOR 变体不要求 16 字节对齐；AES 变体必须。
-        if (variant.cipher != GodzillaCipher.xor) continue;
+        if (variant.cipher != GodzillaCipher.xor &&
+            variant.cipher != GodzillaCipher.none) {
+          continue;
+        }
       }
 
       Uint8List plain;
