@@ -99,7 +99,7 @@ See [MCP Server](#mcp-server) for setup and safety details.
 
 Matrix targets:
 
-- macOS
+- macOS (Apple Silicon / arm64 only)
 - Windows
 - Linux
 

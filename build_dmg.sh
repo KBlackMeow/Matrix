@@ -12,6 +12,14 @@ echo "==> Building $APP_NAME $VERSION"
 cd "$REPO_ROOT"
 flutter build macos --release
 
+APP_BINARY="$BUILD_DIR/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
+ARCHS="$(lipo -archs "$APP_BINARY" 2>/dev/null || true)"
+if [ "$ARCHS" != "arm64" ]; then
+  echo "ERROR: expected arm64-only build, got: ${ARCHS:-unknown}" >&2
+  exit 1
+fi
+echo "==> Architecture: $ARCHS"
+
 echo "==> Preparing dist/"
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"

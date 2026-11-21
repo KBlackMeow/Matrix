@@ -12,3 +12,7 @@ PRODUCT_BUNDLE_IDENTIFIER = com.example.matrix
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.
+
+// Matrix macOS 只发布 Apple Silicon 版本，不生成 universal 包。
+ARCHS = arm64
+EXCLUDED_ARCHS[sdk=macosx*] = x86_64
