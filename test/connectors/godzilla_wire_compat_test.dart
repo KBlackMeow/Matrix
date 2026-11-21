@@ -134,7 +134,7 @@ void main() {
   test('ASP_EVAL_BASE64 sends hex chopper and secretKey data', () async {
     await _expectWire(
       GodzillaVariant.aspEvalBase64,
-      '58e51c0272199f7b0e7bde6e6adab04cadf9dec16f484fc08df59e3f0de7060f',
+      '81b2490e5e038e5687ae9b7d0d9e3a5f7dbb526e32c2ef1bbdb6bcb50f180cd9',
       (fake) {
         expect(fake.bodies.last, startsWith('mAtrix_911=eval'));
         expect(fake.bodies.last, contains('&key='));
