@@ -82,7 +82,17 @@ class AspxBehinderConnector extends ShellConnector {
     return r.trim().split('\n').where((l)=>l.contains('|')).map((l){final p=l.trim().split('|');if(p.length<4)return null;try{return FileEntry(name:decodeWithFallback(base64.decode(p[0])),isDirectory:p[1]=='d',size:int.tryParse(p[2])??0,permissions:'',modified:p[3]);}catch(_){return null;}}).whereType<FileEntry>().toList()..sort((a,b)=>a.name.compareTo(b.name));
   }
 
-  @override Future<String> readFile(String path) async => (await _send('FileOperation', {'mode': 'download', 'path': path})).trim();
+  @override Future<String> readFile(String path) async {
+    final r = (await _send('FileOperation', {'mode': 'download', 'path': path})).trim();
+    if (r.isEmpty || r.startsWith('[')) return r;
+    // FileOperation.dll 的 download 返回 base64(file)；旧实现直接 trim，
+    // 导致文件管理器和预览显示的是 Base64 文本。
+    try {
+      return decodeWithFallback(base64.decode(r.replaceAll(RegExp(r'\s'), '')));
+    } catch (_) {
+      return r;
+    }
+  }
   @override Future<bool> writeFile(String path, String content) async { final r = await _send('FileOperation', {'mode': 'create', 'path': path, 'content': base64.encode(utf8.encode(content))}); return r.isNotEmpty && !r.startsWith('['); }
   @override Future<bool> deleteFile(String path) async { final r = await _send('FileOperation', {'mode': 'delete', 'path': path}); return r.isNotEmpty && !r.startsWith('['); }
   @override Future<Uint8List> readFileBinary(String path) async { final r = await _send('Cmd', {'cmd': 'del "%TEMP%\\mxb64.tmp" >nul 2>nul & certutil -encode "$path" "%TEMP%\\mxb64.tmp" >nul && type "%TEMP%\\mxb64.tmp" && del "%TEMP%\\mxb64.tmp"'}); final lines = r.split('\n'); final b64 = lines.where((l) => l.isNotEmpty && !l.contains('CERTIFICATE') && !l.startsWith('---')).join().trim(); return b64.isEmpty ? Uint8List(0) : Uint8List.fromList(base64.decode(b64)); }
