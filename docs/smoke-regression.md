@@ -27,3 +27,53 @@
 - UI state updates after create/edit/delete.
 - Navigation to target pages succeeds.
 - Detection actions return logs or expected error messages without blocking the UI.
+
+## Tunnel Integration (opt-in, Docker)
+
+These tests are skipped unless the matching environment variables are set.
+
+### FRP
+
+Start a local frps:
+
+```bash
+cat >/tmp/frps.toml <<'TOML'
+bindPort = 17000
+auth.method = "token"
+auth.token = "matrix-test-token"
+TOML
+docker run -d --name mx-frps \
+  -p 17000:17000 -p 16000:16000 \
+  -v /tmp/frps.toml:/etc/frp/frps.toml \
+  snowdreamtech/frps:latest
+```
+
+Run:
+
+```bash
+MATRIX_FRP_SERVER=127.0.0.1 \
+MATRIX_FRP_PORT=17000 \
+MATRIX_FRP_TOKEN=matrix-test-token \
+MATRIX_FRP_REMOTE_PORT=16000 \
+flutter test test/services/frp_integration_test.dart
+```
+
+### SUO5 / SUO6
+
+Deploy `assets/defaults/payloads/suo5/*` and `assets/defaults/payloads/suo6/*`
+to PHP/Tomcat, then run:
+
+```bash
+MATRIX_SUO5_URL=http://127.0.0.1:18098/suo5.php \
+MATRIX_SUO5_TARGET=127.0.0.1:80 \
+MATRIX_SUO5_JSP_URL=http://127.0.0.1:18097/suo5.jsp \
+MATRIX_SUO5_JSP_TARGET=127.0.0.1:8080 \
+MATRIX_SUO6_URL=http://127.0.0.1:18097/suo6.jsp \
+MATRIX_SUO6_TARGET=127.0.0.1:8080 \
+flutter test test/services/suo_integration_test.dart
+```
+
+The target address is resolved by the WebShell payload, not by the test host.
+For Docker Desktop, a container usually cannot reach the host through
+`127.0.0.1`; use an address reachable from the container or target a service
+inside the same container (as above).
