@@ -464,14 +464,13 @@ class SeedService {
 
     final stored = await db.getMetaValue(_kMetaKey);
     final storedVersion = int.tryParse(stored ?? '0') ?? 0;
-    if (storedVersion >= _kCurrentVersion) return;
 
     final existing = await db.getAllPayloads();
     final existingNames = existing.map((e) => e.name).toSet();
 
+    // 每次启动都补齐缺失的内置 payload，不能只看 seed_version：
+    // 旧版本可能在资产缺失时把版本推进到当前值，导致某些条目永久缺失。
     for (final def in _defaultPayloads) {
-      // 只种子化本次升级新增的条目
-      if (def.sinceVersion <= storedVersion) continue;
       if (existingNames.contains(def.name)) continue;
       try {
         final content = await _loadPayloadContent(def);
@@ -495,17 +494,17 @@ class SeedService {
       }
     }
 
-    // 防卡死：即使某次执行出现异常，只要“当前应有条目”已经齐全，也推进版本号。
+    // 只有当前应有条目全部存在时才推进版本号。
     final latest = await db.getAllPayloads();
     final latestNames = latest.map((e) => e.name).toSet();
-    final pending = _defaultPayloads.where((def) {
-      return def.sinceVersion <= _kCurrentVersion &&
-          def.sinceVersion > storedVersion &&
-          !latestNames.contains(def.name);
-    }).toList();
+    final pending = _defaultPayloads
+        .where((def) => !latestNames.contains(def.name))
+        .toList();
 
     if (pending.isEmpty) {
-      await db.setMetaValue(_kMetaKey, '$_kCurrentVersion');
+      if (storedVersion < _kCurrentVersion) {
+        await db.setMetaValue(_kMetaKey, '$_kCurrentVersion');
+      }
     } else {
       final missing = pending.map((e) => e.name).join(', ');
       developer.log(

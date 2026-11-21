@@ -99,6 +99,27 @@ void main() {
       },
     );
 
+    test(
+      'seed repairs missing defaults even when seed_version is current',
+      () async {
+        final db = _MemoryDb();
+        await SeedService.seed(db);
+        final payloads = await db.getAllPayloads();
+        final target = payloads.firstWhere(
+          (p) => p.name == 'aspx_behinder.aspx',
+        );
+        await db.deletePayload(target.id);
+        expect((await db.getAllPayloads()).length, equals(44));
+
+        await SeedService.seed(db);
+
+        final repaired = await db.getAllPayloads();
+        expect(repaired.length, equals(45));
+        expect(repaired.map((p) => p.name), contains('aspx_behinder.aspx'));
+        expect(await db.getMetaValue('seed_version'), equals('20'));
+      },
+    );
+
     test('seed is idempotent and does not create duplicate payloads', () async {
       final db = _MemoryDb();
 
