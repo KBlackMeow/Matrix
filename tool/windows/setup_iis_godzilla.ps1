@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   在本地 Windows 上启用 IIS，并部署 Matrix 的三个 Godzilla 服务端壳。
@@ -148,11 +148,11 @@ Start-Service -Name W3SVC
 Write-Host "`n[2/5] 准备站点目录和应用池"
 New-Item -ItemType Directory -Path $SitePath -Force | Out-Null
 
-if (Get-Website -Name $SiteName -ErrorAction SilentlyContinue) {
+if (Test-Path "IIS:\Sites\$SiteName") {
     Write-Host "  移除旧站点 $SiteName"
     Remove-Website -Name $SiteName
 }
-if (Get-WebAppPoolState -Name $AppPoolName -ErrorAction SilentlyContinue) {
+if (Test-Path "IIS:\AppPools\$AppPoolName") {
     Write-Host "  移除旧应用池 $AppPoolName"
     Remove-WebAppPool -Name $AppPoolName
 }

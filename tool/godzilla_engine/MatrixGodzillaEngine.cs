@@ -34,11 +34,11 @@ public class LY
     private Dictionary<string, byte[]> parameters = new Dictionary<string, byte[]>();
     private byte[] requestData;
 
-    public bool Equals(object obj)
+    public override bool Equals(object obj)
     {
         if (obj == null) return false;
         if (obj is Stream) { this.output = (Stream)obj; return true; }
-        if (obj is byte[]) { this.requestData = (byte[])obj; return true; }
+        if (obj is byte[]) { this.requestData = (byte[])obj; Run(); return true; }
         this.context = obj;
         Run();
         return true;

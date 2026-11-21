@@ -221,7 +221,7 @@ enum GodzillaVariant {
     cipher: GodzillaCipher.aesCbcKeyIv,
     markerStyle: GodzillaMarkerStyle.upper16,
     gzipRequest: false,
-    gunzipResponse: false,
+    gunzipResponse: true,
     wire: GodzillaWire.asmxBase64,
     requestTemplateAsset:
         'assets/defaults/payloads/godzilla_shells/asmx_request.xml.tpl',
@@ -237,7 +237,7 @@ enum GodzillaVariant {
     cipher: GodzillaCipher.aesCbcKeyIv,
     markerStyle: GodzillaMarkerStyle.upper16,
     gzipRequest: false,
-    gunzipResponse: false,
+    gunzipResponse: true,
     wire: GodzillaWire.csharpEval,
     evalLoaderAsset:
         'assets/defaults/payloads/godzilla_shells/csharp_eval_loader.cs.tpl',
