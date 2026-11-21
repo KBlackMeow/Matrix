@@ -211,7 +211,13 @@ class GodzillaCrypto {
       final b64 = text
           .substring(start + marker.left.length, end)
           .replaceAll(RegExp(r'\s'), '');
-      if (b64.isEmpty || b64.length % 4 != 0) continue;
+      if (b64.isEmpty) {
+        // 合法空响应：markers 紧邻，表示服务器返回了零字节。
+        return variant.gunzipResponse
+            ? GodzillaCodec.maybeGunzip(Uint8List(0))
+            : Uint8List(0);
+      }
+      if (b64.length % 4 != 0) continue;
 
       Uint8List cipherBytes;
       try {

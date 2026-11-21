@@ -378,6 +378,13 @@ abstract class GodzillaConnectorBase extends ShellConnector {
   static const int _kMaxSingleWrite = 2 * 1024 * 1024;
   static const int _kChunkSize = 1024 * 1024;
 
+  /// 经典 ASP 的 request.Form 默认上限是 200000 字节；用 64 KB 分块，
+  /// 给 base64/参数编码留出余量。
+  int get _effectiveMaxSingleWrite =>
+      variant.connectorType == 'asp_godzilla' ? 64 * 1024 : _kMaxSingleWrite;
+  int get _effectiveChunkSize =>
+      variant.connectorType == 'asp_godzilla' ? 64 * 1024 : _kChunkSize;
+
   @override
   Future<bool> writeFileBinaryWithProgress(
     String path,
@@ -402,7 +409,7 @@ abstract class GodzillaConnectorBase extends ShellConnector {
       }
       return false;
     }
-    if (total <= _kMaxSingleWrite) {
+    if (total <= _effectiveMaxSingleWrite) {
       final result = await callText('uploadFile', {
         'fileName': utf8.encode(path),
         'fileValue': bytes,
@@ -416,7 +423,7 @@ abstract class GodzillaConnectorBase extends ShellConnector {
 
     var offset = 0;
     while (offset < total) {
-      final end = (offset + _kChunkSize).clamp(0, total);
+      final end = (offset + _effectiveChunkSize).clamp(0, total);
       final chunk = bytes.sublist(offset, end);
       final params = <String, List<int>>{
         'fileName': utf8.encode(path),
