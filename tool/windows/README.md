@@ -5,7 +5,7 @@ This script enables IIS and deploys the Windows shells used by Matrix:
 - Godzilla ASPX: AES Base64 / AES Raw / ASMX / C# Eval
 - Godzilla ASP: Base64 / Raw / XOR Base64 / XOR Raw / Eval
 - Behinder ASPX, ASPX CMD, ASP WScript
-- SUO5 ASPX (deployed separately)
+- SUO5 ASPX (when `payloads/suo5/` is present)
 
 ## Requirements
 

@@ -189,6 +189,25 @@ foreach ($shell in $shells) {
     Write-Host "  [OK] $shell"
 }
 
+# 其它 Windows 壳（Behinder / CMD / WScript / SUO5）
+$payloadsRoot = Split-Path $payloadSource -Parent
+$extraShells = @(
+    'webshell/aspx_behinder.aspx',
+    'webshell/aspx_cmd_post.aspx',
+    'webshell/asp_wscript_get.asp',
+    'suo5/suo5.aspx'
+)
+foreach ($rel in $extraShells) {
+    $sourceFile = Join-Path $payloadsRoot $rel
+    if (-not (Test-Path -LiteralPath $sourceFile)) {
+        Write-Warning "缺少 $rel（$sourceFile）"
+        continue
+    }
+    $name = Split-Path $rel -Leaf
+    Copy-Item -LiteralPath $sourceFile -Destination (Join-Path $SitePath $name) -Force
+    Write-Host "  [OK] $name"
+}
+
 # eval 壳会把代码放在 POST 参数里，需要关闭 ASP.NET 请求验证。
 $webConfig = @'
 <?xml version="1.0" encoding="utf-8"?>
