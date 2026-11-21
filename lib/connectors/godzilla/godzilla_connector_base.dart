@@ -386,6 +386,22 @@ abstract class GodzillaConnectorBase extends ShellConnector {
   ) async {
     final total = bytes.length;
     onProgress(0, total);
+    if (total == 0) {
+      // 空文件走 newFile：部分目标引擎（经典 ASP）无法处理零长度
+      // uploadFile 的 fileValue 参数。ASP 的 newFile 会覆盖已有文件，
+      // 其它引擎先删除再创建。
+      if (variant.connectorType != 'asp_godzilla') {
+        await deleteFile(path);
+      }
+      final result = await callText('newFile', {
+        'fileName': utf8.encode(path),
+      });
+      if (result.trim() == 'ok') {
+        onProgress(0, 0);
+        return true;
+      }
+      return false;
+    }
     if (total <= _kMaxSingleWrite) {
       final result = await callText('uploadFile', {
         'fileName': utf8.encode(path),

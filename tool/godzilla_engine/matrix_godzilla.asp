@@ -192,9 +192,11 @@ Function MxUploadFile(path, value)
     If Len(value) = 0 Then
         stream.Close
         Set stream = Nothing
-        Dim emptyFso
+        Dim emptyFso, emptyTs
         Set emptyFso = Server.CreateObject("Scripting.FileSystemObject")
-        emptyFso.CreateTextFile(path, True).Close
+        Set emptyTs = emptyFso.CreateTextFile(path, True)
+        emptyTs.Close
+        Set emptyTs = Nothing
         Set emptyFso = Nothing
         If Err.Number <> 0 Then
             Err.Clear
