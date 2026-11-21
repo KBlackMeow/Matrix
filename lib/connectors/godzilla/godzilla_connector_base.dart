@@ -35,11 +35,11 @@ abstract class GodzillaConnectorBase extends ShellConnector {
 
   @override
   Set<ConnectorCapability> get capabilities => const {
-        ConnectorCapability.codeExec,
-        ConnectorCapability.shellExec,
-        ConnectorCapability.fileRead,
-        ConnectorCapability.fileWrite,
-      };
+    ConnectorCapability.codeExec,
+    ConnectorCapability.shellExec,
+    ConnectorCapability.fileRead,
+    ConnectorCapability.fileWrite,
+  };
 
   @override
   String? get lastPingDiagnostic => _lastPingDiagnostic;
@@ -61,10 +61,7 @@ abstract class GodzillaConnectorBase extends ShellConnector {
     String method, [
     Map<String, List<int>> params = const {},
   ]) {
-    return _transport.call({
-      'methodName': utf8.encode(method),
-      ...params,
-    });
+    return _transport.call({'methodName': utf8.encode(method), ...params});
   }
 
   Future<String> callText(
@@ -141,8 +138,7 @@ abstract class GodzillaConnectorBase extends ShellConnector {
     return value;
   }
 
-  static String _quote(String value) =>
-      "'${value.replaceAll("'", "'\\''")}'";
+  static String _quote(String value) => "'${value.replaceAll("'", "'\\''")}'";
 
   static String _withWorkingDir(
     String command,
@@ -161,7 +157,10 @@ abstract class GodzillaConnectorBase extends ShellConnector {
     try {
       final windows = await _isWindowsTarget();
       final full = _withWorkingDir(cmd, workingDir, windows: windows);
-      final bytes = await callBytes(execMethod, execParams(full, windows: windows));
+      final bytes = await callBytes(
+        execMethod,
+        execParams(full, windows: windows),
+      );
       return decodeWithFallback(bytes).trim();
     } catch (e) {
       return '[Error] $e';
@@ -205,12 +204,7 @@ abstract class GodzillaConnectorBase extends ShellConnector {
       final docBase = basics['DocBase'];
       final docRoot = basics['DOCUMENT_ROOT'] ?? basics['FileRoot'];
 
-      final candidates = <String>[
-        ?currentDirRaw,
-        ?realFile,
-        ?docBase,
-        ?docRoot,
-      ]
+      final candidates = <String>[?currentDirRaw, ?realFile, ?docBase, ?docRoot]
           .map(_normalizeDir)
           .where((d) => d.isNotEmpty && d != '/' && d != '.' && d != r'\')
           .toSet()
@@ -346,10 +340,9 @@ abstract class GodzillaConnectorBase extends ShellConnector {
 
   @override
   Future<String> readFile(String path) async {
-    final bytes = await callBytes(
-      variant.readFileMethod,
-      {'fileName': utf8.encode(path)},
-    );
+    final bytes = await callBytes(variant.readFileMethod, {
+      'fileName': utf8.encode(path),
+    });
     return decodeWithFallback(bytes);
   }
 
@@ -423,6 +416,99 @@ abstract class GodzillaConnectorBase extends ShellConnector {
   }
 
   @override
+  Future<bool> createDirectory(String path) async {
+    try {
+      final result = await callText('newDir', {'dirName': utf8.encode(path)});
+      return result.trim() == 'ok';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> createFile(String path) async {
+    try {
+      final result = await callText('newFile', {'fileName': utf8.encode(path)});
+      return result.trim() == 'ok';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> copyFile(String from, String to) async {
+    try {
+      final result = await callText('copyFile', {
+        'srcFileName': utf8.encode(from),
+        'destFileName': utf8.encode(to),
+      });
+      return result.trim() == 'ok';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> moveFile(String from, String to) async {
+    try {
+      final result = await callText('moveFile', {
+        'srcFileName': utf8.encode(from),
+        'destFileName': utf8.encode(to),
+      });
+      return result.trim() == 'ok';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> setFileAttributes({
+    required String type,
+    required String path,
+    required String attr,
+  }) async {
+    try {
+      final result = await callText('setFileAttr', {
+        'type': utf8.encode(type),
+        'fileName': utf8.encode(path),
+        'attr': utf8.encode(attr),
+      });
+      return result.trim() == 'ok';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<int?> fileSize(String path) async {
+    try {
+      final text = await callText('bigFileDownload', {
+        'fileName': utf8.encode(path),
+        'mode': utf8.encode('fileSize'),
+      });
+      final value = int.tryParse(text.trim());
+      if (value == null) return null;
+      return value;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<Uint8List> readFileRange(
+    String path, {
+    int position = 0,
+    int length = 1024 * 1024,
+  }) {
+    return callBytes('bigFileDownload', {
+      'fileName': utf8.encode(path),
+      'mode': utf8.encode('read'),
+      'position': utf8.encode('$position'),
+      'readByteNum': utf8.encode('$length'),
+    });
+  }
+
+  @override
   Future<Map<String, String>> getSystemInfo() async {
     final basics = await _loadBasics();
     final info = <String, String>{};
@@ -436,10 +522,11 @@ abstract class GodzillaConnectorBase extends ShellConnector {
     put('OS', basics['OsInfo'] ?? basics['OSVersion'] ?? basics['OS']);
     put('运行用户', basics['CurrentUser'] ?? basics['USER']);
     put('当前目录', basics['CurrentDir']);
-    put('文档根目录',
-        basics['DocBase'] ?? basics['RealFile'] ?? basics['FileRoot']);
-    put('服务器IP',
-        basics['IPList'] ?? basics['SERVER_ADDR'] ?? basics['LOCAL_ADDR']);
+    put('文档根目录', basics['DocBase'] ?? basics['RealFile'] ?? basics['FileRoot']);
+    put(
+      '服务器IP',
+      basics['IPList'] ?? basics['SERVER_ADDR'] ?? basics['LOCAL_ADDR'],
+    );
     put('服务器软件', basics['SERVER_SOFTWARE'] ?? basics['server.info']);
     put('内存限制', basics['memory_limit']);
     put('最大执行时间', basics['max_execution_time']);
@@ -484,7 +571,9 @@ abstract class GodzillaConnectorBase extends ShellConnector {
   @override
   Future<String> getHomeDir() async {
     final windows = await _isWindowsTarget();
-    final result = await executeCommand(windows ? 'echo %USERPROFILE%' : 'echo \$HOME');
+    final result = await executeCommand(
+      windows ? 'echo %USERPROFILE%' : 'echo \$HOME',
+    );
     return result.trim();
   }
 

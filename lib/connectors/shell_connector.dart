@@ -5,9 +5,9 @@ import '../models/file_entry.dart';
 
 /// 连接器能力枚举
 enum ConnectorCapability {
-  codeExec,  // 可执行任意代码（eval 类）
+  codeExec, // 可执行任意代码（eval 类）
   shellExec, // 可执行 shell/系统命令
-  fileRead,  // 可读取远端文件
+  fileRead, // 可读取远端文件
   fileWrite, // 可写入/删除远端文件
   probeOnly, // 只读探测，无执行能力
 }
@@ -25,11 +25,15 @@ abstract class ShellConnector {
 
   Set<ConnectorCapability> get capabilities;
 
-  bool get supportsCodeExec  => capabilities.contains(ConnectorCapability.codeExec);
-  bool get supportsShellExec => capabilities.contains(ConnectorCapability.shellExec);
-  bool get supportsFileRead  => capabilities.contains(ConnectorCapability.fileRead);
-  bool get supportsFileWrite => capabilities.contains(ConnectorCapability.fileWrite);
-  bool get isProbeOnly       => capabilities.contains(ConnectorCapability.probeOnly);
+  bool get supportsCodeExec =>
+      capabilities.contains(ConnectorCapability.codeExec);
+  bool get supportsShellExec =>
+      capabilities.contains(ConnectorCapability.shellExec);
+  bool get supportsFileRead =>
+      capabilities.contains(ConnectorCapability.fileRead);
+  bool get supportsFileWrite =>
+      capabilities.contains(ConnectorCapability.fileWrite);
+  bool get isProbeOnly => capabilities.contains(ConnectorCapability.probeOnly);
 
   Future<bool> ping();
 
@@ -48,6 +52,38 @@ abstract class ShellConnector {
   Future<String> readFile(String path);
   Future<bool> writeFile(String path, String content);
   Future<bool> deleteFile(String path);
+
+  /// 新建目录（目标协议原生支持时；默认不支持）。
+  Future<bool> createDirectory(String path) async =>
+      throw UnsupportedError('当前连接器不支持创建目录');
+
+  /// 新建空文件（目标协议原生支持时；默认不支持）。
+  Future<bool> createFile(String path) async =>
+      throw UnsupportedError('当前连接器不支持创建文件');
+
+  /// 复制文件（目标协议原生支持时；默认不支持）。
+  Future<bool> copyFile(String from, String to) async =>
+      throw UnsupportedError('当前连接器不支持复制文件');
+
+  /// 移动/重命名文件（目标协议原生支持时；默认走 [renameFile]）。
+  Future<bool> moveFile(String from, String to) => renameFile(from, to);
+
+  /// 设置文件属性；[type] 由协议定义（Godzilla: fileBasicAttr / fileTimeAttr）。
+  Future<bool> setFileAttributes({
+    required String type,
+    required String path,
+    required String attr,
+  }) async => throw UnsupportedError('当前连接器不支持设置文件属性');
+
+  /// 读取远端文件的一段原始字节（大文件分块下载）。
+  Future<Uint8List> readFileRange(
+    String path, {
+    int position = 0,
+    int length = 1024 * 1024,
+  }) async => throw UnsupportedError('当前连接器不支持分块读取');
+
+  /// 远端文件大小（字节）；不支持时返回 `null`。
+  Future<int?> fileSize(String path) async => null;
 
   /// 以二进制方式读取远端文件，返回原始字节（用于下载）
   Future<Uint8List> readFileBinary(String path) async =>
@@ -69,6 +105,7 @@ abstract class ShellConnector {
     onProgress(bytes.length, bytes.length);
     return ok;
   }
+
   /// 重命名/移动远端文件（默认用 shell 的 `mv -f` / `move /Y`）。
   ///
   /// 用于"先写临时文件、成功再改名"的原子上传：取消或失败时目标目录里

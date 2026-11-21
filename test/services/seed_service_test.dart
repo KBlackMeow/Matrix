@@ -81,9 +81,11 @@ void main() {
 
         final payloads = await db.getAllPayloads();
         expect(payloads, isNotEmpty);
-        expect(payloads.length, equals(37));
+        expect(payloads.length, equals(39));
         expect(payloads.map((p) => p.name), contains('php_eval_post.php'));
         expect(payloads.map((p) => p.name), contains('jsp_behinder.jsp'));
+        expect(payloads.map((p) => p.name), contains('jsp_behinder.jspx'));
+        expect(payloads.map((p) => p.name), contains('php_behinder_magic.php'));
         expect(payloads.map((p) => p.name), contains('aspx_cmd_post.aspx'));
         expect(payloads.map((p) => p.name), contains('suo5.php'));
         expect(payloads.map((p) => p.name), contains('suo5.jsp'));
@@ -93,7 +95,7 @@ void main() {
           payloads.map((p) => p.name),
           contains('godzilla_jsp_aes_base64.jsp'),
         );
-        expect(await db.getMetaValue('seed_version'), equals('17'));
+        expect(await db.getMetaValue('seed_version'), equals('18'));
       },
     );
 

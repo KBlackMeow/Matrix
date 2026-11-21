@@ -15,10 +15,7 @@ import 'package:matrix/models/webshell.dart';
 /// MATRIX_GODZILLA_KEY=key \
 /// flutter test test/connectors/godzilla_integration_test.dart
 /// ```
-Webshell _shell({
-  required String url,
-  required String connectorType,
-}) {
+Webshell _shell({required String url, required String connectorType}) {
   final now = DateTime.now();
   return Webshell(
     id: 0,
@@ -40,8 +37,11 @@ void _exercise(String connectorType, String url) {
   );
 
   test('$connectorType: ping', () async {
-    expect(await connector.ping(), isTrue,
-        reason: connector.lastPingDiagnostic);
+    expect(
+      await connector.ping(),
+      isTrue,
+      reason: connector.lastPingDiagnostic,
+    );
   });
 
   test('$connectorType: executeCommand', () async {
@@ -50,8 +50,30 @@ void _exercise(String connectorType, String url) {
   });
 
   test('$connectorType: listDirectory', () async {
-    final entries = await connector.listDirectory('/tmp');
-    expect(entries, isNotEmpty);
+    final dir = await connector.getCurrentDir();
+    final entries = await connector.listDirectory(dir);
+    expect(entries, isNotEmpty, reason: 'directory: $dir');
+  });
+
+  test('$connectorType: native file operations', () async {
+    final dir =
+        '/tmp/matrix_gz_ops_${connectorType}_${DateTime.now().millisecondsSinceEpoch}';
+    final a = '$dir/a.txt';
+    final b = '$dir/b.txt';
+    final c = '$dir/c.txt';
+
+    expect(await connector.createDirectory(dir), isTrue);
+    expect(await connector.createFile(a), isTrue);
+    expect(await connector.writeFile(a, 'matrix-ops'), isTrue);
+    expect(await connector.fileSize(a), 10);
+    expect(utf8.decode(await connector.readFileRange(a, length: 6)), 'matrix');
+    expect(await connector.copyFile(a, b), isTrue);
+    expect(await connector.readFile(b), 'matrix-ops');
+    expect(await connector.moveFile(b, c), isTrue);
+    expect(await connector.readFile(c), 'matrix-ops');
+    expect(await connector.deleteFile(a), isTrue);
+    expect(await connector.deleteFile(c), isTrue);
+    expect(await connector.listDirectory(dir), isEmpty);
   });
 
   test('$connectorType: binary write/read round-trip', () async {
@@ -70,6 +92,8 @@ void _exercise(String connectorType, String url) {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  HttpOverrides.global = null;
   final jspUrl = Platform.environment['MATRIX_GODZILLA_JSP_URL'];
   final phpUrl = Platform.environment['MATRIX_GODZILLA_PHP_URL'];
 

@@ -50,10 +50,16 @@ void main() {
         expect(BehinderCrypto.deriveKey('mAtrix_911'), '42b842fc69195c9d');
       });
       test('lowercase hex unchanged', () {
-        expect(BehinderCrypto.deriveKey('e45e329feb5d925b'), 'e45e329feb5d925b');
+        expect(
+          BehinderCrypto.deriveKey('e45e329feb5d925b'),
+          'e45e329feb5d925b',
+        );
       });
       test('uppercase hex normalized', () {
-        expect(BehinderCrypto.deriveKey('E45E329FEB5D925B'), 'e45e329feb5d925b');
+        expect(
+          BehinderCrypto.deriveKey('E45E329FEB5D925B'),
+          'e45e329feb5d925b',
+        );
       });
       test('empty uses default', () {
         expect(BehinderCrypto.deriveKey('').length, 16);
@@ -73,17 +79,78 @@ void main() {
         expect(BehinderCrypto.tryDecryptPhp('not base64!!!', testKey), isNull);
       });
       test('wrong key → null', () {
-        expect(BehinderCrypto.tryDecryptPhp(phpEncrypt('hello'), '0000000000000000'), isNull);
+        expect(
+          BehinderCrypto.tryDecryptPhp(phpEncrypt('hello'), '0000000000000000'),
+          isNull,
+        );
       });
       test('empty → empty', () {
         expect(BehinderCrypto.tryDecryptPhp('', testKey), '');
       });
     });
 
+    group('encryptPhpXorBase64 (request for PHP without OpenSSL)', () {
+      test('matches the raw XOR encoding used by php_behinder.php', () {
+        const plain = 'C|echo MATRIX_PHP_PING;';
+        final encoded = BehinderCrypto.encryptPhpXorBase64(plain, testKey);
+
+        expect(base64Decode(encoded), xorEncrypt(utf8.encode(plain)));
+      });
+
+      test('empty plaintext → empty string', () {
+        expect(BehinderCrypto.encryptPhpXorBase64('', testKey), '');
+      });
+
+      test('rejects a key that is not 16 bytes', () {
+        expect(
+          () => BehinderCrypto.encryptPhpXorBase64('x', 'short'),
+          throwsArgumentError,
+        );
+      });
+    });
+
+    group('aes_with_magic helpers', () {
+      test('magic length is key[0:2] mod 16', () {
+        expect(BehinderCrypto.magicLength(testKey), 2);
+      });
+
+      test('appendMagicTail appends the expected number of bytes', () {
+        final encoded = utf8.encode('QUJD');
+        final out = BehinderCrypto.appendMagicTail(encoded, testKey);
+        expect(out.length, encoded.length + 2);
+        expect(out.sublist(0, encoded.length), encoded);
+      });
+
+      test('tryDecryptPhpWithMagic strips the tail then decrypts', () {
+        const plain = '{"status":"c3VjY2Vzcw==","msg":"dGVzdA=="}';
+        final body = BehinderCrypto.appendMagicTail(
+          utf8.encode(phpEncrypt(plain)),
+          testKey,
+        );
+        expect(BehinderCrypto.tryDecryptPhpWithMagic(body, testKey), plain);
+      });
+
+      test('tryDecryptPhpWithMagic rejects a short body', () {
+        expect(
+          BehinderCrypto.tryDecryptPhpWithMagic(
+            Uint8List.fromList([1, 2]),
+            testKey,
+          ),
+          isNull,
+        );
+      });
+    });
+
     group('tryDecryptPhpXor', () {
       test('roundtrip', () {
         const plain = '{"status":"c3VjY2Vzcw=="}';
-        expect(BehinderCrypto.tryDecryptPhpXor(xorEncrypt(utf8.encode(plain)), testKey), plain);
+        expect(
+          BehinderCrypto.tryDecryptPhpXor(
+            xorEncrypt(utf8.encode(plain)),
+            testKey,
+          ),
+          plain,
+        );
       });
       test('empty → null', () {
         expect(BehinderCrypto.tryDecryptPhpXor(Uint8List(0), testKey), isNull);
@@ -110,17 +177,29 @@ void main() {
     group('tryDecryptJspWithMagic', () {
       test('roundtrip', () {
         const plain = '{"status":"c3VjY2Vzcw==","msg":"dGVzdA=="}';
-        expect(BehinderCrypto.tryDecryptJspWithMagic(jspMagicEncrypt(plain), testKey), plain);
+        expect(
+          BehinderCrypto.tryDecryptJspWithMagic(
+            jspMagicEncrypt(plain),
+            testKey,
+          ),
+          plain,
+        );
       });
       test('empty → null', () {
-        expect(BehinderCrypto.tryDecryptJspWithMagic(Uint8List(0), testKey), isNull);
+        expect(
+          BehinderCrypto.tryDecryptJspWithMagic(Uint8List(0), testKey),
+          isNull,
+        );
       });
     });
 
     group('tryDecryptLegacyMatrix (base64 → AES/ECB plain output)', () {
       test('roundtrip', () {
         const plain = 'MATRIX_JSP_PING';
-        expect(BehinderCrypto.tryDecryptLegacyMatrix(phpEncrypt(plain), testKey), plain);
+        expect(
+          BehinderCrypto.tryDecryptLegacyMatrix(phpEncrypt(plain), testKey),
+          plain,
+        );
       });
       test('plaintext → null', () {
         expect(BehinderCrypto.tryDecryptLegacyMatrix('hello', testKey), isNull);
@@ -130,7 +209,8 @@ void main() {
     group('extractResponse', () {
       test('extracts msg', () {
         const output = 'total 48\ndrwxr-xr-x';
-        final json = '{"status":"c3VjY2Vzcw==","msg":"${base64Encode(utf8.encode(output))}"}';
+        final json =
+            '{"status":"c3VjY2Vzcw==","msg":"${base64Encode(utf8.encode(output))}"}';
         expect(BehinderCrypto.extractResponse(json), output);
       });
       test('returns empty when msg missing (status is not output)', () {
@@ -138,11 +218,15 @@ void main() {
         expect(BehinderCrypto.extractResponse(json), '');
       });
       test('returns empty when msg empty (status=success is not output)', () {
-        final json = '{"status":"${base64Encode(utf8.encode("success"))}","msg":""}';
+        final json =
+            '{"status":"${base64Encode(utf8.encode("success"))}","msg":""}';
         expect(BehinderCrypto.extractResponse(json), '');
       });
       test('plaintext returned as-is', () {
-        expect(BehinderCrypto.extractResponse('MATRIX_JSP_PING'), 'MATRIX_JSP_PING');
+        expect(
+          BehinderCrypto.extractResponse('MATRIX_JSP_PING'),
+          'MATRIX_JSP_PING',
+        );
       });
       test('empty → empty', () {
         expect(BehinderCrypto.extractResponse(''), '');
@@ -152,22 +236,37 @@ void main() {
     group('end-to-end', () {
       test('PHP: phpEncrypt → tryDecryptPhp → extractResponse', () {
         const output = '/var/www/html\nuser=www-data';
-        final json = '{"status":"c3VjY2Vzcw==","msg":"${base64Encode(utf8.encode(output))}"}';
-        final decrypted = BehinderCrypto.tryDecryptPhp(phpEncrypt(json), testKey);
+        final json =
+            '{"status":"c3VjY2Vzcw==","msg":"${base64Encode(utf8.encode(output))}"}';
+        final decrypted = BehinderCrypto.tryDecryptPhp(
+          phpEncrypt(json),
+          testKey,
+        );
         expect(BehinderCrypto.extractResponse(decrypted!), output);
       });
       test('JSP: jspEncrypt → tryDecryptJsp → extractResponse', () {
         const output = '/opt/tomcat\nuser=tomcat';
-        final json = '{"status":"c3VjY2Vzcw==","msg":"${base64Encode(utf8.encode(output))}"}';
-        final decrypted = BehinderCrypto.tryDecryptJsp(jspEncrypt(json), testKey);
+        final json =
+            '{"status":"c3VjY2Vzcw==","msg":"${base64Encode(utf8.encode(output))}"}';
+        final decrypted = BehinderCrypto.tryDecryptJsp(
+          jspEncrypt(json),
+          testKey,
+        );
         expect(BehinderCrypto.extractResponse(decrypted!), output);
       });
-      test('JSP magic: jspMagicEncrypt → tryDecryptJspWithMagic → extractResponse', () {
-        const output = 'magic response';
-        final json = '{"status":"c3VjY2Vzcw==","msg":"${base64Encode(utf8.encode(output))}"}';
-        final decrypted = BehinderCrypto.tryDecryptJspWithMagic(jspMagicEncrypt(json), testKey);
-        expect(BehinderCrypto.extractResponse(decrypted!), output);
-      });
+      test(
+        'JSP magic: jspMagicEncrypt → tryDecryptJspWithMagic → extractResponse',
+        () {
+          const output = 'magic response';
+          final json =
+              '{"status":"c3VjY2Vzcw==","msg":"${base64Encode(utf8.encode(output))}"}';
+          final decrypted = BehinderCrypto.tryDecryptJspWithMagic(
+            jspMagicEncrypt(json),
+            testKey,
+          );
+          expect(BehinderCrypto.extractResponse(decrypted!), output);
+        },
+      );
     });
   });
 }

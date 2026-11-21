@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
@@ -30,6 +31,66 @@ class BehinderCrypto {
   }
 
   // ── 请求加密（客户端 → 服务端，兼容 Matrix 定制 Agent） ──────────────────
+
+  /// 冰蝎 `aes_with_magic` 的尾巴长度：`key[0:2]` 十六进制值 % 16。
+  static int magicLength(String key) {
+    if (key.length < 2) return 0;
+    return int.parse(key.substring(0, 2), radix: 16) % 16;
+  }
+
+  /// 在 Base64 密文后追加随机 magic 尾巴（v4 `aes_with_magic` 请求）。
+  static Uint8List appendMagicTail(
+    List<int> encoded,
+    String key, {
+    Random? random,
+  }) {
+    final magic = magicLength(key);
+    final out = Uint8List(encoded.length + magic);
+    out.setAll(0, encoded);
+    final rng = random ?? Random.secure();
+    for (var i = 0; i < magic; i++) {
+      out[encoded.length + i] = rng.nextInt(256);
+    }
+    return out;
+  }
+
+  /// PHP `aes_with_magic` 响应：剥掉尾巴后按普通 PHP AES 响应解密。
+  static String? tryDecryptPhpWithMagic(Uint8List raw, String key) {
+    final magic = magicLength(key);
+    if (magic <= 0 || raw.length <= magic) return null;
+    try {
+      final body = ascii.decode(
+        raw.sublist(0, raw.length - magic),
+        allowInvalid: true,
+      );
+      return tryDecryptPhp(body, key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// PHP 无 OpenSSL 目标的请求加密：
+  /// `base64(XOR(payload, key[(i + 1) & 15]))`。
+  ///
+  /// 对应 `php_behinder.php` 的 `base64_decode` + 逐字节 XOR 分支；
+  /// 目标没有 `openssl` 扩展时只能走这条路径。
+  static String encryptPhpXorBase64(String plaintext, String key) {
+    if (plaintext.isEmpty) return '';
+    final keyBytes = utf8.encode(key);
+    if (keyBytes.length != 16) {
+      throw ArgumentError.value(
+        key,
+        'key',
+        'Behinder XOR key must be 16 bytes',
+      );
+    }
+    final data = utf8.encode(plaintext);
+    final out = Uint8List(data.length);
+    for (var i = 0; i < data.length; i++) {
+      out[i] = data[i] ^ keyBytes[(i + 1) & 15];
+    }
+    return base64.encode(out);
+  }
 
   /// AES-128-ECB 加密，返回 Base64 字符串。
   /// 用于 JSP/PHP 请求体加密。

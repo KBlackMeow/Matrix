@@ -10,7 +10,7 @@ import '../models/payload.dart';
 /// 版本号递增时自动补充新增的默认条目
 class SeedService {
   static const _kMetaKey = 'seed_version';
-  static const _kCurrentVersion = 17;
+  static const _kCurrentVersion = 18;
   static const _binaryContentPrefix = '__MATRIX_BINARY_B64__:';
 
   // ── Payload 分类 ─────────────────────────────────────────────────────────
@@ -58,6 +58,15 @@ class SeedService {
       tags: 'php,behinder,aes,encrypt,冰蝎',
       sinceVersion: 6,
     ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/webshell/php_behinder_magic.php',
+      name: 'php_behinder_magic.php',
+      type: 'php',
+      description:
+          'PHP 冰蝎 4.x aes_with_magic 兼容壳，Base64 密文尾部追加随机尾巴，默认密码 mAtrix_911',
+      tags: 'php,behinder,aes,magic,冰蝎4',
+      sinceVersion: 18,
+    ),
     // ── JSP ──────────────────────────────────────────────────────────────
     _PayloadDef(
       asset: 'assets/defaults/payloads/webshell/jsp_runtime_get.jsp',
@@ -82,6 +91,14 @@ class SeedService {
           'JSP 冰蝎 3.0（Behinder），AES 加密，payload 只读 body 第一行，agent 读第二行取参',
       tags: 'jsp,behinder,aes,encrypt,冰蝎',
       sinceVersion: 5,
+    ),
+    _PayloadDef(
+      asset: 'assets/defaults/payloads/webshell/jsp_behinder.jspx',
+      name: 'jsp_behinder.jspx',
+      type: 'jsp',
+      description: 'JSPX（XML 语法）冰蝎 3.0 兼容壳，协议与 jsp_behinder.jsp 相同',
+      tags: 'jspx,jsp,behinder,aes,冰蝎',
+      sinceVersion: 18,
     ),
     _PayloadDef(
       asset: 'assets/defaults/payloads/webshell/jsp_behinder_mem_servlet.jsp',
@@ -297,7 +314,8 @@ class SeedService {
       sinceVersion: 17,
     ),
     _PayloadDef(
-      asset: 'assets/defaults/payloads/godzilla/godzilla_php_eval_xor_base64.php',
+      asset:
+          'assets/defaults/payloads/godzilla/godzilla_php_eval_xor_base64.php',
       name: 'godzilla_php_eval_xor_base64.php',
       type: 'php',
       description: 'Godzilla PHP eval 马（PHP_EVAL_XOR_BASE64），一句话 eval 壳',
@@ -344,7 +362,6 @@ class SeedService {
       tags: 'godzilla,asp,raw,godzilla-standard',
       sinceVersion: 17,
     ),
-
   ];
 
   /// 需要更新内容的已有默认 payload（修复 bug 或改进实现）

