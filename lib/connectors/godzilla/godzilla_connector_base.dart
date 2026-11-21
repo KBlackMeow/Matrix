@@ -348,6 +348,28 @@ abstract class GodzillaConnectorBase extends ShellConnector {
 
   @override
   Future<Uint8List> readFileBinary(String path) async {
+    // 经典 ASP 的 Response 缓冲上限约 4 MB；5 MB 文件直接读会溢出。
+    // 对 ASP 先取大小，超过 1 MB 时按 512 KB 分段读取。
+    if (variant.connectorType == 'asp_godzilla') {
+      final size = await fileSize(path);
+      if (size != null && size > 1024 * 1024) {
+        const chunk = 512 * 1024;
+        final out = BytesBuilder(copy: false);
+        for (var offset = 0; offset < size; offset += chunk) {
+          final length = (size - offset).clamp(0, chunk);
+          final part = await callBytes('bigFileDownload', {
+            'fileName': utf8.encode(path),
+            'mode': utf8.encode('read'),
+            'position': utf8.encode('$offset'),
+            'readByteNum': utf8.encode('$length'),
+          });
+          if (part.isEmpty) break;
+          out.add(part);
+        }
+        if (out.isNotEmpty || size == 0) return out.takeBytes();
+      }
+    }
+
     final bytes = await callBytes(
       variant.readFileMethod,
       {'fileName': utf8.encode(path)},

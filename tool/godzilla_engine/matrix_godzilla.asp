@@ -362,11 +362,17 @@ End Function
 Function MxBigDownload(path, mode, position, readByteNum)
     Dim fso, stream
     On Error Resume Next
-    Set fso = Server.CreateObject("Scripting.FileSystemObject")
     If mode = "fileSize" Then
-        MxBigDownload = CStr(fso.GetFile(path).Size)
+        Set stream = Server.CreateObject("ADODB.Stream")
+        stream.Type = 1
+        stream.Open
+        stream.LoadFromFile path
+        MxBigDownload = CStr(stream.Size)
+        stream.Close
+        Set stream = Nothing
         Exit Function
     End If
+    Set fso = Server.CreateObject("Scripting.FileSystemObject")
     If mode <> "read" Then
         MxBigDownload = "no mode"
         Exit Function
