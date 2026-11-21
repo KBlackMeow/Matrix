@@ -75,3 +75,64 @@ page.
 - The script writes a lab `web.config` that disables ASP.NET request
   validation so the eval shells can receive code in POST parameters. Do not
   reuse that setting outside this lab.
+
+## Enable SSH (for scp from macOS)
+
+In an Administrator **Windows PowerShell** inside the VM:
+
+```powershell
+# 1. Install OpenSSH Server (once)
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+
+# 2. Start it and make it persistent
+Set-Service -Name sshd -StartupType Automatic
+Start-Service -Name sshd
+
+# 3. Allow TCP 22 on the VM's firewall
+New-NetFirewallRule `
+  -Name 'OpenSSH-Server-In-TCP' `
+  -DisplayName 'OpenSSH Server (sshd)' `
+  -Enabled True `
+  -Direction Inbound `
+  -Protocol TCP `
+  -Action Allow `
+  -LocalPort 22
+```
+
+Check the VM IP:
+
+```powershell
+ipconfig
+whoami
+```
+
+From the Mac:
+
+```bash
+ssh <windows-user>@<vm-ip>
+```
+
+If the Windows account is a Microsoft account, password SSH may fail; create
+a local account instead:
+
+```powershell
+net user matrixlab 'ChangeMe-Str0ng!' /add
+net localgroup administrators matrixlab /add
+```
+
+Then use `ssh matrixlab@<vm-ip>`.
+
+For key-only login, put the public key in
+`C:\Users\<user>\.ssh\authorized_keys` for a normal user, or in
+`C:\ProgramData\ssh\administrators_authorized_keys` for an administrator.
+The administrators file must be readable only by Administrators and SYSTEM.
+
+Common checks:
+
+```powershell
+Get-Service sshd
+Get-WinEvent -LogName OpenSSH/Operational -MaxEvents 30
+```
+
+Do not expose port 22 to the public internet; use the VM's NAT/shared network
+and a strong password or key.
