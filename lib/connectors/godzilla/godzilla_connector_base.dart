@@ -347,8 +347,22 @@ abstract class GodzillaConnectorBase extends ShellConnector {
   }
 
   @override
-  Future<Uint8List> readFileBinary(String path) {
-    return callBytes(variant.readFileMethod, {'fileName': utf8.encode(path)});
+  Future<Uint8List> readFileBinary(String path) async {
+    final bytes = await callBytes(
+      variant.readFileMethod,
+      {'fileName': utf8.encode(path)},
+    );
+    // 引擎对不存在/无权限返回的是 ASCII 错误文本，不是文件内容；
+    // 直接返回会让下载保存成 "File Not Found"。
+    if (bytes.length <= 64) {
+      final text = latin1.decode(bytes, allowInvalid: true).trim();
+      if (text == 'File Not Found' ||
+          text == 'Path Not Found Or No Permission!' ||
+          text == 'No Permission!') {
+        throw Exception('无法读取文件: $text');
+      }
+    }
+    return bytes;
   }
 
   @override

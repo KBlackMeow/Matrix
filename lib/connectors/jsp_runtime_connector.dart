@@ -83,7 +83,7 @@ class JspRuntimeConnector extends ShellExecConnector {
       if (useBase64 && out.isEmpty && _hasBase64 == null) {
         // 第一次就空：极可能是没有 base64。降级重试一次原文命令。
         _hasBase64 = false;
-        return _requestRuntime(cmd, timeout: t);
+        return await _requestRuntime(cmd, timeout: t);
       }
       _hasBase64 ??= true;
       return out;
@@ -125,6 +125,12 @@ class JspRuntimeConnector extends ShellExecConnector {
     final total = bytes.length;
     onProgress(0, total);
     final b64Path = base64.encode(utf8.encode(path));
+    if (total == 0) {
+      final cmd =
+          '_p=\$(echo ${_sq(b64Path)}|base64 -d) && : > "\$_p" && echo 1 || echo 0';
+      final r = await _requestRuntime(cmd);
+      return r.trim() == '1';
+    }
     var offset = 0;
     var first = true;
     const uploadTimeout = Duration(seconds: 120);

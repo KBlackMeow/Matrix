@@ -367,17 +367,20 @@ class JspBehinderConnector extends ShellConnector {
     // HTTP header value sent to the behinder agent.
     final b64Path = base64.encode(utf8.encode(path));
     final cmd =
-        "_p=\$(echo ${_sq(b64Path)} | base64 -d)"
-        " && cat \"\$_p\" 2>/dev/null | base64 -w0 2>/dev/null"
-        " || cat \"\$_p\" 2>/dev/null | base64";
+        "_p=\$(echo ${_sq(b64Path)} | base64 -d); "
+        "if [ ! -f \"\$_p\" ]; then echo __MX_FILE_MISSING__; "
+        "else cat \"\$_p\" 2>/dev/null | base64 -w0 2>/dev/null "
+        "|| cat \"\$_p\" 2>/dev/null | base64; fi";
     final result = await _sendBehinder(
       'exec',
       extraParams: {'_k': _execKey, _execKey: cmd},
     );
-    final b64 = result.trim().replaceAll(RegExp(r'\s'), '');
-    if (b64.isEmpty || b64.startsWith('[')) {
-      throw Exception('无法读取文件: $b64');
+    if (result.contains('__MX_FILE_MISSING__')) {
+      throw Exception('无法读取文件: 文件不存在');
     }
+    final b64 = result.trim().replaceAll(RegExp(r'\s'), '');
+    if (b64.isEmpty) return Uint8List(0);
+    if (b64.startsWith('[')) throw Exception('无法读取文件: $b64');
     return base64.decode(b64);
   }
 

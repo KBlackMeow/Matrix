@@ -85,6 +85,13 @@ void _exercise(String connectorType, String url) {
     expect(await connector.deleteFile(path), isTrue);
   });
 
+  test('$connectorType: empty file round-trip', () async {
+    final path = '/tmp/matrix_gz_it_${connectorType}_empty.bin';
+    expect(await connector.writeFileBinary(path, Uint8List(0)), isTrue);
+    expect(await connector.readFileBinary(path), isEmpty);
+    expect(await connector.deleteFile(path), isTrue);
+  });
+
   test('$connectorType: getSystemInfo', () async {
     final info = await connector.getSystemInfo();
     expect(info['OS'], isNotNull);

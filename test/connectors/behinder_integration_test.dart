@@ -63,6 +63,13 @@ void _exercise(String label, String connectorType, String type, String url) {
     expect(base64.encode(read), base64.encode(payload));
     expect(await connector.deleteFile(path), isTrue);
   });
+
+  test('$label: empty file round-trip', () async {
+    final path = '/tmp/matrix_behinder_${label}_empty.bin';
+    expect(await connector.writeFileBinary(path, Uint8List(0)), isTrue);
+    expect(await connector.readFileBinary(path), isEmpty);
+    expect(await connector.deleteFile(path), isTrue);
+  });
 }
 
 void main() {
@@ -88,5 +95,18 @@ void main() {
   groupFor('MATRIX_BEHINDER_PHP_URL', 'php', 'php_behinder', 'php');
   groupFor('MATRIX_BEHINDER_PHP_MAGIC_URL', 'php-magic', 'php_behinder', 'php');
   groupFor('MATRIX_BEHINDER_JSP_URL', 'jsp', 'jsp_behinder', 'jsp');
+  groupFor('MATRIX_BEHINDER_JSP_V2_URL', 'jsp-v2', 'jsp_behinder_v2', 'jsp');
   groupFor('MATRIX_BEHINDER_JSPX_URL', 'jspx', 'jsp_behinder', 'jsp');
+  groupFor(
+    'MATRIX_BEHINDER_JSP_CLASSLOADER_URL',
+    'jsp-classloader',
+    'jsp_classloader',
+    'jsp',
+  );
+  groupFor(
+    'MATRIX_BEHINDER_JSP_RUNTIME_URL',
+    'jsp-runtime',
+    'jsp_runtime',
+    'jsp',
+  );
 }

@@ -211,10 +211,16 @@ abstract class ShellExecConnector extends ShellConnector {
   @override
   Future<Uint8List> readFileBinary(String path) async {
     final raw = await sendRawCommand(
-      'cat ${sq(path)} 2>/dev/null | base64 -w0 2>/dev/null || cat ${sq(path)} 2>/dev/null | base64',
+      'if [ ! -f ${sq(path)} ]; then echo __MX_FILE_MISSING__; '
+      'else cat ${sq(path)} 2>/dev/null | base64 -w0 2>/dev/null '
+      '|| cat ${sq(path)} 2>/dev/null | base64; fi',
     );
-    if (raw.isEmpty || raw.startsWith('[')) throw Exception('无法读取文件: $raw');
+    if (raw.contains('__MX_FILE_MISSING__')) {
+      throw Exception('无法读取文件: 文件不存在');
+    }
+    if (raw.startsWith('[')) throw Exception('无法读取文件: $raw');
     final b64 = raw.trim().replaceAll(RegExp(r'\s'), '');
+    if (b64.isEmpty) return Uint8List(0);
     return base64.decode(b64);
   }
 
@@ -238,6 +244,11 @@ abstract class ShellExecConnector extends ShellConnector {
   ) async {
     final total = bytes.length;
     onProgress(0, total);
+
+    if (total == 0) {
+      final r = await sendRawCommand(': > ${sq(path)} && echo 1 || echo 0');
+      return r.trim() == '1';
+    }
 
     // 通过多次 base64 分块写入，避免超长命令，同时便于进度反馈。
     int offset = 0;
