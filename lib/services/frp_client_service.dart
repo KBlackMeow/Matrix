@@ -624,11 +624,8 @@ class FrpClientService {
     _runId = '';
 
     final pk = _privilegeKey(cfg.token, ts, cfg.authMode);
-    final tokenHex = cfg.token.codeUnits
-        .map((c) => c.toRadixString(16).padLeft(2, '0'))
-        .join(' ');
-    _log('[auth] mode=${cfg.authMode.name}  token(${cfg.token.length}B): $tokenHex');
-    _log('[auth] timestamp=$ts  privilege_key=$pk');
+    // 不记录 token / privilege_key：token 十六进制是可逆的，日志会泄漏凭据。
+    _log('[auth] mode=${cfg.authMode.name}  token(${cfg.token.length}B)');
 
     final body = <String, dynamic>{
       'version': cfg.version.isNotEmpty ? cfg.version : '0.67.0',
